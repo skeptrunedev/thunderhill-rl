@@ -1,0 +1,15 @@
+# Historical visual pit divider
+
+The previous wall followed OSM way 896075617 with a constant estimated height. It no longer matched the corrected pavement. The visual divider now follows the adopted provisional road edge, with heights derived from the historical lidar observations. This is a construction interpretation within the road envelope uncertainty, not an independent exact wall survey.
+
+`tools/measure_pit_wall.py` verifies the preserved baseline, local observation archive and original lidar tile hashes. Forty profiles cover baseline stations 43 through 429 metres. The selected top is the 95th percentile of raised returns within four metres along each side of a section, relative to its interior pavement plane. Selected bins require at least eight returns. Observations more than 1.5 metres above the plane are excluded, including the nearby roof. The resulting relative heights range from 0.668 to 0.975 metres. Narrower profiles, source counts and quantile sensitivity remain in `data/reference/pit-wall-profile.json`.
+
+Raw face candidates disagree with the adopted road edge by as much as 0.805 metres inward and 0.505 metres outward. Sparse bands can change the selected face, especially near endpoints. These disagreements are retained. They are not silently removed or presented as exact wall dimensions.
+
+`tools/build_pit_wall.py` maps profile heights through original source station coordinates onto every rendered road edge vertex in that interval. The runtime face therefore coincides with the adopted pavement edge. The wall extrudes away from the road by the existing artistic width of 0.35 metres. It shares section vertices geometrically, has vertical faces and closed ends, and follows the current support surface. Transferring relative heights from the interior plane to that surface remains an approximation. Width, base shape and endpoint treatment remain estimates.
+
+The renderer rejects stale track provenance and invalid or unsupported sections. It replaces the old OSM wall rather than drawing both. Metre UV coordinates supply restrained concrete paint variation on vertical faces. An independent sloping ground fixture verifies outward normals on every face, extrusion direction, closed prism triangle count, changing top elevation and origin rejection.
+
+The first full render exposed an empty legacy concrete surface after replacement. Godot represents its vertex slot as null. The landmark commit helper now handles that expected empty case explicitly. Final rendering and controls checks are recorded separately. The divider is visual geometry only; physical wall collision and crash response remain unfinished.
+
+After the correction, the actual 1920 by 1200 Vulkan Mobile render at station 70 was inspected (`artifacts/pit-wall-fixed-preview.png`). Its completed log contains no script or shader errors. The shared human controls diagnostic completed with zero failures. These checks establish the visual integration and control path, not graphical performance or physical collision behavior. Native verification of this wall revision remains separate from the previously verified pit pavement package.

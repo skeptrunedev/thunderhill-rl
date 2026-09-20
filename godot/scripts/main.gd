@@ -106,6 +106,10 @@ func _ready() -> void:
 	var landmarks = preload("res://scripts/landmarks.gd").new()
 	add_child(landmarks)
 	landmarks.build(track)
+	if not landmarks.initialization_error.is_empty():
+		push_error(landmarks.initialization_error)
+		get_tree().quit(2)
+		return
 	var scenery = preload("res://scripts/scenery.gd").new()
 	add_child(scenery)
 	scenery.build(track)

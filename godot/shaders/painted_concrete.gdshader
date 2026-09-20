@@ -5,6 +5,7 @@ render_mode cull_disabled;
 uniform vec3 paint_tint : source_color = vec3(1.0);
 uniform float wear_amount : hint_range(0.0, 1.0) = 0.2;
 uniform bool curb_stripes = false;
+uniform bool use_mesh_uv = false;
 uniform vec3 stripe_blue : source_color = vec3(0.0902, 0.3765, 0.6353);
 uniform vec3 stripe_white : source_color = vec3(0.898, 0.898, 0.863);
 varying vec3 world_position;
@@ -26,7 +27,7 @@ void vertex() {
 }
 
 void fragment() {
-    vec2 p = world_position.xz;
+    vec2 p = use_mesh_uv ? UV : world_position.xz;
     float stains = surface_noise(p * 3.0);
     float chips = surface_noise(p * 85.0);
     float detail_weight = 1.0 - smoothstep(0.006, 0.025, length(fwidth(p)));
