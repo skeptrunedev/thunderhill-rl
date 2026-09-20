@@ -23,10 +23,7 @@ func _run() -> void:
 	stage.add_child(bike)
 	bike.set_rider_visible(false)
 	bike.update_pose(0, steering, 0)
-	var arms := preload("res://scripts/rider_arm_visual.gd").new()
-	bike.add_child(arms)
-	assert(arms.build(bike._front.position).is_empty())
-	assert(arms.set_steering(steering).is_empty())
+	bike._arms.visible = true
 	var camera := Camera3D.new()
 	stage.add_child(camera)
 	camera.position = bike.ONBOARD_CAMERA_LOCAL

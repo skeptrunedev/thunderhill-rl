@@ -8,8 +8,8 @@ camera continues to exclude all rider geometry.
 palm and cuff shell replaces the initial overlapping ellipsoid study. Four curved
 fingers wrap around the existing 21 mm grip radius, with a separate thumb form,
 knuckle protection and a restrained contrasting cuff panel. Each glove is one
-ArrayMesh. Dimensions and anatomy remain artistic estimates. The material is a
-plain leather appearance approximation; it is not a scanned or finished asset.
+ArrayMesh. Dimensions and anatomy remain artistic estimates. The material uses generic CC0 leather normal and roughness maps; it is not a
+scan of the reference rider equipment or a finished tailored garment.
 The cuff is open to receive a future sleeve.
 
 The asset is connected to the playable rider and included in collision geometry.
@@ -92,5 +92,24 @@ containment, invalid inputs and atomic visual updates. Finite differences also
 stayed within the analytic derivative bounds; those samples are sanity checks,
 not the proof of continuous coverage. Rendered neutral and full lock poses were
 inspected in `artifacts/rider-arms-neutral.png` and `artifacts/rider-arms-lock.png`.
-The sleeves and gloves remain visually provisional, without scanned leather or
-validated anatomy. The test log is `artifacts/rider-pose-check.log`.
+The sleeves and gloves remain visually provisional, without reference equipment
+scans or validated anatomy. The test log is `artifacts/rider-pose-check.log`.
+
+## Leather surface detail
+
+The playable sleeves and gloves now use the CC0 Leather Red 02 normal and
+roughness maps from Poly Haven. Only surface detail is used; original black
+and contrasting vertex colors remain. Object space triplanar mapping keeps
+the grain attached to each articulated part, at the published 0.6 metre tile
+width. Both 1K maps have mipmaps for distant and oblique sampling. Normal
+intensity and roughness are artistic adjustments. Geometry, collision and
+control behavior are unchanged. The standalone arm preview now renders the
+actual integrated arms rather than building a second rig. Native visual
+acceptance and equipment tailoring remain outstanding.
+
+Verification: publisher and repository checksums passed, the native macOS export
+completed, and the rendered camera checks passed with zero failures. Neutral
+and full steering lock previews were visually inspected, along with the game
+cockpit under track lighting. Evidence: `artifacts/leather-arms-neutral.png`,
+`artifacts/leather-arms-lock.png`, `artifacts/leather-game.png`, and
+`artifacts/leather-camera.log`. Native foreground performance remains unverified.

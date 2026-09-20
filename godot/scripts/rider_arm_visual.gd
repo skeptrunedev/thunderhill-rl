@@ -13,13 +13,11 @@ func build(origin: Vector3) -> String:
 		if bounds.has("error"):
 			return bounds.error
 	front_origin = origin
-	var leather := StandardMaterial3D.new()
+	var leather := _leather_material()
 	leather.albedo_color = Color("24282a")
-	leather.roughness = 0.72
-	var glove_material := StandardMaterial3D.new()
+	var glove_material := _leather_material()
 	glove_material.vertex_color_use_as_albedo = true
 	glove_material.vertex_color_is_srgb = true
-	glove_material.roughness = 0.65
 	for side in [-1.0, 1.0]:
 		var row := {}
 		for key in ["upper", "lower", "glove"]:
@@ -40,6 +38,22 @@ func build(origin: Vector3) -> String:
 			row[key] = instance
 		joints[side] = row
 	return set_steering(0.0)
+
+
+static func _leather_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	# Generic CC0 leather grain at the publisher's 0.6 metre tile width.
+	# Object space keeps the grain attached while limbs articulate.
+	material.uv1_triplanar = true
+	material.uv1_scale = Vector3.ONE / 0.6
+	material.uv1_triplanar_sharpness = 4.0
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	material.normal_enabled = true
+	material.normal_texture = preload("res://assets/materials/leather_red_02_nor_gl_1k.jpg")
+	material.normal_scale = 0.45
+	material.roughness_texture = preload("res://assets/materials/leather_red_02_rough_1k.jpg")
+	material.roughness = 0.85
+	return material
 
 
 func set_steering(angle: float) -> String:

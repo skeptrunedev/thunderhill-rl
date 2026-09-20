@@ -127,9 +127,9 @@
       "license": "CC0-1.0",
       "license_url": "https://polyhaven.com/license",
       "publisher_md5": "82909f2db1e0453500703ae54e806f5c",
+      "published_width_m": 1.2,
       "sha256": "dd7fc03e152eb8c2fd511248aa2e9bf7428a645bd0e0b74ac1d887ad136cb0bc",
-      "bytes": 1042065,
-      "published_width_m": 1.2
+      "bytes": 1042065
     },
     {
       "asset": "rough_concrete",
@@ -142,9 +142,9 @@
       "license": "CC0-1.0",
       "license_url": "https://polyhaven.com/license",
       "publisher_md5": "61f785d44cdbf0b9f3bc68e471177358",
+      "published_width_m": 1.2,
       "sha256": "54c85854ad5cafb16840df91a605c857bdf3d07fa79f11921c8327fccf6423ae",
-      "bytes": 1447537,
-      "published_width_m": 1.2
+      "bytes": 1447537
     },
     {
       "asset": "rough_concrete",
@@ -157,10 +157,40 @@
       "license": "CC0-1.0",
       "license_url": "https://polyhaven.com/license",
       "publisher_md5": "4b530c64e200c3190f527ccc04a4c919",
+      "published_width_m": 1.2,
       "sha256": "2d392a3e0d44087ddecc0cd3fd27367a6cc0c16f94bbba2e8fbfbdf77eb105be",
-      "bytes": 566436,
-      "published_width_m": 1.2
+      "bytes": 566436
+    },
+    {
+      "asset": "leather_red_02",
+      "map": "nor_gl",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leather_red_02/leather_red_02_nor_gl_1k.jpg",
+      "filename": "leather_red_02_nor_gl_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/leather_red_02",
+      "source": "https://polyhaven.com/a/leather_red_02",
+      "author": "Rob Tuytel",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "6edef21f3d06f4acff1f567d9908f42d",
+      "published_width_m": 0.6,
+      "sha256": "d0057cdbee5be6223b35f0a463441404144fcdae699f69ff610eec4d86d48970",
+      "bytes": 1033319
+    },
+    {
+      "asset": "leather_red_02",
+      "map": "Rough",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leather_red_02/leather_red_02_rough_1k.jpg",
+      "filename": "leather_red_02_rough_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/leather_red_02",
+      "source": "https://polyhaven.com/a/leather_red_02",
+      "author": "Rob Tuytel",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "7c65693a61e330144bd9b5949e64a4a6",
+      "published_width_m": 0.6,
+      "sha256": "dd3b860a9510a44fd857c04e0c8cc63ea1f944c25abe9bdcbf844cc4a22c88d8",
+      "bytes": 879217
     }
   ],
-  "download_bytes": 17751681
+  "download_bytes": 19664217
 }

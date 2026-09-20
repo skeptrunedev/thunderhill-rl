@@ -41,10 +41,11 @@ def resolve():
                 "source": "https://ambientcg.com/a/Asphalt010", "author": "ambientCG / Lennart Demes",
                 "license": "CC0-1.0", "license_url": "https://docs.ambientcg.com/license/"}]
     for asset, author in [("brown_mud_dry", "Rob Tuytel"), ("withered_grass", "Charlotte Baglioni"),
-                          ("rough_concrete", "Dimitrios Savva")]:
+                          ("rough_concrete", "Dimitrios Savva"), ("leather_red_02", "Rob Tuytel")]:
         url = "https://api.polyhaven.com/files/" + asset
         data = json.loads(fetch(url))
-        for channel in ("Diffuse", "nor_gl", "Rough"):
+        channels = ("nor_gl", "Rough") if asset == "leather_red_02" else ("Diffuse", "nor_gl", "Rough")
+        for channel in channels:
             selected = data[channel]["1k"]["jpg"]
             entries.append({"asset": asset, "map": channel, "url": selected["url"],
                             "filename": selected["url"].rsplit("/", 1)[1], "metadata_url": url,
@@ -53,6 +54,8 @@ def resolve():
                             "publisher_md5": selected["md5"]})
             if asset == "rough_concrete":
                 entries[-1]["published_width_m"] = 1.2
+            elif asset == "leather_red_02":
+                entries[-1]["published_width_m"] = 0.6
     return {"status": "Candidate materials, not a verified Thunderhill surface match", "resolution": "1K", "files": entries}
 
 
