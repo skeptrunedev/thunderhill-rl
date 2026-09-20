@@ -96,5 +96,91 @@ func run():
 		" max terrain error=",
 		max_terrain_error
 	)
+	_test_rendered_curbs(track)
 	track.queue_free()
 	quit(failures)
+
+
+func _test_rendered_curbs(track: Node3D) -> void:
+	var mesh_node := track.get_node_or_null("ProvisionalCurbs") as MeshInstance3D
+	check(mesh_node != null, "Rendered curb mesh is present")
+	if mesh_node == null:
+		return
+	var arrays := mesh_node.mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var indices := PackedInt32Array()
+	if arrays[Mesh.ARRAY_INDEX] != null:
+		indices = arrays[Mesh.ARRAY_INDEX]
+	if indices.is_empty():
+		for index in vertices.size():
+			indices.append(index)
+	check(indices.size() == 594 * 3, "Historical fixture covers all 594 curb triangles")
+	var count := 0
+	var ground_above := 0
+	var curb_flags := 0
+	var max_error := 0.0
+	var max_normal_error := 0.0
+	for index in range(0, indices.size(), 3):
+		var a := mesh_node.transform * vertices[indices[index]]
+		var b := mesh_node.transform * vertices[indices[index + 1]]
+		var c := mesh_node.transform * vertices[indices[index + 2]]
+		# Derive expectations from rendered arrays, never CurbSurface internals.
+		var normal := -(b - a).cross(c - a).normalized()
+		check(normal.y > 0.0, "Rendered curb winding faces upward")
+		for weight in [
+			Vector3.ONE / 3.0, Vector3(.8, .1, .1), Vector3(.1, .8, .1), Vector3(.1, .1, .8)
+		]:
+			var point: Vector3 = a * weight.x + b * weight.y + c * weight.z
+			var ground: Dictionary = track.offroad_surface.sample(point)
+			check(not ground.has("error"), "Underlying curb ground query succeeds")
+			if ground.has("error"):
+				continue
+			var expected_height := float(point.y)
+			var expected_normal := normal
+			var separation := -INF
+			if ground.has("height"):
+				separation = float(ground.height) - expected_height
+				if separation > 0.0:
+					expected_height = float(ground.height)
+					expected_normal = ground.normal
+			var sampled: Dictionary = track.sample_world(point)
+			var label := "triangle %d, weights %s" % [index / 3, weight]
+			var height_error := absf(float(sampled.height) - expected_height)
+			max_error = maxf(max_error, height_error)
+			check(height_error < .0002, "Curb visible upper height differs: " + label)
+			# Float32 world positions can perturb the side of an exact height tie.
+			# Away from ties, both face normal and exposed surface identity must agree.
+			if absf(separation) > .0002:
+				var normal_error: float = sampled.normal.distance_to(expected_normal)
+				max_normal_error = maxf(max_normal_error, normal_error)
+				check(normal_error < .0002, "Curb visible upper normal differs: " + label)
+				check(sampled.on_curb == (separation < 0.0), "Curb exposure flag differs: " + label)
+				if separation < 0.0:
+					curb_flags += 1
+					check(
+						sampled.get("curb_triangle_id", -1) == index / 3,
+						"Exposed curb triangle identity differs: " + label
+					)
+				else:
+					ground_above += 1
+					check(
+						not sampled.has("curb_triangle_id"),
+						"Covered curb leaks triangle identity: " + label
+					)
+			count += 1
+	check(count == 2376, "Every curb triangle supplies four contact samples")
+	check(curb_flags > 0 and ground_above > 0, "Both exposed and ground covered curbs exercised")
+	print(
+		"CURB_TRACK_CONTACT samples=",
+		count,
+		" exposed=",
+		curb_flags,
+		" ground_above=",
+		ground_above,
+		" max_height_error_m=",
+		max_error,
+		" max_normal_error=",
+		max_normal_error,
+		" failures=",
+		failures
+	)

@@ -12,6 +12,7 @@ var grid: Dictionary = {}
 var candidate_cache: Dictionary = {}
 var terrain_material: ShaderMaterial
 var offroad_surface := preload("res://scripts/offroad_surface.gd").new()
+var curb_surface := preload("res://scripts/curb_surface.gd").new()
 const CELL: float = 25.0
 const ROAD_LIFT: float = 0.04
 const SHOULDER_WIDTH: float = 6.0
@@ -154,10 +155,9 @@ func edge_point(i: int, offset: float, lift: float = 0.04) -> Vector3:
 func _build_road() -> void:
 	var road := SurfaceTool.new()
 	var paint := SurfaceTool.new()
-	var curb := SurfaceTool.new()
+	curb_surface.clear()
 	road.begin(Mesh.PRIMITIVE_TRIANGLES)
 	paint.begin(Mesh.PRIMITIVE_TRIANGLES)
-	curb.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in points.size():
 		var j: int = (i + 1) % points.size()
 		var w: float = samples[i].width * 0.5
@@ -192,8 +192,7 @@ func _build_road() -> void:
 				absf(float(samples[i].curvature)) > 0.012
 				and side * float(samples[i].curvature) > 0.0
 			):
-				_quad(
-					curb,
+				var error: String = curb_surface.add_quad(
 					edge_point(i, side * w, 0.05),
 					edge_point(i, side * (w + 0.9), 0.11),
 					edge_point(j, side * (wj + 0.9), 0.11),
@@ -203,6 +202,11 @@ func _build_road() -> void:
 					Vector2(0.9, sj),
 					Vector2(0.0, sj)
 				)
+				if not error.is_empty():
+					initialization_error = "Invalid curb segment %d: %s" % [i, error]
+					push_error(initialization_error)
+					get_tree().quit(2)
+					return
 	var asphalt := ShaderMaterial.new()
 	asphalt.shader = load("res://shaders/asphalt.gdshader")
 	for pair in [["color_map", "Color"], ["normal_map", "NormalGL"], ["rough_map", "Roughness"]]:
@@ -227,7 +231,7 @@ func _build_road() -> void:
 			pair[0], load("res://assets/materials/rough_concrete_%s_1k.jpg" % pair[1])
 		)
 	curb_mat.set_shader_parameter("concrete_detail", true)
-	_mesh(curb, curb_mat, "ProvisionalCurbs")
+	_mesh(curb_surface.surface_tool(), curb_mat, "ProvisionalCurbs")
 
 
 func terrain_height(p: Vector3) -> float:
@@ -265,6 +269,18 @@ func terrain_normal(p: Vector3) -> Vector3:
 
 
 func _surface_sample(p: Vector3, road: Dictionary, include_curb: bool = true) -> Dictionary:
+	if include_curb:
+		var curb: Dictionary = curb_surface.sample(p)
+		if not curb.is_empty():
+			var underlying: Dictionary = offroad_surface.sample(p)
+			if underlying.has("error"):
+				push_error(str(underlying))
+				return {"height": NAN, "normal": road.normal}
+			# Some provisional curb triangles intersect the shoulder. Contact follows
+			# the visible upper surface until their surveyed profiles are available.
+			if underlying.has("height") and float(underlying.height) > float(curb.height):
+				return {"height": underlying.height, "normal": underlying.normal}
+			return curb
 	var delta: Vector3 = p - road.center
 	var lateral: float = delta.dot(road.left)
 	var along: Vector3 = Vector3(road.tangent.x, 0.0, road.tangent.z).normalized()
@@ -277,15 +293,6 @@ func _surface_sample(p: Vector3, road: Dictionary, include_curb: bool = true) ->
 	var edge: float = Vector2(delta.x, delta.z).length() - road.width * 0.5
 	if edge <= 0.0:
 		return {"height": plane, "normal": road.normal}
-	if (
-		include_curb
-		and edge <= 0.9
-		and absf(road.curvature) > 0.012
-		and lateral * road.curvature > 0.0
-	):
-		return {
-			"height": plane + lerpf(0.01, 0.07, edge / 0.9), "normal": road.normal, "on_curb": true
-		}
 	var ground: Dictionary = offroad_surface.sample(p)
 	if ground.has("error"):
 		push_error(str(ground))
@@ -313,23 +320,9 @@ func sample_world(p: Vector3) -> Dictionary:
 	var surface := _surface_sample(p, road)
 	road.height = surface.height
 	road.normal = surface.normal
-	if surface.get("on_curb", false):
-		const DELTA: float = 0.10
-		var dx := (
-			(
-				_surface_height(p + Vector3.RIGHT * DELTA, road)
-				- _surface_height(p - Vector3.RIGHT * DELTA, road)
-			)
-			/ (2.0 * DELTA)
-		)
-		var dz := (
-			(
-				_surface_height(p + Vector3.BACK * DELTA, road)
-				- _surface_height(p - Vector3.BACK * DELTA, road)
-			)
-			/ (2.0 * DELTA)
-		)
-		road.normal = Vector3(-dx, 1.0, -dz).normalized()
+	road.on_curb = surface.get("on_curb", false)
+	if road.on_curb:
+		road.curb_triangle_id = surface.triangle_id
 	return road
 
 

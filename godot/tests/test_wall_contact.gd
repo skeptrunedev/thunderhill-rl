@@ -141,7 +141,9 @@ func check_recording(game: Node3D) -> void:
 	var rows := FileAccess.get_file_as_string(game.recorder.get_path()).split("\n", false)
 	var manifest: Dictionary = JSON.parse_string(rows[0])
 	if manifest.get("build", {}).get("kind") == "unbundled_development":
-		for source in ["chamfered_box", "rider_pose", "rider_glove", "rider_arm_visual"]:
+		for source in [
+			"chamfered_box", "rider_pose", "rider_glove", "rider_arm_visual", "curb_surface"
+		]:
 			var path: String = "res://scripts/" + source + ".gd"
 			check(
 				(

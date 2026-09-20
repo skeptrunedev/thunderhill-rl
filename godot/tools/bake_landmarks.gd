@@ -6,6 +6,7 @@ const SOURCES := [
 	"scripts/landmarks.gd",
 	"scripts/track.gd",
 	"scripts/offroad_surface.gd",
+	"scripts/curb_surface.gd",
 	"data/track.json",
 	"data/terrain.json",
 	"data/surface.json",
