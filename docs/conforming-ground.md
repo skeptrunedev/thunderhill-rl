@@ -29,3 +29,42 @@ Across 40,102 process frame intervals, median was 8.332 ms, p95 9.849 ms, p99 11
 The captured native PNG was retrieved and visually inspected at 1920 by 1200 pixels; the logical viewport report remains 1600 by 1000. Raw evidence is `artifacts/mac-ground-benchmark.log` and `artifacts/mac-ground-benchmark.png`. The original review instance remained open during the run. Resident memory samples ranged from approximately 412 to 638 MiB; these are samples, not an instrumented peak.
 
 The updated app is installed at `~/Applications/ThunderhillReview/90892d0/Thunderhill.app`. The scene, ground contact, model failure and provenance tests pass, along with the actual agent camera sequencing and image capture checks. The next performance investigation must account for the observed long frame rather than accepting median throughput alone.
+
+## Shared pavement boundary and contact
+
+The playable road now loads `godot/data/pavement.json`. Run
+`uv run tools/build_pavement_mesh.py` to regenerate it from the pinned track and
+terrain mesh. The loader verifies both source hashes. The exporter retains the
+original road quad diagonals, subdivides triangles where terrain boundary
+vertices interrupt their outside edge, and uses the exact terrain vertices for
+those shared edges. It records generator provenance and source attribution.
+
+This fixes a concrete topology defect: the old road edges and terrain boundary
+were independently rounded and had different subdivisions. Removing the old
+analytic contact fallback revealed 28 uncovered edge midpoint queries. Matching
+edge arithmetic alone left 11. The final mesh shares all 7,896 terrain boundary
+edges exactly. It contains 13,630 triangles and 10,765 UV indexed vertices.
+Maximum alignment adjustment was 0.000054176 m horizontally and 0.000002424 m
+vertically. The exporter verifies exact boundary edge identity, manifold edge
+multiplicity, coverage and overlap, and reproduces identical output bytes.
+
+`triangle_ribbon.gd` now supplies the same triangle stream to road rendering and
+contact. `curb_surface.gd` adds curb identity to that shared implementation.
+Terrain queries use scalar precision oriented edge tests without an extrapolation
+halo. Contact selects the highest rendered pavement, curb or terrain triangle;
+a missing surface is an explicit failure, never a fabricated plane.
+
+Before the change, 12,288 rendered pavement samples showed a maximum height
+mismatch of 0.053814 m. Final verification checks all 54,520 triangle interior
+samples and 35,156 unique vertices and edge midpoints. Maximum interior height
+error is 0.000005547 m; maximum boundary error is 0.000003152 m. All contacts are
+finite. Existing terrain and curb contact checks also pass. Raw evidence is in
+`artifacts/road-contact/watertight.log`; the reproducible test is
+`godot/tests/test_track_contact.gd`.
+
+This establishes agreement with the current historical mesh, not surveyed
+pavement accuracy. Face normals remain piecewise constant, and no smooth
+curvature, suspension or airborne dynamics is inferred from these triangles.
+Track legality still uses its existing centerline rule. Physical pavement and
+curb identities are now separate flags, so exposed pavement uses pavement grip
+even where that rule and the mesh boundary differ.

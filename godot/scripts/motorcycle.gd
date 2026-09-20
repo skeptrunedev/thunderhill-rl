@@ -3,7 +3,7 @@ extends RefCounted
 ## Explicitly stepped, reduced order motorcycle prototype. SI units throughout.
 ## This is original code, not validated Ducati or tire manufacturer dynamics.
 
-const MODEL_VERSION := "reduced-order-surface-grip-v6"
+const MODEL_VERSION := "reduced-order-surface-grip-v7"
 const GRAVITY := 9.81
 const GEAR_RATIOS := [38.0 / 14.0, 36.0 / 17.0, 33.0 / 19.0, 32.0 / 21.0, 30.0 / 22.0, 30.0 / 24.0]
 
@@ -274,12 +274,14 @@ func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -
 			error = "Road on_track must be boolean"
 	if road_sample.has("on_curb") and not road_sample.on_curb is bool:
 		error = "Road on_curb must be boolean"
+	if road_sample.has("on_pavement") and not road_sample.on_pavement is bool:
+		error = "Road on_pavement must be boolean"
 	if not error.is_empty():
 		return {"error": error, "tick": tick}
 	var material_name := (
 		"curb"
 		if road_sample.get("on_curb", false)
-		else ("asphalt" if road_sample.on_track else "offroad")
+		else ("asphalt" if road_sample.get("on_pavement", road_sample.on_track) else "offroad")
 	)
 	for key: String in [FRICTION_KEYS[material_name], ROLLING_KEYS[material_name]]:
 		var value: Variant = parameters.get(key)

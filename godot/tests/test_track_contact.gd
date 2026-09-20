@@ -96,6 +96,7 @@ func run():
 		" max terrain error=",
 		max_terrain_error
 	)
+	_test_rendered_pavement(track)
 	_test_rendered_curbs(track)
 	track.queue_free()
 	quit(failures)
@@ -181,6 +182,105 @@ func _test_rendered_curbs(track: Node3D) -> void:
 		max_error,
 		" max_normal_error=",
 		max_normal_error,
+		" failures=",
+		failures
+	)
+
+
+func _test_rendered_pavement(track: Node3D) -> void:
+	var mesh_node := track.get_node_or_null("RacingSurface") as MeshInstance3D
+	check(mesh_node != null, "Rendered pavement mesh is present")
+	if mesh_node == null:
+		return
+	var arrays := mesh_node.mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var indices := PackedInt32Array()
+	if arrays[Mesh.ARRAY_INDEX] != null:
+		indices = arrays[Mesh.ARRAY_INDEX]
+	if indices.is_empty():
+		for index in vertices.size():
+			indices.append(index)
+	var pavement_data: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/pavement.json")
+	)
+	check(
+		indices.size() == pavement_data.triangles.size() * 3,
+		"Every authored pavement triangle rendered"
+	)
+	check(indices.size() >= 3072 * 3, "Historical pavement coverage preserved")
+	var boundary_points: Dictionary = {}
+	var count := 0
+	var max_error := 0.0
+	var max_normal_error := 0.0
+	for index in range(0, indices.size(), 3):
+		var a := mesh_node.transform * vertices[indices[index]]
+		var b := mesh_node.transform * vertices[indices[index + 1]]
+		var c := mesh_node.transform * vertices[indices[index + 2]]
+		for point in [(a + b) * .5, (b + c) * .5, (c + a) * .5]:
+			if not boundary_points.has(point):
+				boundary_points[point] = "edge midpoint"
+		for point in [a, b, c]:
+			boundary_points[point] = "vertex"
+		# Derive expectations directly from rendered arrays, independent of the sampler.
+		var normal := -(b - a).cross(c - a).normalized()
+		check(normal.y > 0.0, "Rendered pavement winding faces upward")
+		for weight in [
+			Vector3.ONE / 3.0, Vector3(.8, .1, .1), Vector3(.1, .8, .1), Vector3(.1, .1, .8)
+		]:
+			var point: Vector3 = a * weight.x + b * weight.y + c * weight.z
+			var sampled: Dictionary = track.sample_world(point)
+			var label := "triangle %d, weights %s" % [index / 3, weight]
+			var height_error := absf(float(sampled.height) - float(point.y))
+			var normal_error: float = sampled.normal.distance_to(normal)
+			max_error = maxf(max_error, height_error)
+			max_normal_error = maxf(max_normal_error, normal_error)
+			check(height_error < .0002, "Pavement visible height differs: " + label)
+			check(normal_error < .0002, "Pavement visible normal differs: " + label)
+			check(sampled.get("on_pavement", false), "Exposed pavement flag missing: " + label)
+			check(not sampled.on_curb, "Pavement incorrectly reports curb: " + label)
+			count += 1
+	check(count == indices.size() / 3 * 4, "Every pavement triangle supplies four contact samples")
+	print(
+		"PAVEMENT_TRACK_CONTACT samples=",
+		count,
+		" max_height_error_m=",
+		max_error,
+		" max_normal_error=",
+		max_normal_error,
+		" failures=",
+		failures
+	)
+
+	var max_boundary_error := 0.0
+	for point: Vector3 in boundary_points:
+		# Shared edges can select either face normal. Height still has to agree
+		# with the rendered road or an actually higher curb or terrain triangle.
+		var expected_height := float(point.y)
+		for surface in [track.pavement_surface, track.curb_surface, track.offroad_surface]:
+			var covering: Dictionary = (
+				surface.sample_mesh(point)
+				if surface == track.offroad_surface
+				else surface.sample(point)
+			)
+			check(not covering.has("error"), "Boundary covering surface query succeeds")
+			if covering.has("height"):
+				expected_height = maxf(expected_height, float(covering.height))
+		var sampled: Dictionary = track.sample_world(point)
+		check(
+			is_finite(sampled.height),
+			"Road boundary %s contact must be finite at %s" % [boundary_points[point], point]
+		)
+		if not is_finite(sampled.height):
+			continue
+		var error := absf(float(sampled.height) - expected_height)
+		max_boundary_error = maxf(max_boundary_error, error)
+		check(error < .0002, "Road boundary visible height differs at %s by %s" % [point, error])
+	check(boundary_points.size() >= 3072, "All rendered road vertices and edge midpoints tested")
+	print(
+		"PAVEMENT_BOUNDARY_CONTACT samples=",
+		boundary_points.size(),
+		" max_height_error_m=",
+		max_boundary_error,
 		" failures=",
 		failures
 	)

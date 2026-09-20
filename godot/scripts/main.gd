@@ -669,6 +669,7 @@ func _step(action: Dictionary) -> Dictionary:
 			"lateral_m": after.distance,
 			"on_track": after.on_track,
 			"on_curb": after.on_curb,
+			"on_pavement": after.on_pavement,
 			"lap_valid": lap_valid,
 			"legal_distance": legal_distance,
 			"next_gate": next_gate
@@ -703,6 +704,7 @@ func observation() -> Dictionary:
 				"lateral_m": road.distance,
 				"on_track": road.on_track,
 				"on_curb": road.on_curb,
+				"on_pavement": road.on_pavement,
 				"lap_valid": lap_valid,
 				"legal_distance": legal_distance,
 				"completed_laps": completed_laps
@@ -1050,7 +1052,12 @@ func _build_provenance() -> Dictionary:
 		}
 	var geometry_sources := {}
 	for source in [
-		"chamfered_box", "rider_pose", "rider_glove", "rider_arm_visual", "curb_surface"
+		"chamfered_box",
+		"rider_pose",
+		"rider_glove",
+		"rider_arm_visual",
+		"curb_surface",
+		"triangle_ribbon"
 	]:
 		var path: String = "res://scripts/" + source + ".gd"
 		geometry_sources[path] = FileAccess.get_sha256(path)
@@ -1061,6 +1068,7 @@ func _build_provenance() -> Dictionary:
 		"physics_script_sha256": FileAccess.get_sha256("res://scripts/motorcycle.gd"),
 		"game_script_sha256": FileAccess.get_sha256("res://scripts/main.gd"),
 		"bike_visual_script_sha256": FileAccess.get_sha256("res://scripts/bike_visual.gd"),
+		"pavement_sha256": FileAccess.get_sha256("res://data/pavement.json"),
 		"track_script_sha256": FileAccess.get_sha256("res://scripts/track.gd"),
 		"envelope_script_sha256": FileAccess.get_sha256("res://scripts/bike_collision_envelope.gd"),
 		"sweep_script_sha256": FileAccess.get_sha256("res://scripts/bike_sweep.gd")

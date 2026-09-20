@@ -12,6 +12,7 @@ var grid: Dictionary = {}
 var candidate_cache: Dictionary = {}
 var terrain_material: ShaderMaterial
 var offroad_surface := preload("res://scripts/offroad_surface.gd").new()
+var pavement_surface := preload("res://scripts/triangle_ribbon.gd").new()
 var curb_surface := preload("res://scripts/curb_surface.gd").new()
 const CELL: float = 25.0
 const ROAD_LIFT: float = 0.04
@@ -147,16 +148,82 @@ func _build_terrain() -> void:
 func edge_point(i: int, offset: float, lift: float = 0.04) -> Vector3:
 	var next: int = (i + 1) % points.size()
 	var prev: int = posmod(i - 1, points.size())
-	var tangent := (points[next] - points[prev]).normalized()
-	var left := Vector3(tangent.z, 0, -tangent.x).normalized()
-	return points[i] + left * offset + Vector3.UP * (tan(float(samples[i].bank)) * offset + lift)
+	# Match the offline terrain builder: retain source coordinates in float64
+	# through edge construction, then round once into the render vertex.
+	var dx: float = float(samples[next].p[0]) - float(samples[prev].p[0])
+	var dz: float = float(samples[next].p[2]) - float(samples[prev].p[2])
+	var length := sqrt(dx * dx + dz * dz)
+	return Vector3(
+		float(samples[i].p[0]) + dz / length * offset,
+		float(samples[i].p[1]) + tan(float(samples[i].bank)) * offset + lift,
+		float(samples[i].p[2]) - dx / length * offset
+	)
+
+
+func _load_pavement() -> String:
+	var mesh_data: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/pavement.json")
+	)
+	if not mesh_data is Dictionary or mesh_data.get("schema_version") != 1:
+		return "Invalid pavement mesh schema"
+	var metadata: Variant = mesh_data.get("metadata")
+	if not metadata is Dictionary:
+		return "Missing pavement mesh metadata"
+	for source: String in ["track", "surface"]:
+		if (
+			metadata.get(source + "_sha256", "")
+			!= FileAccess.get_sha256("res://data/" + source + ".json")
+		):
+			return "Pavement mesh " + source + " source mismatch"
+	for key: String in ["vertices", "uvs", "triangles"]:
+		if not mesh_data.get(key) is Array or mesh_data[key].is_empty():
+			return "Missing pavement " + key
+	if mesh_data.vertices.size() != mesh_data.uvs.size():
+		return "Pavement UV count differs from vertices"
+	var vertices := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	for key: String in ["vertices", "uvs"]:
+		for value: Variant in mesh_data[key]:
+			if not value is Array or value.size() != (3 if key == "vertices" else 2):
+				return "Malformed pavement " + key
+			for component: Variant in value:
+				if not (component is float or component is int) or not is_finite(float(component)):
+					return "Nonfinite pavement component"
+			if key == "vertices":
+				vertices.append(Vector3(value[0], value[1], value[2]))
+			else:
+				uvs.append(Vector2(value[0], value[1]))
+	var candidate := preload("res://scripts/triangle_ribbon.gd").new()
+	for face: Variant in mesh_data.triangles:
+		if not face is Array or face.size() != 3:
+			return "Malformed pavement triangle"
+		for index: Variant in face:
+			if not (index is float or index is int) or not is_finite(float(index)):
+				return "Invalid pavement vertex index"
+			if float(index) != floorf(float(index)) or index < 0 or index >= vertices.size():
+				return "Pavement vertex index out of range"
+		var error: String = candidate.add_triangle(
+			vertices[int(face[0])],
+			vertices[int(face[1])],
+			vertices[int(face[2])],
+			uvs[int(face[0])],
+			uvs[int(face[1])],
+			uvs[int(face[2])]
+		)
+		if not error.is_empty():
+			return error
+	pavement_surface = candidate
+	return ""
 
 
 func _build_road() -> void:
-	var road := SurfaceTool.new()
+	initialization_error = _load_pavement()
+	if not initialization_error.is_empty():
+		push_error(initialization_error)
+		get_tree().quit(2)
+		return
 	var paint := SurfaceTool.new()
 	curb_surface.clear()
-	road.begin(Mesh.PRIMITIVE_TRIANGLES)
 	paint.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in points.size():
 		var j: int = (i + 1) % points.size()
@@ -164,17 +231,6 @@ func _build_road() -> void:
 		var wj: float = samples[j].width * 0.5
 		var s: float = samples[i].s
 		var sj: float = samples[j].s if j > 0 else length_m
-		_quad(
-			road,
-			edge_point(i, -w),
-			edge_point(i, w),
-			edge_point(j, wj),
-			edge_point(j, -wj),
-			Vector2(0, s),
-			Vector2(w * 2, s),
-			Vector2(wj * 2, sj),
-			Vector2(0, sj)
-		)
 		for side in [-1.0, 1.0]:
 			_quad(
 				paint,
@@ -213,7 +269,7 @@ func _build_road() -> void:
 		asphalt.set_shader_parameter(
 			pair[0], load("res://assets/materials/Asphalt010_1K-JPG_%s.jpg" % pair[1])
 		)
-	_mesh(road, asphalt, "RacingSurface")
+	_mesh(pavement_surface.surface_tool(), asphalt, "RacingSurface")
 	var paint_mat := ShaderMaterial.new()
 	paint_mat.shader = preload("res://shaders/painted_concrete.gdshader")
 	paint_mat.set_shader_parameter("paint_tint", Color("e8e3ce"))
@@ -269,39 +325,29 @@ func terrain_normal(p: Vector3) -> Vector3:
 
 
 func _surface_sample(p: Vector3, road: Dictionary, include_curb: bool = true) -> Dictionary:
+	var surface: Dictionary = pavement_surface.sample(p)
+	if not surface.is_empty():
+		surface.on_pavement = true
 	if include_curb:
 		var curb: Dictionary = curb_surface.sample(p)
-		if not curb.is_empty():
-			var underlying: Dictionary = offroad_surface.sample(p)
-			if underlying.has("error"):
-				push_error(str(underlying))
-				return {"height": NAN, "normal": road.normal}
-			# Some provisional curb triangles intersect the shoulder. Contact follows
-			# the visible upper surface until their surveyed profiles are available.
-			if underlying.has("height") and float(underlying.height) > float(curb.height):
-				return {"height": underlying.height, "normal": underlying.normal}
-			return curb
-	var delta: Vector3 = p - road.center
-	var lateral: float = delta.dot(road.left)
-	var along: Vector3 = Vector3(road.tangent.x, 0.0, road.tangent.z).normalized()
-	var grade: float = (
-		road.tangent.y / maxf(Vector2(road.tangent.x, road.tangent.z).length(), 0.001)
-	)
-	var plane: float = (
-		road.center.y + tan(road.bank) * lateral + delta.dot(along) * grade + ROAD_LIFT
-	)
-	var edge: float = Vector2(delta.x, delta.z).length() - road.width * 0.5
-	if edge <= 0.0:
-		return {"height": plane, "normal": road.normal}
-	var ground: Dictionary = offroad_surface.sample(p)
-	if ground.has("error"):
-		push_error(str(ground))
-		return {"height": NAN, "normal": road.normal}
-	# The cutout follows rendered edge segments. Close to a corner this may
-	# differ slightly from the analytic nearest-centerline classification.
-	if ground.road_cutout:
-		return {"height": plane, "normal": road.normal}
-	return {"height": float(ground.height), "normal": ground.normal}
+		if (
+			not curb.is_empty()
+			and (surface.is_empty() or float(curb.height) > float(surface.height))
+		):
+			surface = curb
+	# Avoid polygon cutout classification when a rendered ribbon already covers
+	# the point. Mesh triangles alone determine any overlying terrain contact.
+	var ground: Dictionary = offroad_surface.sample_mesh(p)
+	if (
+		not ground.is_empty()
+		and (surface.is_empty() or float(ground.height) > float(surface.height))
+	):
+		surface = ground
+	if not surface.is_empty():
+		return surface
+	# No analytic plane may fill a hole in the rendered geometry.
+	push_error("No rendered ground surface covers point %s" % p)
+	return {"height": NAN, "normal": road.normal}
 
 
 func _surface_height(p: Vector3, road: Dictionary, include_curb: bool = true) -> float:
@@ -320,6 +366,7 @@ func sample_world(p: Vector3) -> Dictionary:
 	var surface := _surface_sample(p, road)
 	road.height = surface.height
 	road.normal = surface.normal
+	road.on_pavement = surface.get("on_pavement", false)
 	road.on_curb = surface.get("on_curb", false)
 	if road.on_curb:
 		road.curb_triangle_id = surface.triangle_id

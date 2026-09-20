@@ -112,6 +112,18 @@ func _initialize() -> void:
 			if not explicit_flag:
 				legacy.erase("on_curb")
 			braking_step(bike_at(), legacy, "asphalt" if legal else "offroad")
+	# Rendered pavement identity is independent of centerline based legality.
+	for legal: bool in [true, false]:
+		for paved: bool in [true, false]:
+			var sample := road(legal)
+			sample.on_pavement = paved
+			braking_step(bike_at(), sample, "asphalt" if paved else "offroad")
+			sample.on_curb = true
+			braking_step(bike_at(), sample, "curb")
+	for invalid: Variant in [null, 0, "true", NAN]:
+		var invalid_pavement := road(true)
+		invalid_pavement.on_pavement = invalid
+		expect_rejected(bike_at(), invalid_pavement, "on_pavement")
 	# Every force step must select its current contact, not retain the previous
 	# material. Include a curb that is legal and one outside legal track bounds.
 	var crossing := bike_at()

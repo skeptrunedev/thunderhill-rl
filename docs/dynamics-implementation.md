@@ -1,6 +1,6 @@
 # Initial motorcycle dynamics implementation
 
-The initial Godot model is a reduced order, explicitly stepped prototype for testing controls, scenes, replay and the RL interface. It is not validated hyperrealistic handling. The dynamics version is `reduced-order-surface-grip-v6`.
+The initial Godot model is a reduced order, explicitly stepped prototype for testing controls, scenes, replay and the RL interface. It is not validated hyperrealistic handling. The dynamics version is `reduced-order-surface-grip-v7`.
 
 `godot/scripts/motorcycle.gd` defines `MotorcycleSim`, a `RefCounted` object with no scene processing or wall clock access. Call `reset(position, heading, initial_speed)` and then `step(dt, controls, road_sample)`. Rendering and reading `telemetry()` do not advance it. The caller owns the fixed timestep, at most 0.02 seconds, and road sampling. Ground position is the contact reference. Positive heading turns right, with forward vector `(sin(heading), 0, -cos(heading))`. Positive lean is right. Velocities are metres per second and angles are radians.
 
@@ -146,3 +146,9 @@ deceleration rather than these tire coefficients. Track legality and rewards
 remain independent.
 The current model still samples one ground point for both tires; mixed axle
 surfaces require separate wheel contact states in the future contact model.
+
+Version 7 also accepts optional boolean `on_pavement` from the rendered contact
+surface. Exposed curb identity still takes precedence. Otherwise this pavement
+flag selects asphalt versus offroad coefficients independently of the legacy
+centerline legality flag. Omitted pavement flags preserve legacy callers.
+Recordings include `track.on_pavement` at the resulting position.

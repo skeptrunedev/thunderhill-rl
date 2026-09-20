@@ -1,22 +1,24 @@
 {
-  "build_ms": 7532.132,
-  "geometry_sha256": "e5e47f14dec47de8c316d055c18798e49b128a2dece789ff79b536668d8458bf",
+  "build_ms": 10985.319,
+  "geometry_sha256": "e17b94d41d877c6fdddec095f333b8a1997d61624f075ca032baa9bcd165fa7f",
   "godot_version": "4.7.2-stable (official)",
   "grass_instances": 96000,
-  "load_ms": 45.435,
-  "scene_sha256": "78d67a97862dde39392c9c0d2ebfa1cdccff516382bd4d0fde2682c1c7b12abb",
+  "load_ms": 37.827,
+  "scene_sha256": "68529da2eb6e6edf427503d6506d578d26bca2fb0b651b86a078bb5d17d58fdf",
   "schema_version": 1,
   "sources": {
     "assets/grass/dry_grass_rgba.png": "64460b09ab5915ca0fc92d19f00c66d2286d5bb4a21b7b591f704f40830f15e1",
     "assets/grass/grass.json": "c61af053940f74461192e4586d0513e0965b678112c94cdf5808c6375fce7922",
     "data/landmarks.json": "d5b43fb77e3ad5c8de2464d8c25d1ca9639a37efcd9b200ee07befb942b4e085",
+    "data/pavement.json": "3d8eb1ad0dbf4de04d589eec0f5db9c839242c7c80a6ff2c21f88affe84ef8f9",
     "data/surface.json": "c0fbcf8df2ff73ac5dec213f67978091c57c9019302ef12a77eab9868b967dae",
     "data/terrain.json": "c643f764f23253de59b1417ac0ab803604d47acbd0c70bb173fc455a586a0543",
     "data/track.json": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
-    "scripts/curb_surface.gd": "4b359499bc4805217d825533733f4d24ccf0a406707ae4e18cc8af877c396a99",
-    "scripts/offroad_surface.gd": "8c4b8c7f3919ca5ecb6835706311b5b8e73711bb474fa0ff9f478f2bcada6493",
+    "scripts/curb_surface.gd": "b2de99aba0dd705d76d11c2541a0bf9484b65e91c04b59e2fdc5b4f2baa72cb4",
+    "scripts/offroad_surface.gd": "744a4e65b018e1fca24b5d4bbfd6b41202bc596795d83328a6188315ea2099d9",
     "scripts/scenery.gd": "b0c2342558579d40869cddfb8b6627781f0098416bd82993402fb23537c5e38f",
-    "scripts/track.gd": "f37ad109660630850ff659e0c998fa5ad23326675e20f5647fabd93b4e1d13f6",
-    "tools/bake_scenery.gd": "f9399c4fa04ee57af5bca798b2d8e70a54fe660182b59ef91f7254180d6a3877"
+    "scripts/track.gd": "4e81be9120925827b60f4d7ede97aed24b82796ec01dabd1350ceddaab44f11e",
+    "scripts/triangle_ribbon.gd": "cf097ef2009e7073216ca56619f3dcd7cd19d64e2220687762744e4ad4418fe1",
+    "tools/bake_scenery.gd": "30848ea919a0019d57b862e9dbb1f7e7d7870abfcd1d564407354e169ea15dbe"
   }
 }

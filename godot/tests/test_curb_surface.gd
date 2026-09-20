@@ -77,6 +77,41 @@ func _initialize() -> void:
 							result.on_curb and result.triangle_id == start / 3,
 							"Triangle identity preserved"
 						)
+	# The pavement loader also uses individual triangles from a shared mesh.
+	surface.clear()
+	check(
+		(
+			surface
+			. add_triangle(
+				Vector3.ZERO,
+				Vector3(2, 2, 0),
+				Vector3(0, 0, 2),
+				Vector2.ZERO,
+				Vector2.RIGHT,
+				Vector2.DOWN
+			)
+			. is_empty()
+		),
+		"Single triangle accepted"
+	)
+	var single: Dictionary = surface.sample(Vector3(.5, 0, .5))
+	check(absf(single.height - .5) < 1e-7, "Single triangle tilted plane height")
+	check(
+		single.normal.distance_to(Vector3(-1, 1, 0).normalized()) < 1e-7, "Single triangle normal"
+	)
+	check(surface.sample(Vector3(2, 0, 2)).is_empty(), "Triangle exterior excluded")
+	var prior_size: int = surface.vertices.size()
+	check(
+		not (
+			surface
+			. add_triangle(
+				Vector3.ZERO, Vector3.ONE, Vector3.ONE * 2, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO
+			)
+			. is_empty()
+		),
+		"Degenerate triangle rejected"
+	)
+	check(surface.vertices.size() == prior_size, "Rejected triangle preserves geometry")
 	# Exact representable boundaries, no extrapolation even one tiny step outside.
 	surface.clear()
 	var square := [Vector3(0, 1, 0), Vector3(2, 1, 0), Vector3(2, 1, 2), Vector3(0, 1, 2)]

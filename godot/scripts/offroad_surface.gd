@@ -41,7 +41,7 @@ func configure(data: Dictionary) -> void:
 				grid[key].append(index)
 
 
-func sample(p: Vector3) -> Dictionary:
+func sample_mesh(p: Vector3) -> Dictionary:
 	var q := Vector2(clampf(p.x, bounds.x0, bounds.x1), clampf(p.z, bounds.z0, bounds.z1))
 	var key := Vector2i(floori(q.x / CELL), floori(q.y / CELL))
 	for index in grid.get(key, []):
@@ -49,23 +49,35 @@ func sample(p: Vector3) -> Dictionary:
 		var a := vertices[int(t[0])]
 		var b := vertices[int(t[1])]
 		var c := vertices[int(t[2])]
-		var ab := Vector2(b.x - a.x, b.z - a.z)
-		var ac := Vector2(c.x - a.x, c.z - a.z)
-		var aq := q - Vector2(a.x, a.z)
-		var determinant := ab.cross(ac)
-		if absf(determinant) < 1e-12:
+		var point := Vector3(q.x, 0.0, q.y)
+		var determinant := TriangleRibbon.projected_cross(a, b, c)
+		if determinant == 0.0:
 			continue
-		var u := aq.cross(ac) / determinant
-		var v := ab.cross(aq) / determinant
-		if u >= -0.00001 and v >= -0.00001 and u + v <= 1.00001:
-			var normal := (b - a).cross(c - a).normalized()
-			if normal.y < 0.0:
-				normal = -normal
-			return {
-				"height": a.y + u * (b.y - a.y) + v * (c.y - a.y),
-				"normal": normal,
-				"road_cutout": false
-			}
+		var orientation := signf(determinant)
+		if (
+			orientation * TriangleRibbon.projected_cross(a, b, point) < 0.0
+			or orientation * TriangleRibbon.projected_cross(b, c, point) < 0.0
+			or orientation * TriangleRibbon.projected_cross(c, a, point) < 0.0
+		):
+			continue
+		var u := TriangleRibbon.projected_cross(a, point, c) / determinant
+		var v := TriangleRibbon.projected_cross(a, b, point) / determinant
+		var normal := (b - a).cross(c - a).normalized()
+		if normal.y < 0.0:
+			normal = -normal
+		return {
+			"height": float(a.y) + u * (float(b.y) - float(a.y)) + v * (float(c.y) - float(a.y)),
+			"normal": normal,
+			"road_cutout": false
+		}
+	return {}
+
+
+func sample(p: Vector3) -> Dictionary:
+	var result := sample_mesh(p)
+	if not result.is_empty():
+		return result
+	var q := Vector2(clampf(p.x, bounds.x0, bounds.x1), clampf(p.z, bounds.z0, bounds.z1))
 	var inside_road := false
 	for ring in road_rings:
 		if ring_contains(q, ring):
