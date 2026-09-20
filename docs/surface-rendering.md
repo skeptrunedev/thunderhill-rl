@@ -173,3 +173,16 @@ The local runs took 6337 ms and 6233 ms respectively, too close to establish a
 meaningful overall startup improvement from these individual measurements.
 Materials and pit wall collision code were not edited. Evidence is in
 `artifacts/landmark-cache-before.log` and `artifacts/landmark-cache-after.log`.
+
+The corrected native probe in debug build `5cd19a5b44e3-c425f467ddf8-debug`
+entered CAPTURE_PROBE_BEGIN and completed all six samples with valid images.
+Every root and offscreen RGB hash matched the corresponding local Vulkan sample;
+main and worker hashes also matched. The root capture was visually inspected.
+However, the debug engine logged `timeout waiting for fence` at metal3.cpp:54
+between samples 1 and 13. Thus this Mac does experience the source identified
+synchronization timeout, but this test does not establish that it causes the
+intermittent black game image. Image checks passed; the engine log was not clean.
+Native readback durations were 26.255, 7.166, 305.885, 5.564, 149.939 and 2.835 ms.
+Evidence is in `artifacts/Thunderhill-probe-5cd19a5*`. Archive SHA256
+`67b4aba3c41dcf7806584e6f013eab5258474e7a0222cc5182561409bafd5759`
+matched after transfer and native signature verification passed.
