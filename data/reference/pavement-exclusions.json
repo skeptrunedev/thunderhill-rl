@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "status": "reviewed-structure-occlusion-not-surveyed-ground",
+  "purpose": "Proposed exclusion from pavement elevation fitting only. Not applied to gameplay or used as physical barrier geometry. Ground beneath the structure remains unmeasured.",
+  "coordinate_basis": {
+    "frame": "Godot local x,z meters",
+    "x": "easting minus origin easting",
+    "z": "origin northing minus northing",
+    "source_horizontal_crs": "EPSG:6339",
+    "source_vertical_crs": "NAVD88 height, Geoid18 meters",
+    "origin": {
+      "easting": 557466.3229144721,
+      "northing": 4377233.643425343,
+      "elevation_m": 90.0
+    },
+    "track_sha256": "e21a8a1f279ad4dbf3fc01e397a297ac53750e47611529617e219eb7699e19a6"
+  },
+  "exclusions": [
+    {
+      "id": "station392_structure_occlusion",
+      "station_m": 392,
+      "lateral_m": -4,
+      "source": {
+        "path": "artifacts/reference/lidar/USGS_LPC_CA_NorthCoastRanges_B23_556376.laz",
+        "sha256": "d247f8a92b92811ea4dfa6bf1358a13e5073cb4dcfc197b445fbf1fccc8d17a7",
+        "local_extract_path": "artifacts/road-surface/edge-392-raw-local.npz",
+        "local_extract_sha256": "48260522c0dd9f4831cecc790c94f62a85e3226e265b0f4452c954c6c8aee130",
+        "local_extract_columns": [
+          "easting",
+          "northing",
+          "height",
+          "class",
+          "source",
+          "intensity",
+          "withheld"
+        ]
+      },
+      "selection": {
+        "classification": 1,
+        "height_navd88_m_inclusive": [
+          97.6,
+          97.85
+        ],
+        "within_radius_m": 12,
+        "radius_center_easting_northing_m": [
+          557466.3757513898,
+          4376841.40998138
+        ],
+        "point_count": 152,
+        "observed_height_range_navd88_m": [
+          97.64,
+          97.8
+        ],
+        "source_id_counts": {
+          "595": 80,
+          "596": 72
+        }
+      },
+      "observed_roof_footprint_convex_hull_xz_m": [
+        [
+          -1.7129144720965996,
+          393.31342534255236
+        ],
+        [
+          -1.7429144721245393,
+          391.00342534296215
+        ],
+        [
+          -1.4129144720500335,
+          390.4334253426641
+        ],
+        [
+          -0.9429144720779732,
+          390.2934253429994
+        ],
+        [
+          0.5570855279220268,
+          390.1334253428504
+        ],
+        [
+          1.917085527908057,
+          390.1034253425896
+        ],
+        [
+          2.31708552793134,
+          390.50342534296215
+        ],
+        [
+          2.3270855279406533,
+          390.9634253429249
+        ],
+        [
+          2.3270855279406533,
+          391.5334253422916
+        ],
+        [
+          2.277085527894087,
+          392.67342534288764
+        ],
+        [
+          2.0770855279406533,
+          393.2834253422916
+        ],
+        [
+          2.06708552793134,
+          393.2934253429994
+        ],
+        [
+          1.5870855279499665,
+          393.5534253427759
+        ],
+        [
+          -1.0129144720267504,
+          393.5134253427386
+        ]
+      ],
+      "observed_roof_footprint_bounds_xz_m": {
+        "min": [
+          -1.7429144721245393,
+          390.1034253425896
+        ],
+        "max": [
+          2.3270855279406533,
+          393.5534253427759
+        ]
+      },
+      "proposed_exclusion_margin_m": 1.0,
+      "margin_method": "Intersection of outward shifted convex hull supporting halfplanes; miter corners. Interpretive one meter margin, not an observed foundation or road boundary.",
+      "proposed_exclusion_polygon_xz_m": [
+        [
+          -2.703166506985112,
+          394.07051188802575
+        ],
+        [
+          -2.746408610649405,
+          390.7408699095668
+        ],
+        [
+          -2.079237384052727,
+          389.58848324510296
+        ],
+        [
+          -1.1403378184264392,
+          389.30881103471853
+        ],
+        [
+          0.4929126082550037,
+          389.13459765571025
+        ],
+        [
+          2.322121213492992,
+          389.0942474655377
+        ],
+        [
+          3.308122299459735,
+          390.0802485523653
+        ],
+        [
+          3.3270855279406533,
+          390.95255706160447
+        ],
+        [
+          3.3270855279406533,
+          391.55534463056375
+        ],
+        [
+          3.2701067187279724,
+          392.8544614800822
+        ],
+        [
+          2.9529573417879416,
+          393.82176707902937
+        ],
+        [
+          2.6713071224905853,
+          394.10341731799974
+        ],
+        [
+          1.833311216887722,
+          394.55733176649534
+        ],
+        [
+          -1.1605022756834018,
+          394.5112730973356
+        ]
+      ],
+      "limitations": [
+        "Roof returns identify an elevated structure, not its ground support or precise occlusion boundary.",
+        "The one meter margin is a proposed conservative fitting exclusion and is not surveyed.",
+        "The surrounding ground classification includes gaps and elevated returns; excluded ground would need explicit reconstruction validation.",
+        "The footprint does not correct provisional road centerline or pavement width."
+      ],
+      "evidence_figures": [
+        "artifacts/road-surface/edge-392-alignment.png",
+        "artifacts/road-surface/edge-392-scatter.png",
+        "artifacts/road-surface/edge-392-raw-classes.png"
+      ]
+    }
+  ]
+}
