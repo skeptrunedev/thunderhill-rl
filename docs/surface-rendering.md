@@ -186,3 +186,20 @@ Native readback durations were 26.255, 7.166, 305.885, 5.564, 149.939 and 2.835 
 Evidence is in `artifacts/Thunderhill-probe-5cd19a5*`. Archive SHA256
 `67b4aba3c41dcf7806584e6f013eab5258474e7a0222cc5182561409bafd5759`
 matched after transfer and native signature verification passed.
+
+The full game using the same debug build reproduced an all black image and exited
+with status 1. The log contains 17 `timeout waiting for fence` errors. Two include
+a GDScript backtrace to main.gd:720, verified in commit 5cd19a5 as the
+`get_viewport().get_texture().get_image()` call. Readback took 2,015,201 microseconds,
+consistent with those two one second fence waits. This directly establishes
+failed GPU synchronization during the failed capture; the engine source above
+shows that readback continues despite the fence errors. It does not yet establish
+why this Mac's GPU work stalled, nor prove that every previous blank image had
+the same cause. The screen remained locked with earlier game instances open.
+No retry, backend change or timeout extension has been applied.
+
+Scene ready was reached at 77,062 ms and first draw at 155,415 ms. The diagnostic
+process completed and is no longer running. Evidence is preserved as
+`artifacts/Thunderhill-debug-game-5cd19a5.log`, `.jsonl`, `.png` and `.png.json`.
+The capture counters still showed 183 objects and draw calls with the intended
+camera, demonstrating why these CPU counters cannot certify rendered pixels.
