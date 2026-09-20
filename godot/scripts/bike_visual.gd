@@ -4,6 +4,9 @@ extends Node3D
 ## All bodywork profiles are artistic approximations. Axle spacing and nominal
 ## unloaded tire envelopes follow docs/motorcycle-reference.md.
 
+## Approximate eye location inside the original helmet mesh, not measured rider data.
+const RIDER_EYE_LOCAL := Vector3(0.0, 1.51, -0.30)
+
 var _front: Node3D
 var _rear_wheel: Node3D
 var _front_wheel: Node3D
@@ -210,7 +213,16 @@ func _wheel(at: Vector3, radius: float, width: float, parent: Node3D, front: boo
 
 ## Shape preserving Hermite interpolation. Harmonic slopes stop at extrema,
 ## keeping every interpolated dimension inside its authored segment bounds.
-func _bounded_hermite(previous: float, a: float, b: float, following: float, t: float, before_span := 1.0, span := 1.0, after_span := 1.0) -> float:
+func _bounded_hermite(
+	previous: float,
+	a: float,
+	b: float,
+	following: float,
+	t: float,
+	before_span := 1.0,
+	span := 1.0,
+	after_span := 1.0
+) -> float:
 	var slope := (b - a) / span
 	var before := (a - previous) / before_span
 	var after := (following - b) / after_span
@@ -222,14 +234,36 @@ func _bounded_hermite(previous: float, a: float, b: float, following: float, t: 
 		end_tangent = 2.0 * slope * after / (slope + after)
 	var t2 := t * t
 	var t3 := t2 * t
-	var value := (2 * t3 - 3 * t2 + 1) * a + (t3 - 2 * t2 + t) * span * start_tangent + (-2 * t3 + 3 * t2) * b + (t3 - t2) * span * end_tangent
+	var value := (
+		(2 * t3 - 3 * t2 + 1) * a
+		+ (t3 - 2 * t2 + t) * span * start_tangent
+		+ (-2 * t3 + 3 * t2) * b
+		+ (t3 - t2) * span * end_tangent
+	)
 	return clampf(value, minf(a, b), maxf(a, b))
 
 
 ## Each ring is (longitudinal z, center height, half width, half height).
 ## Authored creases become bounded smooth shoulders, not inflated primitives.
 func _body_panel(rings: Array[Vector4], material: Material, parent: Node3D) -> void:
-	var profile: Array[Vector2] = [Vector2(-0.35, 0.99), Vector2(0, 1.015), Vector2(0.35, 0.99), Vector2(0.70, 0.87), Vector2(0.93, 0.60), Vector2(1, 0.24), Vector2(0.94, -0.22), Vector2(0.77, -0.68), Vector2(0.44, -0.96), Vector2(0, -1), Vector2(-0.44, -0.96), Vector2(-0.77, -0.68), Vector2(-0.94, -0.22), Vector2(-1, 0.24), Vector2(-0.93, 0.60), Vector2(-0.70, 0.87)]
+	var profile: Array[Vector2] = [
+		Vector2(-0.35, 0.99),
+		Vector2(0, 1.015),
+		Vector2(0.35, 0.99),
+		Vector2(0.70, 0.87),
+		Vector2(0.93, 0.60),
+		Vector2(1, 0.24),
+		Vector2(0.94, -0.22),
+		Vector2(0.77, -0.68),
+		Vector2(0.44, -0.96),
+		Vector2(0, -1),
+		Vector2(-0.44, -0.96),
+		Vector2(-0.77, -0.68),
+		Vector2(-0.94, -0.22),
+		Vector2(-1, 0.24),
+		Vector2(-0.93, 0.60),
+		Vector2(-0.70, 0.87)
+	]
 	var perimeter := PackedVector2Array()
 	for i in range(profile.size()):
 		var previous := profile[posmod(i - 1, profile.size())]
@@ -238,7 +272,12 @@ func _body_panel(rings: Array[Vector4], material: Material, parent: Node3D) -> v
 		var following := profile[(i + 2) % profile.size()]
 		for subdivision in range(4):
 			var t := float(subdivision) / 4
-			perimeter.append(Vector2(_bounded_hermite(previous.x, a.x, b.x, following.x, t), _bounded_hermite(previous.y, a.y, b.y, following.y, t)))
+			perimeter.append(
+				Vector2(
+					_bounded_hermite(previous.x, a.x, b.x, following.x, t),
+					_bounded_hermite(previous.y, a.y, b.y, following.y, t)
+				)
+			)
 	var interpolated: Array[Vector4] = []
 	for i in range(rings.size() - 1):
 		var a := rings[i]
@@ -249,7 +288,16 @@ func _body_panel(rings: Array[Vector4], material: Material, parent: Node3D) -> v
 			var t := float(subdivision) / 6
 			var ring := Vector4(lerpf(a.x, b.x, t), 0, 0, 0)
 			for component in range(1, 4):
-				ring[component] = _bounded_hermite(previous[component], a[component], b[component], following[component], t, a.x - previous.x, b.x - a.x, following.x - b.x)
+				ring[component] = _bounded_hermite(
+					previous[component],
+					a[component],
+					b[component],
+					following[component],
+					t,
+					a.x - previous.x,
+					b.x - a.x,
+					following.x - b.x
+				)
 			interpolated.append(ring)
 	interpolated.append(rings[-1])
 	var sections: Array[PackedVector3Array] = []
@@ -440,7 +488,9 @@ func _build_front() -> void:
 	_build_cockpit()
 
 
-func _instrument_text(text: String, at: Vector3, size: int, color: Color, parent: Node3D) -> Label3D:
+func _instrument_text(
+	text: String, at: Vector3, size: int, color: Color, parent: Node3D
+) -> Label3D:
 	var label := Label3D.new()
 	label.text = text
 	label.position = at
@@ -454,17 +504,43 @@ func _instrument_text(text: String, at: Vector3, size: int, color: Color, parent
 	return label
 
 
-func _beveled_panel(size: Vector2, depth: float, bevel: float, material: Material, parent: Node3D) -> void:
+func _beveled_panel(
+	size: Vector2, depth: float, bevel: float, material: Material, parent: Node3D
+) -> void:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var half_size := size * 0.5
-	var outline: Array[Vector2] = [Vector2(-half_size.x + bevel, -half_size.y), Vector2(half_size.x - bevel, -half_size.y), Vector2(half_size.x, -half_size.y + bevel), Vector2(half_size.x, half_size.y - bevel), Vector2(half_size.x - bevel, half_size.y), Vector2(-half_size.x + bevel, half_size.y), Vector2(-half_size.x, half_size.y - bevel), Vector2(-half_size.x, -half_size.y + bevel)]
+	var outline: Array[Vector2] = [
+		Vector2(-half_size.x + bevel, -half_size.y),
+		Vector2(half_size.x - bevel, -half_size.y),
+		Vector2(half_size.x, -half_size.y + bevel),
+		Vector2(half_size.x, half_size.y - bevel),
+		Vector2(half_size.x - bevel, half_size.y),
+		Vector2(-half_size.x + bevel, half_size.y),
+		Vector2(-half_size.x, half_size.y - bevel),
+		Vector2(-half_size.x, -half_size.y + bevel)
+	]
 	for i in range(outline.size()):
 		var a := outline[i]
 		var b := outline[(i + 1) % outline.size()]
-		_triangle(surface, Vector3(0, 0, depth * 0.5), Vector3(a.x, a.y, depth * 0.5), Vector3(b.x, b.y, depth * 0.5))
-		_triangle(surface, Vector3(a.x, a.y, -depth * 0.5), Vector3(b.x, b.y, -depth * 0.5), Vector3(b.x, b.y, depth * 0.5))
-		_triangle(surface, Vector3(a.x, a.y, -depth * 0.5), Vector3(b.x, b.y, depth * 0.5), Vector3(a.x, a.y, depth * 0.5))
+		_triangle(
+			surface,
+			Vector3(0, 0, depth * 0.5),
+			Vector3(a.x, a.y, depth * 0.5),
+			Vector3(b.x, b.y, depth * 0.5)
+		)
+		_triangle(
+			surface,
+			Vector3(a.x, a.y, -depth * 0.5),
+			Vector3(b.x, b.y, -depth * 0.5),
+			Vector3(b.x, b.y, depth * 0.5)
+		)
+		_triangle(
+			surface,
+			Vector3(a.x, a.y, -depth * 0.5),
+			Vector3(b.x, b.y, depth * 0.5),
+			Vector3(a.x, a.y, depth * 0.5)
+		)
 	surface.generate_normals()
 	_mesh(surface.commit(), material, parent)
 
@@ -494,34 +570,112 @@ func _build_cockpit() -> void:
 	# Forged top yoke and risers, with visible fasteners and fork adjustment caps.
 	_box(Vector3(0.245, 0.028, 0.084), Vector3(0, 0.59, 0.245), dark_metal, _front)
 	for side in [-1.0, 1.0]:
-		_bar(Vector3(side * 0.094, 0.595, 0.25), Vector3(side * 0.094, 0.611, 0.25), 0.026, _gold, _front)
-		_bar(Vector3(side * 0.094, 0.611, 0.25), Vector3(side * 0.094, 0.615, 0.25), 0.012, _metal, _front)
+		_bar(
+			Vector3(side * 0.094, 0.595, 0.25),
+			Vector3(side * 0.094, 0.611, 0.25),
+			0.026,
+			_gold,
+			_front
+		)
+		_bar(
+			Vector3(side * 0.094, 0.611, 0.25),
+			Vector3(side * 0.094, 0.615, 0.25),
+			0.012,
+			_metal,
+			_front
+		)
 		_box(Vector3(0.036, 0.072, 0.043), Vector3(side * 0.045, 0.647, 0.27), dark_metal, _front)
 		_box(Vector3(0.036, 0.026, 0.05), Vector3(side * 0.045, 0.70, 0.27), polymer, _front)
 		for z in [0.253, 0.286]:
-			_bar(Vector3(side * 0.045, 0.713, z), Vector3(side * 0.045, 0.717, z), 0.004, _metal, _front)
+			_bar(
+				Vector3(side * 0.045, 0.713, z),
+				Vector3(side * 0.045, 0.717, z),
+				0.004,
+				_metal,
+				_front
+			)
 		# Circumferential grip grooves catch light without noisy normal textures.
 		for i in range(13):
 			var x: float = side * (0.305 + i * 0.0071)
 			var y: float = 0.715 - float(i) * 0.00105
 			var z: float = 0.25 + float(i) * 0.0014
-			_lathe([Vector2(-0.0009, 0.020), Vector2(-0.0009, 0.0218), Vector2(0.0009, 0.0218), Vector2(0.0009, 0.020)], polymer, _front, Vector3(x, y, z))
-		_bar(Vector3(side * 0.40, 0.70, 0.27), Vector3(side * 0.425, 0.696, 0.275), 0.019, dark_metal, _front)
+			_lathe(
+				[
+					Vector2(-0.0009, 0.020),
+					Vector2(-0.0009, 0.0218),
+					Vector2(0.0009, 0.0218),
+					Vector2(0.0009, 0.020)
+				],
+				polymer,
+				_front,
+				Vector3(x, y, z)
+			)
+		_bar(
+			Vector3(side * 0.40, 0.70, 0.27),
+			Vector3(side * 0.425, 0.696, 0.275),
+			0.019,
+			dark_metal,
+			_front
+		)
 		var switchgear := Node3D.new()
 		switchgear.position = Vector3(side * 0.278, 0.717, 0.25)
 		switchgear.rotation.x = -0.3
 		_front.add_child(switchgear)
 		_beveled_panel(Vector2(0.047, 0.055), 0.047, 0.01, polymer, switchgear)
-		_box(Vector3(0.023, 0.010, 0.006), Vector3(0, 0.009, 0.027), accent if side > 0 else markings, switchgear)
+		_box(
+			Vector3(0.023, 0.010, 0.006),
+			Vector3(0, 0.009, 0.027),
+			accent if side > 0 else markings,
+			switchgear
+		)
 		_box(Vector3(0.014, 0.008, 0.006), Vector3(0, -0.009, 0.027), dark_metal, switchgear)
 		# Fluid pots have dark lids and a restrained translucent amber body color.
 		var fluid := _material(Color("696450"), 0.15, 0.43)
-		_bar(Vector3(side * 0.219, 0.70, 0.205), Vector3(side * 0.219, 0.745, 0.205), 0.028, fluid, _front)
-		_bar(Vector3(side * 0.219, 0.745, 0.205), Vector3(side * 0.219, 0.753, 0.205), 0.03, polymer, _front)
-		_bar(Vector3(side * 0.252, 0.713, 0.211), Vector3(side * 0.288, 0.704, 0.186), 0.009, dark_metal, _front)
-		_bar(Vector3(side * 0.288, 0.704, 0.186), Vector3(side * 0.372, 0.687, 0.167), 0.006, dark_metal, _front)
-		_bar(Vector3(side * 0.372, 0.687, 0.167), Vector3(side * 0.393, 0.69, 0.18), 0.007, dark_metal, _front)
-		_hose([Vector3(side * 0.23, 0.704, 0.215), Vector3(side * 0.20, 0.64, 0.10), Vector3(side * 0.12, 0.53, 0.12), Vector3(side * 0.11, 0.20, 0.06)], 0.0035, polymer)
+		_bar(
+			Vector3(side * 0.219, 0.70, 0.205),
+			Vector3(side * 0.219, 0.745, 0.205),
+			0.028,
+			fluid,
+			_front
+		)
+		_bar(
+			Vector3(side * 0.219, 0.745, 0.205),
+			Vector3(side * 0.219, 0.753, 0.205),
+			0.03,
+			polymer,
+			_front
+		)
+		_bar(
+			Vector3(side * 0.252, 0.713, 0.211),
+			Vector3(side * 0.288, 0.704, 0.186),
+			0.009,
+			dark_metal,
+			_front
+		)
+		_bar(
+			Vector3(side * 0.288, 0.704, 0.186),
+			Vector3(side * 0.372, 0.687, 0.167),
+			0.006,
+			dark_metal,
+			_front
+		)
+		_bar(
+			Vector3(side * 0.372, 0.687, 0.167),
+			Vector3(side * 0.393, 0.69, 0.18),
+			0.007,
+			dark_metal,
+			_front
+		)
+		_hose(
+			[
+				Vector3(side * 0.23, 0.704, 0.215),
+				Vector3(side * 0.20, 0.64, 0.10),
+				Vector3(side * 0.12, 0.53, 0.12),
+				Vector3(side * 0.11, 0.20, 0.06)
+			],
+			0.0035,
+			polymer
+		)
 	# Display face normal points upward and toward the rider, not skyward.
 	var instruments := Node3D.new()
 	instruments.name = "LiveInstrumentCluster"
@@ -536,13 +690,20 @@ func _build_cockpit() -> void:
 	_instrument_text("TRACK", Vector3(-0.061, 0.036, 0.002), 15, Color("94a8ae"), face)
 	_instrument_text("km/h", Vector3(-0.033, -0.034, 0.002), 13, Color("a7b4b9"), face)
 	_instrument_text("GEAR", Vector3(0.057, -0.034, 0.002), 12, Color("a7b4b9"), face)
-	_speed_label = _instrument_text("000", Vector3(-0.032, -0.009, 0.002), 56, Color("eaf3ee"), face)
+	_speed_label = _instrument_text(
+		"000", Vector3(-0.032, -0.009, 0.002), 56, Color("eaf3ee"), face
+	)
 	_gear_label = _instrument_text("N", Vector3(0.057, -0.009, 0.002), 56, Color("eaf3ee"), face)
 	_rpm_label = _instrument_text("0 RPM", Vector3(0.032, 0.036, 0.002), 14, Color("a7b4b9"), face)
 	for i in range(24):
 		var lit := _material(Color("d62a31") if i >= 19 else Color("e0e9d8"), 0, 1)
 		lit.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		var segment := _box(Vector3(0.0057, 0.005 + float(i) * 0.00012, 0.0005), Vector3(-0.077 + float(i) * 0.0066, 0.022, 0.002), lit, face)
+		var segment := _box(
+			Vector3(0.0057, 0.005 + float(i) * 0.00012, 0.0005),
+			Vector3(-0.077 + float(i) * 0.0066, 0.022, 0.002),
+			lit,
+			face
+		)
 		_rpm_segments.append(segment)
 	update_instruments(0, 1500, 1)
 

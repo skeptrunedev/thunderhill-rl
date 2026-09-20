@@ -535,17 +535,20 @@ func _update_visual(dt: float) -> void:
 	bike.update_instruments(sim.speed, sim.rpm, sim.gear)
 	camera.set_cull_mask_value(20, camera_mode == 0)
 	var forward := Vector3(sin(sim.heading), 0, -cos(sim.heading))
-	var desired: Vector3
-	var focus: Vector3
 	if camera_mode == 0:
-		desired = sim.position - forward * 5.5 + Vector3.UP * 2.35
-		focus = sim.position + forward * 10 + Vector3.UP * 1.0
+		camera.fov = 64.0
+		var desired: Vector3 = sim.position - forward * 5.5 + Vector3.UP * 2.35
+		var focus: Vector3 = sim.position + forward * 10 + Vector3.UP * 1.0
+		camera.position = camera.position.lerp(desired, 1.0 - exp(-dt * 8.0))
+		camera.look_at(focus, Vector3.UP)
 	else:
-		desired = sim.position + Vector3.UP * 1.23 + forward * 0.05
-		focus = desired + forward * 30 + Vector3.UP * (-0.3)
-	camera.position = camera.position.lerp(desired, 1.0 - exp(-dt * 8.0))
-	camera.look_at(focus, Vector3.UP)
-	if camera_mode == 1:
+		# A rider cannot trail metres behind the bike at speed. Attach translation
+		# to the posed helmet; retain partial roll stabilization for readability.
+		camera.fov = 90.0
+		camera.global_position = bike.to_global(bike.RIDER_EYE_LOCAL)
+		var upright := Vector3.UP.slide(riding_tangent).normalized()
+		var gaze := riding_tangent * cos(0.25) - upright * sin(0.25)
+		camera.look_at(camera.position + gaze * 30.0, upright)
 		camera.rotate_object_local(Vector3.FORWARD, sim.lean * 0.22)
 
 
