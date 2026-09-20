@@ -8,6 +8,8 @@ const AgentCameraScript = preload("res://scripts/agent_camera.gd")
 const DT: float = 1.0 / 120.0
 var track: Node3D
 var sim: RefCounted
+var collision_sweep: RefCounted
+var _collision_start_pose: Dictionary = {}
 var engine_audio: AudioStreamPlayer
 var bike_root: Node3D
 var bike: Node3D
@@ -145,6 +147,15 @@ func _ready() -> void:
 	add_child(bike_root)
 	bike = BikeScript.new()
 	bike_root.add_child(bike)
+	var envelope = preload("res://scripts/bike_collision_envelope.gd").new()
+	var collision_error: String = envelope.build(bike)
+	collision_sweep = preload("res://scripts/bike_sweep.gd").new()
+	if collision_error.is_empty():
+		collision_error = collision_sweep.build(envelope)
+	if not collision_error.is_empty():
+		push_error(collision_error)
+		get_tree().quit(2)
+		return
 	_startup_mark("environment_and_bike_complete")
 	AgentCameraScript.assign_rider_layer(bike.rider)
 	camera = Camera3D.new()
@@ -339,6 +350,14 @@ func _start_recording(station: float) -> void:
 			"surface_sha256": FileAccess.get_sha256("res://data/surface.json"),
 			"physics_version": sim.MODEL_VERSION,
 			"physics_dt": DT,
+			"obstacle_collision":
+			{
+				"envelope": preload("res://scripts/bike_collision_envelope.gd").MODEL_VERSION,
+				"sweep": preload("res://scripts/bike_sweep.gd").MODEL_VERSION,
+				"spatial_tolerance_m": preload("res://scripts/bike_sweep.gd").SPATIAL_TOLERANCE_M,
+				"pit_wall_sha256": FileAccess.get_sha256("res://data/pit-wall.json"),
+				"response": "terminal_freeze_no_impact_dynamics"
+			},
 			"initial_state": sim.telemetry(),
 			"parameters": sim.parameters,
 			"engine": Engine.get_version_info(),
@@ -371,7 +390,12 @@ func serializable(value: Variant) -> Variant:
 
 
 func _physics_process(_dt: float) -> void:
-	if agent_mode or paused or not environment_failure.is_empty():
+	if (
+		agent_mode
+		or paused
+		or not environment_failure.is_empty()
+		or (terminated and replay == null)
+	):
 		return
 	if replay != null:
 		var row: Dictionary = replay.next_state()
@@ -382,6 +406,8 @@ func _physics_process(_dt: float) -> void:
 		replay.apply_state(sim, row.state)
 		lap_time = sim.elapsed
 		wheel_rotation += sim.longitudinal_velocity * DT / 0.32
+		if not sim.collision_contact.is_empty():
+			wheel_rotation = float(sim.collision_contact.wheel_rotation)
 		return
 	if benchmark != null:
 		var action: Dictionary = benchmark.next_action()
@@ -468,12 +494,84 @@ func _sample_ground_after_step() -> Dictionary:
 			"error": "Integrated position has invalid ground contact",
 			"failure_type": "infrastructure"
 		}
-	return ground
+	sim.position.y = ground.height
+	var next_wheel: float = wheel_rotation + sim.longitudinal_velocity * DT / 0.32
+	var finish := _collision_pose(ground.normal, next_wheel)
+	var contact: Dictionary = collision_sweep.sweep(
+		get_world_3d().direct_space_state,
+		_collision_start_pose,
+		finish,
+		preload("res://scripts/pit_wall.gd").COLLISION_LAYER
+	)
+	if contact.has("error"):
+		return {"error": contact.error, "failure_type": "infrastructure"}
+	if contact.status == "clear":
+		return ground
+	var stopped: Dictionary = (
+		_collision_start_pose
+		if contact.status == "initial_overlap"
+		else collision_sweep.pose_at(float(contact.safe_fraction))
+	)
+	var stop_ground: Dictionary = track.sample_world(stopped.root.origin)
+	if (
+		not is_finite(float(stop_ground.height))
+		or not stop_ground.normal.is_finite()
+		or stop_ground.normal.y <= 0.0
+	):
+		return {
+			"error": "Obstacle contact pose has invalid ground", "failure_type": "infrastructure"
+		}
+	contact["type"] = "obstacle_contact"
+	contact["candidate_preimpact_state"] = serializable(sim.telemetry())
+	var collider := instance_from_id(int(contact.collider_id))
+	contact["obstacle_kind"] = str(collider.get_meta("obstacle_kind", "pit_wall"))
+	# Instance IDs are process local, so recordings use the obstacle kind and
+	# source hashes rather than presenting the ID as stable across rollouts.
+	contact.erase("collider_id")
+	var angles: Vector3 = stopped.root.basis.get_euler()
+	contact["root_rotation"] = [angles.x, angles.y, angles.z]
+	contact["wheel_rotation"] = stopped.wheel_rotation
+	sim.position = stopped.root.origin
+	sim.heading = -angles.y
+	sim.lean = -float(stopped.lean)
+	sim.steering = -float(stopped.steering)
+	sim.speed = 0.0
+	sim.longitudinal_velocity = 0.0
+	sim.lean_rate = 0.0
+	sim.crashed = true
+	sim.crash_reason = "pit_wall"
+	sim.collision_contact = contact
+	return stop_ground
+
+
+func _collision_pose(normal: Vector3, wheel: float) -> Dictionary:
+	return {
+		"root": _bike_root_transform(normal),
+		"lean": -sim.lean,
+		"steering": -sim.steering,
+		"wheel_rotation": wheel
+	}
+
+
+func _bike_root_transform(normal: Vector3) -> Transform3D:
+	if not sim.collision_contact.is_empty():
+		var angles: Array = sim.collision_contact.root_rotation
+		return Transform3D(Basis.from_euler(Vector3(angles[0], angles[1], angles[2])), sim.position)
+	var tangent: Vector3 = sim.surface_forward(normal)
+	return Transform3D(
+		Basis.from_euler(
+			Vector3(atan2(tangent.y, Vector2(tangent.x, tangent.z).length()), -sim.heading, 0)
+		),
+		sim.position
+	)
 
 
 func _step(action: Dictionary) -> Dictionary:
+	if terminated:
+		return {"error": "Episode terminated; reset required"}
 	var old_tick: int = sim.tick
 	var road: Dictionary = track.sample_world(sim.position)
+	_collision_start_pose = _collision_pose(road.normal, wheel_rotation)
 	var result: Dictionary = sim.step(DT, action, road, _sample_ground_after_step)
 	if result.has("error"):
 		environment_failure = {
@@ -495,7 +593,8 @@ func _step(action: Dictionary) -> Dictionary:
 			get_tree().quit(2)
 		return environment_failure.duplicate(true)
 	var after: Dictionary = result.ground_after
-	sim.position.y = after.height
+	if sim.collision_contact.is_empty():
+		sim.position.y = after.height
 	sim.on_track = after.on_track
 	var difference := float(after.progress) - last_progress
 	if difference > 0.5:
@@ -505,6 +604,9 @@ func _step(action: Dictionary) -> Dictionary:
 	var moved: float = difference * track.length_m
 	lap_time += DT
 	var events: Array = []
+	if not sim.collision_contact.is_empty():
+		lap_valid = false
+		events.append(sim.collision_contact.duplicate(true))
 	if not after.on_track:
 		lap_valid = false
 	var gate := int(float(after.progress) * 32) % 32
@@ -525,8 +627,11 @@ func _step(action: Dictionary) -> Dictionary:
 		legal_distance += moved
 	last_progress = after.progress
 	if sim.crashed:
+		lap_valid = false
 		terminated = true
 	wheel_rotation += sim.longitudinal_velocity * DT / 0.32
+	if not sim.collision_contact.is_empty():
+		wheel_rotation = float(sim.collision_contact.wheel_rotation)
 	var transition: Dictionary = {
 		"type": "transition",
 		"episode_id": episode_id,
@@ -631,13 +736,8 @@ func _update_visual(dt: float) -> void:
 	if sim == null:
 		return
 	var road: Dictionary = track.sample_world(sim.position)
-	bike_root.position = sim.position
+	bike_root.transform = _bike_root_transform(road.normal)
 	var riding_tangent: Vector3 = sim.surface_forward(road.normal)
-	bike_root.rotation = Vector3(
-		atan2(riding_tangent.y, Vector2(riding_tangent.x, riding_tangent.z).length()),
-		-sim.heading,
-		0
-	)
 	bike.update_pose(-sim.lean, -sim.steering, wheel_rotation)
 	bike.update_instruments(sim.speed, sim.rpm, sim.gear)
 	camera.set_cull_mask_value(20, camera_mode == 0)
@@ -859,5 +959,8 @@ func _build_provenance() -> Dictionary:
 	return {
 		"kind": "unbundled_development",
 		"physics_script_sha256": FileAccess.get_sha256("res://scripts/motorcycle.gd"),
-		"game_script_sha256": FileAccess.get_sha256("res://scripts/main.gd")
+		"game_script_sha256": FileAccess.get_sha256("res://scripts/main.gd"),
+		"bike_visual_script_sha256": FileAccess.get_sha256("res://scripts/bike_visual.gd"),
+		"envelope_script_sha256": FileAccess.get_sha256("res://scripts/bike_collision_envelope.gd"),
+		"sweep_script_sha256": FileAccess.get_sha256("res://scripts/bike_sweep.gd")
 	}

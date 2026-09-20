@@ -26,6 +26,14 @@ func open_recording(path: String, expected_track_hash: String) -> String:
 			and manifest[key] != FileAccess.get_sha256("res://data/" + source + ".json")
 		):
 			return "Replay " + source + " hash differs from loaded ground"
+	if (
+		manifest.has("obstacle_collision")
+		and (
+			manifest.obstacle_collision.get("pit_wall_sha256", "")
+			!= FileAccess.get_sha256("res://data/pit-wall.json")
+		)
+	):
+		return "Replay pit wall hash differs from loaded obstacle"
 	finished = false
 	consumed_ticks = 0
 	return ""
@@ -71,6 +79,7 @@ func apply_state(sim: RefCounted, state: Dictionary) -> void:
 		"grip_utilization",
 		"target_lean",
 		"crash_reason",
+		"collision_contact",
 		"assist_enabled",
 		"auto_shift",
 		"shift_remaining",

@@ -10,7 +10,7 @@ The shape inputs preserve every distinct authored vertex. The initial use of `Me
 
 `transforms` calculates each part's pose from the supplied world root transform and explicit lean, steering and wheel angles. It does not read the last rendered pose. Angles follow `BikeVisual.update_pose`, so the caller must apply the simulation's sign convention. Front steering and both wheel rotations use their actual authored pivot positions. The current artwork still rotates steering about a vertical axis and has a fixed rider pose; this utility does not improve those physical assumptions.
 
-`overlaps` uses the actual physics space and an explicit collision mask. It reports at most one obstacle per component, with the component identifier and joint. It provides discrete overlap existence, not a full contact manifold, contact normal, continuous sweep or impact response. It is not yet connected to gameplay termination. The next integration must cover translation and rotation between physics steps, initially overlapping poses, a last certified clear pose, human and agent parity, and recorded crash events. Simply calling this endpoint query from the simulation would miss fast crossings.
+`overlaps` uses the actual physics space and an explicit collision mask. It reports at most one obstacle per component, with the component identifier and joint. It provides discrete overlap existence, not a full contact manifold, contact normal, continuous sweep or impact response. The game now uses the separate [continuous sweep and terminal contact response](continuous-wall-contact.md) for gameplay termination. Simply calling this endpoint query from the simulation would miss fast crossings.
 
 Run the actual engine checks with:
 

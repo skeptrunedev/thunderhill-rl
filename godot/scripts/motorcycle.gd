@@ -60,6 +60,7 @@ var gear := 1
 var rpm := 1400.0
 var crashed := false
 var crash_reason := ""
+var collision_contact: Dictionary = {}
 var elapsed := 0.0
 var tick := 0
 var longitudinal_acceleration := 0.0
@@ -106,6 +107,7 @@ func reset(start_position: Vector3, start_heading: float, initial_speed: float =
 	rpm = float(parameters.idle_rpm)
 	crashed = false
 	crash_reason = ""
+	collision_contact.clear()
 	elapsed = 0.0
 	tick = 0
 	longitudinal_acceleration = 0.0
@@ -704,6 +706,7 @@ func telemetry() -> Dictionary:
 		"rpm": rpm,
 		"crashed": crashed,
 		"crash_reason": crash_reason,
+		"collision_contact": collision_contact.duplicate(true),
 		"on_track": on_track,
 		"longitudinal_acceleration": longitudinal_acceleration,
 		"lateral_acceleration": lateral_acceleration,
