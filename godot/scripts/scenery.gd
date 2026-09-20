@@ -4,15 +4,27 @@ extends Node3D
 ## Braking boards are provisional visual landmarks, with no collision geometry.
 ## Mapped trees and buildings are provided separately by TrackLandmarks.
 
-const GRASS_COUNT := 24000
+const GRASS_COUNT := 96000
 const PATCH_SIZE := 32.0
 var _track: Node3D
 var _random := RandomNumberGenerator.new()
+var _grass_exclusions: Array[PackedVector2Array] = []
 
 
 func build(track: Node3D) -> void:
 	_track = track
 	_random.seed = 481927
+	_grass_exclusions.clear()
+	var landmarks: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/landmarks.json")
+	)
+	for row: Dictionary in landmarks.paving + landmarks.buildings:
+		var polygon := PackedVector2Array()
+		for point: Array in row.points:
+			polygon.append(Vector2(point[0], point[1]))
+		# Keep the whole clump clear, including its largest authored footprint.
+		for expanded: PackedVector2Array in Geometry2D.offset_polygon(polygon, 0.4):
+			_grass_exclusions.append(expanded)
 	_build_grass()
 	_build_boards()
 
@@ -22,7 +34,9 @@ func _ground_height(p: Vector3, _road: Dictionary) -> float:
 
 
 func _grass_meshes() -> Array[ArrayMesh]:
-	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/grass/grass.json"))
+	var data: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://assets/grass/grass.json")
+	)
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = load("res://assets/grass/dry_grass_rgba.png")
 	material.vertex_color_use_as_albedo = true
@@ -34,27 +48,49 @@ func _grass_meshes() -> Array[ArrayMesh]:
 	material.alpha_scissor_threshold = 0.35
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var meshes: Array[ArrayMesh] = []
-	for row: Dictionary in data.meshes:
+	# The source assets are individual stems, not complete roadside tussocks.
+	# Assemble several sizes in each clump, keeping the source UVs and normals.
+	# A separate seed keeps decorative mesh edits independent of world placement.
+	var clump_random := RandomNumberGenerator.new()
+	clump_random.seed = 91317
+	for variant in range(3):
 		var surface := SurfaceTool.new()
 		surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-		# Source glTF uses counterclockwise front faces; Godot uses clockwise.
-		for face in range(0, row.indices.size(), 3):
-			for corner in [0, 2, 1]:
-				var index := int(row.indices[face + corner])
-				var p: Array = row.positions[index]
-				var n: Array = row.normals[index]
-				var uv: Array = row.uv[index]
-				surface.set_normal(Vector3(n[0], n[1], n[2]))
-				surface.set_uv(Vector2(uv[0], uv[1]))
-				surface.add_vertex(Vector3(p[0], p[1], p[2]))
+		for source_index: int in [0, 1, 1, 2, 2, 2]:
+			var row: Dictionary = data.meshes[source_index]
+			var scale := clump_random.randf_range(0.75, 1.15)
+			if source_index == 0:
+				scale *= 0.7
+			var basis := Basis(Vector3.UP, clump_random.randf() * TAU)
+			var angle := clump_random.randf() * TAU
+			var radius := sqrt(clump_random.randf()) * 0.16
+			var offset := Vector3(cos(angle), 0, sin(angle)) * radius
+			# Source glTF uses counterclockwise front faces; Godot uses clockwise.
+			for face in range(0, row.indices.size(), 3):
+				for corner in [0, 2, 1]:
+					var index := int(row.indices[face + corner])
+					var p: Array = row.positions[index]
+					var n: Array = row.normals[index]
+					var uv: Array = row.uv[index]
+					surface.set_normal(basis * Vector3(n[0], n[1], n[2]))
+					surface.set_uv(Vector2(uv[0], uv[1]))
+					surface.add_vertex(basis * Vector3(p[0], p[1], p[2]) * scale + offset)
 		surface.set_material(material)
 		meshes.append(surface.commit())
 	return meshes
 
 
+func _excluded_grass(position: Vector3) -> bool:
+	for polygon in _grass_exclusions:
+		if Geometry2D.is_point_in_polygon(Vector2(position.x, position.z), polygon):
+			return true
+	return false
+
+
 func _build_grass() -> void:
 	var patches: Dictionary = {}
 	var positions: PackedVector3Array = _track.points
+	var accepted := 0
 	# Sample around all sections rather than scattering uniformly over distant land.
 	for attempt in range(GRASS_COUNT * 2):
 		var index := _random.randi_range(0, positions.size() - 1)
@@ -67,21 +103,26 @@ func _build_grass() -> void:
 		var position := (
 			positions[index].lerp(positions[next], _random.randf()) + left * offset * side
 		)
+		if _excluded_grass(position):
+			continue
 		var road: Dictionary = _track.sample_world(position)
 		if absf(road.distance) < road.width * 0.5 + 1.4:
 			continue
-		position.y = _ground_height(position, road) - 0.015
+		position.y = road.height - 0.015
 		var cell := Vector2i(floori(position.x / PATCH_SIZE), floori(position.z / PATCH_SIZE))
 		if not patches.has(cell):
 			patches[cell] = []
-		patches[cell].append(position)
-		if attempt >= GRASS_COUNT - 1:
+		patches[cell].append({"position": position, "normal": road.normal})
+		accepted += 1
+		if accepted >= GRASS_COUNT:
 			break
 	var meshes := _grass_meshes()
 	for cell: Vector2i in patches:
 		var positions_in_patch: Array = patches[cell]
 		var origin := Vector3(
-			(cell.x + 0.5) * PATCH_SIZE, positions_in_patch[0].y, (cell.y + 0.5) * PATCH_SIZE
+			(cell.x + 0.5) * PATCH_SIZE,
+			positions_in_patch[0].position.y,
+			(cell.y + 0.5) * PATCH_SIZE
 		)
 		var multi := MultiMesh.new()
 		multi.transform_format = MultiMesh.TRANSFORM_3D
@@ -90,12 +131,17 @@ func _build_grass() -> void:
 		multi.mesh = meshes[variant]
 		multi.instance_count = positions_in_patch.size()
 		for i in range(positions_in_patch.size()):
-			var authored_scale := 0.7 if variant == 0 else 2.0
-			var scale := _random.randf_range(0.65, 1.55) * authored_scale
-			var basis := Basis(Vector3.UP, _random.randf() * TAU).scaled(
-				Vector3(scale, scale * _random.randf_range(0.7, 1.2), scale)
+			var scale := _random.randf_range(0.65, 1.55)
+			var ground_basis := Basis(Quaternion(Vector3.UP, positions_in_patch[i].normal))
+			var basis := (
+				ground_basis
+				* Basis(Vector3.UP, _random.randf() * TAU).scaled(
+					Vector3(scale, scale * _random.randf_range(0.7, 1.2), scale)
+				)
 			)
-			multi.set_instance_transform(i, Transform3D(basis, positions_in_patch[i] - origin))
+			multi.set_instance_transform(
+				i, Transform3D(basis, positions_in_patch[i].position - origin)
+			)
 			multi.set_instance_color(i, Color.WHITE.lerp(Color("ab9d74"), _random.randf() * 0.25))
 		var instance := MultiMeshInstance3D.new()
 		instance.name = "DryGrass_%d_%d" % [cell.x, cell.y]
