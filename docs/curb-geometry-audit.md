@@ -45,8 +45,9 @@ invalid input, winding, UVs and reset behavior.
 
 Placement, width and profile remain provisional. This change preserves the
 existing visible curb geometry and does not certify it against surveyed curbs.
-Motorcycle friction still follows `on_track`, so curb material friction and
-racing legality need separate explicit semantics. Reviewed station intervals
+Motorcycle friction now selects separate configurable curb coefficients for
+exposed curbs, independently of `on_track`. Those coefficients remain uncalibrated
+dry pavement estimates, as documented in `dynamics-implementation.md`. Reviewed station intervals
 must replace the curvature rule before claiming an accurate reconstruction.
 
 Evidence is in `artifacts/curb-audit/report.json`, `overview.png`, the numbered

@@ -668,6 +668,7 @@ func _step(action: Dictionary) -> Dictionary:
 			"progress": after.progress,
 			"lateral_m": after.distance,
 			"on_track": after.on_track,
+			"on_curb": after.on_curb,
 			"lap_valid": lap_valid,
 			"legal_distance": legal_distance,
 			"next_gate": next_gate
@@ -701,6 +702,7 @@ func observation() -> Dictionary:
 				"progress": road.progress,
 				"lateral_m": road.distance,
 				"on_track": road.on_track,
+				"on_curb": road.on_curb,
 				"lap_valid": lap_valid,
 				"legal_distance": legal_distance,
 				"completed_laps": completed_laps

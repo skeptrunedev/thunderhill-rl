@@ -43,6 +43,8 @@ def exercise(client: Client) -> dict:
     episode = client.request({"op": "reset", "policy_id": "checkpoint-alpha"})
     assert episode["tick"] == 0 and episode["policy_id"] == "checkpoint-alpha", episode
     episode_id = episode["episode_id"]
+    assert episode["state"]["surface_material"] == "unknown"
+    assert episode["track"]["on_curb"] is False
 
     def observe() -> dict:
         return client.request({"op": "observe", "episode_id": episode_id})
@@ -58,6 +60,9 @@ def exercise(client: Client) -> dict:
     assert abs(advanced["sim_time"] - 0.1) < 1e-10, advanced
     for index, transition in enumerate(advanced["transitions"]):
         assert transition["previous_tick"] == index and transition["tick"] == index + 1
+        assert transition["state"]["surface_material"] == "asphalt"
+        assert transition["state"]["surface_friction"] > 0
+        assert transition["track"]["on_curb"] is False
     assert client.request(command) == advanced, "Duplicate action was not identical"
     assert observe()["tick"] == 12, "Duplicate action advanced twice"
     altered = copy.deepcopy(command)
@@ -133,6 +138,9 @@ def main() -> None:
                         if record.get("type") == "transition":
                             policies.add(record["policy_id"])
                             transition_count += 1
+                            assert record["state"]["surface_material"] == "asphalt"
+                            assert record["state"]["surface_friction"] > 0
+                            assert record["track"]["on_curb"] is False
                             if record["policy_id"] == "checkpoint-alpha":
                                 replay_recording = recording
                 assert policies == {"checkpoint-alpha", "checkpoint-beta", "checkpoint-coast"}, policies

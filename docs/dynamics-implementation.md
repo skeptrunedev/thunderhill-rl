@@ -1,6 +1,6 @@
 # Initial motorcycle dynamics implementation
 
-The initial Godot model is a reduced order, explicitly stepped prototype for testing controls, scenes, replay and the RL interface. It is not validated hyperrealistic handling. The dynamics version is `reduced-order-combined-assist-v5`.
+The initial Godot model is a reduced order, explicitly stepped prototype for testing controls, scenes, replay and the RL interface. It is not validated hyperrealistic handling. The dynamics version is `reduced-order-surface-grip-v6`.
 
 `godot/scripts/motorcycle.gd` defines `MotorcycleSim`, a `RefCounted` object with no scene processing or wall clock access. Call `reset(position, heading, initial_speed)` and then `step(dt, controls, road_sample)`. Rendering and reading `telemetry()` do not advance it. The caller owns the fixed timestep, at most 0.02 seconds, and road sampling. Ground position is the contact reference. Positive heading turns right, with forward vector `(sin(heading), 0, -cos(heading))`. Positive lean is right. Velocities are metres per second and angles are radians.
 
@@ -18,7 +18,7 @@ Engine torque passes through the selected primary, gear and final ratios to the 
 
 Each tire's longitudinal force consumes part of a circular friction budget. The remaining front and rear budgets bound total lateral force while preserving steady yaw moment balance about the center of gravity. Steering requests lateral force using wheelbase and speed. The roll equation includes gravity and lateral acceleration; exceeding the ground contact lean threshold marks a fall. The fallen state slides to rest under a labeled estimated deceleration. The game server should stop RL episodes at the fall event, although human visualization may continue the slide.
 
-Leaving the road lowers grip and increases rolling resistance. It does not teleport or steer the motorcycle back onto the course. Track boundary and lap legality decisions belong to the episode and track logic.
+Unpaved ground lowers grip and increases rolling resistance. Exposed curb contact uses separate configurable curb coefficients, independently of track legality. It does not teleport or steer the motorcycle back onto the course. Track boundary and lap legality decisions belong to the episode and track logic.
 
 Important simplifications include no separate lateral velocity or wheel slip state, no tire relaxation or thermal model, no suspension, pitch, airborne motion, wheelies or crash collision geometry. The tire model is a force budget, not Pacejka. Bank and grade gravity are projected into a local road frame, with the contact assumptions explained below. Axle loads satisfy quasistatic pitch balance within the declared contact model. Axle lateral forces now satisfy steady yaw moment balance. There is still no yaw inertia or transient yaw response, and steered front tire forces are not rotated into the road frame; this is a small steering angle force approximation. Changes in surface and sharp throttle or brake commands require timestep sensitivity testing.
 
@@ -120,3 +120,29 @@ The independent research reference is [Nonplanar Vehicle Control](https://github
 ## Acceptance boundary
 
 Deterministic reset, numerical finiteness, acceleration and braking direction, correctly signed load transfer, countersteering and combined grip constraints can be tested now. Calibration against measured acceleration, braking, lean response, suspension and tire data remains outstanding. Successful laps with this prototype demonstrate the game loop and assisted control task, not physical fidelity or optimal real world racing.
+
+## Surface grip selection
+
+Version 6 accepts an optional boolean `on_curb` in the road sample. Exposed
+curbs use `curb_friction` and `curb_rolling_coefficient`; otherwise `on_track`
+selects the existing asphalt or offroad parameters. Omitted curb flags preserve
+legacy callers. Terrain covering a curb has no exposed curb flag. Invalid flags
+and nonnumeric, nonfinite or negative selected coefficients reject the transition
+without mutating state.
+
+The default curb coefficients reuse the existing dry pavement estimates (1.10
+friction and 0.015 rolling resistance). These are placeholders, not measured
+paint, concrete or Thunderhill values. Wetness and paint specific grip are not
+modeled. This removes the accidental assignment of dirt coefficients to exposed
+curbs without claiming calibrated tire behavior.
+
+`state.surface_material`, `state.surface_friction` and
+`state.surface_rolling_coefficient` describe the contact selected at the start of
+the last accepted step. Before any step they are `unknown`, zero and zero.
+`track.on_curb` describes the sampled position after the step, so a transition
+crossing a boundary may legitimately have different current contact and force
+material. Both are recorded. Crashed sliding still uses the existing fixed slide
+deceleration rather than these tire coefficients. Track legality and rewards
+remain independent.
+The current model still samples one ground point for both tires; mixed axle
+surfaces require separate wheel contact states in the future contact model.

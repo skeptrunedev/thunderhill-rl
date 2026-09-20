@@ -3,9 +3,18 @@ extends RefCounted
 ## Explicitly stepped, reduced order motorcycle prototype. SI units throughout.
 ## This is original code, not validated Ducati or tire manufacturer dynamics.
 
-const MODEL_VERSION := "reduced-order-combined-assist-v5"
+const MODEL_VERSION := "reduced-order-surface-grip-v6"
 const GRAVITY := 9.81
 const GEAR_RATIOS := [38.0 / 14.0, 36.0 / 17.0, 33.0 / 19.0, 32.0 / 21.0, 30.0 / 22.0, 30.0 / 24.0]
+
+const FRICTION_KEYS := {
+	"curb": "curb_friction", "asphalt": "asphalt_friction", "offroad": "offtrack_friction"
+}
+const ROLLING_KEYS := {
+	"curb": "curb_rolling_coefficient",
+	"asphalt": "rolling_coefficient",
+	"offroad": "offtrack_rolling_coefficient"
+}
 
 # Brochure dimensions and ratios are sourced in docs/motorcycle-reference.md.
 # Other parameters are explicit engineering estimates, not measured calibration.
@@ -32,6 +41,9 @@ var parameters: Dictionary = {
 	"air_density_kg_m3": 1.225,
 	"rolling_coefficient": 0.015,
 	"asphalt_friction": 1.10,
+	# Uncalibrated dry pavement placeholder, not measured painted curb grip.
+	"curb_friction": 1.10,
+	"curb_rolling_coefficient": 0.015,
 	"offtrack_friction": 0.48,
 	"offtrack_rolling_coefficient": 0.07,
 	"front_brake_capacity_n": 4400.0,
@@ -80,6 +92,9 @@ var requested_lateral_force_n := 0.0
 var grip_utilization := 0.0
 var target_lean := 0.0
 var on_track := true
+var surface_material := "unknown"
+var surface_friction := 0.0
+var surface_rolling_coefficient := 0.0
 var assist_enabled := true
 var auto_shift := true
 var throttle_applied := 0.0
@@ -127,6 +142,9 @@ func reset(start_position: Vector3, start_heading: float, initial_speed: float =
 	grip_utilization = 0.0
 	target_lean = 0.0
 	on_track = true
+	surface_material = "unknown"
+	surface_friction = 0.0
+	surface_rolling_coefficient = 0.0
 	assist_enabled = true
 	auto_shift = true
 	throttle_applied = 0.0
@@ -254,8 +272,28 @@ func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -
 			error = "Road normal must be finite, nonzero and upward"
 		elif not road_sample.on_track is bool:
 			error = "Road on_track must be boolean"
+	if road_sample.has("on_curb") and not road_sample.on_curb is bool:
+		error = "Road on_curb must be boolean"
 	if not error.is_empty():
 		return {"error": error, "tick": tick}
+	var material_name := (
+		"curb"
+		if road_sample.get("on_curb", false)
+		else ("asphalt" if road_sample.on_track else "offroad")
+	)
+	for key: String in [FRICTION_KEYS[material_name], ROLLING_KEYS[material_name]]:
+		var value: Variant = parameters.get(key)
+		if (
+			not (value is float or value is int)
+			or not is_finite(float(value))
+			or float(value) < 0.0
+		):
+			return {
+				"error": "Surface coefficient %s must be finite and nonnegative" % key, "tick": tick
+			}
+	surface_material = material_name
+	surface_friction = float(parameters[FRICTION_KEYS[material_name]])
+	surface_rolling_coefficient = float(parameters[ROLLING_KEYS[material_name]])
 	last_controls = controls.duplicate(true)
 	assist_enabled = bool(controls.get("assist_enabled", true))
 	auto_shift = bool(controls.get("auto_shift", true))
@@ -294,10 +332,8 @@ func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -
 	var total_mass := mass_kg()
 	var normal_gravity := gravity_normal_m_s2
 	var normal_force := total_mass * normal_gravity
-	var friction := float(parameters.asphalt_friction if on_track else parameters.offtrack_friction)
-	var roll_resistance := float(
-		parameters.rolling_coefficient if on_track else parameters.offtrack_rolling_coefficient
-	)
+	var friction := surface_friction
+	var roll_resistance := surface_rolling_coefficient
 	var ratio := (
 		float(parameters.primary_ratio)
 		* float(GEAR_RATIOS[gear - 1])
@@ -708,6 +744,9 @@ func telemetry() -> Dictionary:
 		"crash_reason": crash_reason,
 		"collision_contact": collision_contact.duplicate(true),
 		"on_track": on_track,
+		"surface_material": surface_material,
+		"surface_friction": surface_friction,
+		"surface_rolling_coefficient": surface_rolling_coefficient,
 		"longitudinal_acceleration": longitudinal_acceleration,
 		"lateral_acceleration": lateral_acceleration,
 		"front_load_n": front_load_n,
