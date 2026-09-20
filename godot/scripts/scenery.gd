@@ -1,8 +1,8 @@
 class_name TrackScenery
 extends Node3D
-## Original decorative vegetation, not surveyed individual plants.
+## CC0 Poly Haven decorative vegetation, not surveyed individual plants.
 ## Braking boards are provisional visual landmarks, with no collision geometry.
-## Trees and paddock structures await georeferenced placement evidence.
+## Mapped trees and buildings are provided separately by TrackLandmarks.
 
 const GRASS_COUNT := 24000
 const PATCH_SIZE := 32.0
@@ -21,36 +21,35 @@ func _ground_height(p: Vector3, _road: Dictionary) -> float:
 	return _track.terrain_surface_height(p)
 
 
-func _grass_mesh() -> ArrayMesh:
-	var surface := SurfaceTool.new()
-	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Bent tapered ribbons, no alpha textures, each clump contains six blades.
-	for i in range(6):
-		var angle := float(i) * 2.39996
-		var width := 0.013 + float(i % 3) * 0.004
-		var height := 0.16 + float(i % 4) * 0.042
-		var offset := Vector3(cos(angle) * 0.05, 0, sin(angle) * 0.05)
-		var side := Vector3(cos(angle), 0, sin(angle)) * width
-		var bend := Vector3(sin(angle), 0, -cos(angle)) * height * 0.28
-		var left := offset - side
-		var right := offset + side
-		var mid_left := offset + bend * 0.4 + Vector3.UP * height * 0.6 - side * 0.55
-		var mid_right := offset + bend * 0.4 + Vector3.UP * height * 0.6 + side * 0.55
-		var tip := offset + bend + Vector3.UP * height
-		for vertex in [left, right, mid_right, left, mid_right, mid_left, mid_left, mid_right, tip]:
-			surface.set_color(
-				Color("877246").lerp(Color("c0ad75"), clampf(vertex.y / height, 0, 1))
-			)
-			surface.add_vertex(vertex)
-	surface.generate_normals()
+func _grass_meshes() -> Array[ArrayMesh]:
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/grass/grass.json"))
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color.WHITE
+	material.albedo_texture = load("res://assets/grass/dry_grass_rgba.png")
 	material.vertex_color_use_as_albedo = true
 	material.vertex_color_is_srgb = true
-	material.roughness = 1
+	material.roughness = 1.0
+	material.metallic_specular = 0.05
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	surface.set_material(material)
-	return surface.commit()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	material.alpha_scissor_threshold = 0.35
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var meshes: Array[ArrayMesh] = []
+	for row: Dictionary in data.meshes:
+		var surface := SurfaceTool.new()
+		surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+		# Source glTF uses counterclockwise front faces; Godot uses clockwise.
+		for face in range(0, row.indices.size(), 3):
+			for corner in [0, 2, 1]:
+				var index := int(row.indices[face + corner])
+				var p: Array = row.positions[index]
+				var n: Array = row.normals[index]
+				var uv: Array = row.uv[index]
+				surface.set_normal(Vector3(n[0], n[1], n[2]))
+				surface.set_uv(Vector2(uv[0], uv[1]))
+				surface.add_vertex(Vector3(p[0], p[1], p[2]))
+		surface.set_material(material)
+		meshes.append(surface.commit())
+	return meshes
 
 
 func _build_grass() -> void:
@@ -78,7 +77,7 @@ func _build_grass() -> void:
 		patches[cell].append(position)
 		if attempt >= GRASS_COUNT - 1:
 			break
-	var mesh := _grass_mesh()
+	var meshes := _grass_meshes()
 	for cell: Vector2i in patches:
 		var positions_in_patch: Array = patches[cell]
 		var origin := Vector3(
@@ -87,10 +86,12 @@ func _build_grass() -> void:
 		var multi := MultiMesh.new()
 		multi.transform_format = MultiMesh.TRANSFORM_3D
 		multi.use_colors = true
-		multi.mesh = mesh
+		var variant := absi(cell.x * 73 + cell.y * 131) % meshes.size()
+		multi.mesh = meshes[variant]
 		multi.instance_count = positions_in_patch.size()
 		for i in range(positions_in_patch.size()):
-			var scale := _random.randf_range(0.65, 1.55)
+			var authored_scale := 0.7 if variant == 0 else 2.0
+			var scale := _random.randf_range(0.65, 1.55) * authored_scale
 			var basis := Basis(Vector3.UP, _random.randf() * TAU).scaled(
 				Vector3(scale, scale * _random.randf_range(0.7, 1.2), scale)
 			)

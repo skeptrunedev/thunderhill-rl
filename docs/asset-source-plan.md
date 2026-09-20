@@ -1,6 +1,6 @@
 # Asset source plan
 
-Verified 19 September 2026. This is a source inventory for the first playable section. Their existence and licenses were checked on their publishers' pages. Asphalt, soil, and dry grass candidates have now been acquired locally for inspection, but have not been imported into Godot or matched to a calibrated Thunderhill view.
+Verified 19 September 2026. This is a source inventory for the first playable section. Their existence and licenses were checked on their publishers' pages. Asphalt, soil, dry grass, and the sky panorama are now imported and rendered in Godot. Their appearance remains an artistic match rather than a calibrated reconstruction of Thunderhill lighting.
 
 ## Material inventory
 
@@ -44,3 +44,9 @@ Run `uv run tools/fetch_materials.py` to acquire the pinned 1K samples from [the
 The acquired color sheet was visually inspected. Asphalt010 has a fine dark grey aggregate with no dominant cracks, making it a plausible repave starting point. Brown Mud Dry contains pronounced coarse stones and tracks; it should not cover every shoulder uniformly. Withered Grass is pale beige and dense, so blending exposed ground and adding sparse silhouettes will be necessary. These observations concern the samples only. They do not establish a calibrated color match, actual aggregate size at Thunderhill, or correct lighting response in Godot. A sheet of color maps also cannot validate the normal and roughness response at a low riding camera angle.
 
 The pinned acquisition was run a second time successfully, verifying all downloaded hashes and regenerating the sheet from the cached files.
+
+## Near vegetation implementation
+
+`tools/fetch_grass.py` acquires pinned CC0 Grass Medium 01 source files and extracts three complete author tufts, preserving mesh shape and atlas coordinates. The source dry diffuse RGB and alpha mask form one 1K RGBA atlas. Mesh triangles, conversion details, authors, licenses and source hashes are stored in `godot/assets/grass/grass.json`. This JSON is explicitly included in native export presets.
+
+Godot instantiates these tufts in spatial patches with bounded visibility. Placement and scale remain artistic estimates. Broad terrain color variation uses several spatial scales instead of a repeating sine pattern; this changes appearance only, not surface identity or tire grip.

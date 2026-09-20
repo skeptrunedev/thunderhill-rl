@@ -3,7 +3,7 @@ extends RefCounted
 ## Explicitly stepped, reduced order motorcycle prototype. SI units throughout.
 ## This is original code, not validated Ducati or tire manufacturer dynamics.
 
-const MODEL_VERSION := "reduced-order-contact-balance-v3"
+const MODEL_VERSION := "reduced-order-combined-assist-v5"
 const GRAVITY := 9.81
 const GEAR_RATIOS := [38.0 / 14.0, 36.0 / 17.0, 33.0 / 19.0, 32.0 / 21.0, 30.0 / 22.0, 30.0 / 24.0]
 
@@ -68,6 +68,12 @@ var front_load_n := 0.0
 var rear_load_n := 0.0
 var front_force_n := 0.0
 var rear_force_n := 0.0
+var front_lateral_force_n := 0.0
+var rear_lateral_force_n := 0.0
+var front_lateral_capacity_n := 0.0
+var rear_lateral_capacity_n := 0.0
+var lateral_capacity_n := 0.0
+var longitudinal_force_scale := 1.0
 var lateral_force_n := 0.0
 var requested_lateral_force_n := 0.0
 var grip_utilization := 0.0
@@ -108,6 +114,12 @@ func reset(start_position: Vector3, start_heading: float, initial_speed: float =
 	rear_load_n = mass_kg() * GRAVITY - front_load_n
 	front_force_n = 0.0
 	rear_force_n = 0.0
+	front_lateral_force_n = 0.0
+	rear_lateral_force_n = 0.0
+	front_lateral_capacity_n = 0.0
+	rear_lateral_capacity_n = 0.0
+	lateral_capacity_n = 0.0
+	longitudinal_force_scale = 1.0
 	lateral_force_n = 0.0
 	requested_lateral_force_n = 0.0
 	grip_utilization = 0.0
@@ -305,6 +317,14 @@ func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -
 		0.5 * float(parameters.air_density_kg_m3) * float(parameters.drag_area_m2) * speed * speed
 	)
 	var resistance := roll_resistance * normal_force * clampf(speed, 0.0, 1.0)
+	_update_steering(dt, float(controls.get("steer", 0.0)), normal_gravity)
+	# Steering specifies total acceleration in the local road plane. Gravity's
+	# cross slope component is already a force and must not consume tire grip.
+	requested_lateral_force_n = (
+		total_mass
+		* (speed * speed * tan(steering) / float(parameters.wheelbase_m) - gravity_right_m_s2)
+	)
+	longitudinal_force_scale = 1.0
 	var contact: Dictionary
 	var travel_sign := signf(longitudinal_velocity)
 	if speed <= 0.0:
@@ -320,6 +340,7 @@ func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -
 		)
 	if contact.has("error"):
 		return contact
+	contact = _reserve_lateral(contact, normal_force, friction)
 	var acceleration := (
 		(
 			(
@@ -347,6 +368,7 @@ func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -
 		)
 		if contact.has("error"):
 			return contact
+		contact = _reserve_lateral(contact, normal_force, friction)
 		acceleration = (
 			(float(contact.front_force) + float(contact.rear_force)) / total_mass
 			+ gravity_forward_m_s2
@@ -363,23 +385,26 @@ func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -
 	front_force_n = contact.front_force
 	rear_force_n = contact.rear_force
 	longitudinal_acceleration = acceleration
-	var front_lateral_capacity := sqrt(
+	front_lateral_capacity_n = sqrt(
 		maxf(0.0, pow(friction * front_load_n, 2.0) - front_force_n * front_force_n)
 	)
-	var rear_lateral_capacity := sqrt(
+	rear_lateral_capacity_n = sqrt(
 		maxf(0.0, pow(friction * rear_load_n, 2.0) - rear_force_n * rear_force_n)
 	)
-	var lateral_capacity := front_lateral_capacity + rear_lateral_capacity
-	_update_steering(dt, float(controls.get("steer", 0.0)), normal_gravity)
-	# Steering specifies total acceleration in the local road plane. Gravity's
-	# cross slope component is already a force and must not consume tire grip.
-	requested_lateral_force_n = (
-		total_mass
-		* (speed * speed * tan(steering) / float(parameters.wheelbase_m) - gravity_right_m_s2)
+	# Steady yaw balance about the CG: a*Fyf - b*Fyr = 0.
+	# b/L is the static front fraction, independent of current load transfer.
+	# This uses road-frame axle forces (small steering angle approximation).
+	var front_share := float(parameters.static_front_fraction)
+	var rear_share := 1.0 - front_share
+	lateral_capacity_n = minf(
+		front_lateral_capacity_n / front_share if front_share > 0.0 else INF,
+		rear_lateral_capacity_n / rear_share if rear_share > 0.0 else INF
 	)
-	lateral_force_n = clampf(requested_lateral_force_n, -lateral_capacity, lateral_capacity)
+	lateral_force_n = clampf(requested_lateral_force_n, -lateral_capacity_n, lateral_capacity_n)
+	front_lateral_force_n = front_share * lateral_force_n
+	rear_lateral_force_n = rear_share * lateral_force_n
 	lateral_acceleration = lateral_force_n / total_mass + gravity_right_m_s2
-	grip_utilization = absf(requested_lateral_force_n) / maxf(lateral_capacity, 1.0)
+	grip_utilization = absf(requested_lateral_force_n) / maxf(lateral_capacity_n, 1.0)
 	# In the road frame, gravity and inertial acceleration both contribute.
 	# lean is world upright roll; relative lean determines contact clearance.
 	var roll_acceleration := (
@@ -420,6 +445,47 @@ func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -
 
 func _unsupported(reason: String) -> Dictionary:
 	return {"error": reason, "failure_type": "unsupported_dynamics", "rollout_valid": false}
+
+
+func _reserve_lateral(contact: Dictionary, total_load: float, friction: float) -> Dictionary:
+	# Explicit ideal combined TC/ABS: preserve the rider's lateral requirement
+	# before spending remaining grip on longitudinal acceleration. No added force.
+	# A held stationary reaction cannot be scaled without violating grade balance.
+	longitudinal_force_scale = 1.0
+	if not assist_enabled or contact.get("held", false):
+		return contact
+	var share := float(parameters.static_front_fraction)
+	var lateral := minf(absf(requested_lateral_force_n), friction * total_load)
+	var xf := float(contact.front_force)
+	var xr := float(contact.rear_force)
+	var ratio := float(parameters.cg_height_m) / float(parameters.wheelbase_m)
+	var low := 0.0
+	var high := 1.0
+	# At scale zero, static loads support the reserved pure lateral force. Each
+	# friction-circle constraint is convex in scale, so feasible scales form an
+	# interval containing zero. Check one first to avoid work when unrestricted.
+	for iteration in 49:
+		var scale := 1.0 if iteration == 0 else (low + high) * 0.5
+		var nf := share * total_load - ratio * scale * (xf + xr)
+		var nr := total_load - nf
+		var feasible := (
+			nf >= 0.0
+			and nr >= 0.0
+			and (pow(scale * xf, 2) + pow(share * lateral, 2)) <= pow(friction * nf, 2)
+			and ((pow(scale * xr, 2) + pow((1.0 - share) * lateral, 2)) <= pow(friction * nr, 2))
+		)
+		if feasible:
+			low = scale
+			if iteration == 0:
+				break
+		else:
+			high = scale
+	longitudinal_force_scale = low
+	return {
+		"front_load": share * total_load - ratio * low * (xf + xr),
+		"front_force": low * xf,
+		"rear_force": low * xr,
+	}
 
 
 func _forces_at_load(
@@ -638,10 +704,18 @@ func telemetry() -> Dictionary:
 		"front_force_n": front_force_n,
 		"rear_force_n": rear_force_n,
 		"lateral_force_n": lateral_force_n,
+		"front_lateral_force_n": front_lateral_force_n,
+		"rear_lateral_force_n": rear_lateral_force_n,
+		"front_lateral_capacity_n": front_lateral_capacity_n,
+		"rear_lateral_capacity_n": rear_lateral_capacity_n,
+		"lateral_capacity_n": lateral_capacity_n,
+		"requested_lateral_force_n": requested_lateral_force_n,
 		"grip_utilization": grip_utilization,
 		"assist_enabled": assist_enabled,
 		"auto_shift": auto_shift,
 		"ideal_tire_force_limiter": true,
+		"combined_force_policy": "lateral_priority" if assist_enabled else "longitudinal_priority",
+		"longitudinal_force_scale": longitudinal_force_scale,
 		"automatic_launch_clutch": true,
 		"throttle_applied": throttle_applied,
 		"front_brake_applied": front_brake_applied,
@@ -653,6 +727,8 @@ func telemetry() -> Dictionary:
 		[
 			"suspension",
 			"wheel_slip",
+			"yaw_inertia",
+			"steered_tire_force_rotation",
 			"tire_temperature",
 			"pitch_dynamics",
 			"wheelies",

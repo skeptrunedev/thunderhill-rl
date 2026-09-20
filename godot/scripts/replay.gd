@@ -49,6 +49,23 @@ func apply_state(sim: RefCounted, state: Dictionary) -> void:
 		"elapsed",
 		"tick",
 		"on_track",
+		"longitudinal_force_scale",
+		"front_force_n",
+		"rear_force_n",
+		"lateral_force_n",
+		"front_lateral_force_n",
+		"rear_lateral_force_n",
+		"front_lateral_capacity_n",
+		"rear_lateral_capacity_n",
+		"lateral_capacity_n",
+		"requested_lateral_force_n",
+		"grip_utilization",
+		"target_lean",
+		"crash_reason",
+		"assist_enabled",
+		"auto_shift",
+		"shift_remaining",
+		"last_shift_command",
 		"front_load_n",
 		"rear_load_n",
 		"longitudinal_acceleration",
@@ -64,3 +81,5 @@ func apply_state(sim: RefCounted, state: Dictionary) -> void:
 	]:
 		if state.has(key):
 			sim.set(key, state[key])
+	if state.has("requested_controls"):
+		sim.last_controls = state.requested_controls.duplicate(true)

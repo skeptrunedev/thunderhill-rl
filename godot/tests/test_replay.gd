@@ -65,6 +65,24 @@ func _initialize() -> void:
 			),
 			"Playback lost signed velocity"
 		)
+		for field in [
+			"longitudinal_force_scale",
+			"front_lateral_force_n",
+			"rear_lateral_force_n",
+			"front_lateral_capacity_n",
+			"rear_lateral_capacity_n",
+			"lateral_capacity_n",
+			"requested_lateral_force_n",
+			"front_force_n",
+			"rear_force_n",
+			"lateral_force_n",
+			"grip_utilization"
+		]:
+			if expected.has(field):
+				check(
+					is_equal_approx(float(observed[field]), float(expected[field])),
+					"Playback force differs: " + field
+				)
 		check(observed.tick == expected.tick, "Playback tick differs")
 		check(is_equal_approx(observed.elapsed, float(expected.elapsed)), "Playback time differs")
 		count += 1

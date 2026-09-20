@@ -1,6 +1,6 @@
 # Initial motorcycle dynamics implementation
 
-The initial Godot model is a reduced order, explicitly stepped prototype for testing controls, scenes, replay and the RL interface. It is not validated hyperrealistic handling. The dynamics version is `reduced-order-contact-balance-v3`.
+The initial Godot model is a reduced order, explicitly stepped prototype for testing controls, scenes, replay and the RL interface. It is not validated hyperrealistic handling. The dynamics version is `reduced-order-combined-assist-v5`.
 
 `godot/scripts/motorcycle.gd` defines `MotorcycleSim`, a `RefCounted` object with no scene processing or wall clock access. Call `reset(position, heading, initial_speed)` and then `step(dt, controls, road_sample)`. Rendering and reading `telemetry()` do not advance it. The caller owns the fixed timestep, at most 0.02 seconds, and road sampling. Ground position is the contact reference. Positive heading turns right, with forward vector `(sin(heading), 0, -cos(heading))`. Positive lean is right. Velocities are metres per second and angles are radians.
 
@@ -16,11 +16,50 @@ Automatic shifting is enabled by default and can be disabled with `auto_shift`. 
 
 Engine torque passes through the selected primary, gear and final ratios to the rear wheel. A broad estimated torque curve respects the published US peak torque and power. Shift interruption, drag, rolling resistance, engine braking and road grade affect speed. Separate brake requests act on their corresponding axle. Estimated mass, center of gravity and current tire forces determine a simultaneous longitudinal force and axle load balance, with drive unloading the front axle and braking loading it.
 
-Each tire's longitudinal force consumes part of a circular friction budget. The remaining front and rear budgets bound total lateral force. Steering requests lateral force using wheelbase and speed. The roll equation includes gravity and lateral acceleration; exceeding the ground contact lean threshold marks a fall. The fallen state slides to rest under a labeled estimated deceleration. The game server should stop RL episodes at the fall event, although human visualization may continue the slide.
+Each tire's longitudinal force consumes part of a circular friction budget. The remaining front and rear budgets bound total lateral force while preserving steady yaw moment balance about the center of gravity. Steering requests lateral force using wheelbase and speed. The roll equation includes gravity and lateral acceleration; exceeding the ground contact lean threshold marks a fall. The fallen state slides to rest under a labeled estimated deceleration. The game server should stop RL episodes at the fall event, although human visualization may continue the slide.
 
 Leaving the road lowers grip and increases rolling resistance. It does not teleport or steer the motorcycle back onto the course. Track boundary and lap legality decisions belong to the episode and track logic.
 
-Important simplifications include no separate lateral velocity or wheel slip state, no tire relaxation or thermal model, no suspension, pitch, airborne motion, wheelies or crash collision geometry. The tire model is a force budget, not Pacejka. Bank and grade gravity are projected into a local road frame, with the contact assumptions explained below. Axle loads satisfy quasistatic pitch balance within the declared contact model. The summed lateral budgets do not establish individual axle lateral forces or yaw moment equilibrium, which remains a limitation during combined braking and cornering. Changes in surface and sharp throttle or brake commands require timestep sensitivity testing.
+Important simplifications include no separate lateral velocity or wheel slip state, no tire relaxation or thermal model, no suspension, pitch, airborne motion, wheelies or crash collision geometry. The tire model is a force budget, not Pacejka. Bank and grade gravity are projected into a local road frame, with the contact assumptions explained below. Axle loads satisfy quasistatic pitch balance within the declared contact model. Axle lateral forces now satisfy steady yaw moment balance. There is still no yaw inertia or transient yaw response, and steered front tire forces are not rotated into the road frame; this is a small steering angle force approximation. Changes in surface and sharp throttle or brake commands require timestep sensitivity testing.
+
+## Axle lateral force balance
+
+Version 4 replaces the sum of remaining tire budgets with a steady yaw balance constraint. Let `f` be the static front load fraction and `L` the wheelbase. The distances from the center of gravity to the front and rear contacts are `a=(1-f)*L` and `b=f*L`. Gravity acts through the center of gravity. With zero yaw acceleration, axle forces must satisfy:
+
+```text
+a*front_lateral_force - b*rear_lateral_force = 0
+front_lateral_force = f*total_lateral_force
+rear_lateral_force = (1-f)*total_lateral_force
+front_remaining = sqrt((mu*front_load)^2 - front_longitudinal_force^2)
+rear_remaining = sqrt((mu*rear_load)^2 - rear_longitudinal_force^2)
+total_lateral_limit = min(front_remaining/f, rear_remaining/(1-f))
+```
+
+The geometric force share uses the static fraction, not the instantaneous load fraction altered by braking. Requested total lateral force is clamped to this limit, then allocated to each axle. A fully saturated front brake therefore cannot retain steady cornering using only the rear tire. Direct steering mode retains longitudinal priority in the ideal force limiter. Assisted mode explicitly reserves lateral grip as described below.
+
+Telemetry adds `front_lateral_force_n`, `rear_lateral_force_n`, `front_lateral_capacity_n`, `rear_lateral_capacity_n`, `lateral_capacity_n` and `requested_lateral_force_n`. Forces are along road right. Capacities are the remaining lateral budgets after longitudinal demand. These values reset to zero before the first transition. Unsupported telemetry explicitly includes `yaw_inertia` and `steered_tire_force_rotation`. This algebraic balance does not reproduce transient yaw, lateral slip, camber thrust or individual tire slip angles.
+
+`tests/test_lateral_axles.gd` exercises 60 combinations of asymmetric center of gravity locations, front and rear braking, small and saturated lateral demands, and mirrored turns. It independently checks zero yaw moment, Newton lateral force balance, both friction circles, unconstrained demands, saturation of the limiting axle, zero cornering capacity with a saturated brake, and reset and telemetry values. The test uses a lower configured center of gravity to isolate lateral force sharing while both contacts remain supported; it is a synthetic mechanics case, not motorcycle calibration.
+
+## Assisted combined force allocation
+
+Version 5 adds an explicit ideal traction and brake intervention to assisted mode. The version 4 axle correction exposed a real force allocation problem: full throttle consumed the entire rear friction circle, leaving neither axle able to generate the steady balanced lateral force needed on the slightly banked starting straight. The virtual rider could request corrective steering but had no available force. This caused an upright straight launch to fall. The correction reduces longitudinal force rather than inventing lateral grip.
+
+After calculating the rider's steering and lateral force request, the allocator begins with the valid longitudinal contact solution `(Xf, Xr)`. It reserves the lateral request, bounded by the pure lateral limit `mu*N`, and seeks the largest common longitudinal scale `s` between zero and one satisfying:
+
+```text
+Nf(s) = f*N - (h/L)*s*(Xf+Xr)
+Nr(s) = N - Nf(s)
+(s*Xf)^2 + (f*reserved_lateral)^2 <= (mu*Nf(s))^2
+(s*Xr)^2 + ((1-f)*reserved_lateral)^2 <= (mu*Nr(s))^2
+Nf(s) >= 0, Nr(s) >= 0
+```
+
+Each friction constraint is a convex norm bounded by an affine nonnegative load. Scale zero is feasible for the bounded lateral request, so feasible scales form an interval containing zero. A deterministic bisection finds its upper endpoint, with an immediate return when full longitudinal force is feasible. Loads and acceleration are recomputed from the reduced forces in the same tick. The scalar intervention preserves the initially limited front and rear force ratio; it is not an optimal independent axle brake controller. No measured electronic control behavior is claimed.
+
+The same policy applies to breakaway after a stop event. A held stationary reaction is exempt because scaling it would violate grade force balance. Direct mode retains its declared longitudinal priority. Telemetry identifies `combined_force_policy` and `longitudinal_force_scale`; scale one means no reduction by this allocator, not absence of the original tire force limiter. All control actions and applied actuator values remain observable.
+
+`tests/test_combined_assist.gd` reproduces straight full throttle launches on mirrored banks at the recorded starting bank magnitude (approximately 0.018 radians), and on larger 0.08 radian banks. Every tick checks both friction circles, pitch balance and yaw balance. It follows each launch with full front and rear braking. Independent cases check the closed form circular limit with zero center of gravity height and unchanged maximum braking when no lateral force is requested. The synthetic parameters are mechanics tests, not calibration. Actual rendered scene controls and a complete legal QA lap are separate integration checks.
 
 ## Longitudinal contact and stationary braking
 

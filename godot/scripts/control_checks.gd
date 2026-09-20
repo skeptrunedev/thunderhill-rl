@@ -29,6 +29,8 @@ func run(main: Node3D) -> int:
 		await tree.physics_frame
 	key(KEY_W, false)
 	check(main.sim.speed > 2.0, "Keyboard throttle failed to move motorcycle")
+	check(not main.sim.crashed, "Motorcycle fell during straight throttle input")
+	check(main.environment_failure.is_empty(), "Straight launch hit an unsupported model state")
 	key(KEY_D, true)
 	for i in 60:
 		await tree.physics_frame
