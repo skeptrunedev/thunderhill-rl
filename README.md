@@ -15,6 +15,8 @@ Current status: reference evaluation and development environment preparation. No
 
 See [reference evaluation](docs/reference-evaluation.md) and [build sequence](docs/build-sequence.md).
 
+The [RL game design contract](docs/rl-game-contract.md) defines the information the simulator and trainer must capture, action and reward semantics, isolated rollouts, and checkpoint replay requirements.
+
 The [small language model reference audit](docs/small-model-references.md) covers RobotxR1, MindDrive, and the limits of existing racing examples.
 
 The [Gemma 4 RL audit](docs/gemma4-rl-references.md) identifies exact E4B training code and the closest game and environment integration references.

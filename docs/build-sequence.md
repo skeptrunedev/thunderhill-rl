@@ -6,6 +6,8 @@ Run the public motorcycle dynamics model with its supported dependency versions.
 
 ## 2. Establish the simulation contract
 
+Implement against the [RL game design contract](rl-game-contract.md), including observation boundaries, transition records, action semantics, reset state, trainer traces, and replay verification.
+
 Use explicit reset, observe, and advance operations. Each advance applies bounded controls for a fixed number of physics ticks. Validate bounds against the selected motorcycle model rather than inventing arbitrary limits. Record simulation time separately from wall time. Every response identifies the episode, tick, terminal state, and configuration.
 
 Keep the validated dynamics implementation separate from Godot presentation. Physics forces, controllers, observations, and reward calculations must participate in one explicitly ordered loop. Test consistency across different rendering frame rates and inference delays. A fixed step alone does not establish deterministic replay. Godot's default vehicle body is not a validated motorcycle model.
