@@ -192,10 +192,11 @@ def build_mesh(terrain, footprint, starts, ends):
     return vertices.tolist(), triangles.tolist(), report
 
 
-def build(output_dir):
-    track_path = ROOT/'godot/data/track.json'
+def build(output_dir, track_path=None, template_path=None):
+    track_path = track_path or ROOT/'godot/data/track.json'
+    template_path = template_path or ROOT/'godot/data/terrain.json'
     track = json.loads(track_path.read_text())
-    template = json.loads((ROOT/'godot/data/terrain.json').read_text())
+    template = json.loads(template_path.read_text())
     terrain = raw_terrain(track, template, ROOT/'artifacts/reference/geometry/east-terrain-1m.tif')
     output_dir.mkdir(parents=True, exist_ok=True)
     terrain_path = output_dir/'terrain.json'

@@ -1,0 +1,11 @@
+# Historical pit pavement correction
+
+The old symmetric road crossed the physical pit divider and stopped short of pavement on the opposite side. The game now applies the reviewed historical envelope in `data/reference/pit-envelope.json`. Its 42 anchors use registered aerial pavement and paint interpretation, raised lidar face observations and unchanged joins to the surrounding road. Uncertainty remains at least 1.2 metres; these are not surveyed current legal limits.
+
+The build interpolates edge displacement from the baseline, preserving existing curve detail between anchors. The wrapped interval crosses the lap seam. It then recalculates center, width, raw lidar elevation and banking, tangent, curvature and lap stationing. Both terrain and the shared offroad contact mesh are rebuilt against the corrected footprint. The correction changes 269 samples, moves the center by at most 3.2941 metres and produces widths from 10.5335 to 12.3585 metres. Recomputing the normal frame introduces at most 0.3281 metres of edge discrepancy against the interpolated target edges, within the stated interpretation uncertainty. Lap length becomes 4607.285 metres.
+
+Tests independently check wrapped displacement interpolation, preservation outside the correction interval, unchanged endpoint requirements and rejection of duplicate anchors or a different baseline. The actual terrain mesh partition and boundary height checks pass. Runtime contact checks pass for 475 offroad points, 2,222 mesh points and 31 road points. A 1920 by 1200 Vulkan Mobile cockpit render at station 70 was inspected without shader errors.
+
+A privileged path following diagnostic completed one valid lap with 40,383 ordered recorded physics ticks, all 32 gates in order and zero off track ticks. This verifies a playable circuit and recording continuity, not optimal racing or calibrated motorcycle dynamics. No RL training was performed. The corrected pit revision still requires its own native Mac build verification. The previously installed datum revision is separate.
+
+Apron extents are recorded separately from the main ribbon and are still provisional. Pit scenery, physical divider collisions, exact curb layout, the continuous height atlas and realistic suspension remain unfinished. Recordings made against the previous track geometry are intentionally incompatible with this revision.

@@ -23,3 +23,35 @@ The source image visibly ends the raised divider near station 429. A thin pale l
 Before the divider, the faint marking is substantially less consistent. Station 5 selects a different feature at minus 5.9 meters with contrast only 0.012. Stations 10, 20, 25 and 35 have contrasts below 0.031. Stations 0, 15 and 30 produce stronger candidates near minus 3 meters, consistent with a possibly interrupted marking. No continuous visible boundary can be established over the whole 0 through 43 meter span from these pixels alone. All RGB profiles and peak contrasts are preserved, with a minimum 0.6 meter pixel interval and no claim of total positional accuracy.
 
 These observations support a plausible stripe continuation after the wall, but do not establish whether the marking defines the legal main track limit or a pit blend line. The artifact keeps stripe hypotheses separate from adopted anchors. Use video or a track boundary reference to resolve that semantic distinction and the poorly observed northern apron before generating one continuous racing boundary. A rendered apron may remain fully paved while racing limits and the physical divider are represented separately.
+
+## Reproducing the adopted interpretation
+
+The historical reconstruction now has 42 adopted anchors in
+`data/reference/pit-envelope.json`, with wrapped coverage from baseline station
+4500 through station 700. The additional joins are explicit manual interpretation
+of registered historical imagery, with at least 1.2 meters of interpretive
+uncertainty. The western paved apron remains separately described; these anchors
+are not a claim about surveyed wall bases or legal race limits.
+
+After applying the correction, the live track is no longer the evidence baseline.
+Recover the exact original baseline from git before reproducing the adoption or
+its diagnostic panels:
+
+```sh
+git show e8a4056:godot/data/track.json > artifacts/road-surface/pit-baseline-track.json
+uv run tools/adopt_pit_envelope.py --output artifacts/road-surface/pit-envelope-reproduced.json
+uv run tools/review_pit_joins.py
+```
+
+Both tools default to that preserved baseline and accept `--baseline-track` for
+another location. They verify its SHA against candidate evidence and the adopted
+manifest, and verify the original road frame. Passing the corrected runtime
+track fails instead of silently reinterpreting the historical station coordinates.
+The diagnostic tool also verifies aerial image and datum grid hashes.
+
+The adoption command above writes a review artifact without replacing the tracked
+manifest or runtime data. Its anchors must be compared with the existing manifest
+before adoption. A source only change to the builder updates
+`adoption_builder_sha256`, so its resulting manifest SHA changes even when every
+geometry field remains identical. Coordinate publication with the track builder
+because runtime metadata pins the adopted manifest hash.

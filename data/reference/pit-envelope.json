@@ -1,0 +1,1398 @@
+{
+  "schema_version": 1,
+  "status": "Adopted provisional historical reconstruction for game development, not surveyed or current legal track limits",
+  "baseline_track_sha256": "e21a8a1f279ad4dbf3fc01e397a297ac53750e47611529617e219eb7699e19a6",
+  "baseline_length_m": 4606.232,
+  "coverage": {
+    "start_station_m": 4500,
+    "end_station_m": 700
+  },
+  "coordinates": "x east, z south, y up; meters",
+  "origin": {
+    "easting": 557466.3229144721,
+    "northing": 4377233.643425343,
+    "elevation_m": 90.0
+  },
+  "sources": {
+    "track": {
+      "path": "godot/data/track.json",
+      "sha256": "e21a8a1f279ad4dbf3fc01e397a297ac53750e47611529617e219eb7699e19a6"
+    },
+    "road": {
+      "path": "artifacts/road-surface/road-surface.json",
+      "sha256": "78160f13ab8bc73b84b61cd3bcee4e476e73884ad06f36e5b806d1e4ee7b09cf"
+    },
+    "divider_measurements": {
+      "path": "artifacts/road-surface/pit-divider-measurements.json",
+      "sha256": "efba651cc51049ecc0834943f31607d792109fb2653d8f972bdb2b04075b283c"
+    },
+    "raw_local_points": {
+      "path": "artifacts/road-surface/pit-divider-points.npz",
+      "sha256": "fbdac2e5a988300827ceeb3d4b7fe058da7a838508318266576e17d0a407974b"
+    },
+    "east_measurements": {
+      "path": "artifacts/road-surface/pit-east-edge-measurements.json",
+      "sha256": "f15ad5da482bd9bc6d88768c45987ea4601495e74ebffb501df5fa920bb16717"
+    }
+  },
+  "source_aerial": {
+    "image_sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
+    "extent": {
+      "xmin": 556880,
+      "ymin": 4376247.8,
+      "xmax": 558008,
+      "ymax": 4377699.2,
+      "spatialReference": {
+        "wkid": 26910,
+        "latestWkid": 26910
+      }
+    },
+    "datum_operation": "proj=pipeline step inv proj=utm zone=10 ellps=GRS80 step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif step inv proj=gridshift grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif step proj=utm zone=10 ellps=GRS80",
+    "datum_grid_hashes": {
+      "us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96",
+      "us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a",
+      "us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff",
+      "us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+    }
+  },
+  "adoption_builder_sha256": "05e1895144d8729dfef3d383c971f3888f6bb875c9f7c3f8fd71fc38af636ff8",
+  "interpolation": "Interpolate displacement from original baseline edges across the wrapped coverage; keep baseline unchanged elsewhere. Endpoints have exactly zero displacement.",
+  "anchors": [
+    {
+      "station_m": 0,
+      "baseline_center_xz_m": [
+        -1.3003,
+        0.2189
+      ],
+      "baseline_left_xz_m": [
+        4.699006763939256,
+        0.12769499929996897
+      ],
+      "baseline_right_xz_m": [
+        -7.299606763939256,
+        0.31010500070003105
+      ],
+      "left_xz_m": [
+        6.698780283756836,
+        0.09759619126900702
+      ],
+      "right_xz_m": [
+        -4.299955106408813,
+        0.2643889282741226
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 8,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 20,
+      "baseline_center_xz_m": [
+        -1.023782988659106,
+        20.2172
+      ],
+      "baseline_left_xz_m": [
+        4.9756463912380005,
+        20.13445270018054
+      ],
+      "baseline_right_xz_m": [
+        -7.023212368556212,
+        20.29994729981946
+      ],
+      "left_xz_m": [
+        6.975460848510472,
+        20.107196585674917
+      ],
+      "right_xz_m": [
+        -4.023496316413458,
+        20.258660390488256
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 8,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 35,
+      "baseline_center_xz_m": [
+        -0.8168727818545697,
+        35.2153
+      ],
+      "baseline_left_xz_m": [
+        5.182556610864732,
+        35.13255362983616
+      ],
+      "baseline_right_xz_m": [
+        -6.816302174573871,
+        35.298046370163846
+      ],
+      "left_xz_m": [
+        7.4823412919347385,
+        35.10089794309905
+      ],
+      "right_xz_m": [
+        -4.31654040408179,
+        35.26335016193924
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 8.3,
+      "frame_right_offset_m": -3.5
+    },
+    {
+      "station_m": 45,
+      "baseline_center_xz_m": [
+        -0.6789271514342895,
+        45.2144
+      ],
+      "baseline_left_xz_m": [
+        5.320502216200812,
+        45.13165181167785
+      ],
+      "baseline_right_xz_m": [
+        -6.67835651906939,
+        45.29714818832214
+      ],
+      "left_xz_m": [
+        7.820264649353402,
+        45.09723328465863
+      ],
+      "right_xz_m": [
+        -4.538560962441345,
+        45.267613733203135
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 8.5,
+      "frame_right_offset_m": -3.86
+    },
+    {
+      "station_m": 50,
+      "baseline_center_xz_m": [
+        -0.6098904634878293,
+        50.21379109703234
+      ],
+      "baseline_left_xz_m": [
+        5.389538488907303,
+        50.13101282106113
+      ],
+      "baseline_right_xz_m": [
+        -6.609319415882961,
+        50.29656937300357
+      ],
+      "left_xz_m": [
+        8.014301535702849,
+        50.094673001744546
+      ],
+      "right_xz_m": [
+        -4.265039947822436,
+        50.26415849353554
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.625,
+      "frame_right_offset_m": -3.6555110887516626,
+      "raw_raised_face_candidate_m": -3.6555110887516626
+    },
+    {
+      "station_m": 70,
+      "baseline_center_xz_m": [
+        -0.33397311541027347,
+        70.2116
+      ],
+      "baseline_left_xz_m": [
+        5.665456264486833,
+        70.12885270018054
+      ],
+      "baseline_right_xz_m": [
+        -6.33340249530738,
+        70.29434729981946
+      ],
+      "left_xz_m": [
+        7.990241693613646,
+        70.09708924991926
+      ],
+      "right_xz_m": [
+        -3.9086378882088972,
+        70.26096766247355
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.325000000000001,
+      "frame_right_offset_m": -3.575008043560924,
+      "raw_raised_face_candidate_m": -3.575008043560924
+    },
+    {
+      "station_m": 90,
+      "baseline_center_xz_m": [
+        -0.058082160720239986,
+        90.20978266088696
+      ],
+      "baseline_left_xz_m": [
+        5.94134588124797,
+        90.12693841498161
+      ],
+      "baseline_right_xz_m": [
+        -6.05751020268845,
+        90.29262690679231
+      ],
+      "left_xz_m": [
+        7.966151924538052,
+        90.09885125289176
+      ],
+      "right_xz_m": [
+        -3.778944647779321,
+        90.26123044401068
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.025,
+      "frame_right_offset_m": -3.7212189871792245,
+      "raw_raised_face_candidate_m": -3.7212189871792245
+    },
+    {
+      "station_m": 110,
+      "baseline_center_xz_m": [
+        0.21787458305537016,
+        110.2079
+      ],
+      "baseline_left_xz_m": [
+        6.217303545002675,
+        110.12512241644747
+      ],
+      "baseline_right_xz_m": [
+        -5.781554378891935,
+        110.29067758355251
+      ],
+      "left_xz_m": [
+        8.69208331131645,
+        110.09102530191164
+      ],
+      "right_xz_m": [
+        -2.4280157526132884,
+        110.24450816437194
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.475,
+      "frame_right_offset_m": -2.646158221187217,
+      "raw_raised_face_candidate_m": -2.646158221187217
+    },
+    {
+      "station_m": 130,
+      "baseline_center_xz_m": [
+        0.4937903301100367,
+        130.20574188062687
+      ],
+      "baseline_left_xz_m": [
+        6.493219710007143,
+        130.12299458080741
+      ],
+      "baseline_right_xz_m": [
+        -5.50563904978707,
+        130.28848918044633
+      ],
+      "left_xz_m": [
+        9.267955880893346,
+        130.08495686331446
+      ],
+      "right_xz_m": [
+        -2.0361896963985298,
+        130.24059352853698
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.775,
+      "frame_right_offset_m": -2.530216937510268,
+      "raw_raised_face_candidate_m": -2.530216937510268
+    },
+    {
+      "station_m": 150,
+      "baseline_center_xz_m": [
+        0.7696737825216813,
+        150.2033
+      ],
+      "baseline_left_xz_m": [
+        6.769101839484661,
+        150.12045684061297
+      ],
+      "baseline_right_xz_m": [
+        -5.229754274441298,
+        150.28614315938705
+      ],
+      "left_xz_m": [
+        9.24386513155873,
+        150.08614091119298
+      ],
+      "right_xz_m": [
+        -1.7496973373247686,
+        150.23810784700908
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.475,
+      "frame_right_offset_m": -2.519612758384226,
+      "raw_raised_face_candidate_m": -2.519612758384226
+    },
+    {
+      "station_m": 170,
+      "baseline_center_xz_m": [
+        1.0456344448149384,
+        170.2017011003668
+      ],
+      "baseline_left_xz_m": [
+        7.045063409008982,
+        170.1189236790299
+      ],
+      "baseline_right_xz_m": [
+        -4.953794519379105,
+        170.28447852170368
+      ],
+      "left_xz_m": [
+        9.219870117720866,
+        170.08887814307118
+      ],
+      "right_xz_m": [
+        -1.4396713487297679,
+        170.23599807604205
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.175,
+      "frame_right_offset_m": -2.485556671659219,
+      "raw_raised_face_candidate_m": -2.485556671659219
+    },
+    {
+      "station_m": 190,
+      "baseline_center_xz_m": [
+        1.3215498665777186,
+        190.19960000000003
+      ],
+      "baseline_left_xz_m": [
+        7.320979258478178,
+        190.11685357046707
+      ],
+      "baseline_right_xz_m": [
+        -4.67787952532274,
+        190.28234642953294
+      ],
+      "left_xz_m": [
+        10.395684339342255,
+        190.07452417354648
+      ],
+      "right_xz_m": [
+        -1.2189498778263606,
+        190.23443532432475
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 9.075000000000001,
+      "frame_right_offset_m": -2.5407349993346178,
+      "raw_raised_face_candidate_m": -2.5407349993346178
+    },
+    {
+      "station_m": 210,
+      "baseline_center_xz_m": [
+        1.5974432955303537,
+        210.19770396931287
+      ],
+      "baseline_left_xz_m": [
+        7.596871368689743,
+        210.1148619835479
+      ],
+      "baseline_right_xz_m": [
+        -4.401984777629036,
+        210.28054595507783
+      ],
+      "left_xz_m": [
+        10.371606822330618,
+        210.07642076970328
+      ],
+      "right_xz_m": [
+        -0.8490569076277155,
+        210.23152563489305
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.775,
+      "frame_right_offset_m": -2.446735697297811,
+      "raw_raised_face_candidate_m": -2.446735697297811
+    },
+    {
+      "station_m": 230,
+      "baseline_center_xz_m": [
+        1.8733997998665775,
+        230.1959
+      ],
+      "baseline_left_xz_m": [
+        7.872828766064584,
+        230.11312272328485
+      ],
+      "baseline_right_xz_m": [
+        -4.1260291663314295,
+        230.27867727671514
+      ],
+      "left_xz_m": [
+        10.347595645239766,
+        230.07885014116167
+      ],
+      "right_xz_m": [
+        -0.5356913928782643,
+        230.22910582919675
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.475,
+      "frame_right_offset_m": -2.409324210802194,
+      "raw_raised_face_candidate_m": -2.409324210802194
+    },
+    {
+      "station_m": 250,
+      "baseline_center_xz_m": [
+        2.145013775850567,
+        250.19369999999998
+      ],
+      "baseline_left_xz_m": [
+        8.144466377991053,
+        250.1126538731997
+      ],
+      "baseline_right_xz_m": [
+        -3.8544388262899183,
+        250.27474612680027
+      ],
+      "left_xz_m": [
+        11.069202500432398,
+        250.07300106296245
+      ],
+      "right_xz_m": [
+        -0.21368413767703398,
+        250.22545537871218
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.925,
+      "frame_right_offset_m": -2.3589165721312892,
+      "raw_raised_face_candidate_m": -2.3589165721312892
+    },
+    {
+      "station_m": 270,
+      "baseline_center_xz_m": [
+        2.4152668779186124,
+        270.1919051034023
+      ],
+      "baseline_left_xz_m": [
+        8.414719491367128,
+        270.1108598136824
+      ],
+      "baseline_right_xz_m": [
+        -3.584185735529904,
+        270.27295039312224
+      ],
+      "left_xz_m": [
+        11.039479592629622,
+        270.0753646299765
+      ],
+      "right_xz_m": [
+        -0.09377641495259681,
+        270.22576515151206
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.625,
+      "frame_right_offset_m": -2.509271850787717,
+      "raw_raised_face_candidate_m": -2.509271850787717
+    },
+    {
+      "station_m": 290,
+      "baseline_center_xz_m": [
+        2.6854199799866576,
+        290.1902
+      ],
+      "baseline_left_xz_m": [
+        8.684872580263784,
+        290.109153735264
+      ],
+      "baseline_right_xz_m": [
+        -3.3140326202904684,
+        290.271246264736
+      ],
+      "left_xz_m": [
+        11.609602111406897,
+        290.06952771167266
+      ],
+      "right_xz_m": [
+        0.3657088215068409,
+        290.2214357301128
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.925,
+      "frame_right_offset_m": -2.3199194021445018,
+      "raw_raised_face_candidate_m": -2.3199194021445018
+    },
+    {
+      "station_m": 310,
+      "baseline_center_xz_m": [
+        2.9556730820547035,
+        310.1884
+      ],
+      "baseline_left_xz_m": [
+        8.95512568440223,
+        310.1073538885259
+      ],
+      "baseline_right_xz_m": [
+        -3.043779520292822,
+        310.2694461114741
+      ],
+      "left_xz_m": [
+        11.579882990041833,
+        310.0717106842905
+      ],
+      "right_xz_m": [
+        0.5309227147289706,
+        310.2209714164277
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.625,
+      "frame_right_offset_m": -2.424968413149419,
+      "raw_raised_face_candidate_m": -2.424968413149419
+    },
+    {
+      "station_m": 330,
+      "baseline_center_xz_m": [
+        3.2258261841227487,
+        330.18670000000003
+      ],
+      "baseline_left_xz_m": [
+        9.225278796432546,
+        330.1056546259861
+      ],
+      "baseline_right_xz_m": [
+        -2.7736264281870477,
+        330.26774537401394
+      ],
+      "left_xz_m": [
+        11.550067297428463,
+        330.07425106382135
+      ],
+      "right_xz_m": [
+        0.918268018530644,
+        330.21791157110135
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.325000000000001,
+      "frame_right_offset_m": -2.307769829546962,
+      "raw_raised_face_candidate_m": -2.307769829546962
+    },
+    {
+      "station_m": 350,
+      "baseline_center_xz_m": [
+        3.4960792861907937,
+        350.1849
+      ],
+      "baseline_left_xz_m": [
+        9.495531886260881,
+        350.1038537199378
+      ],
+      "baseline_right_xz_m": [
+        -2.5033733138792926,
+        350.2659462800622
+      ],
+      "left_xz_m": [
+        12.270279068516476,
+        350.0663630019426
+      ],
+      "right_xz_m": [
+        1.1155656706364345,
+        350.217052797925
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.775,
+      "frame_right_offset_m": -2.3807311908927655,
+      "raw_raised_face_candidate_m": -2.3807311908927655
+    },
+    {
+      "station_m": 370,
+      "baseline_center_xz_m": [
+        3.763696632210737,
+        370.1831965321774
+      ],
+      "baseline_left_xz_m": [
+        9.7631790924323,
+        370.10439166544336
+      ],
+      "baseline_right_xz_m": [
+        -2.2357858280108256,
+        370.2620013989115
+      ],
+      "left_xz_m": [
+        12.23798064806822,
+        370.0717809840977
+      ],
+      "right_xz_m": [
+        1.4393291797487255,
+        370.2137857675794
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.475,
+      "frame_right_offset_m": -2.3245851259560175,
+      "raw_raised_face_candidate_m": -2.3245851259560175
+    },
+    {
+      "station_m": 390,
+      "baseline_center_xz_m": [
+        4.02620440293529,
+        390.1809073715811
+      ],
+      "baseline_left_xz_m": [
+        10.025687657228294,
+        390.1021629656984
+      ],
+      "baseline_right_xz_m": [
+        -1.9732788513577149,
+        390.25965177746366
+      ],
+      "left_xz_m": [
+        12.200496431623076,
+        390.073498122057
+      ],
+      "right_xz_m": [
+        1.5561382184022943,
+        390.2132963960022
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.175,
+      "frame_right_offset_m": -2.4702761978615992,
+      "raw_raised_face_candidate_m": -2.4702761978615992
+    },
+    {
+      "station_m": 410,
+      "baseline_center_xz_m": [
+        4.288820013342228,
+        410.1793
+      ],
+      "baseline_left_xz_m": [
+        10.288302931498901,
+        410.1005300003769
+      ],
+      "baseline_right_xz_m": [
+        -1.7106629048144453,
+        410.25806999962305
+      ],
+      "left_xz_m": [
+        12.76310428918368,
+        410.0679724479324
+      ],
+      "right_xz_m": [
+        2.0360340644555968,
+        410.20882367932234
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "East optical pavement boundary; west raised face candidate used as provisional wall base without invented clearance strip",
+      "frame_left_offset_m": 8.475,
+      "frame_right_offset_m": -2.252994904716906,
+      "raw_raised_face_candidate_m": -2.252994904716906
+    },
+    {
+      "station_m": 420,
+      "baseline_center_xz_m": [
+        4.420027818545697,
+        420.17849999999993
+      ],
+      "baseline_left_xz_m": [
+        10.419510968535642,
+        420.09974765238303
+      ],
+      "baseline_right_xz_m": [
+        -1.5794553314442479,
+        420.2572523476169
+      ],
+      "left_xz_m": [
+        12.81929810105802,
+        420.0682680796801
+      ],
+      "right_xz_m": [
+        1.9802306164224448,
+        420.21045128373675
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 8.4,
+      "frame_right_offset_m": -2.44
+    },
+    {
+      "station_m": 425,
+      "baseline_center_xz_m": [
+        4.485738292194797,
+        425.17857471647767
+      ],
+      "baseline_left_xz_m": [
+        10.485221214295702,
+        425.0998050171723
+      ],
+      "baseline_right_xz_m": [
+        -1.5137446299061095,
+        425.257344415783
+      ],
+      "left_xz_m": [
+        12.885032225326814,
+        425.0684396012568
+      ],
+      "right_xz_m": [
+        1.8159861520913885,
+        425.2137634760724
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 8.4,
+      "frame_right_offset_m": -2.67
+    },
+    {
+      "station_m": 435,
+      "baseline_center_xz_m": [
+        4.616945015005001,
+        435.17762587529177
+      ],
+      "baseline_left_xz_m": [
+        10.616428161086807,
+        435.09887323010537
+      ],
+      "baseline_right_xz_m": [
+        -1.3825381310768046,
+        435.2563785204781
+      ],
+      "left_xz_m": [
+        12.816233392729973,
+        435.07007685846776
+      ],
+      "right_xz_m": [
+        1.617197027596038,
+        435.2169934756616
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 8.2,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 450,
+      "baseline_center_xz_m": [
+        4.8139427284856575,
+        450.17599999999993
+      ],
+      "baseline_left_xz_m": [
+        10.813425982778663,
+        450.09725559411737
+      ],
+      "baseline_right_xz_m": [
+        -1.185540525807348,
+        450.2547444058826
+      ],
+      "left_xz_m": [
+        13.013239457523241,
+        450.0685566331149
+      ],
+      "right_xz_m": [
+        1.8142016896706008,
+        450.2153662861019
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 8.2,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 480,
+      "baseline_center_xz_m": [
+        5.207764388129377,
+        480.17342744248083
+      ],
+      "baseline_left_xz_m": [
+        11.2072470875101,
+        480.094640897076
+      ],
+      "baseline_right_xz_m": [
+        -0.7917183112513471,
+        480.2522139878856
+      ],
+      "left_xz_m": [
+        13.407063651167867,
+        480.0658405596129
+      ],
+      "right_xz_m": [
+        2.2080281914217683,
+        480.2128261757441
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 8.2,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 510,
+      "baseline_center_xz_m": [
+        5.621901534356236,
+        510.16999999999996
+      ],
+      "baseline_left_xz_m": [
+        11.62131716669204,
+        510.08626189864634
+      ],
+      "baseline_right_xz_m": [
+        -0.3775140979795667,
+        510.2537381013536
+      ],
+      "left_xz_m": [
+        13.62112691150467,
+        510.0582968106638
+      ],
+      "right_xz_m": [
+        2.622198290493603,
+        510.21181941454876
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 8,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 550,
+      "baseline_center_xz_m": [
+        6.1798509006004,
+        550.1662
+      ],
+      "baseline_left_xz_m": [
+        12.179267008694572,
+        550.0824960008243
+      ],
+      "baseline_right_xz_m": [
+        0.18043479250622746,
+        550.2499039991757
+      ],
+      "left_xz_m": [
+        13.97910181478076,
+        550.0573193909642
+      ],
+      "right_xz_m": [
+        3.1801510055639666,
+        550.2078564964098
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 7.8,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 590,
+      "baseline_center_xz_m": [
+        6.7378002668445625,
+        590.1624777518346
+      ],
+      "baseline_left_xz_m": [
+        12.73721687015396,
+        590.0788092499707
+      ],
+      "baseline_right_xz_m": [
+        0.7383836635351668,
+        590.2461462536984
+      ],
+      "left_xz_m": [
+        14.537046301387289,
+        590.0537120252519
+      ],
+      "right_xz_m": [
+        3.738094654121044,
+        590.2041890002536
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 7.8,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 620,
+      "baseline_center_xz_m": [
+        7.156226375458487,
+        620.1595217072359
+      ],
+      "baseline_left_xz_m": [
+        13.155602410454074,
+        620.0730064467443
+      ],
+      "baseline_right_xz_m": [
+        1.1568503404628996,
+        620.2460369677274
+      ],
+      "left_xz_m": [
+        14.957265884892674,
+        620.0636206545722
+      ],
+      "right_xz_m": [
+        4.158084037064541,
+        620.1965545386626
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 7.8,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 640,
+      "baseline_center_xz_m": [
+        8.388853757794548,
+        640.1147489005579
+      ],
+      "baseline_left_xz_m": [
+        14.363519584226964,
+        639.571379785472
+      ],
+      "baseline_right_xz_m": [
+        2.414187931362134,
+        640.6581180156437
+      ],
+      "left_xz_m": [
+        15.860216319616248,
+        639.5622063399813
+      ],
+      "right_xz_m": [
+        4.8901522605350305,
+        640.3731900264107
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 7.5,
+      "frame_right_offset_m": -3.5
+    },
+    {
+      "station_m": 660,
+      "baseline_center_xz_m": [
+        12.634633604159903,
+        659.6105883327917
+      ],
+      "baseline_left_xz_m": [
+        18.303970428965542,
+        657.6472244773299
+      ],
+      "baseline_right_xz_m": [
+        6.9652967793542615,
+        661.5739521882535
+      ],
+      "left_xz_m": [
+        19.243336649811596,
+        657.3198956841021
+      ],
+      "right_xz_m": [
+        8.377518619262947,
+        661.0860606468996
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 7,
+      "frame_right_offset_m": -4.5
+    },
+    {
+      "station_m": 680,
+      "baseline_center_xz_m": [
+        21.46092342253054,
+        677.4995405682193
+      ],
+      "baseline_left_xz_m": [
+        26.541615161076464,
+        674.308307352311
+      ],
+      "baseline_right_xz_m": [
+        16.380231683984622,
+        680.6907737841276
+      ],
+      "left_xz_m": [
+        26.927646870128637,
+        673.9909177924314
+      ],
+      "right_xz_m": [
+        16.82882761136462,
+        680.4727269209709
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Historical main ribbon and pit merge paint interpretation; taper into unaffected corner pavement, excluding western apron",
+      "frame_left_offset_m": 6.5,
+      "frame_right_offset_m": -5.5
+    },
+    {
+      "station_m": 700,
+      "baseline_center_xz_m": [
+        33.57216277396141,
+        693.3596258096173
+      ],
+      "baseline_left_xz_m": [
+        37.9396032303621,
+        689.2458768061739
+      ],
+      "baseline_right_xz_m": [
+        29.204722317560705,
+        697.4733748130608
+      ],
+      "left_xz_m": [
+        37.9396032303621,
+        689.2458768061739
+      ],
+      "right_xz_m": [
+        29.204722317560705,
+        697.4733748130608
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Unchanged baseline join"
+    },
+    {
+      "station_m": 4500,
+      "baseline_center_xz_m": [
+        -32.76696738912947,
+        -93.39499663221054
+      ],
+      "baseline_left_xz_m": [
+        -29.027185817719698,
+        -98.08690816144292
+      ],
+      "baseline_right_xz_m": [
+        -36.50674896053924,
+        -88.70308510297815
+      ],
+      "left_xz_m": [
+        -29.027185817719698,
+        -98.08690816144292
+      ],
+      "right_xz_m": [
+        -36.50674896053924,
+        -88.70308510297815
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Unchanged baseline join"
+    },
+    {
+      "station_m": 4520,
+      "baseline_center_xz_m": [
+        -17.133307671601564,
+        -80.93173738223415
+      ],
+      "baseline_left_xz_m": [
+        -13.300727924576357,
+        -85.54793742723751
+      ],
+      "baseline_right_xz_m": [
+        -20.96588741862677,
+        -76.31553733723078
+      ],
+      "left_xz_m": [
+        -13.039992882998913,
+        -85.98575087485905
+      ],
+      "right_xz_m": [
+        -19.96332846218889,
+        -77.43780232225755
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 6.5,
+      "frame_right_offset_m": -4.5
+    },
+    {
+      "station_m": 4540,
+      "baseline_center_xz_m": [
+        -4.500947647471849,
+        -65.69416548455041
+      ],
+      "baseline_left_xz_m": [
+        1.0489430615923148,
+        -67.95427158183787
+      ],
+      "baseline_right_xz_m": [
+        -10.050838356536012,
+        -63.43405938726296
+      ],
+      "left_xz_m": [
+        2.516194050489739,
+        -68.42642731986602
+      ],
+      "right_xz_m": [
+        -7.268986334889519,
+        -64.618508619895
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 7.5,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 4560,
+      "baseline_center_xz_m": [
+        -1.8529386924616418,
+        -46.00844146097417
+      ],
+      "baseline_left_xz_m": [
+        4.14699844469482,
+        -46.035905318417306
+      ],
+      "baseline_right_xz_m": [
+        -7.852875829618103,
+        -45.980977603531024
+      ],
+      "left_xz_m": [
+        5.946053008494042,
+        -46.04816683008116
+      ],
+      "right_xz_m": [
+        -4.853808483440221,
+        -45.993469891999844
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 7.8,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 4580,
+      "baseline_center_xz_m": [
+        -1.7397513315579287,
+        -26.008551997337253
+      ],
+      "baseline_left_xz_m": [
+        4.25967743004837,
+        -26.090702855369535
+      ],
+      "baseline_right_xz_m": [
+        -7.739180093164228,
+        -25.926401139304968
+      ],
+      "left_xz_m": [
+        6.257795615280626,
+        -26.13258292721593
+      ],
+      "right_xz_m": [
+        -4.740881050322706,
+        -25.96196169315414
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 8,
+      "frame_right_offset_m": -3
+    },
+    {
+      "station_m": 4600,
+      "baseline_center_xz_m": [
+        -1.4039921614409612,
+        -6.01179209472986
+      ],
+      "baseline_left_xz_m": [
+        4.595156799693198,
+        -6.112845255584797
+      ],
+      "baseline_right_xz_m": [
+        -7.403141122575122,
+        -5.910738933874923
+      ],
+      "left_xz_m": [
+        6.5948983046929825,
+        -6.146022694903266
+      ],
+      "right_xz_m": [
+        -4.40355286109979,
+        -5.961436797089893
+      ],
+      "uncertainty_m": 1.2,
+      "interpretation": "Manual historical paint and pavement interpretation from registered final turn and wall approach panels; western apron excluded",
+      "frame_left_offset_m": 8,
+      "frame_right_offset_m": -3
+    }
+  ],
+  "separate_paved_aprons": [
+    {
+      "start_station_m": 4540,
+      "end_station_m": 4600,
+      "status": "Separate provisional paved apron extent; excluded from racing ribbon; not ready for collision or legal limits",
+      "uncertainty_m": 2.0,
+      "sections": [
+        {
+          "station_m": 4540,
+          "inner_xz_m": [
+            -7.268986334889519,
+            -64.618508619895
+          ],
+          "outer_xz_m": [
+            -11.928596042212973,
+            -62.80521400086117
+          ]
+        },
+        {
+          "station_m": 4560,
+          "inner_xz_m": [
+            -4.853808483440221,
+            -45.993469891999844
+          ],
+          "outer_xz_m": [
+            -9.853744359335712,
+            -45.968147235480714
+          ]
+        },
+        {
+          "station_m": 4580,
+          "inner_xz_m": [
+            -4.740881050322706,
+            -25.96196169315414
+          ],
+          "outer_xz_m": [
+            -9.740279534687858,
+            -25.884406586762417
+          ]
+        },
+        {
+          "station_m": 4600,
+          "inner_xz_m": [
+            -4.40355286109979,
+            -5.961436797089893
+          ],
+          "outer_xz_m": [
+            -9.40284884555105,
+            -5.8775341162656325
+          ]
+        }
+      ]
+    },
+    {
+      "start_station_m": 0,
+      "end_station_m": 35,
+      "status": "Separate provisional paved apron extent; excluded from racing ribbon; not ready for collision or legal limits",
+      "uncertainty_m": 2.0,
+      "sections": [
+        {
+          "station_m": 0,
+          "inner_xz_m": [
+            -4.299955106408813,
+            0.2643889282741226
+          ],
+          "outer_xz_m": [
+            -9.299380283756836,
+            0.34020380873099326
+          ]
+        },
+        {
+          "station_m": 20,
+          "inner_xz_m": [
+            -4.023496316413458,
+            20.258660390488256
+          ],
+          "outer_xz_m": [
+            -9.023022300469789,
+            20.327507574494316
+          ]
+        },
+        {
+          "station_m": 35,
+          "inner_xz_m": [
+            -4.31654040408179,
+            35.26335016193924
+          ],
+          "outer_xz_m": [
+            -8.816113932223686,
+            35.32530227929356
+          ]
+        }
+      ]
+    },
+    {
+      "start_station_m": 435,
+      "end_station_m": 620,
+      "status": "Separate provisional paved apron extent; excluded from racing ribbon; not ready for collision or legal limits",
+      "uncertainty_m": 2.0,
+      "sections": [
+        {
+          "station_m": 435,
+          "inner_xz_m": [
+            1.617197027596038,
+            435.2169934756616
+          ],
+          "outer_xz_m": [
+            -3.3823727782673263,
+            435.2825812511946
+          ]
+        },
+        {
+          "station_m": 450,
+          "inner_xz_m": [
+            1.8142016896706008,
+            450.2153662861019
+          ],
+          "outer_xz_m": [
+            -3.185368742406471,
+            450.2809063097568
+          ]
+        },
+        {
+          "station_m": 480,
+          "inner_xz_m": [
+            2.2080281914217683,
+            480.2128261757441
+          ],
+          "outer_xz_m": [
+            -2.791541210250598,
+            480.27844475437416
+          ]
+        },
+        {
+          "station_m": 510,
+          "inner_xz_m": [
+            2.622198290493603,
+            510.21181941454876
+          ],
+          "outer_xz_m": [
+            -2.3773147190568817,
+            510.2816024163146
+          ]
+        },
+        {
+          "station_m": 550,
+          "inner_xz_m": [
+            3.1801510055639666,
+            550.2078564964098
+          ],
+          "outer_xz_m": [
+            -1.8193632579623271,
+            550.2775496007828
+          ]
+        },
+        {
+          "station_m": 590,
+          "inner_xz_m": [
+            3.738094654121044,
+            590.2041890002536
+          ],
+          "outer_xz_m": [
+            -1.2614199973911067,
+            590.273854266458
+          ]
+        },
+        {
+          "station_m": 620,
+          "inner_xz_m": [
+            4.158084037064541,
+            620.1965545386626
+          ],
+          "outer_xz_m": [
+            -0.8415371887818166,
+            620.2580980035192
+          ]
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "2022 aerial and 2023 lidar predate repave.",
+    "Minimum 1.2m interpretive uncertainty includes pixel ambiguity; not a statistical confidence interval.",
+    "Raised returns identify a wall face above ground, not surveyed wall base. No arbitrary clearance offset is applied.",
+    "Join paint is manually interpreted where pit apron and main ribbon are both paved.",
+    "Curved frame conversion must be diagnosed by the application builder; explicit edge xz anchors are authoritative."
+  ]
+}

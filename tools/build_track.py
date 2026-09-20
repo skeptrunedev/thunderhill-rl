@@ -9,12 +9,14 @@ Generated geographic databases retain ODbL, separately from MIT source code.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 from pathlib import Path
 
 import numpy as np
 import rasterio
+from apply_pavement_envelope import apply_envelope
 from build_surface_mesh import build as build_surface_mesh
 from build_surface_mesh import raw_terrain
 from pyproj import Transformer
@@ -135,8 +137,34 @@ def build_terrain(origin: np.ndarray, road_xyz: np.ndarray, road_left: np.ndarra
                        template, source_path)
 
 
+def geometry_samples(points, widths, origin, source_stations):
+    sample_count = len(points)
+    heading, left = normals(points)
+    heights, banks, fit_metadata = road_elevation(points, heading, left)
+    xyz = np.column_stack([points[:, 0] - origin[0], heights - origin[2], origin[1] - points[:, 1]])
+    left_xyz = np.column_stack([left[:, 0], np.zeros(sample_count), -left[:, 1]])
+    tangent = np.roll(xyz, -1, axis=0) - np.roll(xyz, 1, axis=0)
+    tangent /= np.linalg.norm(tangent, axis=1)[:, None]
+    segments = np.linalg.norm(np.roll(xyz, -1, axis=0) - xyz, axis=1)
+    stations = np.r_[0, np.cumsum(segments[:-1])]
+    directions = heading
+    turn = np.arctan2(directions[:, 0] * np.roll(directions[:, 1], -1) - directions[:, 1] * np.roll(directions[:, 0], -1), np.sum(directions * np.roll(directions, -1, axis=0), axis=1))
+    curvature = turn / segments
+    assert np.all(np.isfinite(xyz)) and np.all(np.isfinite(banks))
+    assert segments.min() > 1.0 and segments.max() < 5.0
+    assert widths.min() >= 10.0 and widths.max() <= 13.0
+    assert np.max(np.abs(banks)) < np.radians(15)
+    samples = [{"s": round(float(stations[i]), 3), "p": np.round(xyz[i], 4).tolist(), "tangent": np.round(tangent[i], 7).tolist(), "left": np.round(left_xyz[i], 7).tolist(), "width": round(float(widths[i]), 4), "bank": round(float(banks[i]), 7), "curvature": round(float(curvature[i]), 7), "source_s": round(float(source_stations[i]), 3)} for i in range(sample_count)]
+    return samples, segments, heights, banks, xyz, left_xyz, fit_metadata
+
+
 def main() -> None:
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT)
+    parser.add_argument("--pavement-envelope", type=Path, default=ROOT / "data/reference/pit-envelope.json")
+    args = parser.parse_args()
+    output = args.output_dir
+    output.mkdir(parents=True, exist_ok=True)
     source_points, osm_metadata = read_route()
     closed = np.vstack([source_points, source_points[0]])
     source_length = float(np.linalg.norm(np.diff(closed, axis=0), axis=1).sum())
@@ -153,31 +181,26 @@ def main() -> None:
     sample_count = int(np.ceil(source_length / ROAD_SPACING))
     source_stations = np.linspace(0, source_length, sample_count, endpoint=False)
     points, _smoothed_length = resample(smooth, source_stations * (float(np.linalg.norm(np.diff(np.vstack([smooth, smooth[0]]), axis=0), axis=1).sum()) / source_length))
-    heading, left = normals(points)
+    _heading, left = normals(points)
     widths, center_offsets, anchors = reviewed_widths(source_stations, source_length)
     points += left * center_offsets[:, None]
-    heading, left = normals(points)
-    heights, banks, fit_metadata = road_elevation(points, heading, left)
     origin = np.array([source_points[0, 0], source_points[0, 1], 90.0])
-    xyz = np.column_stack([points[:, 0] - origin[0], heights - origin[2], origin[1] - points[:, 1]])
-    left_xyz = np.column_stack([left[:, 0], np.zeros(sample_count), -left[:, 1]])
-    tangent = np.roll(xyz, -1, axis=0) - np.roll(xyz, 1, axis=0)
-    tangent /= np.linalg.norm(tangent, axis=1)[:, None]
-    segments = np.linalg.norm(np.roll(xyz, -1, axis=0) - xyz, axis=1)
-    stations = np.r_[0, np.cumsum(segments[:-1])]
-    directions = heading
-    turn = np.arctan2(directions[:, 0] * np.roll(directions[:, 1], -1) - directions[:, 1] * np.roll(directions[:, 0], -1), np.sum(directions * np.roll(directions, -1, axis=0), axis=1))
-    curvature = turn / segments
-    assert np.all(np.isfinite(xyz)) and np.all(np.isfinite(banks))
-    assert segments.min() > 1.0 and segments.max() < 5.0
-    assert widths.min() >= 10.0 and widths.max() <= 13.0
-    assert np.max(np.abs(banks)) < np.radians(15)
-    samples = [{"s": round(float(stations[i]), 3), "p": np.round(xyz[i], 4).tolist(), "tangent": np.round(tangent[i], 7).tolist(), "left": np.round(left_xyz[i], 7).tolist(), "width": round(float(widths[i]), 4), "bank": round(float(banks[i]), 7), "curvature": round(float(curvature[i]), 7), "source_s": round(float(source_stations[i]), 3)} for i in range(sample_count)]
+    samples, segments, heights, banks, xyz, left_xyz, fit_metadata = geometry_samples(points, widths, origin, source_stations)
     track = {"schema_version": 1, "name": "Thunderhill East", "closed": True, "length_m": round(float(segments.sum()), 3), "origin": {"easting": float(origin[0]), "northing": float(origin[1]), "elevation_m": float(origin[2])}, "coordinates": "x east, z south, y up; meters", "bank_convention": "Positive bank raises the geometric left road edge relative to center", "samples": samples, "terrain_file": "res://data/terrain.json", "metadata": {"osm": osm_metadata, "historical_geometry_year": 2023, "route_configuration": "Angular hill branch, consistent with Cyclone, not Hill Bypass", "width_anchors": anchors, "width_and_center_status": "Provisional periodic linear interpolation of eight reviewed 2022 aerial pavement envelopes, not 2026 surveyed edges", "source_polyline_length_m": source_length, "plan_smoothing_max_displacement_m": max_displacement, "plan_smoothing_sigma_m": sigma * 0.5, "lidar": fit_metadata, "license": "Open Database License 1.0 (ODbL), separate from repository MIT source code", "attribution": "OpenStreetMap contributors; USGS 3DEP; USDA NAIP", "osm_license_url": "https://www.openstreetmap.org/copyright", "limitations": ["2023 lidar and 2022 width evidence predate repave", "Width and center interpolation between reviewed sections is provisional", "Curbs, current asphalt boundaries and tire grip are not surveyed by this data", "Local lidar plane fits and spatial smoothing do not model pavement microtexture"]}}
+    envelope = load_json(args.pavement_envelope)
+    corrected_xz, widths, correction = apply_envelope(track, envelope)
+    baseline_xz = np.array([s["p"] for s in track["samples"]])[:, [0, 2]]
+    corrected_points = points + (corrected_xz-baseline_xz)*[1, -1]
+    samples, segments, heights, banks, xyz, left_xyz, fit_metadata = geometry_samples(corrected_points, widths, origin, source_stations)
+    track["samples"] = samples
+    track["length_m"] = round(float(segments.sum()), 3)
+    track["metadata"]["lidar"] = fit_metadata
+    track["metadata"]["pavement_envelope"] = {"source_sha256": digest(args.pavement_envelope), "baseline_track_sha256": envelope["baseline_track_sha256"], **correction}
+    track["metadata"]["width_and_center_status"] = "Historical aerial and lidar pit envelope applied to the provisional eight section baseline; unresolved apron and paint interpretation retained in source manifest"
     terrain = build_terrain(origin, xyz, left_xyz, widths, banks)
-    (OUTPUT / "track.json").write_text(json.dumps(track, separators=(",", ":")) + "\n")
-    (OUTPUT / "terrain.json").write_text(json.dumps(terrain, separators=(",", ":")) + "\n")
-    build_surface_mesh(OUTPUT)
+    (output / "track.json").write_text(json.dumps(track, separators=(",", ":")) + "\n")
+    (output / "terrain.json").write_text(json.dumps(terrain, separators=(",", ":")) + "\n")
+    build_surface_mesh(output, output / "track.json", output / "terrain.json")
     print(json.dumps({"samples": sample_count, "length_m": track["length_m"], "segment_m": [float(segments.min()), float(segments.max())], "height_m": [float(heights.min()), float(heights.max())], "width_m": [float(widths.min()), float(widths.max())], "maximum_bank_degrees": float(np.degrees(np.abs(banks)).max()), "plan_smoothing_max_displacement_m": max_displacement, "lidar_fit": fit_metadata, "terrain_grid": [terrain["nx"], terrain["nz"]]}, indent=2))
 
 
