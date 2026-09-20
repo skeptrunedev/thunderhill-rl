@@ -15,6 +15,8 @@ Current status: reference evaluation and development environment preparation. No
 
 See [reference evaluation](docs/reference-evaluation.md) and [build sequence](docs/build-sequence.md).
 
+The [small language model reference audit](docs/small-model-references.md) covers RobotxR1, MindDrive, and the limits of existing racing examples.
+
 ## License
 
 Original project code and documentation use the [MIT license](LICENSE). Referenced projects, models, footage, maps, and assets retain their own licenses and are not bundled here. Godot is [MIT licensed](https://godotengine.org/license/).
