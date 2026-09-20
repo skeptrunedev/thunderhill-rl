@@ -68,7 +68,7 @@ func sample(p: Vector3) -> Dictionary:
 			}
 	var inside_road := false
 	for ring in road_rings:
-		if Geometry2D.is_point_in_polygon(q, ring):
+		if ring_contains(q, ring):
 			inside_road = not inside_road
 	if inside_road:
 		return {"road_cutout": true}
@@ -87,3 +87,35 @@ func surface_tool() -> SurfaceTool:
 			st.set_uv(Vector2(p.x, p.z))
 			st.add_vertex(p)
 	return st
+
+
+static func ring_contains(point: Vector2, ring: PackedVector2Array) -> bool:
+	if ring.size() < 3:
+		return false
+	# Scalar arithmetic uses float64 even with Godot's float32 Vector2 storage.
+	# A horizontal ray owns the lower endpoint of each edge, never both ends.
+	# This avoids counting a shared vertex twice on large, detailed road rings.
+	var inside := false
+	var px: float = point.x
+	var py: float = point.y
+	for i in ring.size():
+		var a := ring[i]
+		var b := ring[(i + 1) % ring.size()]
+		var ax: float = a.x
+		var ay: float = a.y
+		var bx: float = b.x
+		var by: float = b.y
+		var cross_value := (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+		if (
+			cross_value == 0.0
+			and px >= minf(ax, bx)
+			and px <= maxf(ax, bx)
+			and py >= minf(ay, by)
+			and py <= maxf(ay, by)
+		):
+			return true
+		if (ay > py) != (by > py):
+			var crossing_x := ax + (py - ay) * (bx - ax) / (by - ay)
+			if px < crossing_x:
+				inside = not inside
+	return inside

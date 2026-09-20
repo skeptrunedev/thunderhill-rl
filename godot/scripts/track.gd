@@ -252,7 +252,7 @@ func terrain_normal(p: Vector3) -> Vector3:
 	return Vector3(-dx, 1.0, -dz).normalized()
 
 
-func _surface_height(p: Vector3, road: Dictionary, include_curb: bool = true) -> float:
+func _surface_sample(p: Vector3, road: Dictionary, include_curb: bool = true) -> Dictionary:
 	var delta: Vector3 = p - road.center
 	var lateral: float = delta.dot(road.left)
 	var along: Vector3 = Vector3(road.tangent.x, 0.0, road.tangent.z).normalized()
@@ -264,23 +264,29 @@ func _surface_height(p: Vector3, road: Dictionary, include_curb: bool = true) ->
 	)
 	var edge: float = Vector2(delta.x, delta.z).length() - road.width * 0.5
 	if edge <= 0.0:
-		return plane
+		return {"height": plane, "normal": road.normal}
 	if (
 		include_curb
 		and edge <= 0.9
 		and absf(road.curvature) > 0.012
 		and lateral * road.curvature > 0.0
 	):
-		return plane + lerpf(0.01, 0.07, edge / 0.9)
+		return {
+			"height": plane + lerpf(0.01, 0.07, edge / 0.9), "normal": road.normal, "on_curb": true
+		}
 	var ground: Dictionary = offroad_surface.sample(p)
 	if ground.has("error"):
 		push_error(str(ground))
-		return NAN
+		return {"height": NAN, "normal": road.normal}
 	# The cutout follows rendered edge segments. Close to a corner this may
 	# differ slightly from the analytic nearest-centerline classification.
 	if ground.road_cutout:
-		return plane
-	return float(ground.height)
+		return {"height": plane, "normal": road.normal}
+	return {"height": float(ground.height), "normal": ground.normal}
+
+
+func _surface_height(p: Vector3, road: Dictionary, include_curb: bool = true) -> float:
+	return float(_surface_sample(p, road, include_curb).height)
 
 
 # Shared visible surface for scenery placement, including the finite road shoulder.
@@ -290,35 +296,28 @@ func terrain_surface_height(p: Vector3) -> float:
 
 func sample_world(p: Vector3) -> Dictionary:
 	var road := _road_sample(p)
-	road.height = _surface_height(p, road)
-	var edge: float = road.planar_distance - road.width * 0.5
-	if edge > 0.0:
-		var on_curb: bool = (
-			edge <= 0.9 and absf(road.curvature) > 0.012 and road.distance * road.curvature > 0.0
+	# Height and normal come from the same triangle search. This matters for
+	# both contact consistency and the many scenery placement queries at startup.
+	var surface := _surface_sample(p, road)
+	road.height = surface.height
+	road.normal = surface.normal
+	if surface.get("on_curb", false):
+		const DELTA: float = 0.10
+		var dx := (
+			(
+				_surface_height(p + Vector3.RIGHT * DELTA, road)
+				- _surface_height(p - Vector3.RIGHT * DELTA, road)
+			)
+			/ (2.0 * DELTA)
 		)
-		if on_curb:
-			const DELTA: float = 0.10
-			var dx := (
-				(
-					_surface_height(p + Vector3.RIGHT * DELTA, road)
-					- _surface_height(p - Vector3.RIGHT * DELTA, road)
-				)
-				/ (2.0 * DELTA)
+		var dz := (
+			(
+				_surface_height(p + Vector3.BACK * DELTA, road)
+				- _surface_height(p - Vector3.BACK * DELTA, road)
 			)
-			var dz := (
-				(
-					_surface_height(p + Vector3.BACK * DELTA, road)
-					- _surface_height(p - Vector3.BACK * DELTA, road)
-				)
-				/ (2.0 * DELTA)
-			)
-			road.normal = Vector3(-dx, 1.0, -dz).normalized()
-		else:
-			var ground: Dictionary = offroad_surface.sample(p)
-			if ground.has("error"):
-				road.height = NAN
-			elif not ground.road_cutout:
-				road.normal = ground.normal
+			/ (2.0 * DELTA)
+		)
+		road.normal = Vector3(-dx, 1.0, -dz).normalized()
 	return road
 
 
