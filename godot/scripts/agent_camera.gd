@@ -68,10 +68,19 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 		return {
 			"error": "Simulation changed during camera capture", "failure_type": "infrastructure"
 		}
-	var image := viewport.get_texture().get_image()
-	if image == null or image.is_empty():
-		return {"error": "Renderer returned no observation image", "failure_type": "infrastructure"}
+	var image := _read_image()
+	var validation := preload("res://scripts/image_validation.gd").classify(
+		image, Vector2i(WIDTH, HEIGHT)
+	)
+	if validation != "nonblack":
+		return {
+			"error": "Invalid observation readback: " + validation,
+			"failure_type": "infrastructure",
+			"validation": validation
+		}
 	var png := image.save_png_to_buffer()
+	if png.is_empty():
+		return {"error": "Cannot encode observation image", "failure_type": "infrastructure"}
 	var hash_context := HashingContext.new()
 	hash_context.start(HashingContext.HASH_SHA256)
 	hash_context.update(png)
@@ -95,7 +104,13 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 		if output == null:
 			return {"error": "Cannot write observation artifact", "failure_type": "infrastructure"}
 		output.store_buffer(png)
+		output.flush()
+		var write_error := output.get_error()
 		output.close()
+		if write_error != OK:
+			return {
+				"error": "Cannot persist observation artifact", "failure_type": "infrastructure"
+			}
 	var focal_px := HEIGHT / (2.0 * tan(deg_to_rad(camera.fov) * 0.5))
 	return {
 		"episode_id": episode_id,
@@ -131,6 +146,10 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 			{"height_m": EYE_HEIGHT_M, "forward_m": EYE_FORWARD_M, "look_down_rad": LOOK_DOWN_RAD},
 		},
 	}
+
+
+func _read_image() -> Image:
+	return viewport.get_texture().get_image()
 
 
 func _vector(value: Vector3) -> Array:

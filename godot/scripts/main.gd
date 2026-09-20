@@ -375,6 +375,10 @@ func _start_recording(station: float) -> void:
 			"start_station": station
 		}
 	)
+	# Reset may be the final request before the process exits. Persist the complete
+	# manifest before acknowledging it, rather than leaving a partial buffered line.
+	if recorder:
+		recorder.flush()
 
 
 func _record(record: Dictionary) -> void:
@@ -577,6 +581,31 @@ func _bike_root_transform(normal: Vector3) -> Transform3D:
 	)
 
 
+func _fail_environment(result: Dictionary, details: Dictionary = {}) -> Dictionary:
+	if not environment_failure.is_empty():
+		return environment_failure.duplicate(true)
+	environment_failure = {
+		"type": "environment_failure",
+		"episode_id": episode_id,
+		"policy_id": policy_id,
+		"tick": sim.tick,
+		"error": result.error,
+		"failure_type": result.get("failure_type", "infrastructure"),
+		"rollout_valid": false,
+		"state": sim.telemetry()
+	}
+	if result.has("validation"):
+		environment_failure["validation"] = result.validation
+	environment_failure.merge(details, true)
+	_record(environment_failure)
+	if recorder:
+		recorder.flush()
+	paused = not agent_mode
+	if qa_target > 0:
+		get_tree().quit(2)
+	return environment_failure.duplicate(true)
+
+
 func _step(action: Dictionary) -> Dictionary:
 	if terminated:
 		return {"error": "Episode terminated; reset required"}
@@ -585,24 +614,7 @@ func _step(action: Dictionary) -> Dictionary:
 	_collision_start_pose = _collision_pose(road.normal, wheel_rotation)
 	var result: Dictionary = sim.step(DT, action, road, _sample_ground_after_step)
 	if result.has("error"):
-		environment_failure = {
-			"type": "environment_failure",
-			"episode_id": episode_id,
-			"policy_id": policy_id,
-			"tick": old_tick,
-			"error": result.error,
-			"failure_type": result.get("failure_type", "infrastructure"),
-			"rollout_valid": false,
-			"requested_controls": action,
-			"state": sim.telemetry()
-		}
-		_record(environment_failure)
-		if recorder:
-			recorder.flush()
-		paused = not agent_mode
-		if qa_target > 0:
-			get_tree().quit(2)
-		return environment_failure.duplicate(true)
+		return _fail_environment(result, {"tick": old_tick, "requested_controls": action})
 	var after: Dictionary = result.ground_after
 	if sim.collision_contact.is_empty():
 		sim.position.y = after.height
@@ -778,10 +790,7 @@ static func _save_screenshot(
 	if screenshot != null and not screenshot.is_empty():
 		# Preserve the original capture even when validation fails.
 		file_error = screenshot.save_png(path)
-		var rgb := screenshot.duplicate() as Image
-		rgb.convert(Image.FORMAT_RGB8)
-		var pixels := rgb.get_data()
-		validation = "all_black" if pixels.count(0) == pixels.size() else "nonblack"
+		validation = preload("res://scripts/image_validation.gd").classify(screenshot)
 		diagnostics["width"] = screenshot.get_width()
 		diagnostics["height"] = screenshot.get_height()
 	diagnostics["validation"] = validation
@@ -916,6 +925,8 @@ func _capture_request(request: Dictionary) -> Dictionary:
 		return {"error": "Episode mismatch"}
 	if request.get("expected_tick", -1) != sim.tick:
 		return {"error": "Tick mismatch"}
+	if not environment_failure.is_empty():
+		return serializable(environment_failure)
 	if agent_camera == null:
 		return {
 			"error":
@@ -927,6 +938,8 @@ func _capture_request(request: Dictionary) -> Dictionary:
 	var captured: Dictionary = await agent_camera.capture(
 		sim, road.normal, episode_id, "user://runs/" + run_id
 	)
+	if captured.has("error"):
+		return serializable(_fail_environment(captured, {"operation": "capture"}))
 	if not captured.has("error"):
 		var metadata: Dictionary = captured.duplicate(true)
 		metadata.image.erase("base64")
@@ -1040,6 +1053,7 @@ func _build_provenance() -> Dictionary:
 	return {
 		"kind": "unbundled_development",
 		"geometry_helper_sha256": geometry_sources,
+		"capture_validation_sha256": FileAccess.get_sha256("res://scripts/image_validation.gd"),
 		"physics_script_sha256": FileAccess.get_sha256("res://scripts/motorcycle.gd"),
 		"game_script_sha256": FileAccess.get_sha256("res://scripts/main.gd"),
 		"bike_visual_script_sha256": FileAccess.get_sha256("res://scripts/bike_visual.gd"),

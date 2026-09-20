@@ -74,3 +74,34 @@ Evaluate checkpoints on a fixed held out scenario set, using identical physics a
 8. Measure E4B GPU memory and sustained rollout throughput before selecting environment counts or training batch sizes.
 
 Physical realism remains a separate acceptance requirement. Correct RL plumbing cannot validate inaccurate motorcycle dynamics or track geometry.
+
+## Implemented readback failure handling
+
+Agent capture validates image presence, expected dimensions and nonblack RGB
+bytes before encoding or recording an observation. The black image check shares
+the human screenshot validator and ignores alpha. It targets the observed black
+readback failure in this daylight environment; a nonblack result alone cannot
+prove a complete or correct rendered frame. Camera pose and intrinsics are
+unchanged. PNG encoding and artifact write failures also return infrastructure
+errors. Artifact writes are flushed and checked before a response is returned.
+
+An actual capture failure records one `environment_failure`, marks the rollout
+invalid and prevents further captures or advances until reset. It does not
+advance physics, fabricate an observation, grant reward or automatically retry
+the GPU readback. Repeated capture requests return the recorded failure. Asking
+a headless telemetry instance for an unsupported camera remains a capability
+error, without attempting a readback.
+
+Reset now flushes the complete episode manifest before acknowledging the new
+episode. The end to end camera diagnostic exposed truncated final manifest
+lines when a process stopped immediately after reset; deferring the flush until
+the first observation was insufficient. This guarantees the buffered line has
+been written before acknowledgement, not durability against a power failure.
+
+Verification passed the shared screenshot validator, injected black/empty/wrong
+size readbacks through the rendered capture path, existing wall failure atomicity,
+and the real socket camera diagnostic. Five valid camera observations were
+recorded with verified PNG hashes and unchanged simulation ticks during capture;
+queued advance and reset requests remained serialized. Evidence is in
+`artifacts/camera-failure-check.log`, `artifacts/capture-wall-check.log` and
+`artifacts/qa/capture-validation-durable/summary.json`. No training was performed.

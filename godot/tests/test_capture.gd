@@ -4,6 +4,7 @@ extends SceneTree
 func _initialize() -> void:
 	var script = load("res://scripts/main.gd")
 	var failures := 0
+	var validator := preload("res://scripts/image_validation.gd")
 	for format in [Image.FORMAT_RGB8, Image.FORMAT_RGBA8]:
 		var frame := Image.create(4, 4, false, format)
 		frame.fill(Color.BLACK)
@@ -11,6 +12,8 @@ func _initialize() -> void:
 		if result.error == OK or result.validation != "all_black":
 			failures += 1
 		frame.set_pixel(2, 2, Color.RED)
+		if validator.classify(frame, Vector2i(8, 8)) != "wrong_dimensions":
+			failures += 1
 		result = script._save_screenshot(frame, "user://capture-test.png")
 		if result.error != OK or result.validation != "nonblack":
 			failures += 1
