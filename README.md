@@ -11,7 +11,7 @@ A new Godot motorcycle racing environment for training a language model on Thund
 5. Evaluation compares legal laps, completion rate, crashes, and lap times under identical conditions.
 6. Model checkpoints and state trajectories support recordings of training progress from consistent camera views.
 
-Current status: reference evaluation and development environment preparation. No playable game or trained racing model yet.
+Current status: the first Godot prototype renders the full measured circuit and supports human controls, agent stepping, telemetry recording, and state replay. It is not yet the polished or physically validated review build, and no model training has started. See [playable status and run instructions](docs/playable-status.md).
 
 Current priority: build and review the playable game before starting any RL. The first bike is the 2026 Ducati Streetfighter V4S. The [reference readiness report](docs/reference-readiness.md) records inspected footage, acquired terrain and materials, the M3 Pro Mac target, and remaining realism gaps.
 

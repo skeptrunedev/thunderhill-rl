@@ -1,6 +1,6 @@
 # Game design contract for language model RL
 
-This specification is required for game implementation. It is not an implemented API. Target: Godot motorcycle simulation of Thunderhill East, Gemma 4 E4B adapter training, Harbor integration, batched rollouts on one RTX PRO 6000 96GB, and recordings of checkpoint progression.
+This specification is required for game implementation. The prototype implements a subset; see [implementation status](playable-status.md) for tested behavior and outstanding work. This document is not a claim that the full API or trainer is implemented. Target: Godot motorcycle simulation of Thunderhill East, Gemma 4 E4B adapter training, Harbor integration, batched rollouts on one RTX PRO 6000 96GB, and recordings of checkpoint progression.
 
 ## Simulation lifecycle
 
