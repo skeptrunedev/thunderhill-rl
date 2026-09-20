@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["numpy==2.4.3", "scipy==1.17.1"]
+# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "shapely==2.1.2", "rasterio==1.4.4"]
 # ///
 """Fit overlapping lidar height patches and blend their full C2 differentials.
 
@@ -11,6 +11,8 @@ review before the atlas can replace live road and terrain contact.
 import argparse
 import hashlib
 import json
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
 from pathlib import Path
 
 import numpy as np
@@ -142,6 +144,28 @@ def sample_road(track, road):
     return np.array(points)
 
 
+def initialize_fit_worker():
+    global worker_knots, worker_penalty
+    worker_knots = (knots([-16, 16], 2), knots([-16, 16], 2))
+    worker_penalty = bending_matrix(worker_knots)
+
+
+def fit_patch(task):
+    center, q, h, held = task
+    if len(h) < 100 or sum(held) < 20 or sum(~held) < 20:
+        raise ValueError(f"Insufficient patch support at {center.tolist()}")
+    cv, cv_solve = fit(q[~held], h[~held], worker_knots, 0.01, worker_penalty)
+    validation = metrics(cv(q[held]) - h[held])
+    spline, solve = fit(q, h, worker_knots, 0.01, worker_penalty)
+    return serialized_patch(spline, center), {
+        "center": center.tolist(),
+        "points": len(h),
+        "heldout": validation,
+        "training": metrics(spline(q) - h),
+        "solves": [cv_solve, solve],
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -153,7 +177,20 @@ def main():
         default=0,
         help="Diagnostic patch limit; never accepted as full coverage",
     )
+    parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument(
+        "--pavement-mask-buffer",
+        type=float,
+        default=None,
+        help="Restrict observations to provisional road polygon buffered by these metres",
+    )
     args = parser.parse_args()
+    if args.workers < 1 or args.limit < 0:
+        raise ValueError("Workers must be positive and diagnostic limit nonnegative")
+    if args.pavement_mask_buffer is not None and not np.isfinite(
+        args.pavement_mask_buffer
+    ):
+        raise ValueError("Pavement buffer must be finite")
     paths = {
         "track": ROOT / "godot/data/track.json",
         "road": ROOT / "artifacts/road-surface/road-surface.json",
@@ -173,49 +210,60 @@ def main():
         (raw[:, 0] - origin["easting"], origin["northing"] - raw[:, 1])
     )
     heights = raw[:, 2] - origin["elevation_m"]
+    mask_metadata = None
+    if args.pavement_mask_buffer is not None:
+        import shapely
+        from build_surface_mesh import road_edges
+
+        footprint, _, _ = road_edges(track)
+        footprint = footprint.buffer(args.pavement_mask_buffer)
+        mask = shapely.contains_xy(footprint, xz[:, 0], xz[:, 1])
+        mask_metadata = {
+            "source": "Provisional rendered road polygon, not surveyed pavement",
+            "buffer_m": args.pavement_mask_buffer,
+            "polygon_wkb_sha256": hashlib.sha256(footprint.wkb).hexdigest(),
+            "selected_points": int(sum(mask)),
+            "input_points": len(mask),
+            "builder_sha256": hashlib.sha256(
+                (ROOT / "tools/build_surface_mesh.py").read_bytes()
+            ).hexdigest(),
+        }
+        xz, heights = xz[mask], heights[mask]
     tree = cKDTree(xz)
     road_points = sample_road(track, road)
     radius = 12.0
     centers = np.unique(np.round(road_points / radius).astype(int), axis=0) * radius
     if args.limit:
         centers = centers[: args.limit]
-    t = (knots([-16, 16], 2), knots([-16, 16], 2))
-    penalty = bending_matrix(t)
-    patches = []
-    reports = []
-    for index, center in enumerate(centers):
+    tasks = []
+    for center in centers:
         ids = np.array(tree.query_ball_point(center, 16, p=np.inf), dtype=int)
-        if len(ids) < 100:
-            raise ValueError(f"Insufficient raw support for patch {index}: {len(ids)}")
-        q = xz[ids] - center
-        h = heights[ids]
-        # A globally fixed spatial fold, identical in every overlapping patch.
         blocks = np.floor(xz[ids] / 2).astype(int)
         held = (blocks[:, 0] + 2 * blocks[:, 1]) % 3 == 0
-        cv, cv_solve = fit(q[~held], h[~held], t, 0.01, penalty)
-        validation = metrics(cv(q[held]) - h[held])
-        spline, solve = fit(q, h, t, 0.01, penalty)
-        patches.append(serialized_patch(spline, center))
-        reports.append(
-            {
-                "center": center.tolist(),
-                "points": len(ids),
-                "heldout": validation,
-                "training": metrics(spline(q) - h),
-                "solves": [cv_solve, solve],
-            }
-        )
-        if index % 10 == 0 or index + 1 == len(centers):
-            print(
-                json.dumps(
-                    {
-                        "patch": index + 1,
-                        "total": len(centers),
-                        "heldout_rmse_m": validation["rmse_m"],
-                    }
-                ),
-                flush=True,
-            )
+        tasks.append((center, xz[ids] - center, heights[ids], held))
+    patches, reports = [], []
+    # Spawn isolates BLAS state, and map preserves deterministic patch order.
+    with ProcessPoolExecutor(
+        max_workers=args.workers,
+        mp_context=get_context("spawn"),
+        initializer=initialize_fit_worker,
+    ) as pool:
+        for index, (patch, report) in enumerate(
+            pool.map(fit_patch, tasks, chunksize=1)
+        ):
+            patches.append(patch)
+            reports.append(report)
+            if index % 10 == 0 or index + 1 == len(centers):
+                print(
+                    json.dumps(
+                        {
+                            "patch": index + 1,
+                            "total": len(centers),
+                            "heldout_rmse_m": report["heldout"]["rmse_m"],
+                        }
+                    ),
+                    flush=True,
+                )
     data = {
         "schema_version": 1,
         "support_radius_m": radius,
@@ -230,9 +278,13 @@ def main():
             "lambda_m4": 0.01,
             "fit_halfwidth_m": 16,
             "diagnostic_limit": args.limit,
+            "pavement_mask": mask_metadata,
+            "workers": args.workers,
             "validation": "One of three global 2m spatial folds withheld per patch; same acquisition, no independent survey",
             "limitations": [
-                "No pavement mask",
+                "Pavement boundary is provisional"
+                if mask_metadata
+                else "No pavement mask",
                 "Historical ground observations include curb and soil",
                 "Height agreement does not certify derivatives",
                 "Patch validation includes unsupported square corners; road coverage checked separately",

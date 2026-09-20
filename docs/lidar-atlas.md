@@ -39,3 +39,11 @@ More seriously, the strongest positive curvature is 0.048562 per metre at statio
 Per patch withheld RMSE reaches 0.068744 m; maximum individual withheld error reaches 0.724886 m. Those metrics include the surrounding square, not just road positions. They must not be presented as road surface survey accuracy.
 
 This version is not accepted for playable tire contact. Next work must distinguish pavement support from nearby curb and soil, and check derivative sensitivity at the identified features. The full circuit audit now preserves raw local fits at every reported extremum, including explicit insufficient support results. Clamping curvature or claiming realism from the parity results would not resolve the source fitting issue.
+
+## Pavement support correction experiment
+
+`tools/compare_pavement_fits.py` compares all ground support with the provisional rendered road polygon and that polygon buffered by plus or minus 0.5 m. Each mask is tested at 1, 2 and 3 m knot spacing. All candidates score the same withheld pavement observations, preventing a changed mask from silently changing the validation set. Results retain input hashes, solver status, heights, curvature and error distributions.
+
+At station 4502, the dominant patch's 2 m fit changes from curvature 0.049147 per metre using all ground to 0.002505 with the nominal road mask. Buffers of negative and positive 0.5 m yield negative 0.004068 and positive 0.000422 respectively. Common pavement withheld RMSE improves from 0.009829 m to 0.009063 m with the nominal mask. This supports a correction to which surface is being fitted, rather than clamping the calculated curvature. The boundary is still provisional. At station 392 the negative feature persists under masking, so that separate feature requires its own explanation.
+
+The full atlas builder accepts `--pavement-mask-buffer 0` and records the selected point count and mask polygon hash. Use a distinct output path to retain the original experiment. `--workers` distributes independent patches using spawned processes while preserving output order. A two patch verification found the serial and parallel coefficients and validation results exactly equal. These options do not enable the atlas in the game.
