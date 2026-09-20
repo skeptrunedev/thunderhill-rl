@@ -115,3 +115,20 @@ Evidence: `artifacts/scenery-bake.log`, `artifacts/baked-scenery-startup.jsonl`,
 `artifacts/baked-scenery-preview.png`, compared with `artifacts/reservoir-preview.png`.
 The saved scene is approximately 5.4 MiB. Grass is still decorative and has no
 collision; this does not change simulation or agent observations intentionally.
+
+The native `93e71c38b2bf-023e62d45bc2` preview reduced the recorded scenery stage
+from 25,433 ms in build 871573b to 586 ms. Landmarks took 27,865 ms, scene ready
+56,688 ms and first draw 59,265 ms. These are individual runs with older instances
+still open, not a controlled foreground benchmark. Archive SHA256 was
+`ab6f2f5eeefa01150122ed2f4460eb645af1e54af75e81ca3d487e4731df6f52`;
+transfer hash and native signature verification passed.
+
+Native appearance validation FAILED: the saved PNG was entirely black and the
+preview correctly exited with status 1. Both capture diagnostic samples reported
+183 draw calls, 1,774,555 primitives, the intended camera, window_can_draw true and
+window_focused false. Thus these counters do not establish valid texture pixels.
+The earlier native black capture is reproducible intermittently; its cause
+remains unproven. Do not infer that the scenery bake is visually accepted on Mac.
+Evidence: `artifacts/Thunderhill-scenery-93e71c3.png`, its `.png.json` sidecar,
+`.jsonl` startup trace and `.log`. Local rendered input checks passed with zero
+failures, median frame interval 17.361 ms and p95 18.750 ms in 273 samples.

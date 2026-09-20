@@ -54,3 +54,10 @@ Run `uv run tools/check_camera.py --godot /path/to/godot --display :1` on a mach
 ## Model failure handling
 
 Unsupported dynamics are separate from crashes and lap completion. The game records an `environment_failure`, marks the rollout invalid and truncated, excludes that failed step from reward transitions, and requires reset. Successful ticks earlier in the same action remain available for diagnosis. Retrying the same failed action returns its cached result. Human play pauses with an explanation and restart prompt. This prevents an unimplemented contact regime from becoming a successful or rewarded training outcome.
+
+Static decorative scenery is generated before packaging. If you change its
+placement code, ground data, landmark exclusions or source grass assets, run
+`godot --path godot --script res://tools/bake_scenery.gd` using Godot 4.7.2 with a
+real renderer. Headless baking is rejected. Commit the regenerated scene and
+`data/scenery-bake.json` together with the source change. The package tool rejects
+stale inputs. See [the verification details](surface-rendering.md#static-scenery-bake).
