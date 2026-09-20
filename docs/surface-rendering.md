@@ -1,5 +1,39 @@
 # Surface rendering refinement
 
+## Grass alpha coverage comparison
+
+Grass materials now enable alpha coverage, with edge threshold 0.30 below the
+existing scissor threshold 0.35. The project retains its existing 4x MSAA setting.
+[Godot documents](https://docs.godotengine.org/en/4.5/tutorials/3d/3d_antialiasing.html)
+that ordinary MSAA does not smooth internal alpha scissor texture edges without
+material alpha antialiasing. The scenery was regenerated and its serialized
+fingerprint verified. Placement, meshes, atlas colors and collision are unchanged.
+
+The visual effect is limited. Matching 1280 by 800 captures at station 1830 differ
+in 177 pixels, confined to the grass region. A closer moving comparison captured
+16 identical camera poses for both disabled and enabled coverage at 1920 by 1080.
+Between 1,217 and 2,060 pixels change per pair, while bright stems remain clearly
+visible. These results establish that the material setting is active, not that
+the overall vegetation appearance or temporal stability is solved.
+
+Run the reusable comparison with a real renderer and an empty output directory:
+
+```
+DISPLAY=:1 godot --path godot --script res://tools/preview_grass.gd -- --output-dir=/absolute/path/grass-comparison
+```
+
+It loads the actual game and baked grass, freezes simulation, and captures both
+material modes at each pose. The report includes camera transforms, image and
+window dimensions, MSAA, thresholds and source frame names. Failed or all black
+captures fail the diagnostic. Existing outputs are preserved. This is a visual
+comparison, not a frame timing benchmark or agent training run.
+
+Evidence: `artifacts/grass-before.png`, `artifacts/grass-after.png` and
+`artifacts/grass-motion/comparison.json` with its 32 images. The rendered human
+control check passed with zero failures, as did macOS packaging. The short Linux
+control check reported median 17.171 ms and p95 17.820 ms over 275 process
+intervals. Native Mac performance and appearance remain unverified for this build.
+
 20 September 2026. This is an incremental visual correction, not physical realism acceptance.
 
 The original terrain sampler interpolated each elevation cell bilinearly while the mesh rendered two planar triangles. The sampler now evaluates those same triangles. A synthetic saddle fixture verifies both interiors, the diagonal, corners, edges, translated coordinates, adjacent cells and bounds. This corrects scenery and shoulder vertex placement relative to the rendered surface. Shoulder segments can still cross terrain triangles between their endpoints; a fully stitched road boundary remains necessary.

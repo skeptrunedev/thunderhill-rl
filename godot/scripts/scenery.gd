@@ -46,6 +46,9 @@ func _grass_meshes() -> Array[ArrayMesh]:
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	material.alpha_scissor_threshold = 0.35
+	# MSAA alone only covers mesh edges, not the thin atlas cutouts inside them.
+	material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
+	material.alpha_antialiasing_edge = 0.30
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var meshes: Array[ArrayMesh] = []
 	# The source assets are individual stems, not complete roadside tussocks.
