@@ -17,6 +17,8 @@ See [reference evaluation](docs/reference-evaluation.md) and [build sequence](do
 
 The [small language model reference audit](docs/small-model-references.md) covers RobotxR1, MindDrive, and the limits of existing racing examples.
 
+The [Gemma 4 RL audit](docs/gemma4-rl-references.md) identifies exact E4B training code and the closest game and environment integration references.
+
 ## License
 
 Original project code and documentation use the [MIT license](LICENSE). Referenced projects, models, footage, maps, and assets retain their own licenses and are not bundled here. Godot is [MIT licensed](https://godotengine.org/license/).
