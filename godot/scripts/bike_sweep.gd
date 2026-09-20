@@ -3,7 +3,7 @@ extends RefCounted
 ## Clear intervals are rejected by enclosing volumes. Possible contact is refined
 ## to a declared spatial bound, never presented as an exact physical impact.
 
-const MODEL_VERSION := "articulated-conservative-sweep-v3"
+const MODEL_VERSION := "articulated-conservative-sweep-v4"
 const RiderPose = preload("res://scripts/rider_pose.gd")
 const SPATIAL_TOLERANCE_M := 0.002
 const NUMERICAL_PADDING_M := 0.0005
@@ -12,6 +12,7 @@ const MAX_INTERVALS := 4096
 const MAX_DEPTH := 32
 const MAX_CACHED_POINTS := 131072
 const MAX_CACHED_ENDPOINTS := 2048
+static var _corner_indices: Array[PackedInt32Array] = _build_corner_indices()
 
 var envelope: RefCounted
 var _parts: Array[Dictionary] = []
@@ -229,10 +230,11 @@ func _interval(a: float, b: float, candidates: Array[int], depth: int) -> Dictio
 		var center := bounds.get_center()
 		var vertices_started := Time.get_ticks_usec() if profiling_enabled else 0
 		var vertices := PackedVector3Array()
-		for endpoint in [a, b]:
-			var pose: Transform3D = from[part.joint] if endpoint == a else to[part.joint]
-			var cloud := _endpoint_cloud(i, endpoint, pose)
-			vertices.append_array(_expand_masked(cloud.points, cloud.masks, padding, center))
+		var first := _endpoint_cloud(i, a, from[part.joint])
+		var second := _endpoint_cloud(i, b, to[part.joint])
+		var pair := _paired_masks(first.points, second.points, first.masks, second.masks)
+		vertices.append_array(_expand_masked(first.points, pair[0], padding, center))
+		vertices.append_array(_expand_masked(second.points, pair[1], padding, center))
 		_profile_add("hull_vertices_us", vertices_started)
 		generated_vertices += vertices.size()
 		original_vertices += part.points.size() * 16
@@ -369,8 +371,9 @@ static func _witness_indices(points: PackedVector3Array) -> Array[PackedInt32Arr
 	return result
 
 
-# A strict coordinatewise dominator excludes this corner from the support
-# maximum in its entire direction octant. Keeping any unproven corner preserves
+# A coordinatewise dominator with at least one strict improvement excludes
+# this corner from the support maximum in its entire direction octant.
+# Keeping any unproven corner preserves
 # the original cube Minkowski hull. Witness choices only affect speed.
 # World coordinate comparison permits caching: subtracting a common center and
 # adding the same corner preserve weak coordinate ordering under float rounding.
@@ -384,12 +387,54 @@ static func _corner_masks(
 		var mask := 255
 		for j in witnesses[i]:
 			var q := points[j]
-			if q.x == p.x or q.y == p.y or q.z == p.z:
+			if q.x != p.x and q.y != p.y and q.z != p.z:
+				var corner := int(q.x > p.x) * 4 + int(q.y > p.y) * 2 + int(q.z > p.z)
+				mask &= ~(1 << corner)
 				continue
-			var corner := int(q.x > p.x) * 4 + int(q.y > p.y) * 2 + int(q.z > p.z)
-			mask &= ~(1 << corner)
+			if q == p:
+				continue
+			var dominated := 255
+			if q.x != p.x:
+				dominated &= 240 if q.x > p.x else 15
+			if q.y != p.y:
+				dominated &= 204 if q.y > p.y else 51
+			if q.z != p.z:
+				dominated &= 170 if q.z > p.z else 85
+			mask &= ~dominated
 		masks.append(mask)
 	return masks
+
+
+static func _paired_masks(
+	first: PackedVector3Array,
+	second: PackedVector3Array,
+	first_masks: PackedInt32Array,
+	second_masks: PackedInt32Array
+) -> Array[PackedInt32Array]:
+	# Compare corresponding source vertices across the two endpoint clouds.
+	# At least one coordinate must improve; identical points retain both copies.
+	# Never modify cached masks: each subdivision has a different opposite endpoint.
+	var a := first_masks.duplicate()
+	var b := second_masks.duplicate()
+	for i in first.size():
+		var p := first[i]
+		var q := second[i]
+		if p == q:
+			continue
+		var forward := 255
+		var backward := 255
+		if p.x != q.x:
+			forward &= 240 if q.x > p.x else 15
+			backward &= 15 if q.x > p.x else 240
+		if p.y != q.y:
+			forward &= 204 if q.y > p.y else 51
+			backward &= 51 if q.y > p.y else 204
+		if p.z != q.z:
+			forward &= 170 if q.z > p.z else 85
+			backward &= 85 if q.z > p.z else 170
+		a[i] &= ~forward
+		b[i] &= ~backward
+	return [a, b]
 
 
 static func _expand_masked(
@@ -410,9 +455,19 @@ static func _expand_masked(
 		)
 	for i in points.size():
 		var p := points[i] - center
+		for corner in _corner_indices[masks[i]]:
+			result.append(p + offsets[corner])
+	return result
+
+
+static func _build_corner_indices() -> Array[PackedInt32Array]:
+	var result: Array[PackedInt32Array] = []
+	for mask in 256:
+		var corners := PackedInt32Array()
 		for corner in 8:
-			if masks[i] & (1 << corner):
-				result.append(p + offsets[corner])
+			if mask & (1 << corner):
+				corners.append(corner)
+		result.append(corners)
 	return result
 
 
@@ -425,9 +480,7 @@ func _endpoint_cloud(part_index: int, fraction: float, pose: Transform3D) -> Dic
 	if cache.has(fraction):
 		return cache[fraction]
 	var part: Dictionary = _parts[part_index]
-	var transformed := PackedVector3Array()
-	for p: Vector3 in part.points:
-		transformed.append(pose * p)
+	var transformed: PackedVector3Array = pose * part.points
 	var cloud := {"points": transformed, "masks": _corner_masks(transformed, part.witnesses)}
 	# Full caches only cause recomputation. They never change query coverage or
 	# turn a resource limit into a clear result.

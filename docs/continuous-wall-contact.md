@@ -67,3 +67,45 @@ for the construction and assumptions. Full steering outside plus or minus
 checks contact between clear endpoints. The updated sweep suite passes 115
 checks and wall integration passes 91. Geometry remains an artistic envelope,
 not measured human anatomy or a physical injury model.
+
+### Endpoint union pruning
+
+Sweep version `articulated-conservative-sweep-v4` extends corner dominance to
+allow equal coordinates when at least one coordinate strictly improves. It also
+compares each source vertex with its counterpart at the other endpoint. In each
+direction octant, every removed corner has a coordinatewise dominating witness.
+Strict partial dominance is acyclic across the combined endpoint set, so a
+maximal retained witness remains. Identical points retain both copies.
+
+Paired masks are local copies: cached endpoint masks must not change when the
+opposite endpoint changes during subdivision. Original world coordinates are
+compared before subtracting the common hull center. The acceleration padding,
+spatial tolerance, subdivision limits and authored envelope are unchanged.
+The packed array transform uses the engine's native loop over the same scalar
+transform operation. A small lookup enumerates only retained corner indices, in
+the original order, instead of branching across all eight for every vertex.
+
+The updated support audit covers axial and mixed translations, identical and
+duplicate points, rotated endpoints, coordinates near the supported limits and
+mask cache reuse, in addition to every authored mesh. These sampled checks
+support the dominance argument; they are not the mathematical proof by themselves.
+
+An alternating comparison in one process measured three baseline wall contacts
+at 271.977, 271.468 and 254.478 ms, versus 254.251, 231.749 and 235.729 ms with
+the new solver. The median decreased about 13 percent. All six recorded contact
+results matched after excluding diagnostic query and interval counts. The
+comparison passed 152 checks. The remaining roughly 236 ms contact stall is
+still unacceptable for final performance acceptance. No native speed claim is
+implied. Evidence is `artifacts/sweep-endpoint-ab.log`.
+
+For future comparisons, save the baseline script from git into an artifact file
+and run `test_wall_contact.gd` with `--compare-sweep-source=/absolute/path/baseline.gd`
+after the engine argument separator. The test loads that explicit source into a
+separate script object and alternates the solvers against the same game scene.
+It does not alter the working implementation or run a training policy.
+
+Final validation passed 124,898 support checks, 115 sweep checks and the rendered
+human control diagnostic. The packed transform implementation is verified against
+the [pinned engine source](https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/core/math/transform_3d.h).
+Artifacts include `artifacts/sweep-endpoint-support-final.log`,
+`artifacts/sweep-endpoint-suite.log` and `artifacts/sweep-endpoint-human.log`.

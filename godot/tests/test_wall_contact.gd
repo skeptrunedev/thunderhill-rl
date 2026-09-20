@@ -4,6 +4,7 @@ extends SceneTree
 
 var failures := 0
 var checks := 0
+var last_wall_elapsed_ms := 0.0
 
 
 class FailedSweep:
@@ -257,7 +258,8 @@ func check_historical_wall(game: Node3D) -> void:
 	game.collision_sweep.profiling_enabled = "--profile-sweep" in OS.get_cmdline_user_args()
 	var query_started := Time.get_ticks_usec()
 	var transition: Dictionary = game._step({"throttle": 0.0})
-	print("HISTORICAL_WALL_STEP_MS ", (Time.get_ticks_usec() - query_started) / 1000.0)
+	last_wall_elapsed_ms = (Time.get_ticks_usec() - query_started) / 1000.0
+	print("HISTORICAL_WALL_STEP_MS ", last_wall_elapsed_ms)
 	if game.collision_sweep.profiling_enabled:
 		print("HISTORICAL_WALL_PROFILE ", JSON.stringify(game.collision_sweep.profile))
 	check(not transition.has("error"), "Historical wall contact produced infrastructure failure")
@@ -414,8 +416,42 @@ func run() -> void:
 	obstacle.queue_free()
 	await physics_frame
 	await physics_frame
-	await check_historical_wall(game)
+	var comparison_source := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--compare-sweep-source="):
+			comparison_source = arg.trim_prefix("--compare-sweep-source=")
+	if comparison_source.is_empty():
+		await check_historical_wall(game)
+	else:
+		await compare_sweeps(game, comparison_source)
 	game.queue_free()
 	await process_frame
 	print("WALL_CONTACT_CHECK checks=", checks, " failures=", failures)
 	quit(failures)
+
+
+func compare_sweeps(game: Node3D, source_path: String) -> void:
+	var baseline_script := GDScript.new()
+	baseline_script.source_code = FileAccess.get_file_as_string(source_path)
+	var valid := not baseline_script.source_code.is_empty() and baseline_script.reload() == OK
+	check(valid, "Cannot load requested baseline sweep source")
+	if not valid:
+		return
+	var current: RefCounted = game.collision_sweep
+	var baseline: RefCounted = baseline_script.new()
+	check(baseline.build(current.envelope).is_empty(), "Cannot build baseline sweep")
+	var timings := {"baseline": [], "current": []}
+	var expected := {}
+	for trial in range(3):
+		for label in ["baseline", "current"]:
+			game.collision_sweep = baseline if label == "baseline" else current
+			await check_historical_wall(game)
+			timings[label].append(last_wall_elapsed_ms)
+			var contact: Dictionary = game.sim.collision_contact.duplicate(true)
+			contact.erase("queries")
+			contact.erase("intervals")
+			if expected.is_empty():
+				expected = contact
+			check(contact == expected, "Compared sweeps changed the recorded contact")
+	game.collision_sweep = current
+	print("SWEEP_COMPARISON ", JSON.stringify(timings))

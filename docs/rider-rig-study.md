@@ -78,7 +78,7 @@ acceleration <= w*w*P0 + 2*w*a*P1 + a*a*P2
 
 The gameplay sweep uses these bounds for articulated arm parts and rigid steering
 bounds for gloves. The envelope version is `authored-convex-parts-v2` and the
-sweep version is `articulated-conservative-sweep-v3`. The envelope audit passed
+sweep version is `articulated-conservative-sweep-v4`. The envelope audit passed
 2,128 checks across 298 mesh parts. A real forearm fixture has clear endpoints
 but intersects a small obstacle during steering; independent engine overlap
 queries verify the sweep result. The sweep suite passed 115 checks, wall contact
