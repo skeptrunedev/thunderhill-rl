@@ -44,3 +44,21 @@ Run `uv run tools/build_road_surface.py`, then `uv run tools/audit_road_alignmen
 `uv run tools/test_road_alignment.py` verifies an analytical tilted quadratic, one sided fitting, zero plane curvature under multiple directions, and rejection of collinear observations. Both source and overlay panels were visually inspected after datum correction.
 
 Run `uv run tools/fit_cyclone_surface.py` after the road surface audit to produce `artifacts/road-surface/cyclone-height-fit.json`. It records all candidate coefficients, validation folds, coverage, solver diagnostics and input hashes. Run `uv run --with numpy==2.4.3 --with scipy==1.17.1 python -m unittest discover -s tools -p test_cyclone_surface.py` for the three tests covering analytical derivatives and bending energy, plane preservation, extrapolation rejection, invalid parameters and stale provenance.
+
+## Game surface evaluator
+
+`godot/scripts/lidar_height_surface.gd` now evaluates a serialized cubic tensor height field, including analytical first and second derivatives. Binary knot lookup restricts each query to sixteen supported coefficients. Configuration rejects malformed or nonfinite values and repeated interior knots, which would reduce continuity. Evaluation rejects positions outside the patch and numerical overflow. Rejected configuration preserves the previous valid surface, and accepted arrays are copied to prevent caller mutation.
+
+`tools/export_lidar_height_surface.py` converts a specifically requested candidate into local Godot coordinates. It reflects the north axis into south by reversing and negating its knot vector and reversing the corresponding coefficient axis. Heights subtract the track origin elevation. There is no artificial road lift. The tool checks the fitted report's track hash; its output records the report hash and selected parameters. Candidate selection here is for parity testing, not acceptance for gameplay.
+
+The asymmetric analytical polynomial test independently checks height, slope and mixed curvature signs after coordinate reflection. Godot passed 725 historical candidate samples with maximum component error 0.0000000074445 against Python doubles. Another 199 samples on a seeded control lattice with unequal knot intervals passed with maximum component error 0.00000043770939. These include all knot positions, interval midpoints, domain endpoints and seeded random points. Invalid inputs, array ownership and overflow checks also pass.
+
+Generate the historical fixture with:
+
+```
+uv run tools/export_lidar_height_surface.py --spacing 2 --strength 0.01
+```
+
+Run `godot --headless --path godot --script res://tests/test_lidar_height_surface.gd -- --fixture=/absolute/path/to/artifacts/road-surface/lidar-height-fixture.json`. Run the Python conversion test with `uv run --with numpy==2.4.3 --with scipy==1.17.1 python -m unittest discover -s tools -p test_lidar_height_export.py`. The Python test module also exposes `nonuniform_fixture()` to reproduce the second fixture as JSON.
+
+The live track does not yet load these patches. Joining patch heights with continuous first and second derivatives, verifying complete road coverage, and rebuilding mesh and contact together remain required before changing playable geometry. This evaluator alone does not change tire loads or provide suspension.
