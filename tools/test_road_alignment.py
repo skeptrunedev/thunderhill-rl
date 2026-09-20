@@ -1,0 +1,52 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "pyproj==3.7.2", "matplotlib==3.10.8"]
+# ///
+"""Independent analytical tests for the local lidar curvature audit."""
+
+import unittest
+import numpy as np
+from audit_road_alignment import fit_height_graph
+
+
+class HeightGraphTests(unittest.TestCase):
+    def test_tilted_quadratic_and_one_sided_support(self):
+        for low in [-3.0, 0.25]:
+            x, z = np.meshgrid(np.linspace(low, 3, 11), np.linspace(-3, 3, 13))
+            heights = (
+                7 + 0.2 * x - 0.1 * z + 0.01 * x * x + 0.003 * x * z - 0.02 * z * z
+            )
+            result = fit_height_graph(
+                np.column_stack([x.ravel(), z.ravel()]), heights.ravel(), [1, 0]
+            )
+            self.assertAlmostEqual(result["height_m"], 7, places=10)
+            np.testing.assert_allclose(result["gradient"], [0.2, -0.1], atol=1e-11)
+            np.testing.assert_allclose(
+                result["hessian"], [[0.02, 0.003], [0.003, -0.04]], atol=1e-11
+            )
+            expected = 0.02 / (np.sqrt(1.05) * 1.04)
+            self.assertAlmostEqual(
+                result["lidar_directional_normal_curvature_per_m"], expected, places=10
+            )
+            self.assertLess(result["rmse_m"], 1e-10)
+
+    def test_plane_has_zero_curvature_in_any_direction(self):
+        x, z = np.meshgrid(np.arange(-3, 4), np.arange(-3, 4))
+        for direction in [[1, 0], [0, 4], [3, -2]]:
+            result = fit_height_graph(
+                np.column_stack([x.ravel(), z.ravel()]),
+                (0.3 * x + 0.4 * z).ravel(),
+                direction,
+            )
+            self.assertAlmostEqual(
+                result["lidar_directional_normal_curvature_per_m"], 0, places=11
+            )
+
+    def test_collinear_data_is_not_a_surface_measurement(self):
+        x = np.arange(30)
+        with self.assertRaisesRegex(ValueError, "Rank deficient"):
+            fit_height_graph(np.column_stack([x, x]), x * 0.2, [1, 0])
+
+
+if __name__ == "__main__":
+    unittest.main()

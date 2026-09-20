@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "source_crs": "EPSG:6339",
+  "target_crs": "EPSG:26910",
+  "acquired_date": "2026-09-20",
+  "grids": [
+    {
+      "name": "us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif",
+      "open_license": true,
+      "sha256": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96"
+    },
+    {
+      "name": "us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif",
+      "open_license": true,
+      "sha256": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a"
+    },
+    {
+      "name": "us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif",
+      "open_license": true,
+      "sha256": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff"
+    },
+    {
+      "name": "us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+      "url": "https://cdn.proj.org/us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif",
+      "open_license": true,
+      "sha256": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+    }
+  ],
+  "operation_accuracy_m": 0.2,
+  "accuracy_scope": "PROJ operation metadata only, not total imagery, lidar or track accuracy",
+  "operation": "proj=pipeline step inv proj=utm zone=10 ellps=GRS80 step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif step inv proj=gridshift grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif step proj=utm zone=10 ellps=GRS80"
+}
