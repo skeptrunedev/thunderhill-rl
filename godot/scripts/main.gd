@@ -130,7 +130,8 @@ func _ready() -> void:
 	hud = HudScript.new()
 	hud.game = self
 	layer.add_child(hud)
-	reset_episode(0.0)
+	if benchmark_path.is_empty():
+		reset_episode(0.0)
 	if preview_mode:
 		reset_episode(preview_station)
 		paused = true
@@ -155,8 +156,11 @@ func _ready() -> void:
 			push_error(error)
 			get_tree().quit(2)
 			return
-		reset_episode(float(benchmark.reader.manifest.start_station), "diagnostic-recorded-inputs")
-		benchmark.reader.apply_state(sim, benchmark.reader.manifest.initial_state)
+		reset_episode(
+			float(benchmark.reader.manifest.start_station),
+			"diagnostic-recorded-inputs",
+			benchmark.reader.manifest.initial_state
+		)
 		paused = false
 		benchmark.start()
 	if server_port > 0:
@@ -215,7 +219,9 @@ func _environment() -> void:
 	sun.look_at(-Vector3(direction[0], direction[1], direction[2]), Vector3.UP)
 
 
-func reset_episode(station: float, checkpoint: String = "human") -> Dictionary:
+func reset_episode(
+	station: float, checkpoint: String = "human", initial_state: Dictionary = {}
+) -> Dictionary:
 	var index := 0
 	for i in track.samples.size():
 		if (
@@ -243,6 +249,13 @@ func reset_episode(station: float, checkpoint: String = "human") -> Dictionary:
 	steering_input = 0
 	action_cache.clear()
 	action_requests.clear()
+	if not initial_state.is_empty():
+		preload("res://scripts/replay.gd").new().apply_state(sim, initial_state)
+	_start_recording(station)
+	return observation()
+
+
+func _start_recording(station: float) -> void:
 	if recorder:
 		recorder.close()
 	var folder: String = "user://runs/" + run_id
@@ -264,7 +277,6 @@ func reset_episode(station: float, checkpoint: String = "human") -> Dictionary:
 			"start_station": station
 		}
 	)
-	return observation()
 
 
 func _record(record: Dictionary) -> void:
