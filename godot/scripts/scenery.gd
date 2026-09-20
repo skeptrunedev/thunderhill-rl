@@ -193,3 +193,22 @@ func _build_boards() -> void:
 			mark.material_override = dark
 			mark.position = Vector3(x, 0.61, 0)
 			board.add_child(mark)
+
+
+static func validate_bake() -> String:
+	var manifest: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/scenery-bake.json")
+	)
+	if not manifest is Dictionary or manifest.get("schema_version") != 1:
+		return "Missing or invalid scenery bake manifest"
+	for source: String in manifest.sources:
+		# Export converts scripts and textures. Packaging verifies their source
+		# hashes; runtime can still verify the original ground JSON documents.
+		if OS.has_feature("editor") or source.begins_with("data/"):
+			if FileAccess.get_sha256("res://" + source) != manifest.sources[source]:
+				return (
+					"Stale scenery bake: "
+					+ source
+					+ ". Run res://tools/bake_scenery.gd with a renderer."
+				)
+	return ""

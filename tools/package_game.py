@@ -22,12 +22,26 @@ def git(*args):
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
 
 
+def validate_scenery_bake():
+    project = ROOT / "godot"
+    manifest = json.loads((project / "data/scenery-bake.json").read_text())
+    if manifest.get("schema_version") != 1 or not manifest.get("sources"):
+        raise RuntimeError("Invalid scenery bake manifest")
+    expected = dict(manifest["sources"])
+    expected["assets/generated/scenery.scn"] = manifest["scene_sha256"]
+    for relative, digest in expected.items():
+        path = project / relative
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise RuntimeError(f"Stale scenery bake: {relative}. Run Godot --path godot --script res://tools/bake_scenery.gd")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--godot", required=True)
     parser.add_argument("--platform", choices=["macos", "linux"], default="macos")
     parser.add_argument("--allow-dirty", action="store_true")
     args = parser.parse_args()
+    validate_scenery_bake()
     dirty = bool(git("status", "--porcelain"))
     if dirty and not args.allow_dirty:
         parser.error("Commit the verified source first, or explicitly use --allow-dirty for a development package")

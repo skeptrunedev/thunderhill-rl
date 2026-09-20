@@ -87,3 +87,31 @@ Evidence: `artifacts/Thunderhill-diagnostics-871573b.png`, its `.png.json` sidec
 `.jsonl` startup trace and `.log` runtime output. The transferred archive SHA256
 was `f50f3eec458fef3593b1f34ba76389a29168acf380cf4185845b7ac4041bb91e`;
 native code signature verification passed.
+
+### Static scenery bake
+
+The 96,000 fixed decorative grass instances and provisional marker boards now
+load from `assets/generated/scenery.scn`. Runtime no longer repeats the seeded
+placement, exclusion and terrain sampling work. Regenerate with the pinned Godot
+editor executable and a real renderer:
+
+```
+DISPLAY=:1 godot --path godot --script res://tools/bake_scenery.gd
+```
+
+The generator rejects headless rendering because its MultiMesh buffer behavior
+did not preserve the authored instance data. It compares mesh arrays, transforms,
+instance colors, material storage properties, visibility ranges and shadow flags
+before saving and after an uncached reload. It verifies 96,000 instances and writes
+source hashes to `data/scenery-bake.json`. Packaging rejects changed inputs or a
+changed scene artifact; source runs verify all inputs, and exported runtime
+verifies ground JSON inputs (export converts scripts and textures).
+
+Local evidence: generation 6250 ms, scene resource reload and instantiation
+44 ms. Complete runtime scenery stage, including source validation and attachment,
+was 173 ms. These timings measure different scopes and are not a native benchmark.
+The baked and generated cockpit captures were pixel identical at 1280 by 800.
+Evidence: `artifacts/scenery-bake.log`, `artifacts/baked-scenery-startup.jsonl`,
+`artifacts/baked-scenery-preview.png`, compared with `artifacts/reservoir-preview.png`.
+The saved scene is approximately 5.4 MiB. Grass is still decorative and has no
+collision; this does not change simulation or agent observations intentionally.

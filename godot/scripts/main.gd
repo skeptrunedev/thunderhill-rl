@@ -133,9 +133,13 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	_startup_mark("landmarks_complete")
-	var scenery = preload("res://scripts/scenery.gd").new()
+	var scenery_error: String = preload("res://scripts/scenery.gd").validate_bake()
+	if not scenery_error.is_empty():
+		push_error(scenery_error)
+		get_tree().quit(2)
+		return
+	var scenery = load("res://assets/generated/scenery.scn").instantiate()
 	add_child(scenery)
-	scenery.build(track)
 	_startup_mark("scenery_complete")
 	sim = SimScript.new()
 	if DisplayServer.get_name() != "headless":
