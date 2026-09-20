@@ -71,9 +71,14 @@ func run() -> void:
 	game._update_visual(1.0 / 60.0)
 	check(game.camera.fov == 64.0, "Chase field of view was not restored")
 	check(game.camera.get_cull_mask_value(20), "Chase view lost rider mesh")
+	var screenshot_camera := 1
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--screenshot-camera="):
+			screenshot_camera = int(arg.trim_prefix("--screenshot-camera="))
+	check(screenshot_camera in [0, 1, 2], "Invalid screenshot camera")
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
-			game.camera_mode = 1
+			game.camera_mode = screenshot_camera
 			game.sim.lean = 0.4
 			game._update_visual(1.0 / 60.0)
 			game.hud.visible = false

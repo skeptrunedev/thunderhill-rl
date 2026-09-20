@@ -7,7 +7,8 @@ extends Node3D
 ## Approximate eye location inside the original helmet mesh, not measured rider data.
 const RIDER_EYE_LOCAL := Vector3(0.0, 1.51, -0.30)
 ## Approximate onboard framing anchor, not a measured eye or camera mount.
-const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.23, -0.12)
+const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.14, -0.30)
+const ONBOARD_LOOK_DOWN := 0.40
 
 var _front: Node3D
 var _rear_wheel: Node3D
@@ -644,16 +645,26 @@ func _build_cockpit() -> void:
 		# an approximation, not physical transmission or simulated fluid motion.
 		var fluid := ShaderMaterial.new()
 		fluid.shader = preload("res://shaders/reservoir.gdshader")
+		# The footage shows raised pots on stalks, above the bar and display sides.
+		# Mount height is an artistic estimate, not a manufacturer measurement.
+		var reservoir_base := 0.775
 		_bar(
 			Vector3(side * 0.219, 0.70, 0.205),
-			Vector3(side * 0.219, 0.745, 0.205),
+			Vector3(side * 0.219, reservoir_base, 0.205),
+			0.005,
+			dark_metal,
+			_front
+		)
+		_bar(
+			Vector3(side * 0.219, reservoir_base, 0.205),
+			Vector3(side * 0.219, reservoir_base + 0.045, 0.205),
 			0.028,
 			fluid,
 			_front
 		)
 		_bar(
-			Vector3(side * 0.219, 0.745, 0.205),
-			Vector3(side * 0.219, 0.753, 0.205),
+			Vector3(side * 0.219, reservoir_base + 0.045, 0.205),
+			Vector3(side * 0.219, reservoir_base + 0.053, 0.205),
 			0.03,
 			polymer,
 			_front

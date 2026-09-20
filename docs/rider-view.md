@@ -14,7 +14,7 @@ The clean exported build `7667d8f45deb-9b0c94c52cdf` was installed at `~/Applica
 
 ## Onboard framing view
 
-The human camera cycle now offers chase, rider and onboard views. Press C or use Change camera in the pause menu; the HUD labels the selected view. The third view attaches to an approximate local anchor `(0, 1.23, -0.12)` metres, uses a 74 degree vertical field of view and a 0.38 radian downward angle. It exposes the handlebar controls and instrument cluster for comparison with the supplied Ken Moto footage. This is an appearance study, not a measured camera mount, calibrated lens or replacement for the helmet eye. The reference also supports a dark handlebar finish, now applied to the original bar geometry.
+The human camera cycle now offers chase, rider and onboard views. Press C or use Change camera in the pause menu; the HUD labels the selected view. The third view attaches to an approximate local anchor `(0, 1.14, -0.30)` metres, uses a 74 degree vertical field of view and a 0.40 radian downward angle. It exposes the handlebar controls and instrument cluster for comparison with the supplied Ken Moto footage. This is an appearance study, not a measured camera mount, calibrated lens or replacement for the helmet eye. The reference also supports a dark handlebar finish, now applied to the original bar geometry.
 
 The existing rider view retains its eye anchor and framing. Both human close views use the existing partial roll stabilization, hide the helmet and torso, and show articulated arms and gloves on a separate visibility layer. Rider material realism, precise cockpit shapes and camera comfort remain unfinished. The separate versioned agent observation camera is unchanged.
 
@@ -27,3 +27,30 @@ simulated slosh. Geometry, dimensions and collision remain unchanged. The local
 Mobile renderer compiled the shader and the resulting cockpit capture was
 visually inspected in `artifacts/reservoir-preview.png`. Native verification of
 this material remains outstanding.
+
+## Closer onboard framing
+
+Comparison with the supplied video frame at ten seconds showed the previous
+onboard anchor made the tank dominate and the display appear too small. The
+optional onboard view now sits farther forward and slightly lower, with a
+shared downward angle constant used by gameplay and the standalone preview.
+The helmet and agent camera poses and intrinsics are unchanged. This is a
+qualitative framing adjustment, not calibrated camera reconstruction.
+
+The fluid pots now sit on raised supports, matching their elevated placement
+relative to the handlebars in the footage. The 75 mm elevation change and mount
+shape are artistic estimates, not dimensions inferred with measured confidence.
+Both support meshes and the moved pots are included in the normal front joint
+collision envelope. The instrument design, yoke, clamps and tank still need
+shape and detail work to approach the reference quality.
+
+The existing camera diagnostic now accepts `--screenshot-camera=2` alongside
+`--screenshot=/absolute/path/image.png` to inspect the actual onboard camera
+in the track scene at the existing leaned test pose, with the UI hidden.
+
+Verification passed: 2,142 envelope checks, 115 continuous sweep checks, rendered
+camera attachment and human controls, and the macOS export. Neutral, full steering
+lock and leaned onboard captures were inspected in
+`artifacts/onboard-raised-pots.png`, `artifacts/onboard-close-lock.png` and
+`artifacts/onboard-close-lean.png`. These establish presentation and collision
+integration, not measured mount dimensions or native viewing comfort.

@@ -827,7 +827,7 @@ func _update_visual(dt: float) -> void:
 		# study against the footage, separate from the helmet eye and policy camera.
 		var onboard := camera_mode == 2
 		var anchor: Vector3 = bike.ONBOARD_CAMERA_LOCAL if onboard else bike.RIDER_EYE_LOCAL
-		var look_down := 0.38 if onboard else 0.25
+		var look_down: float = bike.ONBOARD_LOOK_DOWN if onboard else 0.25
 		camera.fov = 74.0 if onboard else 90.0
 		camera.global_position = bike.to_global(anchor)
 		var upright := Vector3.UP.slide(riding_tangent).normalized()

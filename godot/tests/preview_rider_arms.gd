@@ -27,7 +27,9 @@ func _run() -> void:
 	var camera := Camera3D.new()
 	stage.add_child(camera)
 	camera.position = bike.ONBOARD_CAMERA_LOCAL
-	camera.look_at(camera.position + Vector3(0, -sin(0.38), -cos(0.38)))
+	camera.look_at(
+		camera.position + Vector3(0, -sin(bike.ONBOARD_LOOK_DOWN), -cos(bike.ONBOARD_LOOK_DOWN))
+	)
 	camera.fov = 74.0
 	camera.near = 0.02
 	var environment := WorldEnvironment.new()
