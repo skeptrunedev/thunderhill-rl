@@ -3,6 +3,9 @@ render_mode cull_disabled;
 uniform sampler2D grass_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D soil_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D soil_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D grass_roughness : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D soil_roughness : filter_linear_mipmap_anisotropic, repeat_enable;
 varying vec3 world_pos;
 
 float terrain_hash(vec2 cell) {
@@ -32,8 +35,16 @@ void fragment() {
     vec2 secondary_uv = rotation * uv * 0.93 + vec2(0.37, 0.71);
     vec3 grass = mix(texture(grass_color, uv).rgb, texture(grass_color, secondary_uv).rgb, 0.35);
     vec3 soil = texture(soil_color, world_pos.xz / 1.3).rgb;
-    ALBEDO = mix(grass, soil, smoothstep(0.32, 0.72, coverage) * 0.6) * vec3(0.88, 0.80, 0.66);
-    ROUGHNESS = 0.96;
-    NORMAL_MAP = texture(grass_normal, uv).rgb;
+    float soil_weight = smoothstep(0.32, 0.72, coverage) * 0.6;
+    ALBEDO = mix(grass, soil, soil_weight) * vec3(0.88, 0.80, 0.66);
+    float grass_r = mix(texture(grass_roughness, uv).r, texture(grass_roughness, secondary_uv).r, 0.35);
+    ROUGHNESS = clamp(mix(grass_r, texture(soil_roughness, world_pos.xz / 1.3).r, soil_weight), 0.65, 1.0);
+    vec3 primary_n = texture(grass_normal, uv).rgb * 2.0 - 1.0;
+    vec3 secondary_n = texture(grass_normal, secondary_uv).rgb * 2.0 - 1.0;
+    // Bring the rotated texture's tangent directions back to the original UV frame.
+    secondary_n.xy = transpose(rotation) * secondary_n.xy;
+    vec3 grass_n = normalize(mix(primary_n, secondary_n, 0.35));
+    vec3 soil_n = texture(soil_normal, world_pos.xz / 1.3).rgb * 2.0 - 1.0;
+    NORMAL_MAP = normalize(mix(grass_n, soil_n, soil_weight)) * 0.5 + 0.5;
     NORMAL_MAP_DEPTH = 0.45;
 }

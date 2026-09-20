@@ -4,6 +4,9 @@ render_mode cull_disabled;
 // Original material, metre scaled detail. It is not a surveyed curb surface.
 uniform vec3 paint_tint : source_color = vec3(1.0);
 uniform float wear_amount : hint_range(0.0, 1.0) = 0.2;
+uniform bool curb_stripes = false;
+uniform vec3 stripe_blue : source_color = vec3(0.0902, 0.3765, 0.6353);
+uniform vec3 stripe_white : source_color = vec3(0.898, 0.898, 0.863);
 varying vec3 world_position;
 
 float hash_cell(vec2 cell) {
@@ -29,6 +32,14 @@ void fragment() {
     float detail_weight = 1.0 - smoothstep(0.006, 0.025, length(fwidth(p)));
     float exposed = smoothstep(0.62, 0.84, chips) * wear_amount * detail_weight;
     vec3 pigment = pow(COLOR.rgb, vec3(2.2)) * paint_tint;
+    if (curb_stripes) {
+        // Continuous distance avoids quantizing stripe boundaries to track vertices.
+        // 2.5 m is provisional appearance, not a surveyed curb measurement.
+        float wave = sin(UV.y * 3.14159265 / 2.5);
+        float footprint = max(fwidth(UV.y) * 3.14159265 / 2.5, 0.001);
+        float stripe = smoothstep(-footprint, footprint, wave);
+        pigment = mix(stripe_white, stripe_blue, stripe);
+    }
     vec3 concrete = vec3(0.25, 0.24, 0.21);
     ALBEDO = mix(pigment, concrete, exposed) * mix(0.76, 1.0, stains);
     ROUGHNESS = mix(0.78, 0.96, max(exposed, stains));

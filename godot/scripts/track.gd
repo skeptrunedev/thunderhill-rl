@@ -112,6 +112,15 @@ func _build_terrain() -> void:
 	mat.set_shader_parameter(
 		"grass_normal", load("res://assets/materials/withered_grass_nor_gl_1k.jpg")
 	)
+	mat.set_shader_parameter(
+		"soil_normal", load("res://assets/materials/brown_mud_dry_nor_gl_1k.jpg")
+	)
+	mat.set_shader_parameter(
+		"grass_roughness", load("res://assets/materials/withered_grass_rough_1k.jpg")
+	)
+	mat.set_shader_parameter(
+		"soil_roughness", load("res://assets/materials/brown_mud_dry_rough_1k.jpg")
+	)
 	terrain_material = mat
 	_mesh(st, mat, "MeasuredTerrain")
 
@@ -188,18 +197,16 @@ func _build_road() -> void:
 				absf(float(samples[i].curvature)) > 0.012
 				and side * float(samples[i].curvature) > 0.0
 			):
-				var col := Color("1760a2") if int(s / 2.5) % 2 == 0 else Color("e5e5dc")
 				_quad(
 					curb,
 					edge_point(i, side * w, 0.05),
 					edge_point(i, side * (w + 0.9), 0.11),
 					edge_point(j, side * (wj + 0.9), 0.11),
 					edge_point(j, side * wj, 0.05),
-					Vector2.ZERO,
-					Vector2.RIGHT,
-					Vector2.ONE,
-					Vector2.DOWN,
-					col
+					Vector2(0.0, s),
+					Vector2(0.9, s),
+					Vector2(0.9, sj),
+					Vector2(0.0, sj)
 				)
 	var asphalt := ShaderMaterial.new()
 	asphalt.shader = load("res://shaders/asphalt.gdshader")
@@ -217,6 +224,7 @@ func _build_road() -> void:
 	var curb_mat := ShaderMaterial.new()
 	curb_mat.shader = preload("res://shaders/painted_concrete.gdshader")
 	curb_mat.set_shader_parameter("wear_amount", 0.28)
+	curb_mat.set_shader_parameter("curb_stripes", true)
 	_mesh(curb, curb_mat, "ProvisionalCurbs")
 
 
@@ -230,11 +238,15 @@ func terrain_height(p: Vector3) -> float:
 	var z := mini(floori(gz), nz - 2)
 	var fx := gx - float(x)
 	var fz := gz - float(z)
-	var top := lerpf(terrain.heights[z * nx + x], terrain.heights[z * nx + x + 1], fx)
-	var bottom := lerpf(
-		terrain.heights[(z + 1) * nx + x], terrain.heights[(z + 1) * nx + x + 1], fx
-	)
-	return lerpf(top, bottom, fz)
+	var a: float = terrain.heights[z * nx + x]
+	var b: float = terrain.heights[z * nx + x + 1]
+	var c: float = terrain.heights[(z + 1) * nx + x + 1]
+	var d: float = terrain.heights[(z + 1) * nx + x]
+	# Match _build_terrain's a,b,c / a,c,d triangle planes. Bilinear
+	# interpolation invents a curved surface between noncoplanar corners.
+	if fx >= fz:
+		return a + (b - a) * fx + (c - b) * fz
+	return a + (c - d) * fx + (d - a) * fz
 
 
 func terrain_normal(p: Vector3) -> Vector3:

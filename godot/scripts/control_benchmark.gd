@@ -87,7 +87,6 @@ func report(sim: RefCounted, laps: int, failure: String = "") -> Dictionary:
 		"offtrack_ticks": offtrack_ticks,
 		"max_position_error_m": max_position_error_m,
 		"rendered": DisplayServer.get_name() != "headless",
-		"clock_mode": "fixed_fps" if "--fixed-fps" in OS.get_cmdline_args() else "wall_time",
 		"resolution": [resolution.x, resolution.y],
 		"platform": OS.get_name(),
 		"frame_intervals": intervals_ms.size(),
