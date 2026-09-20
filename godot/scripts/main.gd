@@ -204,7 +204,8 @@ func _environment() -> void:
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.45
+	# Sky lighting strength lives in sky.gdshader. ambient_light_energy does
+	# not attenuate a sky with full ambient_light_sky_contribution.
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
 	env.fog_light_color = Color("b9bdad")
