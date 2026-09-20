@@ -51,3 +51,52 @@ The current sweep accepts arbitrary finite steering values, so any narrower
 valid arm domain must be checked before broadphase rejection. Camera visibility
 also needs a dedicated limb layer; placing hands under the front node without
 mask changes would silently alter policy RGB observations.
+
+## Shared pose prototype
+
+`rider_pose.gd` now supplies the glove, upper arm and forearm transforms used by
+`rider_arm_visual.gd`. The new cuff center is attached to a grip basis derived
+from the existing inner and outer grip endpoints. The study uses fixed shoulders
+and equal 0.33 m bones with an outward, downward and rearward elbow pole. These
+are original artistic proportions, not measured anatomy. Invalid or unreachable
+poses are rejected; no clamp or stretch is used. Visual pose application validates
+both sides before changing either.
+
+The equal length construction uses `E = S + D/2 + h*n`, where D points from
+shoulder to wrist, `h = sqrt(L*L - |D|*|D|/4)`, and n is the normalized elbow pole
+projected perpendicular to D. The bone frame uses the continuous bend plane
+normal rather than switching reference axes during animation.
+
+`domain_bounds` covers the steering interval with cells at most 0.01 rad wide.
+For wrist steering radius R and cell half width delta, the circular trajectory
+lies within `2*R*sin(delta/2)` of its center sample. This bounds shoulder distance
+and pole cross product throughout each cell. Local coordinates are limited to
+2 m, with explicit 0.1 mm numerical broadening. The current full domain encloses
+shoulder distance between 0.299975 and 0.597738 m, elbow height above 0.139919 m,
+and normalized pole separation above 0.935421. These margins avoid folded,
+fully extended and undefined bend plane configurations across the supported range.
+
+`point_motion_bounds` applies normalization and product rule bounds to the
+elbow and bone frames. For a local mesh point radius r it returns whole point
+reach P0 and first and second steering derivative bounds P1 and P2. Future
+sweep composition with root plus lean angular displacement w and steering
+change a is:
+
+```
+speed <= root_translation + w*P0 + a*P1
+acceleration <= w*w*P0 + 2*w*a*P1 + a*a*P2
+```
+
+This motion bound implementation is not wired into the current gameplay sweep.
+Integration still requires new joint identification, independent envelope poses,
+whole bike broadphase reach, domain rejection before broadphase, and actual swept
+arm obstacle tests. The current playable bike still uses its original rider.
+
+`test_rider_pose.gd` passed with zero failures across 2,002 sampled poses, checking
+bone lengths, grip and cuff attachment, bone frames, continuity, interval
+containment, invalid inputs and atomic visual updates. Finite differences also
+stayed within the analytic derivative bounds; those samples are sanity checks,
+not the proof of continuous coverage. Rendered neutral and full lock poses were
+inspected in `artifacts/rider-arms-neutral.png` and `artifacts/rider-arms-lock.png`.
+The sleeves and gloves remain visually provisional, without scanned leather or
+validated anatomy. The test log is `artifacts/rider-pose-check.log`.
