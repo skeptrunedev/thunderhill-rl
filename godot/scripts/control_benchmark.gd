@@ -118,7 +118,7 @@ func report(sim: RefCounted, laps: int, failure: String = "") -> Dictionary:
 		"capture_events": capture_events,
 		"crashed": sim.crashed,
 		"measurement":
-		"Wall clock process frame intervals, including physics and recording; startup excluded"
+		"Wall clock process frame intervals, including physics, recording and render warmup; scene setup before the first callback excluded"
 	}
 	if not intervals_ms.is_empty():
 		result["median_ms"] = intervals_ms[int(intervals_ms.size() * 0.5)]

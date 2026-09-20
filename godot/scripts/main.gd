@@ -38,6 +38,7 @@ var terminated := false
 var environment_failure: Dictionary = {}
 var server_port := 0
 var screenshot_path := ""
+var screenshot_thread: Thread
 var qa_ticks := 0
 var qa_target := 0
 var preview_mode := false
@@ -538,16 +539,30 @@ func _process(dt: float) -> void:
 		await RenderingServer.frame_post_draw
 		var read_begin := Time.get_ticks_usec()
 		var screenshot := get_viewport().get_texture().get_image()
-		var save_begin := Time.get_ticks_usec()
-		var error := screenshot.save_png(path)
-		var save_end := Time.get_ticks_usec()
+		var read_end := Time.get_ticks_usec()
 		if benchmark != null:
 			benchmark.record_capture("post_draw_wait", wait_begin, read_begin)
-			benchmark.record_capture("gpu_readback", read_begin, save_begin)
-			benchmark.record_capture("png_save", save_begin, save_end)
+			benchmark.record_capture("gpu_readback", read_begin, read_end)
+		# The worker exclusively owns the CPU image and never accesses the scene or GPU.
+		screenshot_thread = Thread.new()
+		var error := screenshot_thread.start(_save_screenshot.bind(screenshot, path))
+		if error == OK:
+			while screenshot_thread.is_alive():
+				await get_tree().process_frame
+			var saved: Dictionary = screenshot_thread.wait_to_finish()
+			error = saved.error
+			if benchmark != null:
+				benchmark.record_capture("png_save_worker", saved.begin_usec, saved.end_usec)
+		screenshot_thread = null
 		print("SCREENSHOT ", path, " result=", error)
 		if preview_mode:
 			get_tree().quit()
+
+
+static func _save_screenshot(screenshot: Image, path: String) -> Dictionary:
+	var begin_usec := Time.get_ticks_usec()
+	var error := screenshot.save_png(path)
+	return {"error": error, "begin_usec": begin_usec, "end_usec": Time.get_ticks_usec()}
 
 
 func _update_visual(dt: float) -> void:
@@ -747,6 +762,8 @@ func _request(request: Dictionary) -> Dictionary:
 
 
 func _exit_tree() -> void:
+	if screenshot_thread != null and screenshot_thread.is_started():
+		screenshot_thread.wait_to_finish()
 	if recorder:
 		recorder.flush()
 		recorder.close()
