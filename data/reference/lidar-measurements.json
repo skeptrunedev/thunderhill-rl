@@ -1,0 +1,2028 @@
+{
+  "status": "Historical raw lidar measurements, not an exact 2026 survey",
+  "source_year": 2023,
+  "ground_class": 2,
+  "corridor_point_count": 2749744,
+  "crs": "COMPD_CS[\"NAD83(2011) / UTM zone 10N + NAVD88 height - Geoid18 (m)\",PROJCS[\"NAD83(2011) / UTM zone 10N\",GEOGCS[\"NAD83(2011)\",DATUM[\"NAD83 (National Spatial Reference System 2011)\",SPHEROID[\"GRS 1980\",6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1116\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"6318\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-123],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"X\",EAST],AXIS[\"Y\",NORTH],AUTHORITY[\"EPSG\",\"6339\"]],VERT_CS[\"NAVD88 height - Geoid18 (m)\",VERT_DATUM[\"North American Vertical Datum 1988\",2005,AUTHORITY[\"EPSG\",\"5103\"]],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Up\",UP],AUTHORITY[\"EPSG\",\"5703\"]]]",
+  "horizontal_and_vertical_units": "meters",
+  "tiles": [
+    {
+      "path": "USGS_LPC_CA_NorthCoastRanges_B23_556376.laz",
+      "sha256": "d247f8a92b92811ea4dfa6bf1358a13e5073cb4dcfc197b445fbf1fccc8d17a7",
+      "point_count": 12187114,
+      "crs": "COMPD_CS[\"NAD83(2011) / UTM zone 10N + NAVD88 height - Geoid18 (m)\",PROJCS[\"NAD83(2011) / UTM zone 10N\",GEOGCS[\"NAD83(2011)\",DATUM[\"NAD83 (National Spatial Reference System 2011)\",SPHEROID[\"GRS 1980\",6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1116\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"6318\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-123],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"X\",EAST],AXIS[\"Y\",NORTH],AUTHORITY[\"EPSG\",\"6339\"]],VERT_CS[\"NAVD88 height - Geoid18 (m)\",VERT_DATUM[\"North American Vertical Datum 1988\",2005,AUTHORITY[\"EPSG\",\"5103\"]],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Up\",UP],AUTHORITY[\"EPSG\",\"5703\"]]]",
+      "scales": [
+        0.01,
+        0.01,
+        0.01
+      ],
+      "bounds_min": [
+        556500.01,
+        4376000.0,
+        83.18
+      ],
+      "bounds_max": [
+        557500.0,
+        4376999.99,
+        192.86
+      ],
+      "classification_counts": {
+        "1": 2458598,
+        "2": 9726033,
+        "7": 47,
+        "17": 566,
+        "18": 1870
+      },
+      "intensity_percentiles": [
+        14119.0,
+        44653.0,
+        49002.0,
+        51415.0,
+        65535.0
+      ],
+      "dimensions": [
+        "X",
+        "Y",
+        "Z",
+        "intensity",
+        "return_number",
+        "number_of_returns",
+        "synthetic",
+        "key_point",
+        "withheld",
+        "overlap",
+        "scanner_channel",
+        "scan_direction_flag",
+        "edge_of_flight_line",
+        "classification",
+        "user_data",
+        "scan_angle",
+        "point_source_id",
+        "gps_time"
+      ]
+    },
+    {
+      "path": "USGS_LPC_CA_NorthCoastRanges_B23_556377.laz",
+      "sha256": "3968e7535e45ef21d08e9f7ac67ef49a0c89e43e8e1f6a2e8440e4831e166cde",
+      "point_count": 12334048,
+      "crs": "COMPD_CS[\"NAD83(2011) / UTM zone 10N + NAVD88 height - Geoid18 (m)\",PROJCS[\"NAD83(2011) / UTM zone 10N\",GEOGCS[\"NAD83(2011)\",DATUM[\"NAD83 (National Spatial Reference System 2011)\",SPHEROID[\"GRS 1980\",6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1116\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"6318\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-123],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"X\",EAST],AXIS[\"Y\",NORTH],AUTHORITY[\"EPSG\",\"6339\"]],VERT_CS[\"NAVD88 height - Geoid18 (m)\",VERT_DATUM[\"North American Vertical Datum 1988\",2005,AUTHORITY[\"EPSG\",\"5103\"]],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Up\",UP],AUTHORITY[\"EPSG\",\"5703\"]]]",
+      "scales": [
+        0.01,
+        0.01,
+        0.01
+      ],
+      "bounds_min": [
+        556500.01,
+        4377000.0,
+        77.15
+      ],
+      "bounds_max": [
+        557500.0,
+        4377999.99,
+        209.19
+      ],
+      "classification_counts": {
+        "1": 3064435,
+        "2": 9266533,
+        "7": 28,
+        "18": 3052
+      },
+      "intensity_percentiles": [
+        13375.0,
+        46917.0,
+        49568.0,
+        51385.0,
+        65535.0
+      ],
+      "dimensions": [
+        "X",
+        "Y",
+        "Z",
+        "intensity",
+        "return_number",
+        "number_of_returns",
+        "synthetic",
+        "key_point",
+        "withheld",
+        "overlap",
+        "scanner_channel",
+        "scan_direction_flag",
+        "edge_of_flight_line",
+        "classification",
+        "user_data",
+        "scan_angle",
+        "point_source_id",
+        "gps_time"
+      ]
+    },
+    {
+      "path": "USGS_LPC_CA_NorthCoastRanges_B23_557376.laz",
+      "sha256": "3438bc04540f566e29270871a253471525fe7bee179a3377a0c53654ffe7c685",
+      "point_count": 12575359,
+      "crs": "COMPD_CS[\"NAD83(2011) / UTM zone 10N + NAVD88 height - Geoid18 (m)\",PROJCS[\"NAD83(2011) / UTM zone 10N\",GEOGCS[\"NAD83(2011)\",DATUM[\"NAD83 (National Spatial Reference System 2011)\",SPHEROID[\"GRS 1980\",6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1116\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"6318\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-123],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"X\",EAST],AXIS[\"Y\",NORTH],AUTHORITY[\"EPSG\",\"6339\"]],VERT_CS[\"NAVD88 height - Geoid18 (m)\",VERT_DATUM[\"North American Vertical Datum 1988\",2005,AUTHORITY[\"EPSG\",\"5103\"]],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Up\",UP],AUTHORITY[\"EPSG\",\"5703\"]]]",
+      "scales": [
+        0.01,
+        0.01,
+        0.01
+      ],
+      "bounds_min": [
+        557500.01,
+        4376000.0,
+        64.8
+      ],
+      "bounds_max": [
+        558500.0,
+        4376999.99,
+        197.44
+      ],
+      "classification_counts": {
+        "1": 3241150,
+        "2": 9330514,
+        "7": 22,
+        "18": 3673
+      },
+      "intensity_percentiles": [
+        13970.0,
+        47066.0,
+        49627.0,
+        51713.0,
+        65535.0
+      ],
+      "dimensions": [
+        "X",
+        "Y",
+        "Z",
+        "intensity",
+        "return_number",
+        "number_of_returns",
+        "synthetic",
+        "key_point",
+        "withheld",
+        "overlap",
+        "scanner_channel",
+        "scan_direction_flag",
+        "edge_of_flight_line",
+        "classification",
+        "user_data",
+        "scan_angle",
+        "point_source_id",
+        "gps_time"
+      ]
+    },
+    {
+      "path": "USGS_LPC_CA_NorthCoastRanges_B23_557377.laz",
+      "sha256": "f580348b60ffcc7d197680ad71623bc4dbb652aa8203ef49bd94596d6ccdb07f",
+      "point_count": 15621828,
+      "crs": "COMPD_CS[\"NAD83(2011) / UTM zone 10N + NAVD88 height - Geoid18 (m)\",PROJCS[\"NAD83(2011) / UTM zone 10N\",GEOGCS[\"NAD83(2011)\",DATUM[\"NAD83 (National Spatial Reference System 2011)\",SPHEROID[\"GRS 1980\",6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1116\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"6318\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-123],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"X\",EAST],AXIS[\"Y\",NORTH],AUTHORITY[\"EPSG\",\"6339\"]],VERT_CS[\"NAVD88 height - Geoid18 (m)\",VERT_DATUM[\"North American Vertical Datum 1988\",2005,AUTHORITY[\"EPSG\",\"5103\"]],UNIT[\"meter\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Up\",UP],AUTHORITY[\"EPSG\",\"5703\"]]]",
+      "scales": [
+        0.01,
+        0.01,
+        0.01
+      ],
+      "bounds_min": [
+        557500.01,
+        4377000.0,
+        64.27
+      ],
+      "bounds_max": [
+        558500.0,
+        4377999.99,
+        179.15
+      ],
+      "classification_counts": {
+        "1": 8344434,
+        "2": 7275041,
+        "7": 31,
+        "18": 2322
+      },
+      "intensity_percentiles": [
+        12838.0,
+        34525.0,
+        43282.0,
+        48436.0,
+        65535.0
+      ],
+      "dimensions": [
+        "X",
+        "Y",
+        "Z",
+        "intensity",
+        "return_number",
+        "number_of_returns",
+        "synthetic",
+        "key_point",
+        "withheld",
+        "overlap",
+        "scanner_channel",
+        "scan_direction_flag",
+        "edge_of_flight_line",
+        "classification",
+        "user_data",
+        "scan_angle",
+        "point_source_id",
+        "gps_time"
+      ]
+    }
+  ],
+  "osm_license": "ODbL 1.0 for derived sample station geometry; source USGS points public domain",
+  "method": "Ordinary least squares elevation plane in 4m along by 6m across strip centered on approximate OSM route. Positive across slope rises left relative to route order. 4m and 8m core widths report sensitivity. No pavement boundaries assumed.",
+  "station_origin": {
+    "osm_way_id": 28825115,
+    "osm_way_version": 18,
+    "first_node_id": 570035219,
+    "lon_lat": [
+      -122.3312159,
+      39.5428506
+    ],
+    "direction": "Increasing distance follows OSM node order, initially south",
+    "chainage_definition": "Cumulative Euclidean distance in lidar projected CRS, not surveyed stationing"
+  },
+  "source_accuracy": {
+    "url": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/metadata/CA_NorthCoastRanges_B23/USGS_CA_NorthCoastRanges_B23_Project_Report.pdf",
+    "scope": "Entire collection, not independent Thunderhill control points",
+    "tested_nonvegetated_vertical_rmse_cm": 3.63,
+    "tested_nonvegetated_vertical_95pct_cm": 7.11,
+    "coordinate_quantization_m": 0.01,
+    "local_fit_rmse_is_not_absolute_accuracy": true
+  },
+  "limitations": [
+    "2023 collection predates 2026 repave",
+    "A road strip fit is not a validated whole pavement camber profile",
+    "OSM centerline has visible lateral offsets relative to lidar reflectance band",
+    "Intensity changes do not uniquely identify asphalt boundaries",
+    "No present day exact road widths or curb dimensions are asserted",
+    "Sensitivity across fitted strip widths is not a confidence interval"
+  ],
+  "license": "Measurement database using OSM station geometry: ODbL 1.0, OpenStreetMap contributors, separate from repository MIT code. Original USGS point clouds public domain.",
+  "osm_license_url": "https://www.openstreetmap.org/copyright",
+  "sections": [
+    {
+      "station_m": 0.0,
+      "center_lon_lat": [
+        -122.3312159,
+        39.5428506
+      ],
+      "center_xy_m": [
+        557466.3229144721,
+        4377233.643425343
+      ],
+      "heading_xy": [
+        0.01581153438475914,
+        -0.9998749898764343
+      ],
+      "left_normal_xy": [
+        0.9998749898764343,
+        0.01581153438475914
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 237,
+      "center_elevation_m": 90.96722522859629,
+      "along_slope_pct": -0.1750867710510265,
+      "left_cross_slope_pct": -1.8385315929601285,
+      "left_cross_slope_deg": -1.0532823416994148,
+      "plane_rmse_m": 0.010081681257023958,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.1320280245528909,
+        -1.0532823416994148,
+        -1.0215127663804282
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 100.0,
+      "center_lon_lat": [
+        -122.33120791304083,
+        39.54194960632054
+      ],
+      "center_xy_m": [
+        557467.7523449241,
+        4377133.653642221
+      ],
+      "heading_xy": [
+        0.014294304524041616,
+        -0.9998978312098561
+      ],
+      "left_normal_xy": [
+        0.9998978312098561,
+        0.014294304524041616
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 249,
+      "center_elevation_m": 91.34114560620489,
+      "along_slope_pct": -0.1880564268215491,
+      "left_cross_slope_pct": -1.9347944454184505,
+      "left_cross_slope_deg": -1.1084172638844876,
+      "plane_rmse_m": 0.009115335186328302,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.121392896154198,
+        -1.1084172638844876,
+        -1.14436972603445
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 200.0,
+      "center_lon_lat": [
+        -122.33119992612352,
+        39.541048612503175
+      ],
+      "center_xy_m": [
+        557469.1817753762,
+        4377033.663859101
+      ],
+      "heading_xy": [
+        0.014294304524041616,
+        -0.9998978312098561
+      ],
+      "left_normal_xy": [
+        0.9998978312098561,
+        0.014294304524041616
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 222,
+      "center_elevation_m": 91.44128696414668,
+      "along_slope_pct": 0.11069383349066597,
+      "left_cross_slope_pct": -1.900840644128738,
+      "left_cross_slope_deg": -1.0889703215800939,
+      "plane_rmse_m": 0.008882675847805544,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.0378921134070054,
+        -1.0889703215800939,
+        -1.1136527556510827
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 300.0,
+      "center_lon_lat": [
+        -122.33119215426724,
+        39.54014761742904
+      ],
+      "center_xy_m": [
+        557470.5927300114,
+        4376933.673814496
+      ],
+      "heading_xy": [
+        0.014008369623786378,
+        -0.9999018779762759
+      ],
+      "left_normal_xy": [
+        0.9999018779762759,
+        0.014008369623786378
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 215,
+      "center_elevation_m": 91.51167712469149,
+      "along_slope_pct": -0.16034875358087347,
+      "left_cross_slope_pct": -2.012466499101277,
+      "left_cross_slope_deg": -1.152902742212662,
+      "plane_rmse_m": 0.007767396304080639,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.177757956153038,
+        -1.152902742212662,
+        -1.225600735242802
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 400.0,
+      "center_lon_lat": [
+        -122.33118466288335,
+        39.539246620799766
+      ],
+      "center_xy_m": [
+        557471.9795874446,
+        4376833.683433521
+      ],
+      "heading_xy": [
+        0.013626199622722048,
+        -0.9999071590321982
+      ],
+      "left_normal_xy": [
+        0.9999071590321982,
+        0.013626199622722048
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 236,
+      "center_elevation_m": 91.57164233950652,
+      "along_slope_pct": 0.0905283159697734,
+      "left_cross_slope_pct": -2.460638607849883,
+      "left_cross_slope_deg": -1.4095576336751752,
+      "plane_rmse_m": 0.009616125107078152,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.4264515123983064,
+        -1.4095576336751752,
+        -1.4059989169593508
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 500.0,
+      "center_lon_lat": [
+        -122.33117731489722,
+        39.53834562334714
+      ],
+      "center_xy_m": [
+        557473.3541253565,
+        4376733.692884923
+      ],
+      "heading_xy": [
+        0.014447293687346988,
+        -0.9998956324062584
+      ],
+      "left_normal_xy": [
+        0.9998956324062584,
+        0.014447293687346988
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 229,
+      "center_elevation_m": 91.68844211043799,
+      "along_slope_pct": 0.6421144997535855,
+      "left_cross_slope_pct": -2.2073672123622754,
+      "left_cross_slope_deg": -1.2645228993875293,
+      "plane_rmse_m": 0.010786759117570443,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.2242452967682442,
+        -1.2645228993875293,
+        -1.1871911857901731
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 600.0,
+      "center_lon_lat": [
+        -122.33116915008955,
+        39.53744462993478
+      ],
+      "center_xy_m": [
+        557474.7988547259,
+        4376633.703321682
+      ],
+      "heading_xy": [
+        0.01444729369898609,
+        -0.9998956324060903
+      ],
+      "left_normal_xy": [
+        0.9998956324060903,
+        0.01444729369898609
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 258,
+      "center_elevation_m": 91.80192674418079,
+      "along_slope_pct": 0.2358000703744264,
+      "left_cross_slope_pct": -2.366086553943159,
+      "left_cross_slope_deg": -1.3554148358602902,
+      "plane_rmse_m": 0.008779533860774708,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.395259914640862,
+        -1.3554148358602902,
+        -1.293857607032085
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 700.0,
+      "center_lon_lat": [
+        -122.33086336333025,
+        39.53660469762832
+      ],
+      "center_xy_m": [
+        557501.7693765425,
+        4376540.680611872
+      ],
+      "heading_xy": [
+        0.6981215202586678,
+        -0.7159792894712295
+      ],
+      "left_normal_xy": [
+        0.7159792894712295,
+        0.6981215202586678
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 201,
+      "center_elevation_m": 93.10852237468667,
+      "along_slope_pct": 2.1374642709046285,
+      "left_cross_slope_pct": -3.119124831746295,
+      "left_cross_slope_deg": -1.7865476627533927,
+      "plane_rmse_m": 0.01028599825531273,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.7896600447337654,
+        -1.7865476627533927,
+        -1.7763582698121154
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 800.0,
+      "center_lon_lat": [
+        -122.32982085609873,
+        39.53623252427757
+      ],
+      "center_xy_m": [
+        557591.6648225631,
+        4376500.042348226
+      ],
+      "heading_xy": [
+        0.9608716438817513,
+        -0.2769940143468465
+      ],
+      "left_normal_xy": [
+        0.2769940143468465,
+        0.9608716438817513
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 223,
+      "center_elevation_m": 94.74569840028221,
+      "along_slope_pct": -0.30911149637800683,
+      "left_cross_slope_pct": -3.4082371619801135,
+      "left_cross_slope_deg": -1.9520204560335783,
+      "plane_rmse_m": 0.014204142202840385,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.103921054993399,
+        -1.9520204560335783,
+        -1.8327549033711203
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 900.0,
+      "center_lon_lat": [
+        -122.32870466979244,
+        39.53597787133873
+      ],
+      "center_xy_m": [
+        557687.7956284758,
+        4376472.495085827
+      ],
+      "heading_xy": [
+        0.9615953150643191,
+        -0.2744712189763304
+      ],
+      "left_normal_xy": [
+        0.2744712189763304,
+        0.9615953150643191
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 239,
+      "center_elevation_m": 92.19632765054371,
+      "along_slope_pct": -4.816471973087126,
+      "left_cross_slope_pct": -3.3397513639519505,
+      "left_cross_slope_deg": -1.9128256045038128,
+      "plane_rmse_m": 0.010200948146425472,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.0494525022226817,
+        -1.9128256045038128,
+        -1.8007179189097737
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1000.0,
+      "center_lon_lat": [
+        -122.32757492907783,
+        39.535794630938426
+      ],
+      "center_xy_m": [
+        557785.0327396544,
+        4376452.883276302
+      ],
+      "heading_xy": [
+        0.992057776980537,
+        0.12578301607305875
+      ],
+      "left_normal_xy": [
+        -0.12578301607305875,
+        0.992057776980537
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 237,
+      "center_elevation_m": 87.51938200323218,
+      "along_slope_pct": -3.416959036953525,
+      "left_cross_slope_pct": -3.3209960313458042,
+      "left_cross_slope_deg": -1.902091496135288,
+      "plane_rmse_m": 0.010125246148296805,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.020089825565007,
+        -1.902091496135288,
+        -1.8758161925401662
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1100.0,
+      "center_lon_lat": [
+        -122.32669090293064,
+        39.536312124856494
+      ],
+      "center_xy_m": [
+        557860.5727897302,
+        4376510.884141093
+      ],
+      "heading_xy": [
+        0.3959687088596524,
+        0.9182640043059621
+      ],
+      "left_normal_xy": [
+        -0.9182640043059621,
+        0.3959687088596524
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 254,
+      "center_elevation_m": 85.27352637123867,
+      "along_slope_pct": -1.278048069106965,
+      "left_cross_slope_pct": -3.617883347024938,
+      "left_cross_slope_deg": -2.0719907657847396,
+      "plane_rmse_m": 0.00986839017278799,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.0738983661690322,
+        -2.0719907657847396,
+        -2.057527888594379
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1200.0,
+      "center_lon_lat": [
+        -122.32682803349913,
+        39.53716233413549
+      ],
+      "center_xy_m": [
+        557848.0826663574,
+        4376605.154601078
+      ],
+      "heading_xy": [
+        -0.6377824770805441,
+        0.7702165357410896
+      ],
+      "left_normal_xy": [
+        -0.7702165357410896,
+        -0.6377824770805441
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 226,
+      "center_elevation_m": 85.35911640433662,
+      "along_slope_pct": 1.1298128664622447,
+      "left_cross_slope_pct": -3.8209267874810653,
+      "left_cross_slope_deg": -2.188165332458319,
+      "plane_rmse_m": 0.00991758909205578,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.1171617407681325,
+        -2.188165332458319,
+        -2.1964045491238737
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1300.0,
+      "center_lon_lat": [
+        -122.32783947182308,
+        39.537566026360494
+      ],
+      "center_xy_m": [
+        557760.8307726426,
+        4376649.307885003
+      ],
+      "heading_xy": [
+        -0.9595788832669667,
+        0.28143981024034437
+      ],
+      "left_normal_xy": [
+        -0.28143981024034437,
+        -0.9595788832669667
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 270,
+      "center_elevation_m": 87.83448492953369,
+      "along_slope_pct": 3.7929814647622693,
+      "left_cross_slope_pct": -3.8207123773216596,
+      "left_cross_slope_deg": -2.188042663566305,
+      "plane_rmse_m": 0.007872868480239242,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.201378418796569,
+        -2.188042663566305,
+        -2.1313760573440925
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1400.0,
+      "center_lon_lat": [
+        -122.32895006610036,
+        39.537833430716205
+      ],
+      "center_xy_m": [
+        557665.1718618206,
+        4376678.272997177
+      ],
+      "heading_xy": [
+        -0.9170937932878008,
+        0.3986715117900855
+      ],
+      "left_normal_xy": [
+        -0.3986715117900855,
+        -0.9170937932878008
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 249,
+      "center_elevation_m": 91.12972263030873,
+      "along_slope_pct": -0.04696349480829941,
+      "left_cross_slope_pct": -3.0130874820082183,
+      "left_cross_slope_deg": -1.725849804410835,
+      "plane_rmse_m": 0.010271572644607353,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.6775085474048534,
+        -1.725849804410835,
+        -1.7106867419988623
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1500.0,
+      "center_lon_lat": [
+        -122.32954471801538,
+        39.53854768423761
+      ],
+      "center_xy_m": [
+        557613.4808118702,
+        4376757.162025769
+      ],
+      "heading_xy": [
+        0.020499356902651845,
+        0.999789866105162
+      ],
+      "left_normal_xy": [
+        -0.999789866105162,
+        0.020499356902651845
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 237,
+      "center_elevation_m": 88.41017632462398,
+      "along_slope_pct": -1.7399104781123491,
+      "left_cross_slope_pct": -3.1690731175720197,
+      "left_cross_slope_deg": -1.815137659642136,
+      "plane_rmse_m": 0.008316378915785249,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.8113409337553188,
+        -1.815137659642136,
+        -1.932246936801733
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1600.0,
+      "center_lon_lat": [
+        -122.32894809547459,
+        39.539273253372144
+      ],
+      "center_xy_m": [
+        557664.1497347637,
+        4376838.0698505
+      ],
+      "heading_xy": [
+        0.8032993366942734,
+        0.5955754995519378
+      ],
+      "left_normal_xy": [
+        -0.5955754995519378,
+        0.8032993366942734
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 244,
+      "center_elevation_m": 87.7850730382152,
+      "along_slope_pct": -0.38641170001158276,
+      "left_cross_slope_pct": -3.066377609399698,
+      "left_cross_slope_deg": -1.7563546112220312,
+      "plane_rmse_m": 0.009433353578876154,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.6806564251344562,
+        -1.7563546112220312,
+        -1.816010274410881
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1700.0,
+      "center_lon_lat": [
+        -122.32875145463845,
+        39.540062632719
+      ],
+      "center_xy_m": [
+        557680.3939958804,
+        4376925.803433489
+      ],
+      "heading_xy": [
+        -0.5120942926813632,
+        0.8589292377158751
+      ],
+      "left_normal_xy": [
+        -0.8589292377158751,
+        -0.5120942926813632
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 229,
+      "center_elevation_m": 87.49288970983692,
+      "along_slope_pct": 3.3905000829393135,
+      "left_cross_slope_pct": -3.6834725259990515,
+      "left_cross_slope_deg": -2.1095205781484134,
+      "plane_rmse_m": 0.008731556885917365,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.0556599792253234,
+        -2.1095205781484134,
+        -2.1110692403818763
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1747.576826505588,
+      "center_lon_lat": [
+        -122.3290314,
+        39.540432
+      ],
+      "center_xy_m": [
+        557656.0324485437,
+        4376966.6174838105
+      ],
+      "heading_xy": [
+        -0.4395451862838527,
+        0.8982204791779651
+      ],
+      "left_normal_xy": [
+        -0.8982204791779651,
+        -0.4395451862838527
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 254,
+      "center_elevation_m": 90.51274463693473,
+      "along_slope_pct": 9.886041070255699,
+      "left_cross_slope_pct": -3.7616861198298657,
+      "left_cross_slope_deg": -2.154271649919315,
+      "plane_rmse_m": 0.008750475834176624,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.1981704624495517,
+        -2.154271649919315,
+        -2.0957276238827385
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1790.2347038131586,
+      "center_lon_lat": [
+        -122.32918700000002,
+        39.54079509999999
+      ],
+      "center_xy_m": [
+        557642.361317148,
+        4377006.815687323
+      ],
+      "heading_xy": [
+        -0.1439081801288518,
+        0.989591044670475
+      ],
+      "left_normal_xy": [
+        -0.989591044670475,
+        -0.1439081801288518
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 241,
+      "center_elevation_m": 96.0526259535916,
+      "along_slope_pct": 14.32814939410789,
+      "left_cross_slope_pct": -3.517531568734718,
+      "left_cross_slope_deg": -2.0145665296013453,
+      "plane_rmse_m": 0.009927870750783198,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.9821556494159231,
+        -2.0145665296013453,
+        -2.019695055519249
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1800.0,
+      "center_lon_lat": [
+        -122.32919619926129,
+        39.540882778659594
+      ],
+      "center_xy_m": [
+        557641.4982941188,
+        4377016.540624432
+      ],
+      "heading_xy": [
+        -0.06649529139527077,
+        0.997786738848667
+      ],
+      "left_normal_xy": [
+        -0.997786738848667,
+        -0.06649529139527077
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 243,
+      "center_elevation_m": 97.42648658169594,
+      "along_slope_pct": 14.069714484139743,
+      "left_cross_slope_pct": -2.939832365976946,
+      "left_cross_slope_deg": -1.68391486799175,
+      "plane_rmse_m": 0.011184885218076552,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.6553061080288753,
+        -1.68391486799175,
+        -1.6911613260079845
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1817.2914072805354,
+      "center_lon_lat": [
+        -122.3292314,
+        39.5410324
+      ],
+      "center_xy_m": [
+        557638.3497359729,
+        4377033.123484922
+      ],
+      "heading_xy": [
+        -0.7436356842272122,
+        0.6685850500451875
+      ],
+      "left_normal_xy": [
+        -0.6685850500451875,
+        -0.7436356842272122
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 236,
+      "center_elevation_m": 99.3455629107475,
+      "along_slope_pct": 3.833825596860893,
+      "left_cross_slope_pct": -6.903736356079573,
+      "left_cross_slope_deg": -3.94928321335522,
+      "plane_rmse_m": 0.011117215405740887,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -3.856978241292075,
+        -3.94928321335522,
+        -3.9684060100181844
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1837.5904875402584,
+      "center_lon_lat": [
+        -122.32946060000002,
+        39.541066400000005
+      ],
+      "center_xy_m": [
+        557618.6265641425,
+        4377036.750131482
+      ],
+      "heading_xy": [
+        -0.9789986865995446,
+        0.20386655350097752
+      ],
+      "left_normal_xy": [
+        -0.20386655350097752,
+        -0.9789986865995446
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 215,
+      "center_elevation_m": 97.87570358556205,
+      "along_slope_pct": -13.299611492760699,
+      "left_cross_slope_pct": -3.2199391775819257,
+      "left_cross_slope_deg": -1.844252053747899,
+      "plane_rmse_m": 0.009807692008463301,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.870335913146178,
+        -1.844252053747899,
+        -1.8224985932818367
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1885.5316445452627,
+      "center_lon_lat": [
+        -122.32988790000002,
+        39.541324799999984
+      ],
+      "center_xy_m": [
+        557581.6953376549,
+        4377065.1546130655
+      ],
+      "heading_xy": [
+        -0.5182799056957399,
+        0.8552110495965397
+      ],
+      "left_normal_xy": [
+        -0.8552110495965397,
+        -0.5182799056957399
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 235,
+      "center_elevation_m": 90.70327867042644,
+      "along_slope_pct": -12.73342136230137,
+      "left_cross_slope_pct": -3.270213697380956,
+      "left_cross_slope_deg": -1.873026929715875,
+      "plane_rmse_m": 0.01268816392495998,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.9278761324506204,
+        -1.873026929715875,
+        -1.806462686639077
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 1900.0,
+      "center_lon_lat": [
+        -122.32996559110263,
+        39.54144006816978
+      ],
+      "center_xy_m": [
+        557574.924156291,
+        4377077.897698722
+      ],
+      "heading_xy": [
+        -0.3373935300175466,
+        0.9413636948078563
+      ],
+      "left_normal_xy": [
+        -0.9413636948078563,
+        -0.3373935300175466
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 232,
+      "center_elevation_m": 89.07404743676132,
+      "along_slope_pct": -9.075339916213332,
+      "left_cross_slope_pct": -2.704158017734736,
+      "left_cross_slope_deg": -1.5489909241043684,
+      "plane_rmse_m": 0.010781781635404544,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.5316075297365856,
+        -1.5489909241043684,
+        -1.5584976162189899
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2000.0,
+      "center_lon_lat": [
+        -122.32965306806749,
+        39.54227008465049
+      ],
+      "center_xy_m": [
+        557601.092792472,
+        4377170.215314926
+      ],
+      "heading_xy": [
+        0.6690948372089303,
+        0.7431770306060024
+      ],
+      "left_normal_xy": [
+        -0.7431770306060024,
+        0.6690948372089303
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 261,
+      "center_elevation_m": 86.7210021093611,
+      "along_slope_pct": -1.65772957792158,
+      "left_cross_slope_pct": 0.7316662868366417,
+      "left_cross_slope_deg": 0.4192064220475073,
+      "plane_rmse_m": 0.009159850075733972,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        0.5325082062546191,
+        0.4192064220475073,
+        0.44867168946618896
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2100.0,
+      "center_lon_lat": [
+        -122.32873545205945,
+        39.5428222282423
+      ],
+      "center_xy_m": [
+        557679.4846482218,
+        4377232.081559525
+      ],
+      "heading_xy": [
+        0.7255542123627063,
+        0.6881650128586405
+      ],
+      "left_normal_xy": [
+        -0.6881650128586405,
+        0.7255542123627063
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 236,
+      "center_elevation_m": 84.90392547983376,
+      "along_slope_pct": -1.0225696777301285,
+      "left_cross_slope_pct": -3.447703917073898,
+      "left_cross_slope_deg": -1.9746066996670006,
+      "plane_rmse_m": 0.01042349729202151,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.0961879409252964,
+        -1.9746066996670006,
+        -1.9117645369399647
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2200.0,
+      "center_lon_lat": [
+        -122.32864189942954,
+        39.54364374684454
+      ],
+      "center_xy_m": [
+        557686.843184571,
+        4377323.316058325
+      ],
+      "heading_xy": [
+        -0.5936401328216808,
+        0.8047306336305692
+      ],
+      "left_normal_xy": [
+        -0.8047306336305692,
+        -0.5936401328216808
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 226,
+      "center_elevation_m": 84.90112933489584,
+      "along_slope_pct": 1.3262029428017046,
+      "left_cross_slope_pct": -3.181161676360568,
+      "left_cross_slope_deg": -1.8220569180627781,
+      "plane_rmse_m": 0.010520975835488177,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.8570245702877324,
+        -1.8220569180627781,
+        -1.810696007034243
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2300.0,
+      "center_lon_lat": [
+        -122.32946950775832,
+        39.54427631240604
+      ],
+      "center_xy_m": [
+        557615.2067163949,
+        4377392.9898283
+      ],
+      "heading_xy": [
+        -0.7252141614373463,
+        0.6885233620224711
+      ],
+      "left_normal_xy": [
+        -0.6885233620224711,
+        -0.7252141614373463
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 243,
+      "center_elevation_m": 87.17894813118392,
+      "along_slope_pct": 2.82280794963043,
+      "left_cross_slope_pct": -3.295822777587708,
+      "left_cross_slope_deg": -1.887684054012174,
+      "plane_rmse_m": 0.006447472424924283,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.8728193485132854,
+        -1.887684054012174,
+        -1.897416024974021
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2400.0,
+      "center_lon_lat": [
+        -122.33035516144504,
+        39.54485523959347
+      ],
+      "center_xy_m": [
+        557538.6282995354,
+        4377456.674194098
+      ],
+      "heading_xy": [
+        -0.8870975923562499,
+        0.4615819121626677
+      ],
+      "left_normal_xy": [
+        -0.4615819121626677,
+        -0.8870975923562499
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 253,
+      "center_elevation_m": 89.25466964507996,
+      "along_slope_pct": 1.6843098342415395,
+      "left_cross_slope_pct": -3.6311685377428424,
+      "left_cross_slope_deg": -2.0795926326396046,
+      "plane_rmse_m": 0.008178677926450889,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.1390616659047117,
+        -2.0795926326396046,
+        -2.0686873884165973
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2500.0,
+      "center_lon_lat": [
+        -122.33148366898573,
+        39.54501081262824
+      ],
+      "center_xy_m": [
+        557441.5331944348,
+        4377473.219169321
+      ],
+      "heading_xy": [
+        -0.999905754267878,
+        -0.013728895876437549
+      ],
+      "left_normal_xy": [
+        0.013728895876437549,
+        -0.999905754267878
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 232,
+      "center_elevation_m": 90.01024733029102,
+      "along_slope_pct": 0.6093271770777394,
+      "left_cross_slope_pct": -0.6201161599224365,
+      "left_cross_slope_deg": -0.3552958335308722,
+      "plane_rmse_m": 0.011810013360131308,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -0.41981504068198694,
+        -0.3552958335308722,
+        -0.2837108107829727
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2600.0,
+      "center_lon_lat": [
+        -122.33264740672057,
+        39.545003355923335
+      ],
+      "center_xy_m": [
+        557341.5455748984,
+        4377471.649390292
+      ],
+      "heading_xy": [
+        -0.9998651661837726,
+        -0.016421006433738054
+      ],
+      "left_normal_xy": [
+        0.016421006433738054,
+        -0.9998651661837726
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 226,
+      "center_elevation_m": 91.46267814774943,
+      "along_slope_pct": 2.883255079577182,
+      "left_cross_slope_pct": -1.8895156230994716,
+      "left_cross_slope_deg": -1.0824838922392068,
+      "plane_rmse_m": 0.010345649726148678,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.15816707082104,
+        -1.0824838922392068,
+        -1.1134595061767614
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2700.0,
+      "center_lon_lat": [
+        -122.3337232712571,
+        39.54478030472113
+      ],
+      "center_xy_m": [
+        557249.2855745223,
+        4377446.209497437
+      ],
+      "heading_xy": [
+        -0.691844223680165,
+        -0.7220467922235996
+      ],
+      "left_normal_xy": [
+        0.7220467922235996,
+        -0.691844223680165
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 234,
+      "center_elevation_m": 94.88868829970428,
+      "along_slope_pct": 4.168737294611721,
+      "left_cross_slope_pct": -3.7212946911348475,
+      "left_cross_slope_deg": -2.131161417741792,
+      "plane_rmse_m": 0.011010827845105358,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.174745520248805,
+        -2.131161417741792,
+        -2.0310706614586316
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2800.0,
+      "center_lon_lat": [
+        -122.33453264421372,
+        39.544132881543376
+      ],
+      "center_xy_m": [
+        557180.2716203567,
+        4377373.841976152
+      ],
+      "heading_xy": [
+        -0.6905471599292388,
+        -0.7232873702157825
+      ],
+      "left_normal_xy": [
+        0.7232873702157825,
+        -0.6905471599292388
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 245,
+      "center_elevation_m": 100.33146302718241,
+      "along_slope_pct": 6.657537651060792,
+      "left_cross_slope_pct": -3.134408818029481,
+      "left_cross_slope_deg": -1.7952961886722831,
+      "plane_rmse_m": 0.007508202849868376,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.8600053704487007,
+        -1.7952961886722831,
+        -1.7568257263608038
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 2900.0,
+      "center_lon_lat": [
+        -122.33534246021144,
+        39.543485794985095
+      ],
+      "center_xy_m": [
+        557111.218023468,
+        4377301.512170717
+      ],
+      "heading_xy": [
+        -0.6905243301728728,
+        -0.7233091658753574
+      ],
+      "left_normal_xy": [
+        0.7233091658753574,
+        -0.6905243301728728
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 255,
+      "center_elevation_m": 107.68820408281765,
+      "along_slope_pct": 7.933972326021942,
+      "left_cross_slope_pct": -3.3246231593199354,
+      "left_cross_slope_deg": -1.9041673953682292,
+      "plane_rmse_m": 0.009367350822842355,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.0161841443795616,
+        -1.9041673953682292,
+        -1.811247386098665
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3000.0,
+      "center_lon_lat": [
+        -122.33615192580446,
+        39.542838503413535
+      ],
+      "center_xy_m": [
+        557042.1934059483,
+        4377229.160473116
+      ],
+      "heading_xy": [
+        -0.6596812312741721,
+        -0.7515455229755496
+      ],
+      "left_normal_xy": [
+        0.7515455229755496,
+        -0.6596812312741721
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 250,
+      "center_elevation_m": 114.60909181726169,
+      "along_slope_pct": 6.153539015270999,
+      "left_cross_slope_pct": -7.613568432360414,
+      "left_cross_slope_deg": -4.353853768841443,
+      "plane_rmse_m": 0.00976367252821205,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -4.502986341046321,
+        -4.353853768841443,
+        -4.2293191149003615
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3100.0,
+      "center_lon_lat": [
+        -122.33605586050314,
+        39.54201356947207
+      ],
+      "center_xy_m": [
+        557051.1235061117,
+        4377137.667833537
+      ],
+      "heading_xy": [
+        0.4188507024653466,
+        -0.9080551134398649
+      ],
+      "left_normal_xy": [
+        0.9080551134398649,
+        0.4188507024653466
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 237,
+      "center_elevation_m": 118.88794428989688,
+      "along_slope_pct": -2.584293801809344,
+      "left_cross_slope_pct": -4.974153453569525,
+      "left_cross_slope_deg": -2.8476329858802125,
+      "plane_rmse_m": 0.0075823066240638245,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.9118142764051447,
+        -2.8476329858802125,
+        -2.796239608398438
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3200.0,
+      "center_lon_lat": [
+        -122.3356864110414,
+        39.54116327132966
+      ],
+      "center_xy_m": [
+        557083.5662929942,
+        4377043.533597918
+      ],
+      "heading_xy": [
+        0.1544305191097244,
+        -0.9880036511913814
+      ],
+      "left_normal_xy": [
+        0.9880036511913814,
+        0.1544305191097244
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 257,
+      "center_elevation_m": 108.0567559198935,
+      "along_slope_pct": -11.244845758828257,
+      "left_cross_slope_pct": -3.693993390558877,
+      "left_cross_slope_deg": -2.115540398484419,
+      "plane_rmse_m": 0.009621539461090296,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.190130332135505,
+        -2.115540398484419,
+        -1.9696824461090183
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3300.0,
+      "center_lon_lat": [
+        -122.3356448137504,
+        39.540263948807876
+      ],
+      "center_xy_m": [
+        557087.8775286638,
+        4376943.750616558
+      ],
+      "heading_xy": [
+        0.023715444740097347,
+        -0.9997187492894085
+      ],
+      "left_normal_xy": [
+        0.9997187492894085,
+        0.023715444740097347
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 231,
+      "center_elevation_m": 103.44901299789294,
+      "along_slope_pct": -2.2074023461475196,
+      "left_cross_slope_pct": -3.200412516960723,
+      "left_cross_slope_deg": -1.8330756189394504,
+      "plane_rmse_m": 0.008835683353066063,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.8618235650342636,
+        -1.8330756189394504,
+        -1.6865654423139622
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3400.0,
+      "center_lon_lat": [
+        -122.33555803945475,
+        39.539365821902976
+      ],
+      "center_xy_m": [
+        557096.0699952095,
+        4376844.129005109
+      ],
+      "heading_xy": [
+        0.11256419081639675,
+        -0.9936444549967809
+      ],
+      "left_normal_xy": [
+        0.9936444549967809,
+        0.11256419081639675
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 264,
+      "center_elevation_m": 102.08754251878602,
+      "along_slope_pct": -0.13029601254246817,
+      "left_cross_slope_pct": -2.78766729988502,
+      "left_cross_slope_deg": -1.5968021656581475,
+      "plane_rmse_m": 0.009484889672980472,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.4913996975602952,
+        -1.5968021656581475,
+        -1.540341906566037
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3500.0,
+      "center_lon_lat": [
+        -122.33543013822428,
+        39.53847026763999
+      ],
+      "center_xy_m": [
+        557107.7946804975,
+        4376744.819030365
+      ],
+      "heading_xy": [
+        0.11976138990912588,
+        -0.9928027042101741
+      ],
+      "left_normal_xy": [
+        0.9928027042101741,
+        0.11976138990912588
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 248,
+      "center_elevation_m": 101.48871151687487,
+      "along_slope_pct": -3.145365807151771,
+      "left_cross_slope_pct": -5.496926603521292,
+      "left_cross_slope_deg": -3.1463404808722037,
+      "plane_rmse_m": 0.00902623614934382,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -3.1371913902951607,
+        -3.1463404808722037,
+        -3.080115664668735
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3600.0,
+      "center_lon_lat": [
+        -122.33464836814672,
+        39.53798298775276
+      ],
+      "center_xy_m": [
+        557175.3741003838,
+        4376691.235702805
+      ],
+      "heading_xy": [
+        0.9977456711832045,
+        -0.06710868524399119
+      ],
+      "left_normal_xy": [
+        0.06710868524399119,
+        0.9977456711832045
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 251,
+      "center_elevation_m": 96.85407789304193,
+      "along_slope_pct": -2.9952573564143297,
+      "left_cross_slope_pct": -6.148640286674325,
+      "left_cross_slope_deg": -3.518481878241628,
+      "plane_rmse_m": 0.009453582058150604,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -3.6529635031037215,
+        -3.518481878241628,
+        -3.4787323445342686
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3700.0,
+      "center_lon_lat": [
+        -122.33350924345605,
+        39.5379799959377
+      ],
+      "center_xy_m": [
+        557273.2653151677,
+        4376691.627952412
+      ],
+      "heading_xy": [
+        0.6807860602378747,
+        0.7324823139064813
+      ],
+      "left_normal_xy": [
+        -0.7324823139064813,
+        0.6807860602378747
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 243,
+      "center_elevation_m": 97.34637460161005,
+      "along_slope_pct": 3.79537914401719,
+      "left_cross_slope_pct": -3.517221466244928,
+      "left_cross_slope_deg": -2.0143890735100993,
+      "plane_rmse_m": 0.011855532188543265,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -2.0856594547995675,
+        -2.0143890735100993,
+        -1.928186579047329
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3800.0,
+      "center_lon_lat": [
+        -122.33332088510772,
+        39.53884669739717
+      ],
+      "center_xy_m": [
+        557288.7390434978,
+        4376787.93679626
+      ],
+      "heading_xy": [
+        0.5972945538792916,
+        0.8020219547531963
+      ],
+      "left_normal_xy": [
+        -0.8020219547531963,
+        0.5972945538792916
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 252,
+      "center_elevation_m": 96.31881927978756,
+      "along_slope_pct": -4.840275976565259,
+      "left_cross_slope_pct": 2.2657644300300923,
+      "left_cross_slope_deg": 1.2979653108635019,
+      "plane_rmse_m": 0.009472269073907176,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        1.2491127687559789,
+        1.2979653108635019,
+        1.34996072535154
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 3900.0,
+      "center_lon_lat": [
+        -122.33276816929775,
+        39.53961315645894
+      ],
+      "center_xy_m": [
+        557335.6045042493,
+        4376873.35256908
+      ],
+      "heading_xy": [
+        0.0787976195874573,
+        0.9968906334936397
+      ],
+      "left_normal_xy": [
+        -0.9968906334936397,
+        0.0787976195874573
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 224,
+      "center_elevation_m": 94.39404405906578,
+      "along_slope_pct": -0.2516930353207155,
+      "left_cross_slope_pct": 2.761207005762757,
+      "left_cross_slope_deg": 1.5816531948900023,
+      "plane_rmse_m": 0.010156873041289661,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        1.6023291912453086,
+        1.5816531948900023,
+        1.5808543906913952
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 4000.0,
+      "center_lon_lat": [
+        -122.33277191151238,
+        39.54051412539532
+      ],
+      "center_xy_m": [
+        557334.5415937093,
+        4376973.342276543
+      ],
+      "heading_xy": [
+        -0.016166446625306426,
+        0.9998693144624008
+      ],
+      "left_normal_xy": [
+        -0.9998693144624008,
+        -0.016166446625306426
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 234,
+      "center_elevation_m": 94.18470989634307,
+      "along_slope_pct": 0.5530200946474038,
+      "left_cross_slope_pct": 3.206260814953072,
+      "left_cross_slope_deg": 1.8364230119790201,
+      "plane_rmse_m": 0.00801686946539576,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        1.7358175469979968,
+        1.8364230119790201,
+        1.828391174246178
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 4100.0,
+      "center_lon_lat": [
+        -122.33278165030303,
+        39.54141510823093
+      ],
+      "center_xy_m": [
+        557332.9633855408,
+        4377073.329721563
+      ],
+      "heading_xy": [
+        -0.010554278583557336,
+        0.9999443020506595
+      ],
+      "left_normal_xy": [
+        -0.9999443020506595,
+        -0.010554278583557336
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 224,
+      "center_elevation_m": 95.68198041145112,
+      "along_slope_pct": 1.9888760327621706,
+      "left_cross_slope_pct": 3.0132991789219683,
+      "left_cross_slope_deg": 1.7259709877813432,
+      "plane_rmse_m": 0.00990345552015269,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        1.6776528403703765,
+        1.7259709877813432,
+        1.708890017922686
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 4200.0,
+      "center_lon_lat": [
+        -122.33278662186798,
+        39.54231611383242
+      ],
+      "center_xy_m": [
+        557331.7948040805,
+        4377173.322745664
+      ],
+      "heading_xy": [
+        -0.014296771691017776,
+        0.9998977959367721
+      ],
+      "left_normal_xy": [
+        -0.9998977959367721,
+        -0.014296771691017776
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 226,
+      "center_elevation_m": 96.62684542917545,
+      "along_slope_pct": -0.5908030804775156,
+      "left_cross_slope_pct": 2.8102831103522337,
+      "left_cross_slope_deg": 1.6097499268878883,
+      "plane_rmse_m": 0.010118100262486971,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        1.5713140265816878,
+        1.6097499268878883,
+        1.623885990271734
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 4300.0,
+      "center_lon_lat": [
+        -122.33281365994227,
+        39.543216786997704
+      ],
+      "center_xy_m": [
+        557328.7303871262,
+        4377273.264832415
+      ],
+      "heading_xy": [
+        -0.04759876000456871,
+        0.9988665366534347
+      ],
+      "left_normal_xy": [
+        -0.9988665366534347,
+        -0.04759876000456871
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 232,
+      "center_elevation_m": 94.91854683549663,
+      "along_slope_pct": -2.3755426138040203,
+      "left_cross_slope_pct": 2.670717579932563,
+      "left_cross_slope_deg": 1.5298447927233718,
+      "plane_rmse_m": 0.00896626300347088,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        1.467112798867186,
+        1.5298447927233718,
+        1.5168368526132072
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 4400.0,
+      "center_lon_lat": [
+        -122.33258340679674,
+        39.54404281350458
+      ],
+      "center_xy_m": [
+        557347.8354003713,
+        4377365.086367179
+      ],
+      "heading_xy": [
+        0.9037461642967558,
+        0.42806876844603053
+      ],
+      "left_normal_xy": [
+        -0.42806876844603053,
+        0.9037461642967558
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 237,
+      "center_elevation_m": 92.73882068682369,
+      "along_slope_pct": -1.5044510298128748,
+      "left_cross_slope_pct": 2.3833807833649545,
+      "left_cross_slope_deg": 1.3653181145782771,
+      "plane_rmse_m": 0.01055992137676549,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        1.2666900422629614,
+        1.3653181145782771,
+        1.2978270210834622
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 4500.0,
+      "center_lon_lat": [
+        -122.33157380679343,
+        39.54369914917641
+      ],
+      "center_xy_m": [
+        557434.8694375168,
+        4377327.589386228
+      ],
+      "heading_xy": [
+        0.7822945925771263,
+        -0.6229086373013205
+      ],
+      "left_normal_xy": [
+        0.6229086373013205,
+        0.7822945925771263
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 246,
+      "center_elevation_m": 91.68284153426966,
+      "along_slope_pct": -1.9150710342464357,
+      "left_cross_slope_pct": 1.3268770001805101,
+      "left_cross_slope_deg": 0.760199908863751,
+      "plane_rmse_m": 0.010898834518794196,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        0.8254542970699867,
+        0.760199908863751,
+        0.771167554291981
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    },
+    {
+      "station_m": 4600.0,
+      "center_lon_lat": [
+        -122.33121664919337,
+        39.54290920104239
+      ],
+      "center_xy_m": [
+        557466.2102047551,
+        4377240.146660562
+      ],
+      "heading_xy": [
+        0.017328727850955343,
+        -0.9998498463224703
+      ],
+      "left_normal_xy": [
+        0.9998498463224703,
+        0.017328727850955343
+      ],
+      "strip_length_m": 4,
+      "core_width_m": 6,
+      "core_point_count": 214,
+      "center_elevation_m": 90.93583686811161,
+      "along_slope_pct": 0.47591172104272644,
+      "left_cross_slope_pct": -2.00036310178762,
+      "left_cross_slope_deg": -1.1459707969761228,
+      "plane_rmse_m": 0.008568145613210534,
+      "cross_slope_deg_width_sensitivity_4_6_8m": [
+        -1.1545937758103544,
+        -1.1459707969761228,
+        -1.1002711928914328
+      ],
+      "classification": 2,
+      "status": "Measured local strip; road edges and OSM center offset require orthophoto inspection."
+    }
+  ]
+}

@@ -15,6 +15,8 @@ Current status: reference evaluation and development environment preparation. No
 
 Current priority: build and review the playable game before starting any RL. The first bike is the 2026 Ducati Streetfighter V4S. The [reference readiness report](docs/reference-readiness.md) records inspected footage, acquired terrain and materials, the M3 Pro Mac target, and remaining realism gaps.
 
+The [dimension register](docs/dimension-register.md) records measured aerial widths, raw lidar grades and cross slopes, bike dimensions, and the existing simulator geometry audit.
+
 See [reference evaluation](docs/reference-evaluation.md) and [build sequence](docs/build-sequence.md).
 
 The [RL game design contract](docs/rl-game-contract.md) defines the information the simulator and trainer must capture, action and reward semantics, isolated rollouts, and checkpoint replay requirements.
@@ -25,4 +27,4 @@ The [Gemma 4 RL audit](docs/gemma4-rl-references.md) identifies exact E4B traini
 
 ## License
 
-Original project code and documentation use the [MIT license](LICENSE). Referenced projects, models, footage, maps, and assets retain their own licenses and are not bundled here. Godot is [MIT licensed](https://godotengine.org/license/).
+Original project code and documentation use the [MIT license](LICENSE). Referenced projects, models, footage, maps, and assets retain their own licenses. The measurement databases explicitly marked as derived from OpenStreetMap use ODbL 1.0, with attribution to OpenStreetMap contributors, rather than MIT. Original USGS and USDA geodata is public domain. Third party game assets and video frames are not bundled here. Godot is [MIT licensed](https://godotengine.org/license/).

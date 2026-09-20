@@ -1,0 +1,149 @@
+{
+  "checked": "2026-09-19",
+  "conclusion": "No verified openly reusable accurate Thunderhill East mesh found; no post repave implementation verified",
+  "sources": [
+    {
+      "id": "nukedrop",
+      "name": "Nukedrop Thunderhill v13",
+      "platform": "Assetto Corsa",
+      "source": "https://www.patreon.com/nukedrop/posts/thunderhill-v13-81182397",
+      "date": "2023-04-07",
+      "configuration": "Thunderhill multiple layouts, East included in author update history; exact v13 layout inventory not inspected",
+      "geometry_basis": "Author documented LiDAR corrections in 2021; no numerical accuracy or survey identity established",
+      "geometry_evidence": "https://www.patreon.com/nukedrop/posts/february-2021-47685128",
+      "format": "Assetto Corsa package, internal geometry format not inspected",
+      "license": "No open source or port permission verified",
+      "access": "Author release post locked; not acquired",
+      "recommendation": "Best fidelity lead for author licensing and source mesh request; not currently reusable"
+    },
+    {
+      "id": "carla",
+      "name": "Wolverine CARLA Thunderhill",
+      "platform": "CARLA 0.9.10 / RoadRunner",
+      "source": "https://github.com/szu-zy/Wolverine_CARLA_Thunderhill",
+      "geometry_source": "https://github.com/szu-zy/Wolverine_CARLA_Thunderhill/blob/main/Thunderhill_origin.xodr",
+      "date": "2021-05-11 (OpenDRIVE header)",
+      "configuration": "Thunderhill, OpenStreetMap area centered on East; exact course variant must be compared",
+      "geometry_basis": "README documents OpenStreetMap and RoadRunner; not a laser scan",
+      "format": "OpenDRIVE 1.4 XML, waypoints",
+      "inspection": {
+        "roads": 24,
+        "summed_road_lengths_m": 4584.81773952453,
+        "elevation_records": 75,
+        "superelevation_records": 24,
+        "warning": "Record existence is not measurement accuracy; summed road length is not necessarily a lap length"
+      },
+      "license": "No repository license; OSM attribution/license and generated asset provenance need resolution",
+      "recommendation": "Reject as a measured width, elevation, or camber source. Useful only as an unlicensed flat East topology example.",
+      "detailed_inspection": [
+        {
+          "file": "Thunderhill_origin.xodr",
+          "elevation_all_zero": true,
+          "superelevation_all_zero": true,
+          "driving_width_constant_values_m": [
+            10.0
+          ],
+          "georeference": "+proj=tmerc +lat_0=0.00929897847085288 +lon_0=0.01164650401068383 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +geoidgrids=egm96_15.gtx +vunits=m +no_defs ",
+          "road_geometry_shapes": [
+            "arc",
+            "line",
+            "paramPoly3",
+            "spiral"
+          ]
+        },
+        {
+          "file": "Thunderhilll.xodr",
+          "elevation_all_zero": true,
+          "superelevation_all_zero": true,
+          "driving_width_constant_values_m": [
+            10.0
+          ],
+          "georeference": "+proj=tmerc +lat_0=0.01111178705945256 +lon_0=0.01147833939559823 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +geoidgrids=egm96_15.gtx +vunits=m +no_defs ",
+          "road_geometry_shapes": [
+            "arc",
+            "line",
+            "paramPoly3",
+            "spiral"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sdsandbox",
+      "name": "SDSandbox Thunderhill",
+      "platform": "Unity / gym donkeycar",
+      "source": "https://github.com/tawnkramer/sdsandbox",
+      "commit": "ec04c400f045222375ec82e649bb051fb17aad41",
+      "date": "Scene history inspected through 2021-05-24",
+      "configuration": "Preview appears to depict West, inferred visually, not confirmed as East",
+      "geometry_basis": "No scan or CAD accuracy claim verified",
+      "format": "Unity YAML scene, terrain asset, CSV XYZ paths",
+      "license": "BSD style three clause repository license, separate third party asset provenance unresolved",
+      "license_url": "https://github.com/tawnkramer/sdsandbox/blob/ec04c400f045222375ec82e649bb051fb17aad41/LICENSE",
+      "recommendation": "Reusable code and path representation reference, unsuitable as validated East geometry"
+    },
+    {
+      "id": "gll",
+      "name": "Good Luck League Thunderhill Skidpad",
+      "platform": "Assetto Corsa",
+      "source": "https://github.com/MeAndMyPenguin/GLL_Thunderhill_Skidpad/releases",
+      "author_source": "https://www.goodluckleague.com/cyber-division",
+      "date": "2026-06-28",
+      "version": "1.0.1",
+      "configuration": "Skidpad, not East course",
+      "format": "7z Assetto Corsa package, internals not inspected",
+      "size_bytes": 217704959,
+      "license": "No repository license",
+      "recommendation": "Reject as East track source; no download"
+    },
+    {
+      "id": "gtr2",
+      "name": "Thunderhill long 0.9 Beta",
+      "platform": "GTR2, converted from rFactor and GPL",
+      "source": "https://esport-racing.de/thunderhill-raceway-park/",
+      "date": "2008-11 author notes, reposted 2019-06-23",
+      "configuration": "Long course; author canceled incorrect short layout",
+      "format": "GTR2 download, internal formats not inspected",
+      "geometry_basis": "Author notes fictional scenery, modeled hills, object positioning defects",
+      "license": "Specific conversion permission credited, no general reuse permission verified",
+      "recommendation": "Reject as accurate source"
+    }
+  ],
+  "local_sdsandbox_inspection_files": [
+    {
+      "local_path": "artifacts/reference/sim-track/thunderhill.png",
+      "bytes": 2932342,
+      "sha256": "f3b91216a8567b96f81dac61466689446a768466ec1ba6d99d7b16456daeeb02"
+    },
+    {
+      "local_path": "artifacts/reference/sim-track/thunderhill.unity",
+      "bytes": 110650,
+      "sha256": "a5466162b53db5ab12c640fc460697fe0aa20b8d9d8cb5b928e18a3a7dc08708"
+    },
+    {
+      "local_path": "artifacts/reference/sim-track/thunderhill2.txt",
+      "bytes": 32641,
+      "sha256": "bf8c08cdcc18e7f8081cf5b804f72c87b0f1883613d9e5926cd709e8b3f4aed9"
+    },
+    {
+      "local_path": "artifacts/reference/sim-track/TrackScript.cs",
+      "bytes": 6648,
+      "sha256": "5047a48201dad92ec7ee5ea9d6f50f52d013f4da3f722daa6254911e69fcfbf7"
+    },
+    {
+      "local_path": "artifacts/reference/sim-track/thunderhill.txt",
+      "bytes": 57573,
+      "sha256": "f69e1774eb2fb7b66ae41d22bef4116f406a807073dd37654515136f9cccccd5"
+    },
+    {
+      "local_path": "artifacts/reference/sim-track/LICENSE",
+      "bytes": 1499,
+      "sha256": "419d7b14a523854d71961ca84fdb440b224403e3f1ca240417d7a7a5d15a8f6b"
+    },
+    {
+      "local_path": "artifacts/reference/sim-track/README.md",
+      "bytes": 4227,
+      "sha256": "0397d53a6c7b1ca8bf94c6d6031ed5c19fb73b5a7c75f556a31dfcbf5fe0b4a5"
+    }
+  ]
+}

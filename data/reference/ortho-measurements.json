@@ -1,0 +1,841 @@
+{
+  "source": {
+    "OBJECTID": 23435,
+    "Name": "m_3912230_sw_10_060_20220715",
+    "MinPS": 0,
+    "MaxPS": 19.1,
+    "Category": 1,
+    "CenterX": -13619242.448209347,
+    "CenterY": 4798058.373203856,
+    "State": "CA",
+    "Year": 2022,
+    "raster_name": "m_3912230_sw_10_060_20220715",
+    "download_url": "https://earthexplorer.usgs.gov/download/options/naip/3231139",
+    "acquisition_date": 1657843200000,
+    "agency": "USDA",
+    "vendor": "USDA-FSA-APFO",
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "band_count": 4,
+    "sensor_type": "CNIR",
+    "projection_name": "UTM",
+    "projection_zone": "10N",
+    "datum": "NAD83"
+  },
+  "catalog_url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/query?f=json&where=OBJECTID%3D23435&outFields=%2A&returnGeometry=false",
+  "export_request": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=json&bbox=556880%2C4376248%2C558008%2C4377699&bboxSR=26910&imageSR=26910&size=1880%2C2419&format=png&interpolation=RSP_NearestNeighbor&mosaicRule=%7B%22mosaicMethod%22%3A+%22esriMosaicLockRaster%22%2C+%22lockRasterIds%22%3A+%5B23435%5D%7D",
+  "extent": {
+    "xmin": 556880,
+    "ymin": 4376247.8,
+    "xmax": 558008,
+    "ymax": 4377699.2,
+    "spatialReference": {
+      "wkid": 26910,
+      "latestWkid": 26910
+    }
+  },
+  "image_sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
+  "sample_spacing_m": [
+    0.6,
+    0.600000000000154
+  ],
+  "route_sha256": "99cb54d926aaf1f8a969c9865178be9a3253e31bcd5b4e778d90d489a8bea87f",
+  "route_license": "ODbL 1.0, OpenStreetMap contributors",
+  "imagery_license": "USGS/USDA NAIP public domain",
+  "method": "Neutral color transition across approximate OSM tangent, three thresholds; manual review required",
+  "limitations": [
+    "2022 imagery predates repave",
+    "0.3m sampling oversamples 0.6m imagery and does not improve source accuracy",
+    "curbs, shadows, junctions and gravel may confound detection",
+    "imagery registration and OSM tangent errors are not included in threshold spread"
+  ],
+  "sections": [
+    {
+      "id": "S01",
+      "station_m_from_osm_first_node": 100.0,
+      "utm_center": [
+        557467.7523449241,
+        4377133.653642221
+      ],
+      "utm_normal": [
+        0.9998978312098906,
+        0.014294304521631001
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -5.65,
+          "right_offset_m": 7.55,
+          "width_m": 13.2
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -21.85,
+          "right_offset_m": 7.55,
+          "width_m": 29.4
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -21.85,
+          "right_offset_m": 8.15,
+          "width_m": 30.0
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S02",
+      "station_m_from_osm_first_node": 300.0,
+      "utm_center": [
+        557470.5927300114,
+        4376933.673814496
+      ],
+      "utm_normal": [
+        0.9999018779763666,
+        0.014008369617314503
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -5.05,
+          "right_offset_m": 7.55,
+          "width_m": 12.6
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -25.15,
+          "right_offset_m": 7.55,
+          "width_m": 32.7
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -25.15,
+          "right_offset_m": 7.55,
+          "width_m": 32.7
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S03",
+      "station_m_from_osm_first_node": 500.0,
+      "utm_center": [
+        557473.3541253565,
+        4376733.692884923
+      ],
+      "utm_normal": [
+        0.9998956324061493,
+        0.014447293694899117
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -9.55,
+          "right_offset_m": 7.25,
+          "width_m": 16.8
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -9.55,
+          "right_offset_m": 7.25,
+          "width_m": 16.8
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -9.55,
+          "right_offset_m": 7.25,
+          "width_m": 16.8
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S04",
+      "station_m_from_osm_first_node": 700.0,
+      "utm_center": [
+        557501.7693765425,
+        4376540.680611872
+      ],
+      "utm_normal": [
+        0.7200500830493174,
+        0.6939220978616197
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -7.15,
+          "right_offset_m": 7.25,
+          "width_m": 14.4
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -7.15,
+          "right_offset_m": 7.25,
+          "width_m": 14.4
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -7.15,
+          "right_offset_m": 7.55,
+          "width_m": 14.7
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S05",
+      "station_m_from_osm_first_node": 900.0,
+      "utm_center": [
+        557687.7956284758,
+        4376472.495085827
+      ],
+      "utm_normal": [
+        0.27447121898786314,
+        0.9615953150610276
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -4.15,
+          "right_offset_m": 3.35,
+          "width_m": 7.5
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -4.75,
+          "right_offset_m": 6.65,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -4.75,
+          "right_offset_m": 7.25,
+          "width_m": 12.0
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S06",
+      "station_m_from_osm_first_node": 1100.0,
+      "utm_center": [
+        557860.5727897302,
+        4376510.884141093
+      ],
+      "utm_normal": [
+        -0.9203579410237468,
+        0.3910770517360095
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -5.35,
+          "right_offset_m": 3.95,
+          "width_m": 9.3
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -6.85,
+          "right_offset_m": 3.95,
+          "width_m": 10.8
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -7.75,
+          "right_offset_m": 4.85,
+          "width_m": 12.6
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S07",
+      "station_m_from_osm_first_node": 1300.0,
+      "utm_center": [
+        557760.8307726426,
+        4376649.307885003
+      ],
+      "utm_normal": [
+        -0.2814398101775998,
+        -0.9595788832853694
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -7.45,
+          "right_offset_m": 2.75,
+          "width_m": 10.2
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -7.45,
+          "right_offset_m": 4.55,
+          "width_m": 12.0
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -7.45,
+          "right_offset_m": 5.75,
+          "width_m": 13.2
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S08",
+      "station_m_from_osm_first_node": 1500.0,
+      "utm_center": [
+        557613.4808118702,
+        4376757.162025769
+      ],
+      "utm_normal": [
+        -0.9998677943754787,
+        0.016260189750296042
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -7.45,
+          "right_offset_m": 3.95,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -8.05,
+          "right_offset_m": 3.95,
+          "width_m": 12.0
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -8.05,
+          "right_offset_m": 3.95,
+          "width_m": 12.0
+        }
+      ],
+      "status": "accepted preliminary historical pavement envelope",
+      "selected_width_m": 12.0,
+      "minimum_interpretive_uncertainty_m": 1.2,
+      "review_note": "Visually checked rotated aerial strip. Includes unresolved painted edge pixels. Not a surveyed or legal racing boundary. Uncertainty is a working envelope, not a statistical confidence interval."
+    },
+    {
+      "id": "S09",
+      "station_m_from_osm_first_node": 1700.0,
+      "utm_center": [
+        557680.3939958804,
+        4376925.803433489
+      ],
+      "utm_normal": [
+        -0.8573096668693841,
+        -0.5148010636083666
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -6.25,
+          "right_offset_m": 4.25,
+          "width_m": 10.5
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -6.25,
+          "right_offset_m": 4.25,
+          "width_m": 10.5
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -6.85,
+          "right_offset_m": 4.85,
+          "width_m": 11.7
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S10",
+      "station_m_from_osm_first_node": 1900.0,
+      "utm_center": [
+        557574.924156291,
+        4377077.897698722
+      ],
+      "utm_normal": [
+        -0.942138113501762,
+        -0.33522496190967194
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -6.85,
+          "right_offset_m": 4.55,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -6.85,
+          "right_offset_m": 4.55,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -6.85,
+          "right_offset_m": 4.55,
+          "width_m": 11.4
+        }
+      ],
+      "status": "accepted preliminary historical pavement envelope",
+      "selected_width_m": 11.4,
+      "minimum_interpretive_uncertainty_m": 1.2,
+      "review_note": "Visually checked rotated aerial strip. Includes unresolved painted edge pixels. Not a surveyed or legal racing boundary. Uncertainty is a working envelope, not a statistical confidence interval."
+    },
+    {
+      "id": "S11",
+      "station_m_from_osm_first_node": 2100.0,
+      "utm_center": [
+        557679.4846482218,
+        4377232.081559525
+      ],
+      "utm_normal": [
+        -0.6841254426575434,
+        0.7293643662180243
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -6.55,
+          "right_offset_m": 4.55,
+          "width_m": 11.1
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -6.85,
+          "right_offset_m": 4.85,
+          "width_m": 11.7
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -6.85,
+          "right_offset_m": 4.85,
+          "width_m": 11.7
+        }
+      ],
+      "status": "accepted preliminary historical pavement envelope",
+      "selected_width_m": 11.7,
+      "minimum_interpretive_uncertainty_m": 1.2,
+      "review_note": "Visually checked rotated aerial strip. Includes unresolved painted edge pixels. Not a surveyed or legal racing boundary. Uncertainty is a working envelope, not a statistical confidence interval."
+    },
+    {
+      "id": "S12",
+      "station_m_from_osm_first_node": 2300.0,
+      "utm_center": [
+        557615.2067163949,
+        4377392.9898283
+      ],
+      "utm_normal": [
+        -0.6885233620361697,
+        -0.7252141614243407
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -5.95,
+          "right_offset_m": -0.55,
+          "width_m": 5.4
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -5.95,
+          "right_offset_m": 4.55,
+          "width_m": 10.5
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -6.55,
+          "right_offset_m": 5.45,
+          "width_m": 12.0
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S13",
+      "station_m_from_osm_first_node": 2500.0,
+      "utm_center": [
+        557441.5331944348,
+        4377473.219169321
+      ],
+      "utm_normal": [
+        0.013728895864838164,
+        -0.9999057542680373
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -5.65,
+          "right_offset_m": 5.75,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -5.65,
+          "right_offset_m": 5.75,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -5.65,
+          "right_offset_m": 5.75,
+          "width_m": 11.4
+        }
+      ],
+      "status": "accepted preliminary historical pavement envelope",
+      "selected_width_m": 11.4,
+      "minimum_interpretive_uncertainty_m": 1.2,
+      "review_note": "Visually checked rotated aerial strip. Includes unresolved painted edge pixels. Not a surveyed or legal racing boundary. Uncertainty is a working envelope, not a statistical confidence interval."
+    },
+    {
+      "id": "S14",
+      "station_m_from_osm_first_node": 2700.0,
+      "utm_center": [
+        557249.2855745223,
+        4377446.209497437
+      ],
+      "utm_normal": [
+        0.7156847352335667,
+        -0.6984234816740197
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -6.25,
+          "right_offset_m": 6.35,
+          "width_m": 12.6
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -6.25,
+          "right_offset_m": 7.25,
+          "width_m": 13.5
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -6.55,
+          "right_offset_m": 7.25,
+          "width_m": 13.8
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S15",
+      "station_m_from_osm_first_node": 2900.0,
+      "utm_center": [
+        557111.218023468,
+        4377301.512170717
+      ],
+      "utm_normal": [
+        0.7232716179481257,
+        -0.6905636586663828
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -4.45,
+          "right_offset_m": 6.35,
+          "width_m": 10.8
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -4.45,
+          "right_offset_m": 6.35,
+          "width_m": 10.8
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -4.45,
+          "right_offset_m": 6.35,
+          "width_m": 10.8
+        }
+      ],
+      "status": "accepted preliminary historical pavement envelope",
+      "selected_width_m": 10.8,
+      "minimum_interpretive_uncertainty_m": 1.2,
+      "review_note": "Visually checked rotated aerial strip. Includes unresolved painted edge pixels. Not a surveyed or legal racing boundary. Uncertainty is a working envelope, not a statistical confidence interval."
+    },
+    {
+      "id": "S16",
+      "station_m_from_osm_first_node": 3100.0,
+      "utm_center": [
+        557051.1235061117,
+        4377137.667833537
+      ],
+      "utm_normal": [
+        0.9080551134419071,
+        0.4188507024609189
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -1.45,
+          "right_offset_m": 7.25,
+          "width_m": 8.7
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -5.35,
+          "right_offset_m": 7.25,
+          "width_m": 12.6
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -5.95,
+          "right_offset_m": 7.25,
+          "width_m": 13.2
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S17",
+      "station_m_from_osm_first_node": 3300.0,
+      "utm_center": [
+        557087.8775286638,
+        4376943.750616558
+      ],
+      "utm_normal": [
+        0.9996558183279899,
+        0.026234421720268776
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -3.85,
+          "right_offset_m": 7.55,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -3.85,
+          "right_offset_m": 7.55,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -3.85,
+          "right_offset_m": 7.55,
+          "width_m": 11.4
+        }
+      ],
+      "status": "accepted preliminary historical pavement envelope",
+      "selected_width_m": 11.4,
+      "minimum_interpretive_uncertainty_m": 1.2,
+      "review_note": "Visually checked rotated aerial strip. Includes unresolved painted edge pixels. Not a surveyed or legal racing boundary. Uncertainty is a working envelope, not a statistical confidence interval."
+    },
+    {
+      "id": "S18",
+      "station_m_from_osm_first_node": 3500.0,
+      "utm_center": [
+        557107.7946804975,
+        4376744.819030365
+      ],
+      "utm_normal": [
+        0.992750078344264,
+        0.12019684666187298
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -4.15,
+          "right_offset_m": 7.55,
+          "width_m": 11.7
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -4.15,
+          "right_offset_m": 7.55,
+          "width_m": 11.7
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -4.15,
+          "right_offset_m": 8.15,
+          "width_m": 12.3
+        }
+      ],
+      "status": "accepted preliminary historical pavement envelope",
+      "selected_width_m": 11.7,
+      "minimum_interpretive_uncertainty_m": 1.2,
+      "review_note": "Visually checked rotated aerial strip. Includes unresolved painted edge pixels. Not a surveyed or legal racing boundary. Uncertainty is a working envelope, not a statistical confidence interval."
+    },
+    {
+      "id": "S19",
+      "station_m_from_osm_first_node": 3700.0,
+      "utm_center": [
+        557273.2653151677,
+        4376691.627952412
+      ],
+      "utm_normal": [
+        -0.727013526130617,
+        0.6866231374073603
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -3.85,
+          "right_offset_m": 5.45,
+          "width_m": 9.3
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -6.85,
+          "right_offset_m": 5.45,
+          "width_m": 12.3
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -7.15,
+          "right_offset_m": 5.45,
+          "width_m": 12.6
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S20",
+      "station_m_from_osm_first_node": 3900.0,
+      "utm_center": [
+        557335.6045042493,
+        4376873.35256908
+      ],
+      "utm_normal": [
+        -0.9970063912540228,
+        0.0773191813111753
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -8.35,
+          "right_offset_m": 4.55,
+          "width_m": 12.9
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -13.15,
+          "right_offset_m": 4.55,
+          "width_m": 17.7
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -13.15,
+          "right_offset_m": 4.55,
+          "width_m": 17.7
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S21",
+      "station_m_from_osm_first_node": 4100.0,
+      "utm_center": [
+        557332.9633855408,
+        4377073.329721563
+      ],
+      "utm_normal": [
+        -0.9999399582938405,
+        -0.010958093233433983
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -7.15,
+          "right_offset_m": 4.25,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -7.15,
+          "right_offset_m": 4.85,
+          "width_m": 12.0
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -7.75,
+          "right_offset_m": 4.85,
+          "width_m": 12.6
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    },
+    {
+      "id": "S22",
+      "station_m_from_osm_first_node": 4300.0,
+      "utm_center": [
+        557328.7303871262,
+        4377273.264832415
+      ],
+      "utm_normal": [
+        -0.9988665366536423,
+        -0.047598760000213035
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -6.55,
+          "right_offset_m": 4.85,
+          "width_m": 11.4
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -7.15,
+          "right_offset_m": 4.85,
+          "width_m": 12.0
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -7.15,
+          "right_offset_m": 4.85,
+          "width_m": 12.0
+        }
+      ],
+      "status": "accepted preliminary historical pavement envelope",
+      "selected_width_m": 12.0,
+      "minimum_interpretive_uncertainty_m": 1.2,
+      "review_note": "Visually checked rotated aerial strip. Includes unresolved painted edge pixels. Not a surveyed or legal racing boundary. Uncertainty is a working envelope, not a statistical confidence interval."
+    },
+    {
+      "id": "S23",
+      "station_m_from_osm_first_node": 4500.0,
+      "utm_center": [
+        557434.8694375168,
+        4377327.589386228
+      ],
+      "utm_normal": [
+        0.6229086372920355,
+        0.7822945925845196
+      ],
+      "candidates": [
+        {
+          "threshold": 0.05,
+          "left_offset_m": -8.35,
+          "right_offset_m": 7.85,
+          "width_m": 16.2
+        },
+        {
+          "threshold": 0.07,
+          "left_offset_m": -8.95,
+          "right_offset_m": 8.75,
+          "width_m": 17.7
+        },
+        {
+          "threshold": 0.09,
+          "left_offset_m": -9.55,
+          "right_offset_m": 9.95,
+          "width_m": 19.5
+        }
+      ],
+      "status": "excluded from initial dimension baseline; ambiguous boundary or threshold sensitivity"
+    }
+  ],
+  "review_date": "2026-09-19",
+  "license": "Measurement database derived using OpenStreetMap geometry: ODbL 1.0, OpenStreetMap contributors. Original USDA/USGS NAIP imagery public domain. Separate from MIT repository code.",
+  "osm_license_url": "https://www.openstreetmap.org/copyright",
+  "review_method": "Manual review of both generated section contact sheets and station overview. Only eight stable isolated pavement bands retained as preliminary anchors; other candidates deliberately excluded."
+}

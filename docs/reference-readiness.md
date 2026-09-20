@@ -17,7 +17,7 @@ Two recent videos were downloaded for local reference inspection. Their frames a
 
 This is a timestamped sampled visual review, not a frame by frame photogrammetric reconstruction. Both cameras move with the rider and have substantial perspective distortion. Do not estimate road width, camber, or speed directly from apparent image angles.
 
-A [USGS terrain crop and approximate OSM route](geometry-sources.md) have been acquired. The crop covers the circuit with a one meter elevation grid and no missing pixels. Data is from before the repave. [Reusable material candidates](asset-source-plan.md) have also been downloaded and visually inspected, with pinned checksums.
+A [USGS terrain crop and approximate OSM route](geometry-sources.md) have been acquired. The subsequent [dimension pass](dimension-register.md) adds raw lidar cross sections and reviewed aerial width estimates. The crop covers the circuit with a one meter elevation grid and no missing pixels. Data is from before the repave. [Reusable material candidates](asset-source-plan.md) have also been downloaded and visually inspected, with pinned checksums.
 
 ## Visual observations to build against
 
@@ -52,6 +52,10 @@ Start with Godot 4.7.2 using native Metal. Profile both Mobile and Forward+ on t
 
 Initial performance acceptance target, not a measured result: sustained 60 FPS at a 1920 by 1200 internal render resolution during manual riding, with frame time percentiles and memory recorded over a ten minute session. Also test resizing, full screen, resume from pause, and gamepad input. Compare quality modes at the laptop's native display resolution separately rather than claiming native resolution performance in advance. Measure on battery and external power and record the power mode.
 
+## Approved geometry baseline
+
+On September 19, 2026, the project owner approved using historical geometry because the repave changes are expected to be minimal. Use the acquired lidar and aerial measurements for construction, with recent videos guiding appearance. Exact current survey and curb drawings do not block the first playable game. Keep unmeasured details configurable and preserve source dates.
+
 ## What is sufficient and what is missing
 
 | Area | Ready for first section? | Remaining work before a hyperrealistic claim |
@@ -59,7 +63,7 @@ Initial performance acceptance target, not a measured result: sustained 60 FPS a
 | Overall terrain and recognizable course layout | Yes, with explicit source uncertainty | Align road edges and height samples; validate against images. OSM is approximate and the terrain predates repaving. |
 | Current visual palette and broad scenery | Yes | Match materials in engine; author near field geometry; correct camera distortion during comparisons. |
 | New curb profiles and exact usable widths | Preliminary estimates only | Obtain current survey or design dimensions, or measured reference photography. Public footage is not sufficient to certify dimensions. |
-| Pavement camber and local bumps | Broad shape only | Inspect original lidar points and compare repeated cross sections; use current survey for fine surface validation. One meter grid spacing is not one meter accuracy and is not curb scale detail. |
+| Pavement camber and local bumps | Historical local slopes now measured from raw lidar | See the dimension register. Fit results are local, not whole pavement validation; current survey is still needed for fine surface changes and new curbs. |
 | Motorcycle appearance | Cockpit reference available | Original full bike mesh and views from other angles; do not infer hidden geometry from the onboard video. |
 | Motorcycle dynamics and current grip | No validated model yet | Verify bike specifications, tire behavior, mass distribution, rider model, and handling tests. Video or asphalt appearance cannot supply friction coefficients. |
 
