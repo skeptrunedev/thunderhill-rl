@@ -10,6 +10,7 @@ uniform sampler2D soil_roughness : filter_linear_mipmap_anisotropic, repeat_enab
 uniform sampler2D terrain_macro : filter_linear_mipmap, repeat_disable;
 uniform vec2 macro_origin;
 uniform vec2 macro_size;
+uniform vec3 ground_tint = vec3(1.0);
 varying vec3 world_pos;
 
 float terrain_hash(vec2 cell) {
@@ -44,7 +45,7 @@ void fragment() {
     vec2 edge_distance = min(macro_uv, vec2(1.0) - macro_uv) * macro_size;
     float macro_weight = smoothstep(0.0, 30.0, min(edge_distance.x, edge_distance.y));
     vec3 macro_gain = mix(vec3(1.0), texture(terrain_macro, macro_uv).rgb * 2.0, macro_weight);
-    ALBEDO = mix(grass, soil, soil_weight) * vec3(0.65, 0.56, 0.43) * macro_gain;
+    ALBEDO = mix(grass, soil, soil_weight) * ground_tint * macro_gain;
     float grass_r = mix(texture(grass_roughness, uv).r, texture(grass_roughness, secondary_uv).r, 0.35);
     ROUGHNESS = clamp(mix(grass_r, texture(soil_roughness, world_pos.xz / 1.3).r, soil_weight), 0.65, 1.0);
     vec3 primary_n = texture(grass_normal, uv).rgb * 2.0 - 1.0;

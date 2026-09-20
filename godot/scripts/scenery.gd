@@ -38,6 +38,9 @@ func _grass_meshes() -> Array[ArrayMesh]:
 		FileAccess.get_file_as_string("res://assets/grass/grass.json")
 	)
 	var material := StandardMaterial3D.new()
+	var tint := ThunderhillTrack.DRY_GROUND_TINT
+	# StandardMaterial albedo is tagged source_color; encode the linear multiplier.
+	material.albedo_color = Color(tint.x, tint.y, tint.z).linear_to_srgb()
 	material.albedo_texture = load("res://assets/grass/dry_grass_rgba.png")
 	material.vertex_color_use_as_albedo = true
 	material.vertex_color_is_srgb = true

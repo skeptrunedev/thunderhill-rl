@@ -15,6 +15,9 @@ var offroad_surface := preload("res://scripts/offroad_surface.gd").new()
 const CELL: float = 25.0
 const ROAD_LIFT: float = 0.04
 const SHOULDER_WIDTH: float = 6.0
+## Shared linear albedo multiplier for dry ground and standing vegetation.
+## Artistic palette matching, not measured Thunderhill reflectance.
+const DRY_GROUND_TINT := Vector3(0.65, 0.56, 0.43)
 
 
 func _ready() -> void:
@@ -110,6 +113,7 @@ func _build_terrain() -> void:
 	_startup_mark("terrain_triangle_stream_complete")
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/terrain.gdshader")
+	mat.set_shader_parameter("ground_tint", DRY_GROUND_TINT)
 	mat.set_shader_parameter(
 		"grass_color", load("res://assets/materials/withered_grass_diff_1k.jpg")
 	)

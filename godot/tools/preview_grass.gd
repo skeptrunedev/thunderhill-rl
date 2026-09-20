@@ -3,6 +3,8 @@ extends SceneTree
 const Validation = preload("res://scripts/image_validation.gd")
 var output := ""
 var materials: Array[StandardMaterial3D] = []
+var unshaded := false
+var frames := 16
 
 
 func _initialize() -> void:
@@ -28,6 +30,13 @@ func _run() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
+		if arg == "--unshaded":
+			unshaded = true
+		if arg.begins_with("--frames="):
+			frames = int(arg.trim_prefix("--frames="))
+	if frames < 1 or frames > 120:
+		_fail("Frame count must be between 1 and 120")
+		return
 	if output.is_empty() or not output.is_absolute_path():
 		_fail("Supply --output-dir=/absolute/path")
 		return
@@ -43,7 +52,7 @@ func _run() -> void:
 	}
 	var paths := [output.path_join("comparison.json")]
 	for mode in modes:
-		for index in 16:
+		for index in frames:
 			paths.append(output.path_join("%s_%02d.png" % [mode, index]))
 	for path in paths:
 		if FileAccess.file_exists(path):
@@ -63,6 +72,9 @@ func _run() -> void:
 	if materials.is_empty():
 		_fail("Baked grass materials missing")
 		return
+	if unshaded:
+		for material in materials:
+			material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	var track = game.track
 	var nearest := 0
 	for index in track.samples.size():
@@ -81,7 +93,7 @@ func _run() -> void:
 	var rows: Array = []
 	for frame in 10:
 		await RenderingServer.frame_post_draw
-	for index in 16:
+	for index in frames:
 		var position := origin + forward * (0.30 * index)
 		position.y = track.terrain_surface_height(position) + 1.5
 		game.camera.global_position = position
@@ -119,7 +131,8 @@ func _run() -> void:
 		"purpose": "visual comparison, not performance benchmark",
 		"station_m": track.samples[nearest].s,
 		"step_m": 0.30,
-		"frames_per_mode": 16,
+		"frames_per_mode": frames,
+		"unshaded_grass": unshaded,
 		"alpha_modes": modes,
 		"alpha_edge": 0.30,
 		"alpha_cutoff": 0.35,

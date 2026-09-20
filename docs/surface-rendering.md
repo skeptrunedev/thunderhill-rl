@@ -1,5 +1,46 @@
 # Surface rendering refinement
 
+## Consistent dry vegetation palette
+
+The terrain already multiplied its texture albedo by a warm linear tint
+`(0.65, 0.56, 0.43)`, while standing grass retained nearly its original palette.
+Both now use `ThunderhillTrack.DRY_GROUND_TINT`. The terrain shader receives the
+linear vector directly. StandardMaterial grass receives the corresponding sRGB
+Color, since its albedo uniform has the `source_color` hint. This is an artistic
+palette adjustment against the supplied dry season footage, not measured albedo
+or proof of a uniquely correct cause for every bright stem.
+
+Before changing the palette, a source audit sampled 2,048 deterministic points
+per triangle with bilinear diffuse and alpha sampling, weighted by local triangle
+area and filtered at alpha greater than 0.35. The selected tall, tiny A and tiny E
+meshes had only 2.1%, 0.8% and 2.0% near white visible area respectively (all RGB
+channels above 0.85). This ruled against replacing the assets merely because
+white islands were visible in the atlas. CPU mip approximations suggest some
+contamination in tiny E, but do not reproduce Godot's alpha border processing or
+camera projected coverage. The audit does not establish the dominant cause of
+the rendered bright pixels.
+
+An unshaded render retained conspicuous pale stems and made the overall grass
+brighter. Excess scene lighting was therefore not established as the cause.
+The preview tool now accepts `--unshaded` and `--frames=1` for this isolation,
+recording both options. These options affect the diagnostic only.
+
+The common tint reduces the contrast of standing grass against the ground in
+the inspected 1920 by 1080 close view and 1280 by 800 riding view. Meshes,
+placement, source textures, ground geometry and physical grip are unchanged.
+Both static scenes were regenerated because their source manifests include the
+track script. The landmark geometry fingerprint is unchanged.
+
+Evidence: `artifacts/grass_texture_audit.py` and its JSON report,
+`artifacts/grass-unshaded/coverage_00.png`, `artifacts/grass-palette/coverage_00.png`
+and `artifacts/grass-palette-track.png`. Sparse coverage, distant vegetation,
+shadowing and native Mac visual review remain separate unfinished work.
+The rendered human control diagnostic passes with zero failures. Formatting,
+static scene provenance checks and macOS export also pass. In the matched riding
+captures, the sky and landmark strip above row 330 and the road and cockpit strip
+below row 500 are pixel identical; visible changes are confined to the roadside
+band. This is limited image evidence, not proof of full scene equivalence.
+
 ## Grass alpha coverage comparison
 
 Grass materials now enable alpha coverage, with edge threshold 0.30 below the
