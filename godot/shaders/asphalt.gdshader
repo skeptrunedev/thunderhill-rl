@@ -31,7 +31,10 @@ void fragment() {
     ALBEDO = aggregate * vec3(0.53, 0.50, 0.46) * variation;
     // Dry resurfaced asphalt still reflects at grazing angles. These values are
     // appearance tuning against the onboard references, not measured BRDF data.
-    ROUGHNESS = clamp(texture(rough_map, detail).r * 0.48 + 0.20, 0.52, 0.79);
+    // Metre scale directional variation breaks up the grazing reflection.
+    // Center the contribution to retain the existing nominal dry finish.
+    float finish_variation = (broad * 0.7 + fine * 0.3 - 0.5) * 0.14;
+    ROUGHNESS = clamp(texture(rough_map, detail).r * 0.48 + 0.20 + finish_variation, 0.52, 0.79);
     NORMAL_MAP = texture(normal_map, detail).rgb;
     NORMAL_MAP_DEPTH = 0.18;
 }
