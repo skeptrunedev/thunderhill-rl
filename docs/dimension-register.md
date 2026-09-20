@@ -16,8 +16,8 @@ The project owner explicitly approved historical geometry as the construction ba
 
 | Quantity | Evidence and implementation value | Limit |
 | --- | --- | --- |
-| Overall route footprint | Approximately 834 m east to west by 1,027 m north to south from the projected OSM route | Approximate centerline, not pavement footprint |
-| Mapped route length | Approximately 4,609 m along the acquired OSM polyline | Not an official lap measurement; do not stretch geometry to the promotional three mile label |
+| Overall route footprint | Approximately 840 m east to west by 1,022 m north to south from the projected OSM route | Approximate centerline, not pavement footprint |
+| Mapped route length | Approximately 4,607 m along the acquired OSM polyline | Not an official lap measurement; do not stretch geometry to the promotional three mile label |
 | Terrain working area | 1,128 m by 1,451 m, sampled on a one meter USGS elevation grid | Grid spacing is not vertical accuracy |
 | Historical pavement envelope | Eight reviewed aerial sections span 10.8 to 12.0 m | At least ±1.2 m interpretive uncertainty per width; does not describe all corners or current runoff |
 | Cyclone approach grade | Approximately +14.3% in a measured local strip | Historical 2023 lidar, local tangent and approximate route location |
