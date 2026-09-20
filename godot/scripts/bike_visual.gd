@@ -632,8 +632,10 @@ func _build_cockpit() -> void:
 			switchgear
 		)
 		_box(Vector3(0.014, 0.008, 0.006), Vector3(0, -0.009, 0.027), dark_metal, switchgear)
-		# Fluid pots have dark lids and a restrained translucent amber body color.
-		var fluid := _material(Color("696450"), 0.15, 0.43)
+		# Amber reservoir appearance follows the footage; the opaque finish is
+		# an approximation, not physical transmission or simulated fluid motion.
+		var fluid := ShaderMaterial.new()
+		fluid.shader = preload("res://shaders/reservoir.gdshader")
 		_bar(
 			Vector3(side * 0.219, 0.70, 0.205),
 			Vector3(side * 0.219, 0.745, 0.205),

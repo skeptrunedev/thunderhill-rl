@@ -19,3 +19,11 @@ The human camera cycle now offers chase, rider and onboard views. Press C or use
 The existing rider view retains its eye anchor and framing. Both human close views use the existing partial roll stabilization and hide the rider model. Rider hands and body presentation, precise cockpit shapes and camera comfort remain unfinished. The separate versioned agent observation camera is unchanged.
 
 The updated camera attachment and mode switching checks passed with zero failures. A rendered keyboard diagnostic cycled all three views and passed with zero failures; local frame intervals were median 17.242 ms and p95 17.746 ms at 1920 by 1200 on the RTX 2080 Ti. The final onboard view was inspected in `artifacts/onboard-framing-preview.png`. These checks establish the local presentation and control path, not exact reference camera calibration or native Mac visual acceptance.
+
+The reservoir cylinders now use an amber finish with a visible fluid boundary,
+guided by the supplied onboard frame at ten seconds. This is an opaque artistic
+material approximation, not physical transmission, measured fluid capacity or
+simulated slosh. Geometry, dimensions and collision remain unchanged. The local
+Mobile renderer compiled the shader and the resulting cockpit capture was
+visually inspected in `artifacts/reservoir-preview.png`. Native verification of
+this material remains outstanding.

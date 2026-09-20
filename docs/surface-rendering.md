@@ -75,3 +75,15 @@ The synthetic capture test covers RGB and RGBA black images, a colored pixel,
 empty images and failed output writes. A Linux Mobile rendered preview at
 1280 by 800 produced a visually inspected cockpit image and 183 draw calls.
 The previous black Mac capture remains unexplained pending native diagnostics.
+
+The instrumented native build `871573bdaea5-b8f4af621f89` produced a valid,
+visually inspected 1280 by 800 cockpit capture on the M3 Pro Metal renderer.
+Both diagnostic samples reported the intended camera, 183 objects and draw calls,
+1,774,555 primitives, window_can_draw true and window_focused false. The original
+blank capture was not reproduced; its cause remains unproven. Startup reached
+scene ready at 68.139 seconds and first draw at 68.485 seconds. This is not a
+foreground performance acceptance result, particularly with older instances open.
+Evidence: `artifacts/Thunderhill-diagnostics-871573b.png`, its `.png.json` sidecar,
+`.jsonl` startup trace and `.log` runtime output. The transferred archive SHA256
+was `f50f3eec458fef3593b1f34ba76389a29168acf380cf4185845b7ac4041bb91e`;
+native code signature verification passed.
