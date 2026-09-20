@@ -14,7 +14,7 @@ var _concrete := SurfaceTool.new()
 var _paving := SurfaceTool.new()
 
 
-func build(track: Node3D) -> void:
+func build(track: Node3D, include_divider := true) -> void:
 	_track = track
 	_ground_height_cache.clear()
 	var data: Dictionary = JSON.parse_string(
@@ -23,12 +23,10 @@ func build(track: Node3D) -> void:
 	var divider_data: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://data/pit-wall.json")
 	)
-	var divider := preload("res://scripts/pit_wall.gd").new()
-	add_child(divider)
-	divider.build(track, divider_data)
-	initialization_error = divider.initialization_error
-	if not initialization_error.is_empty():
-		return
+	if include_divider:
+		_build_divider(track, divider_data)
+		if not initialization_error.is_empty():
+			return
 	for surface in [_walls, _roofs, _glass, _metal, _concrete, _paving]:
 		surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 		if surface != _paving:
@@ -51,6 +49,51 @@ func build(track: Node3D) -> void:
 	_commit(_paving, _material(Color("373d3d")), "MappedPaddockPaving")
 	_build_trees(data.trees)
 	_ground_height_cache.clear()
+
+
+func build_prepared(track: Node3D) -> void:
+	initialization_error = validate_bake()
+	if not initialization_error.is_empty():
+		return
+	# Keep the wall's existing provenance checks and solid collision construction.
+	# Only decorative static landmarks are loaded from the prepared scene.
+	var profile: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/pit-wall.json")
+	)
+	_build_divider(track, profile)
+	if not initialization_error.is_empty():
+		return
+	var packed := load("res://assets/generated/landmarks.scn") as PackedScene
+	if packed == null:
+		initialization_error = "Cannot load prepared landmarks"
+		return
+	add_child(packed.instantiate())
+
+
+func _build_divider(track: Node3D, profile: Dictionary) -> void:
+	var divider := preload("res://scripts/pit_wall.gd").new()
+	add_child(divider)
+	divider.build(track, profile)
+	initialization_error = divider.initialization_error
+
+
+static func validate_bake() -> String:
+	var manifest: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/landmarks-bake.json")
+	)
+	if (
+		not manifest is Dictionary
+		or manifest.get("schema_version") != 1
+		or not manifest.get("sources") is Dictionary
+		or manifest.sources.is_empty()
+	):
+		return "Missing or invalid landmark bake manifest"
+	for source: String in manifest.sources:
+		# Packaging checks all sources before export converts scripts and textures.
+		if OS.has_feature("editor") or source.begins_with("data/"):
+			if FileAccess.get_sha256("res://" + source) != manifest.sources[source]:
+				return "Stale landmark bake: " + source + ". Run res://tools/bake_landmarks.gd."
+	return ""
 
 
 func _material(color: Color, roughness: float = 0.85) -> StandardMaterial3D:

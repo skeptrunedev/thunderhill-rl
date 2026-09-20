@@ -17,3 +17,35 @@ The native package `e9a8d0d33b11-efe2831b6b81` completed its 1920 by 1200 Metal 
 After sharing height and normal contact queries, the local rendered control diagnostic reached the first viewport update in 16.895 seconds, with scenery taking 7.304 seconds and zero control failures. See `artifacts/startup-contact-shared.jsonl` and [contact corrections](contact-boundaries.md). The repeated startup work is reduced, but native startup and foreground performance remain acceptance work.
 
 The native package `81e96d1dad12-a5a344040d11` was installed with a verified archive SHA256 of `937e59006e750a1f53bd768d9cce9d5afde1d3edcc6ef8cbb9eadc7360f608d9`. Its 1920 by 1200 Metal control check exited successfully with zero failures across throttle, steering, front and rear braking, camera switching, pause and reset. The rendered screenshot was retrieved and inspected. Scene startup through the first viewport update took 67.120 seconds. The short control run recorded 72 frames, with median 66.667 ms and p95 71.745 ms. The screen was locked and five older review instances were running when the test started, so these results do not establish foreground performance. Evidence is in `artifacts/Thunderhill-controls-81e96d1.log`, `artifacts/Thunderhill-startup-81e96d1.jsonl` and `artifacts/mac-controls-81e96d1.png`. The same installed application was then launched for human review. Motorcycle response to the new wall collision geometry is still pending implementation.
+
+## Prepared static landmarks
+
+Decorative buildings, paving, fences and observed tree crowns are now stored in
+`godot/assets/generated/landmarks.scn`. The pit divider still runs its existing
+profile validation and solid collision construction at startup. Both paths use
+the same original builder; `build(track, false)` is the decorative bake input.
+
+Regenerate using a real renderer:
+
+```
+DISPLAY=:1 godot --path godot --script res://tools/bake_landmarks.gd
+```
+
+The bake compares every mesh array, material property, node transform, tree
+instance transform and color, visibility layer and range after an uncached scene
+reload. It rejects collision nodes and missing tree instance transforms. A
+headless renderer cannot preserve these GPU instance buffers and is rejected.
+The manifest pins inputs and output hashes. Packaging rejects stale sources or
+scene bytes for both scenery and landmarks; runtime also checks available source
+hashes. The existing full builder remains available to geometry diagnostics.
+
+Local generation took 6,942.376 ms, versus 7.714 ms for the prepared resource load
+and instantiation. The gameplay landmark stage, which also constructs the wall
+and validates inputs, decreased from 6,093.387 to 175.398 ms in separate local
+rendered runs. First viewport update decreased from 11,990.080 to 5,842.779 ms.
+These measurements exclude executable startup and do not establish native Mac
+performance. The local output was pixel identical at 1280 by 800, including the
+pit wall and visible trees, and wall integration passed 91 checks. Evidence:
+`artifacts/landmarks-bake.log`, `artifacts/landmarks-before.jsonl`,
+`artifacts/landmarks-after.jsonl`, matching PNGs and
+`artifacts/landmarks-wall-contact.log`.

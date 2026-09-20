@@ -22,17 +22,35 @@ def git(*args):
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
 
 
-def validate_scenery_bake():
+def validate_scene_bake(name):
     project = ROOT / "godot"
-    manifest = json.loads((project / "data/scenery-bake.json").read_text())
-    if manifest.get("schema_version") != 1 or not manifest.get("sources"):
-        raise RuntimeError("Invalid scenery bake manifest")
+    try:
+        manifest = json.loads((project / f"data/{name}-bake.json").read_text())
+    except (OSError, ValueError) as error:
+        raise RuntimeError(f"Invalid {name} bake manifest") from error
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != 1
+        or not isinstance(manifest.get("sources"), dict)
+        or not manifest["sources"]
+        or not isinstance(manifest.get("scene_sha256"), str)
+    ):
+        raise RuntimeError(f"Invalid {name} bake manifest")
     expected = dict(manifest["sources"])
-    expected["assets/generated/scenery.scn"] = manifest["scene_sha256"]
+    expected[f"assets/generated/{name}.scn"] = manifest["scene_sha256"]
     for relative, digest in expected.items():
         path = project / relative
         if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-            raise RuntimeError(f"Stale scenery bake: {relative}. Run Godot --path godot --script res://tools/bake_scenery.gd")
+            raise RuntimeError(f"Stale {name} bake: {relative}. Run Godot --path godot --script res://tools/bake_{name}.gd")
+
+
+def validate_scenery_bake():
+    validate_scene_bake("scenery")
+
+
+def validate_bakes():
+    for name in ("scenery", "landmarks"):
+        validate_scene_bake(name)
 
 
 def main():
@@ -42,7 +60,7 @@ def main():
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--debug", action="store_true", help="Use the debug export template for engine diagnostics")
     args = parser.parse_args()
-    validate_scenery_bake()
+    validate_bakes()
     dirty = bool(git("status", "--porcelain"))
     if dirty and not args.allow_dirty:
         parser.error("Commit the verified source first, or explicitly use --allow-dirty for a development package")

@@ -133,7 +133,7 @@ func _ready() -> void:
 	_startup_mark("horizon_complete")
 	var landmarks = preload("res://scripts/landmarks.gd").new()
 	add_child(landmarks)
-	landmarks.build(track)
+	landmarks.build_prepared(track)
 	if not landmarks.initialization_error.is_empty():
 		push_error(landmarks.initialization_error)
 		get_tree().quit(2)
