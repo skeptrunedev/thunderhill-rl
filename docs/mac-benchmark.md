@@ -21,3 +21,5 @@ The launch requested a 1920 by 1200 window; the benchmark reported a 1600 by 100
 The source fixture SHA256 is `bdc94c8c880b16ba0e083192b9cb5f41190503b07a9b85ba3e7e13ed8c15eb2b`. Local raw evidence is `artifacts/mac-full-circuit-benchmark.log`; the Mac log is in `~/Downloads/Thunderhill-full-circuit-benchmark.log`. Installed app: `~/Applications/ThunderhillReview/1709b61/Thunderhill.app`.
 
 Clock mode must be established from the actual launch command. Godot consumes engine flags before exposing script arguments, so the original automatic `clock_mode` label was unreliable and has been removed. The native run above used no fixed FPS flag; the local accelerated regression did. Always compare simulated and wall seconds as well.
+
+The subsequent terrain build and full native rider view run are documented in [conforming ground](conforming-ground.md), including an unresolved 582 ms maximum frame interval. Do not use the earlier benchmark alone to certify the later build.

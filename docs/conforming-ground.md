@@ -19,3 +19,13 @@ The agent API, recording and state replay checks pass, including 36 recorded tra
 Road edge subdivisions match segment heights but retain topology T junctions against the separate road mesh. Historical source dates, provisional pavement widths, unsurveyed curbs and the artistic shoulder blend remain limitations. This change restores source terrain and removes overlapping shoulder meshes; it does not establish full track realism or calibrated motorcycle dynamics.
 
 Destination contact validation runs inside the simulator step transaction. If the destination ground is missing or nonfinite, the complete pre step simulator state is restored and no successful transition or reward is recorded. Source hash checks use explicit runtime rejection and remain active in release exports. Regenerating both ground files from the pinned source produced byte identical output.
+
+## Native Mac run
+
+Clean build `90892d048231-37eb7b343bcf` completed the full recorded input circuit on the M3 Pro through Metal 4, using the human rider view. It completed 40,313 ticks and one lap, with no crash or off track tick, and zero trajectory error. Simulation time was 335.941667 seconds and wall time 336.415345 seconds.
+
+Across 40,102 process frame intervals, median was 8.332 ms, p95 9.849 ms, p99 11.042 ms and maximum 582.252 ms. The maximum is a material stall, not hidden by the favorable percentiles. Its cause is not yet isolated. The run included an in game screenshot and PNG write; that is a possible contributor, not a demonstrated cause. These callback intervals are not GPU timings or proof of physical display presentation.
+
+The captured native PNG was retrieved and visually inspected at 1920 by 1200 pixels; the logical viewport report remains 1600 by 1000. Raw evidence is `artifacts/mac-ground-benchmark.log` and `artifacts/mac-ground-benchmark.png`. The original review instance remained open during the run. Resident memory samples ranged from approximately 412 to 638 MiB; these are samples, not an instrumented peak.
+
+The updated app is installed at `~/Applications/ThunderhillReview/90892d0/Thunderhill.app`. The scene, ground contact, model failure and provenance tests pass, along with the actual agent camera sequencing and image capture checks. The next performance investigation must account for the observed long frame rather than accepting median throughput alone.
