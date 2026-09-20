@@ -120,6 +120,14 @@ func _build_terrain() -> void:
 	mat.set_shader_parameter(
 		"soil_roughness", load("res://assets/materials/brown_mud_dry_rough_1k.jpg")
 	)
+	var macro: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://assets/materials/terrain_macro.json")
+	)
+	mat.set_shader_parameter("terrain_macro", load("res://assets/materials/terrain_macro.png"))
+	mat.set_shader_parameter(
+		"macro_origin", Vector2(macro.local_origin_xz[0], macro.local_origin_xz[1])
+	)
+	mat.set_shader_parameter("macro_size", Vector2(macro.local_size_xz[0], macro.local_size_xz[1]))
 	terrain_material = mat
 	_mesh(st, mat, "MeasuredTerrain")
 

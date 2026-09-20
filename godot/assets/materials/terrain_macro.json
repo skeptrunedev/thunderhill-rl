@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "purpose": "Artistic broad dry terrain color gains, not measured reflectance or land cover",
+  "source": {
+    "image_sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
+    "catalog": {
+      "OBJECTID": 23435,
+      "Name": "m_3912230_sw_10_060_20220715",
+      "MinPS": 0,
+      "MaxPS": 19.1,
+      "Category": 1,
+      "CenterX": -13619242.448209347,
+      "CenterY": 4798058.373203856,
+      "State": "CA",
+      "Year": 2022,
+      "raster_name": "m_3912230_sw_10_060_20220715",
+      "download_url": "https://earthexplorer.usgs.gov/download/options/naip/3231139",
+      "acquisition_date": 1657843200000,
+      "agency": "USDA",
+      "vendor": "USDA-FSA-APFO",
+      "resolution_value": 0.6,
+      "resolution_units": "METER",
+      "band_count": 4,
+      "sensor_type": "CNIR",
+      "projection_name": "UTM",
+      "projection_zone": "10N",
+      "datum": "NAD83"
+    },
+    "export_request": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=json&bbox=556880%2C4376248%2C558008%2C4377699&bboxSR=26910&imageSR=26910&size=1880%2C2419&format=png&interpolation=RSP_NearestNeighbor&mosaicRule=%7B%22mosaicMethod%22%3A+%22esriMosaicLockRaster%22%2C+%22lockRasterIds%22%3A+%5B23435%5D%7D",
+    "extent": {
+      "xmin": 556880,
+      "ymin": 4376247.8,
+      "xmax": 558008,
+      "ymax": 4377699.2,
+      "spatialReference": {
+        "wkid": 26910,
+        "latestWkid": 26910
+      }
+    },
+    "license": "Public domain",
+    "attribution": "USDA NAIP; USGS The National Map",
+    "license_evidence": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer?f=pjson"
+  },
+  "local_origin_xz": [
+    -586.3229144720826,
+    -465.5565746575594
+  ],
+  "local_size_xz": [
+    1128,
+    1451.4000000003725
+  ],
+  "mapping": "uv = (world_xz - local_origin_xz) / local_size_xz; PNG top is north",
+  "settings": {
+    "encoded_luminance_range": [
+      0.24,
+      0.76
+    ],
+    "red_minus_blue_min": 0.035,
+    "red_minus_green_range": [
+      0.006,
+      0.12
+    ],
+    "green_minus_blue_min": 0.018,
+    "smoothing_sigma_m": 6.0,
+    "gaussian_truncate_sigma": 4.0,
+    "median_prior_weight": 0.02,
+    "target_output_pixel_m": 4.0,
+    "gain_range": [
+      0.6,
+      1.4
+    ]
+  },
+  "accepted_pixel_fraction": 0.7650134572928853,
+  "accepted_terrain_median_linear_rgb": [
+    0.25415209433082675,
+    0.20507873639031693,
+    0.13843161503245183
+  ],
+  "algorithm": "Select tan RGB pixels, convert to linear, Gaussian normalized convolution with 0.02 median prior, divide by accepted median, clamp gains, area downsample, encode gain/2",
+  "encoding": "RGB8 linear numerical data; sample without source_color/sRGB conversion, decode texture.rgb * 2.0; quantization error at most 1/255 in gain",
+  "output_dimensions": [
+    282,
+    363
+  ],
+  "output_pixel_m": [
+    4.0,
+    3.998347107439043
+  ],
+  "output_sha256": "f334df81e85f227f4bc1e840bbca501c1a1320a844b2b85b75830a6925851ce0",
+  "limitations": [
+    "Historical July 2022 appearance predates repave",
+    "Color selection is not a reviewed semantic terrain mask; tan objects and weak shadows may survive",
+    "Median prior gives neutral gains where accepted terrain is absent, including orchard and pit interiors",
+    "Source lighting and fixed display stretch are not physically removed",
+    "Use only as restrained terrain material modulation, never for road boundaries, geometry or friction",
+    "Outside image extent blend to neutral gain; never repeat the image"
+  ]
+}
