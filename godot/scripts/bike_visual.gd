@@ -6,6 +6,8 @@ extends Node3D
 
 ## Approximate eye location inside the original helmet mesh, not measured rider data.
 const RIDER_EYE_LOCAL := Vector3(0.0, 1.51, -0.30)
+## Approximate onboard framing anchor, not a measured eye or camera mount.
+const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.23, -0.12)
 
 var _front: Node3D
 var _rear_wheel: Node3D
@@ -444,7 +446,8 @@ func _build_front() -> void:
 			_front
 		)
 		_box(Vector3(0.045, 0.10, 0.045), Vector3(side * 0.086, 0.035, 0.13), _gold, _front)
-		_bar(Vector3(0, 0.69, 0.27), Vector3(side * 0.30, 0.715, 0.25), 0.014, _metal, _front)
+		# Dark handlebar finish observed in the supplied onboard footage.
+		_bar(Vector3(0, 0.69, 0.27), Vector3(side * 0.30, 0.715, 0.25), 0.014, _black, _front)
 		_bar(
 			Vector3(side * 0.30, 0.715, 0.25),
 			Vector3(side * 0.40, 0.70, 0.27),

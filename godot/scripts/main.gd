@@ -749,12 +749,15 @@ func _update_visual(dt: float) -> void:
 		camera.position = camera.position.lerp(desired, 1.0 - exp(-dt * 8.0))
 		camera.look_at(focus, Vector3.UP)
 	else:
-		# A rider cannot trail metres behind the bike at speed. Attach translation
-		# to the posed helmet; retain partial roll stabilization for readability.
-		camera.fov = 90.0
-		camera.global_position = bike.to_global(bike.RIDER_EYE_LOCAL)
+		# Both views stay attached to the bike. The onboard view is a framing
+		# study against the footage, separate from the helmet eye and policy camera.
+		var onboard := camera_mode == 2
+		var anchor: Vector3 = bike.ONBOARD_CAMERA_LOCAL if onboard else bike.RIDER_EYE_LOCAL
+		var look_down := 0.38 if onboard else 0.25
+		camera.fov = 74.0 if onboard else 90.0
+		camera.global_position = bike.to_global(anchor)
 		var upright := Vector3.UP.slide(riding_tangent).normalized()
-		var gaze := riding_tangent * cos(0.25) - upright * sin(0.25)
+		var gaze := riding_tangent * cos(look_down) - upright * sin(look_down)
 		camera.look_at(camera.position + gaze * 30.0, upright)
 		camera.rotate_object_local(Vector3.FORWARD, sim.lean * 0.22)
 
@@ -767,7 +770,7 @@ func _input(event: InputEvent) -> void:
 	if event.keycode == KEY_ESCAPE and environment_failure.is_empty():
 		paused = not paused
 	if event.keycode == KEY_C:
-		camera_mode = (camera_mode + 1) % 2
+		camera_mode = (camera_mode + 1) % 3
 	if event.keycode == KEY_R and not agent_mode and replay == null:
 		reset_episode(0)
 	if event.keycode == KEY_F11:
@@ -794,7 +797,7 @@ func menu_action(action: String) -> void:
 			reset_episode(1650)
 			paused = false
 		"camera":
-			camera_mode = (camera_mode + 1) % 2
+			camera_mode = (camera_mode + 1) % 3
 		"quit":
 			get_tree().quit()
 

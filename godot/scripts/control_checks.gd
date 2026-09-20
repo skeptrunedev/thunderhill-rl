@@ -53,6 +53,12 @@ func run(main: Node3D) -> int:
 	key(KEY_C, false)
 	await tree.process_frame
 	check(main.camera_mode == 1, "Camera keyboard shortcut failed")
+	for expected in [2, 0]:
+		key(KEY_C, true)
+		await tree.process_frame
+		key(KEY_C, false)
+		await tree.process_frame
+		check(main.camera_mode == expected, "Camera cycle skipped a view")
 	key(KEY_ESCAPE, true)
 	await tree.process_frame
 	key(KEY_ESCAPE, false)

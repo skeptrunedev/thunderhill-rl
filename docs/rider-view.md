@@ -11,3 +11,11 @@ The dedicated agent observation camera remains at its existing versioned pose an
 Camera motion and viewing comfort still need human riding review. This correction does not address the provisional motorcycle mesh, missing rider arm presentation, or the remaining track and dynamics realism work.
 
 The clean exported build `7667d8f45deb-9b0c94c52cdf` was installed at `~/Applications/ThunderhillReview/7667d8f/Thunderhill.app`. The M3 Pro Metal renderer produced a 1920 by 1200 cockpit capture that was retrieved and visually inspected. Evidence is in `artifacts/mac-rider-preview.png` and `artifacts/mac-rider-preview.log`. The rendered human input diagnostic also passed on the local Vulkan renderer with zero failures. Native sustained riding comfort remains a human review item.
+
+## Onboard framing view
+
+The human camera cycle now offers chase, rider and onboard views. Press C or use Change camera in the pause menu; the HUD labels the selected view. The third view attaches to an approximate local anchor `(0, 1.23, -0.12)` metres, uses a 74 degree vertical field of view and a 0.38 radian downward angle. It exposes the handlebar controls and instrument cluster for comparison with the supplied Ken Moto footage. This is an appearance study, not a measured camera mount, calibrated lens or replacement for the helmet eye. The reference also supports a dark handlebar finish, now applied to the original bar geometry.
+
+The existing rider view retains its eye anchor and framing. Both human close views use the existing partial roll stabilization and hide the rider model. Rider hands and body presentation, precise cockpit shapes and camera comfort remain unfinished. The separate versioned agent observation camera is unchanged.
+
+The updated camera attachment and mode switching checks passed with zero failures. A rendered keyboard diagnostic cycled all three views and passed with zero failures; local frame intervals were median 17.242 ms and p95 17.746 ms at 1920 by 1200 on the RTX 2080 Ti. The final onboard view was inspected in `artifacts/onboard-framing-preview.png`. These checks establish the local presentation and control path, not exact reference camera calibration or native Mac visual acceptance.

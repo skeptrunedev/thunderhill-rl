@@ -115,6 +115,7 @@ func _process(_dt: float) -> void:
 			else ("AGENT CONTROL" if game.agent_mode else ("PAUSED" if game.paused else "PRACTICE"))
 		)
 	)
+	status.text += "   •   " + ["CHASE", "RIDER", "ONBOARD"][clampi(game.camera_mode, 0, 2)]
 	if not game.environment_failure.is_empty():
 		status.text = "RIDING STATE NOT SUPPORTED YET / R TO RESTART"
 		status.tooltip_text = str(game.environment_failure.error)

@@ -36,6 +36,24 @@ func run() -> void:
 				check(game.camera.global_basis.is_finite(), "Rider camera basis is not finite")
 				check(not game.camera.get_cull_mask_value(20), "Helmet obscures rider view")
 	check(game.camera.fov == 90.0, "Rider field of view was not applied")
+	game.camera_mode = 2
+	for lean in [-0.5, 0.0, 0.5]:
+		game.sim.lean = lean
+		game._update_visual(1.0 / 60.0)
+		check(
+			(
+				game.bike.to_local(game.camera.global_position).distance_to(
+					game.bike.ONBOARD_CAMERA_LOCAL
+				)
+				< 0.0001
+			),
+			"Onboard view detached from bike"
+		)
+		check(game.camera.global_basis.is_finite(), "Onboard camera basis is not finite")
+		check(not game.camera.get_cull_mask_value(20), "Rider body obscures onboard view")
+	check(game.camera.fov == 74.0, "Onboard field of view was not applied")
+	game.menu_action("camera")
+	check(game.camera_mode == 0, "Camera menu did not cycle back to chase")
 	game.camera_mode = 0
 	game._update_visual(1.0 / 60.0)
 	check(game.camera.fov == 64.0, "Chase field of view was not restored")

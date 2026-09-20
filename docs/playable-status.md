@@ -37,7 +37,7 @@ The keyboard test verifies throttle movement, braking, camera changes, pause fre
 
 Open `godot/project.godot` in Godot 4.7.2 and run the main scene, or run `godot --path godot` from the repository root. Assets and generated game geometry are included. Source reconstruction tools require the acquired reference data, but normal gameplay does not.
 
-Controls: W or up for throttle, S or down for front brake, space for rear brake, A and D or left and right for steering, C for camera, R for restart, Escape for pause, F11 for full screen. Gamepad triggers control throttle and front brake; the left stick steers. Rider assistance and automatic shifting are enabled in the human prototype and labeled in recordings.
+Controls: W or up for throttle, S or down for front brake, space for rear brake, A and D or left and right for steering, C to cycle chase, rider and onboard cameras, R for restart, Escape for pause, F11 for full screen. Gamepad triggers control throttle and front brake; the left stick steers. Rider assistance and automatic shifting are enabled in the human prototype and labeled in recordings.
 
 Run `godot --headless --path godot --script tests/test_motorcycle.gd`, `godot --headless --path godot --script tests/test_human.gd`, and `uv run tools/check_agent.py --godot /path/to/godot` for the implemented checks.
 
