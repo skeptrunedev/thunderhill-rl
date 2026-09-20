@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "rasterio==1.4.4", "shapely==2.1.2"]
+# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "rasterio==1.4.4", "shapely==2.1.2", "pyproj==3.7.2"]
 # ///
 """Build road conforming terrain for rendering and offroad contact.
 
@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +21,7 @@ import rasterio
 import shapely
 from scipy.ndimage import map_coordinates
 from shapely import Polygon, STRtree
+from terrain_datum import terrain_transform
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,11 +36,16 @@ def raw_terrain(track, template, source):
     xx, zz = np.meshgrid(template['x0'] + np.arange(nx) * step,
                          template['z0'] + np.arange(nz) * step)
     origin = track['origin']
+    transform, registration = terrain_transform()
+    east, north = transform.transform(xx + origin['easting'], origin['northing'] - zz, errcheck=True)
     with rasterio.open(source) as src:
         if src.crs.to_epsg() != 26910:
             raise ValueError("Unexpected DEM coordinate reference system")
-        cols = (xx + origin['easting'] - src.transform.c) / src.transform.a - 0.5
-        rows = (origin['northing'] - zz - src.transform.f) / src.transform.e - 0.5
+        cols = (east - src.transform.c) / src.transform.a - 0.5
+        rows = (north - src.transform.f) / src.transform.e - 0.5
+        if (np.any(cols < 0) or np.any(cols > src.width - 1)
+                or np.any(rows < 0) or np.any(rows > src.height - 1)):
+            raise ValueError("Transformed terrain grid leaves the source DEM")
         heights = map_coordinates(src.read(1), [rows.ravel(), cols.ravel()], order=1,
                                   mode='nearest') - origin['elevation_m']
     if not np.isfinite(heights).all():
@@ -47,6 +54,7 @@ def raw_terrain(track, template, source):
             'heights': np.round(heights, 3).tolist(),
             'metadata': {'source': 'USGS 2023 1 meter DEM', 'source_sha256': digest(source),
                          'source_crs': 'EPSG:26910', 'source_vertical_datum': 'NAVD88',
+                         'horizontal_registration': registration,
                          'modifications': 'Bilinear DEM sampling on original 8 meter grid; no road recess.',
                          'license': 'Public domain USGS DEM'}}
 
@@ -144,7 +152,7 @@ def build_mesh(terrain, footprint, starts, ends):
     segments = []
     for ring in rings:
         coords = np.asarray(ring.coords)
-        segments.extend(zip(coords[:-1], coords[1:]))
+        segments.extend(pairwise(coords))
     boundary = np.asarray(segments)
     endpoint_h, _ = segment_heights(boundary.reshape(-1, 2), starts, ends)
     boundary3 = np.zeros((len(boundary), 2, 3))

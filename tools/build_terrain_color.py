@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "Pillow==12.1.1"]
+# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "Pillow==12.1.1", "pyproj==3.7.2"]
 # ///
 """Build restrained terrain color gains from historical public domain NAIP.
 
@@ -10,13 +10,16 @@ The RGB classifier is deliberately conservative but is not semantic segmentation
 Rejected pixels never contribute their color to the normalized convolution.
 Regions without nearby accepted pixels converge to the accepted terrain median.
 """
+
 import hashlib
 import json
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
-from scipy.ndimage import gaussian_filter
+from pyproj.enums import TransformDirection
+from scipy.ndimage import gaussian_filter, map_coordinates
+from terrain_datum import terrain_transform
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_HASH = "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a"
@@ -47,10 +50,14 @@ def dry_terrain_mask(rgb):
     luminance = rgb @ np.array([0.2126, 0.7152, 0.0722])
     low, high = SETTINGS["encoded_luminance_range"]
     rg_low, rg_high = SETTINGS["red_minus_green_range"]
-    return ((luminance >= low) & (luminance <= high)
-            & (red - blue >= SETTINGS["red_minus_blue_min"])
-            & (red - green >= rg_low) & (red - green <= rg_high)
-            & (green - blue >= SETTINGS["green_minus_blue_min"]))
+    return (
+        (luminance >= low)
+        & (luminance <= high)
+        & (red - blue >= SETTINGS["red_minus_blue_min"])
+        & (red - green >= rg_low)
+        & (red - green <= rg_high)
+        & (green - blue >= SETTINGS["green_minus_blue_min"])
+    )
 
 
 def terrain_gains(rgb, pixel_m):
@@ -64,16 +71,89 @@ def terrain_gains(rgb, pixel_m):
     linear = srgb_to_linear(rgb)
     median = np.median(linear[valid], axis=0)
     sigma = tuple(SETTINGS["smoothing_sigma_m"] / p for p in pixel_m)
-    blur_options = dict(sigma=sigma, mode="reflect",
-                        truncate=SETTINGS["gaussian_truncate_sigma"])
+    blur_options = {
+        "sigma": sigma,
+        "mode": "reflect",
+        "truncate": SETTINGS["gaussian_truncate_sigma"],
+    }
     weights = gaussian_filter(valid.astype(float), **blur_options)
     prior = SETTINGS["median_prior_weight"]
-    smooth = np.stack([
-        (gaussian_filter(linear[:, :, c] * valid, **blur_options) + prior * median[c])
-        / (weights + prior) for c in range(3)
-    ], axis=-1)
+    smooth = np.stack(
+        [
+            (
+                gaussian_filter(linear[:, :, c] * valid, **blur_options)
+                + prior * median[c]
+            )
+            / (weights + prior)
+            for c in range(3)
+        ],
+        axis=-1,
+    )
     gains = np.clip(smooth / median, *SETTINGS["gain_range"])
     return gains, valid, median
+
+
+def local_raster_bounds(extent, origin, transform):
+    """Inverse transform a densified perimeter into an enclosing local rectangle."""
+    t = np.linspace(0, 1, 257)
+    e = extent["xmin"] + t * (extent["xmax"] - extent["xmin"])
+    n = extent["ymin"] + t * (extent["ymax"] - extent["ymin"])
+    east, north = transform.transform(
+        np.concatenate(
+            [e, e, np.full_like(t, extent["xmin"]), np.full_like(t, extent["xmax"])]
+        ),
+        np.concatenate(
+            [np.full_like(t, extent["ymin"]), np.full_like(t, extent["ymax"]), n, n]
+        ),
+        direction=TransformDirection.INVERSE,
+        errcheck=True,
+    )
+    x, z = east - origin["easting"], origin["northing"] - north
+    return np.array([x.min(), z.min()]), np.array(
+        [x.max() - x.min(), z.max() - z.min()]
+    )
+
+
+def resample_local_gains(
+    gains, extent, origin, transform, lower, size, dimensions, samples=4
+):
+    """Integrate transformed bilinear samples using midpoint area quadrature.
+
+    Each sample uses the full datum transform. Pixel centers include half a
+    source pixel offset. Exterior samples get neutral gains. Runtime additionally
+    blends the outer 30 metres of this enclosing rectangle to neutral.
+    """
+    width, height = dimensions
+    result = np.zeros((height, width, 3), dtype=float)
+    pixel = np.asarray(size) / [width, height]
+    source_h, source_w = gains.shape[:2]
+    source_pixel = [
+        (extent["xmax"] - extent["xmin"]) / source_w,
+        (extent["ymax"] - extent["ymin"]) / source_h,
+    ]
+    for iy in range(samples):
+        for ix in range(samples):
+            x, z = np.meshgrid(
+                lower[0] + (np.arange(width) + (ix + 0.5) / samples) * pixel[0],
+                lower[1] + (np.arange(height) + (iy + 0.5) / samples) * pixel[1],
+            )
+            east, north = transform.transform(
+                x + origin["easting"], origin["northing"] - z, errcheck=True
+            )
+            col = (east - extent["xmin"]) / source_pixel[0] - 0.5
+            row = (extent["ymax"] - north) / source_pixel[1] - 0.5
+            inside = (
+                (east >= extent["xmin"])
+                & (east <= extent["xmax"])
+                & (north >= extent["ymin"])
+                & (north <= extent["ymax"])
+            )
+            for channel in range(3):
+                value = map_coordinates(
+                    gains[:, :, channel], [row, col], order=1, mode="nearest"
+                )
+                result[:, :, channel] += np.where(inside, value, 1.0)
+    return result / samples**2
 
 
 def build():
@@ -95,44 +175,69 @@ def build():
     size = [extent["xmax"] - extent["xmin"], extent["ymax"] - extent["ymin"]]
     spacing = [size[1] / image.height, size[0] / image.width]
     gains, valid, median = terrain_gains(np.asarray(image, dtype=float) / 255, spacing)
-    width, height = [int(np.ceil(s / SETTINGS["target_output_pixel_m"])) for s in size]
-    # Filter float gains before quantization; this PNG contains linear numeric data.
-    reduced = np.stack([np.asarray(Image.fromarray(gains[:, :, c].astype(np.float32))
-                                  .resize((width, height), Image.Resampling.BOX))
-                        for c in range(3)], axis=-1)
+    origin = json.loads((ROOT / "godot/data/track.json").read_text())["origin"]
+    transform, datum = terrain_transform()
+    lower, local_size = local_raster_bounds(extent, origin, transform)
+    width, height = (
+        np.ceil(local_size / SETTINGS["target_output_pixel_m"]).astype(int).tolist()
+    )
+    reduced = resample_local_gains(
+        gains, extent, origin, transform, lower, local_size, (width, height)
+    )
     encoded = np.rint(np.clip(reduced * 0.5, 0, 1) * 255).astype(np.uint8)
     output_dir = ROOT / "godot/assets/materials"
     output_dir.mkdir(parents=True, exist_ok=True)
     output = output_dir / "terrain_macro.png"
     Image.fromarray(encoded).save(output)
-    origin = json.loads((ROOT / "godot/data/track.json").read_text())["origin"]
     metadata = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "horizontal_datum": datum,
         "purpose": "Artistic broad dry terrain color gains, not measured reflectance or land cover",
-        "source": {"image_sha256": SOURCE_HASH, "catalog": source_attributes,
-                   "export_request": export["request"], "extent": extent,
-                   "license": "Public domain", "attribution": "USDA NAIP; USGS The National Map",
-                   "license_evidence": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer?f=pjson"},
-        "local_origin_xz": [extent["xmin"] - origin["easting"], origin["northing"] - extent["ymax"]],
-        "local_size_xz": size,
+        "source": {
+            "image_sha256": SOURCE_HASH,
+            "catalog": source_attributes,
+            "export_request": export["request"],
+            "extent": extent,
+            "license": "Public domain",
+            "attribution": "USDA NAIP; USGS The National Map",
+            "license_evidence": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer?f=pjson",
+        },
+        "local_origin_xz": lower.tolist(),
+        "local_size_xz": local_size.tolist(),
         "mapping": "uv = (world_xz - local_origin_xz) / local_size_xz; PNG top is north",
         "settings": SETTINGS,
         "accepted_pixel_fraction": float(valid.mean()),
         "accepted_terrain_median_linear_rgb": median.tolist(),
-        "algorithm": "Select tan RGB pixels, convert to linear, Gaussian normalized convolution with 0.02 median prior, divide by accepted median, clamp gains, area downsample, encode gain/2",
+        "algorithm": "Select tan RGB pixels, convert to linear, Gaussian normalized convolution with 0.02 median prior, divide by accepted median, clamp gains, transform local EPSG6339 output samples to source EPSG26910, bilinear interpolation with 4 by 4 midpoint area quadrature, encode gain/2",
         "encoding": "RGB8 linear numerical data; sample without source_color/sRGB conversion, decode texture.rgb * 2.0; quantization error at most 1/255 in gain",
         "output_dimensions": [width, height],
-        "output_pixel_m": [size[0] / width, size[1] / height],
+        "output_pixel_m": [local_size[0] / width, local_size[1] / height],
         "output_sha256": sha256(output),
-        "limitations": ["Historical July 2022 appearance predates repave",
-                        "Color selection is not a reviewed semantic terrain mask; tan objects and weak shadows may survive",
-                        "Median prior gives neutral gains where accepted terrain is absent, including orchard and pit interiors",
-                        "Source lighting and fixed display stretch are not physically removed",
-                        "Use only as restrained terrain material modulation, never for road boundaries, geometry or friction",
-                        "Outside image extent blend to neutral gain; never repeat the image"],
+        "limitations": [
+            "Historical July 2022 appearance predates repave",
+            "Color selection is not a reviewed semantic terrain mask; tan objects and weak shadows may survive",
+            "Median prior gives neutral gains where accepted terrain is absent, including orchard and pit interiors",
+            "Source lighting and fixed display stretch are not physically removed",
+            "Use only as restrained terrain material modulation, never for road boundaries, geometry or friction",
+            "Outside image extent blend to neutral gain; never repeat the image",
+        ],
     }
-    (output_dir / "terrain_macro.json").write_text(json.dumps(metadata, indent=2) + "\n")
-    print(json.dumps({k: metadata[k] for k in ["accepted_pixel_fraction", "output_dimensions", "output_pixel_m", "output_sha256"]}))
+    (output_dir / "terrain_macro.json").write_text(
+        json.dumps(metadata, indent=2) + "\n"
+    )
+    print(
+        json.dumps(
+            {
+                k: metadata[k]
+                for k in [
+                    "accepted_pixel_fraction",
+                    "output_dimensions",
+                    "output_pixel_m",
+                    "output_sha256",
+                ]
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

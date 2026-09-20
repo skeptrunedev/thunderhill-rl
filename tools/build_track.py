@@ -15,10 +15,13 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
-from pyproj import Transformer
-from scipy.ndimage import gaussian_filter1d, map_coordinates
-from scipy.spatial import cKDTree
 from build_surface_mesh import build as build_surface_mesh
+from build_surface_mesh import raw_terrain
+from pyproj import Transformer
+from pyproj.enums import TransformDirection
+from scipy.ndimage import gaussian_filter1d
+from scipy.spatial import cKDTree
+from terrain_datum import terrain_transform
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "godot/data"
@@ -107,23 +110,29 @@ def road_elevation(points: np.ndarray, heading: np.ndarray, left: np.ndarray) ->
 
 def build_terrain(origin: np.ndarray, road_xyz: np.ndarray, road_left: np.ndarray, widths: np.ndarray, banks: np.ndarray) -> dict:
     source_path = ROOT / "artifacts/reference/geometry/east-terrain-1m.tif"
+    transform, _ = terrain_transform()
     with rasterio.open(source_path) as src:
-        # Leave a full pixel margin so bilinear sampling remains inside the crop.
-        x0 = np.ceil((src.bounds.left + 1 - origin[0]) / TERRAIN_SPACING) * TERRAIN_SPACING
-        x1 = np.floor((src.bounds.right - 1 - origin[0]) / TERRAIN_SPACING) * TERRAIN_SPACING
-        z0 = np.ceil((origin[1] - src.bounds.top + 1) / TERRAIN_SPACING) * TERRAIN_SPACING
-        z1 = np.floor((origin[1] - src.bounds.bottom - 1) / TERRAIN_SPACING) * TERRAIN_SPACING
-        xs = np.arange(x0, x1 + 0.1, TERRAIN_SPACING)
-        zs = np.arange(z0, z1 + 0.1, TERRAIN_SPACING)
-        xx, zz = np.meshgrid(xs, zs)
-        world_x, world_y = xx + origin[0], origin[1] - zz
-        cols = (world_x - src.transform.c) / src.transform.a - 0.5
-        rows = (world_y - src.transform.f) / src.transform.e - 0.5
-        heights = map_coordinates(src.read(1), [rows.ravel(), cols.ravel()], order=1, mode="nearest").reshape(xx.shape) - origin[2]
-    assert np.all(np.isfinite(heights))
-    terrain = {"schema_version": 1, "nx": len(xs), "nz": len(zs), "step": TERRAIN_SPACING, "x0": float(x0), "z0": float(z0), "heights": np.round(heights.ravel(), 3).tolist(), "metadata": {"source": "USGS 2023 1 meter DEM", "source_sha256": digest(source_path), "source_crs": "EPSG:26910", "source_vertical_datum": "NAVD88", "render_grid_spacing_m": TERRAIN_SPACING, "modifications": "Bilinear DEM sampling without terrain recess. The derived surface mesh supplies rendering and offroad contact, with a provisional shoulder blend.", "license": "Terrain DEM public domain; road dressing derived from OSM under ODbL 1.0", "osm_attribution": "OpenStreetMap contributors", "osm_license_url": "https://www.openstreetmap.org/copyright"}}
-    assert len(terrain["heights"]) == terrain["nx"] * terrain["nz"]
-    return terrain
+        if src.crs.to_epsg() != 26910:
+            raise ValueError("Unexpected DEM coordinate reference system")
+        # Leave a full source pixel margin, then transform the domain to the
+        # local road datum before selecting the terrain grid.
+        east, north = transform.transform(
+            [src.bounds.left + 1, src.bounds.right - 1] * 2,
+            [src.bounds.bottom + 1] * 2 + [src.bounds.top - 1] * 2,
+            direction=TransformDirection.INVERSE, errcheck=True,
+        )
+    x0 = np.ceil((min(east) - origin[0]) / TERRAIN_SPACING) * TERRAIN_SPACING
+    x1 = np.floor((max(east) - origin[0]) / TERRAIN_SPACING) * TERRAIN_SPACING
+    z0 = np.ceil((origin[1] - max(north)) / TERRAIN_SPACING) * TERRAIN_SPACING
+    z1 = np.floor((origin[1] - min(north)) / TERRAIN_SPACING) * TERRAIN_SPACING
+    template = {
+        "schema_version": 1, "nx": round((x1-x0)/TERRAIN_SPACING)+1,
+        "nz": round((z1-z0)/TERRAIN_SPACING)+1,
+        "x0": float(x0), "z0": float(z0), "step": TERRAIN_SPACING,
+    }
+    return raw_terrain({"origin": {"easting": float(origin[0]),
+                       "northing": float(origin[1]), "elevation_m": float(origin[2])}},
+                       template, source_path)
 
 
 def main() -> None:
@@ -143,7 +152,7 @@ def main() -> None:
     # Sample the bounded source curve at approximately three meter intervals.
     sample_count = int(np.ceil(source_length / ROAD_SPACING))
     source_stations = np.linspace(0, source_length, sample_count, endpoint=False)
-    points, smoothed_length = resample(smooth, source_stations * (float(np.linalg.norm(np.diff(np.vstack([smooth, smooth[0]]), axis=0), axis=1).sum()) / source_length))
+    points, _smoothed_length = resample(smooth, source_stations * (float(np.linalg.norm(np.diff(np.vstack([smooth, smooth[0]]), axis=0), axis=1).sum()) / source_length))
     heading, left = normals(points)
     widths, center_offsets, anchors = reviewed_widths(source_stations, source_length)
     points += left * center_offsets[:, None]

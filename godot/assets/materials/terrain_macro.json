@@ -1,5 +1,18 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "horizontal_datum": {
+    "source_crs": "EPSG:6339",
+    "target_crs": "EPSG:26910",
+    "operation": "proj=pipeline step inv proj=utm zone=10 ellps=GRS80 step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif step inv proj=gridshift grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif step proj=utm zone=10 ellps=GRS80",
+    "grid_sha256": {
+      "us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96",
+      "us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a",
+      "us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff",
+      "us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+    },
+    "manifest_sha256": "950e9e57d04f62b12f8c9284dacfd9146dddb0df6a97d0d86d4157a437e32604",
+    "vertical": "Horizontal transformation only; NAVD88 heights are unchanged"
+  },
   "purpose": "Artistic broad dry terrain color gains, not measured reflectance or land cover",
   "source": {
     "image_sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
@@ -42,12 +55,12 @@
     "license_evidence": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer?f=pjson"
   },
   "local_origin_xz": [
-    -586.3229144720826,
-    -465.5565746575594
+    -586.5781278515933,
+    -466.00422843545675
   ],
   "local_size_xz": [
-    1128,
-    1451.4000000003725
+    1127.9990616173018,
+    1451.4028657516465
   ],
   "mapping": "uv = (world_xz - local_origin_xz) / local_size_xz; PNG top is north",
   "settings": {
@@ -76,17 +89,17 @@
     0.20507873639031693,
     0.13843161503245183
   ],
-  "algorithm": "Select tan RGB pixels, convert to linear, Gaussian normalized convolution with 0.02 median prior, divide by accepted median, clamp gains, area downsample, encode gain/2",
+  "algorithm": "Select tan RGB pixels, convert to linear, Gaussian normalized convolution with 0.02 median prior, divide by accepted median, clamp gains, transform local EPSG6339 output samples to source EPSG26910, bilinear interpolation with 4 by 4 midpoint area quadrature, encode gain/2",
   "encoding": "RGB8 linear numerical data; sample without source_color/sRGB conversion, decode texture.rgb * 2.0; quantization error at most 1/255 in gain",
   "output_dimensions": [
     282,
     363
   ],
   "output_pixel_m": [
-    4.0,
-    3.998347107439043
+    3.9999966724017795,
+    3.9983550020706513
   ],
-  "output_sha256": "f334df81e85f227f4bc1e840bbca501c1a1320a844b2b85b75830a6925851ce0",
+  "output_sha256": "f290ffaba8b7287922de99e526243db2b581e99dd2b99960a22d6b9febbc055f",
   "limitations": [
     "Historical July 2022 appearance predates repave",
     "Color selection is not a reviewed semantic terrain mask; tan objects and weak shadows may survive",
