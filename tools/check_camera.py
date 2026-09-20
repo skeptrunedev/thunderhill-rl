@@ -1,0 +1,173 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["Pillow>=11,<13"]
+# ///
+"""Verify real rendered camera observations and capture/advance serialization."""
+from __future__ import annotations
+
+import argparse
+import base64
+from contextlib import contextmanager
+from datetime import datetime, timezone
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import shutil
+import socket
+import subprocess
+import time
+
+from PIL import Image, ImageChops
+
+from check_agent import Client
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@contextmanager
+def game(args, output: Path, headless: bool = False):
+    with socket.socket() as reservation:
+        reservation.bind(("127.0.0.1", 0))
+        port = reservation.getsockname()[1]
+    env = dict(os.environ, DISPLAY=args.display, XDG_DATA_HOME=str(output / "userdata"))
+    command = [args.godot, "--path", str(ROOT / "godot"), "--audio-driver", "Dummy"]
+    if headless:
+        command.append("--headless")
+    else:
+        command += ["--resolution", "800x500", "--position", "40,40"]
+    command += ["--", f"--agent-port={port}"]
+    log_path = output / ("headless.log" if headless else "rendered.log")
+    with log_path.open("wb") as log:
+        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env)
+        connection = None
+        try:
+            deadline = time.monotonic() + 90
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    raise RuntimeError(log_path.read_text())
+                try:
+                    connection = socket.create_connection(("127.0.0.1", port), timeout=0.5)
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            if connection is None:
+                raise TimeoutError(log_path.read_text())
+            connection.settimeout(30)
+            yield Client(connection)
+        except Exception:
+            print(log_path.read_text())
+            raise
+        finally:
+            if connection:
+                connection.close()
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+
+
+def validate_capture(response: dict, output: Path, label: str, episode: str, tick: int) -> dict:
+    assert "error" not in response, response
+    assert response["episode_id"] == episode and response["tick"] == tick, response
+    assert not {"state", "track", "transitions", "reward_components"}.intersection(response), response.keys()
+    image = response["image"]
+    png = base64.b64decode(image["base64"], validate=True)
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    digest = hashlib.sha256(png).hexdigest()
+    assert digest == image["sha256"]
+    decoded = Image.open(io.BytesIO(png))
+    assert decoded.size == (image["width"], image["height"]) == (640, 360)
+    assert decoded.convert("RGB").entropy() > 3.0, "Observation appears blank"
+    assert response["camera"]["hud_visible"] is False
+    assert response["camera"]["rider_mesh_visible"] is False
+    assert response["camera"]["vertical_fov_degrees"] == 74
+    assert len(response["camera"]["pose"]["position"]) == 3
+    assert response["camera"]["intrinsics"]["fx"] > 0
+    artifacts = list((output / "userdata").rglob(digest + ".png"))
+    assert len(artifacts) == 1 and artifacts[0].read_bytes() == png, "Recorded bytes differ from policy image"
+    (output / f"{label}.png").write_bytes(png)
+    metadata = {**response, "image": {k: v for k, v in image.items() if k != "base64"}}
+    (output / f"{label}.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    return {"sha256": digest, "mtime_ns": artifacts[0].stat().st_mtime_ns}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--godot", default=shutil.which("godot") or shutil.which("godot4"))
+    parser.add_argument("--display", default=":1")
+    parser.add_argument("--output", type=Path)
+    args = parser.parse_args()
+    if not args.godot:
+        parser.error("Provide --godot")
+    output = args.output or ROOT / "artifacts/qa" / datetime.now(timezone.utc).strftime("camera-%Y%m%dT%H%M%SZ")
+    output = output.resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    with game(args, output) as client:
+        initial = client.request({"op": "reset", "policy_id": "camera-qa"})
+        episode = initial["episode_id"]
+        capture = {"op": "capture", "episode_id": episode, "expected_tick": 0}
+        first = client.request(capture)
+        first_info = validate_capture(first, output, "tick0", episode, 0)
+        time.sleep(0.25)
+        assert client.request({"op": "observe", "episode_id": episode}) == initial, "Rendering advanced physics"
+        repeated = client.request(capture)
+        repeat_info = validate_capture(repeated, output, "tick0_repeat", episode, 0)
+        assert repeated["camera"] == first["camera"], "Idle capture changed camera calibration or pose"
+        if repeat_info["sha256"] == first_info["sha256"]:
+            assert repeat_info["mtime_ns"] == first_info["mtime_ns"], "Identical artifact was overwritten"
+        idle_difference = ImageChops.difference(Image.open(output / "tick0.png"), Image.open(output / "tick0_repeat.png"))
+        idle_max_channel_change = max(high for low, high in idle_difference.getextrema())
+        advance = {"op": "advance", "episode_id": episode, "expected_tick": 0,
+                   "action_id": "camera-first", "controls": {"throttle": 0.8}}
+        advanced = client.request(advance)
+        assert advanced["tick"] == 12
+        capture["expected_tick"] = 12
+        second = client.request(capture)
+        second_info = validate_capture(second, output, "tick12", episode, 12)
+        assert second_info["sha256"] != first_info["sha256"], "Movement did not change observation"
+        # Queue both commands before reading. Advance must wait for actual frame capture.
+        queued_advance = {**advance, "expected_tick": 12, "action_id": "camera-queued"}
+        client.stream.write((json.dumps(capture) + "\n" + json.dumps(queued_advance) + "\n").encode())
+        client.stream.flush()
+        captured_before_advance = json.loads(client.stream.readline())
+        queued_result = json.loads(client.stream.readline())
+        queued_info = validate_capture(captured_before_advance, output, "tick12_queued", episode, 12)
+        assert captured_before_advance["camera"] == second["camera"], "Queued advance contaminated capture pose"
+        if queued_info["sha256"] == second_info["sha256"]:
+            assert queued_info["mtime_ns"] == second_info["mtime_ns"], "Immutable capture overwritten"
+        assert queued_result["tick"] == 24, queued_result
+        # Reset is another state mutation and must also wait for capture completion.
+        capture["expected_tick"] = 24
+        client.stream.write((json.dumps(capture) + "\n" + json.dumps({"op": "reset", "policy_id": "after-camera"}) + "\n").encode())
+        client.stream.flush()
+        before_reset = json.loads(client.stream.readline())
+        reset = json.loads(client.stream.readline())
+        validate_capture(before_reset, output, "tick24_queued_reset", episode, 24)
+        assert reset["tick"] == 0 and reset["episode_id"] != episode
+        assert "error" in client.request(capture), "Stale capture episode was accepted"
+    with game(args, output, headless=True) as client:
+        initial = client.request({"op": "reset"})
+        unsupported = client.request({"op": "capture", "episode_id": initial["episode_id"], "expected_tick": 0})
+        assert "headless" in unsupported["error"] and unsupported["failure_type"] == "infrastructure"
+    records = []
+    for path in (output / "userdata").rglob("*.jsonl"):
+        records.extend(json.loads(line) for line in path.read_text().splitlines())
+    observations = [row for row in records if row.get("type") == "camera_observation"]
+    assert len(observations) == 5, len(observations)
+    assert all("base64" not in row["image"] for row in observations)
+    summary = {"ok": True, "camera_observations_recorded": len(observations), "dimensions": [640, 360],
+               "idle_rerender_max_channel_change": idle_max_channel_change,
+               "checks": ["real_png", "sha256", "immutable_artifact", "deterministic_idle_pose",
+                          "no_privileged_telemetry", "frozen_tick", "changed_pixels_after_advance",
+                          "queued_advance_serialization", "queued_reset_serialization", "headless_rejection"],
+               "output": str(output)}
+    (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    print(json.dumps(summary, indent=2))
+
+
+if __name__ == "__main__":
+    main()

@@ -4,6 +4,7 @@ const TrackScript = preload("res://scripts/track.gd")
 const BikeScript = preload("res://scripts/bike_visual.gd")
 const SimScript = preload("res://scripts/motorcycle.gd")
 const HudScript = preload("res://scripts/hud.gd")
+const AgentCameraScript = preload("res://scripts/agent_camera.gd")
 const DT: float = 1.0 / 120.0
 var track: Node3D
 var sim: RefCounted
@@ -39,10 +40,13 @@ var screenshot_path := ""
 var qa_ticks := 0
 var qa_target := 0
 var preview_mode := false
+var preview_station := 1650.0
 var run_id: String
 var replay_path: String = ""
 var replay: RefCounted
 var frame_times: Array = []
+var agent_camera: Node
+var agent_request_pending := false
 
 
 func _ready() -> void:
@@ -57,6 +61,10 @@ func _ready() -> void:
 		if arg.begins_with("--qa-ticks="):
 			qa_target = int(arg.split("=")[1])
 			paused = false
+		if arg.begins_with("--preview-station="):
+			preview_station = float(arg.trim_prefix("--preview-station="))
+		if arg.begins_with("--preview-camera="):
+			camera_mode = int(arg.trim_prefix("--preview-camera="))
 		if arg == "--preview":
 			preview_mode = true
 		if arg.begins_with("--replay="):
@@ -66,6 +74,9 @@ func _ready() -> void:
 	var horizon = preload("res://scripts/horizon.gd").new()
 	add_child(horizon)
 	horizon.build(track)
+	var landmarks = preload("res://scripts/landmarks.gd").new()
+	add_child(landmarks)
+	landmarks.build(track)
 	var scenery = preload("res://scripts/scenery.gd").new()
 	add_child(scenery)
 	scenery.build(track)
@@ -79,11 +90,16 @@ func _ready() -> void:
 	add_child(bike_root)
 	bike = BikeScript.new()
 	bike_root.add_child(bike)
+	AgentCameraScript.assign_rider_layer(bike.rider)
 	camera = Camera3D.new()
 	camera.far = 3000
 	camera.near = 0.06
 	camera.fov = 64
 	add_child(camera)
+	if agent_mode and DisplayServer.get_name() != "headless":
+		agent_camera = AgentCameraScript.new()
+		add_child(agent_camera)
+		agent_camera.configure(get_world_3d())
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	hud = HudScript.new()
@@ -91,7 +107,7 @@ func _ready() -> void:
 	layer.add_child(hud)
 	reset_episode(0.0)
 	if preview_mode:
-		reset_episode(1650.0)
+		reset_episode(preview_station)
 		paused = true
 		hud.visible = false
 	if not replay_path.is_empty():
@@ -123,12 +139,9 @@ func _environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("396a97")
-	sky_mat.sky_horizon_color = Color("c3ced0")
-	sky_mat.ground_bottom_color = Color("6e614b")
-	sky_mat.ground_horizon_color = Color("c3bba2")
-	sky_mat.sky_curve = 0.18
+	var sky_mat := ShaderMaterial.new()
+	sky_mat.shader = preload("res://shaders/sky.gdshader")
+	sky_mat.set_shader_parameter("panorama", preload("res://assets/sky/kloofendal_2k.hdr"))
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -142,13 +155,17 @@ func _environment() -> void:
 	world.environment = env
 	add_child(world)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-37, -38, 0)
 	sun.light_color = Color("fff0d5")
 	sun.light_energy = 1.0
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 160
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	add_child(sun)
+	var sky_metadata: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/sky.json")
+	)
+	var direction: Array = sky_metadata.toward_sun
+	sun.look_at(-Vector3(direction[0], direction[1], direction[2]), Vector3.UP)
 
 
 func reset_episode(station: float, checkpoint: String = "human") -> Dictionary:
@@ -187,6 +204,7 @@ func reset_episode(station: float, checkpoint: String = "human") -> Dictionary:
 		{
 			"type": "episode",
 			"schema_version": 1,
+			"build": _build_provenance(),
 			"episode_id": episode_id,
 			"policy_id": policy_id,
 			"track_sha256": FileAccess.get_sha256("res://data/track.json"),
@@ -400,14 +418,15 @@ func _update_visual(dt: float) -> void:
 		return
 	var road: Dictionary = track.sample_world(sim.position)
 	bike_root.position = sim.position
-	var riding_tangent: Vector3 = sim.forward().slide(road.normal).normalized()
+	var riding_tangent: Vector3 = sim.surface_forward(road.normal)
 	bike_root.rotation = Vector3(
 		atan2(riding_tangent.y, Vector2(riding_tangent.x, riding_tangent.z).length()),
 		-sim.heading,
 		0
 	)
 	bike.update_pose(-sim.lean, -sim.steering, wheel_rotation)
-	bike.set_rider_visible(camera_mode == 0)
+	bike.update_instruments(sim.speed, sim.rpm, sim.gear)
+	camera.set_cull_mask_value(20, camera_mode == 0)
 	var forward := Vector3(sin(sim.heading), 0, -cos(sim.heading))
 	var desired: Vector3
 	var focus: Vector3
@@ -443,6 +462,8 @@ func _input(event: InputEvent) -> void:
 
 
 func menu_action(action: String) -> void:
+	if agent_mode and action in ["ride", "reset", "cyclone"]:
+		return
 	match action:
 		"ride":
 			paused = false
@@ -459,7 +480,7 @@ func menu_action(action: String) -> void:
 
 
 func _poll_agent() -> void:
-	if server_port == 0:
+	if server_port == 0 or agent_request_pending:
 		return
 	while server.is_connection_available():
 		clients.append({"peer": server.take_connection(), "buffer": ""})
@@ -482,8 +503,41 @@ func _poll_agent() -> void:
 			var request: Variant = JSON.parse_string(line)
 			var response: Dictionary = {"error": "Request must be JSON object"}
 			if request is Dictionary:
-				response = _request(request)
+				if request.get("op", "") == "capture":
+					agent_request_pending = true
+					response = await _capture_request(request)
+					agent_request_pending = false
+				else:
+					response = _request(request)
 			peer.put_data((JSON.stringify(response) + "\n").to_utf8_buffer())
+
+
+func _capture_request(request: Dictionary) -> Dictionary:
+	if not agent_mode:
+		return {"error": "Agent capture requires --agent-port"}
+	if request.get("episode_id", "") != episode_id:
+		return {"error": "Episode mismatch"}
+	if request.get("expected_tick", -1) != sim.tick:
+		return {"error": "Tick mismatch"}
+	if agent_camera == null:
+		return {
+			"error":
+			"Camera capture requires a rendered instance; headless dummy rendering is unsupported",
+			"failure_type": "infrastructure"
+		}
+	_update_visual(0.0)
+	var road: Dictionary = track.sample_world(sim.position)
+	var captured: Dictionary = await agent_camera.capture(
+		sim, road.normal, episode_id, "user://runs/" + run_id
+	)
+	if not captured.has("error"):
+		var metadata: Dictionary = captured.duplicate(true)
+		metadata.image.erase("base64")
+		metadata["type"] = "camera_observation"
+		_record(metadata)
+		if recorder:
+			recorder.flush()
+	return captured
 
 
 func _request(request: Dictionary) -> Dictionary:
@@ -566,3 +620,21 @@ func _exit_tree() -> void:
 				}
 			)
 		)
+
+
+func _build_provenance() -> Dictionary:
+	if not OS.has_feature("editor") and FileAccess.file_exists("res://data/build-info.json"):
+		var manifest: Dictionary = JSON.parse_string(
+			FileAccess.get_file_as_string("res://data/build-info.json")
+		)
+		return {
+			"build_id": manifest.build_id,
+			"source_commit": manifest.source_commit,
+			"source_dirty": manifest.source_dirty,
+			"content_sha256": manifest.content_sha256
+		}
+	return {
+		"kind": "unbundled_development",
+		"physics_script_sha256": FileAccess.get_sha256("res://scripts/motorcycle.gd"),
+		"game_script_sha256": FileAccess.get_sha256("res://scripts/main.gd")
+	}

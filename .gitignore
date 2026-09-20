@@ -6,3 +6,5 @@ godot/.godot/
 godot/builds/
 *.csproj
 *.sln
+
+godot/data/build-info.json

@@ -53,7 +53,12 @@ func apply_state(sim: RefCounted, state: Dictionary) -> void:
 		"lateral_acceleration",
 		"throttle_applied",
 		"front_brake_applied",
-		"rear_brake_applied"
+		"rear_brake_applied",
+		"road_bank_rad",
+		"lean_relative_road_rad",
+		"gravity_forward_m_s2",
+		"gravity_right_m_s2",
+		"gravity_normal_m_s2"
 	]:
 		if state.has(key):
 			sim.set(key, state[key])

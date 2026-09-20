@@ -4,7 +4,7 @@ extends Node3D
 ## Braking boards are provisional visual landmarks, with no collision geometry.
 ## Trees and paddock structures await georeferenced placement evidence.
 
-const GRASS_COUNT := 10000
+const GRASS_COUNT := 24000
 const PATCH_SIZE := 32.0
 var _track: Node3D
 var _random := RandomNumberGenerator.new()
@@ -46,6 +46,7 @@ func _grass_mesh() -> ArrayMesh:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color.WHITE
 	material.vertex_color_use_as_albedo = true
+	material.vertex_color_is_srgb = true
 	material.roughness = 1
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	surface.set_material(material)

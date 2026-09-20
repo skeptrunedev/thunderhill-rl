@@ -14,10 +14,18 @@ var _gold: StandardMaterial3D
 var _rubber: StandardMaterial3D
 var rider: Node3D
 var _rider_visible := true
+var _speed_label: Label3D
+var _gear_label: Label3D
+var _rpm_label: Label3D
+var _rpm_segments: Array[MeshInstance3D] = []
+var _instrument_readout := Vector3(-1, -1, -1)
 
 
 func _ready() -> void:
 	_red = _material(Color("bc101b"), 0.48, 0.25)
+	_red.clearcoat_enabled = true
+	_red.clearcoat = 0.8
+	_red.clearcoat_roughness = 0.18
 	_black = _material(Color("14191b"), 0.5, 0.36)
 	_metal = _material(Color("a5abb0"), 0.9, 0.25)
 	_gold = _material(Color("ab8650"), 0.8, 0.28)
@@ -37,6 +45,21 @@ func set_rider_visible(value: bool) -> void:
 	_rider_visible = value
 	if is_instance_valid(rider):
 		rider.visible = value
+
+
+## Simulation speed is metres per second; dashboard displays kilometres per hour.
+func update_instruments(speed_mps: float, rpm: float, gear: int) -> void:
+	if not is_instance_valid(_speed_label):
+		return
+	var readout := Vector3(roundf(absf(speed_mps) * 3.6), roundf(rpm / 100) * 100, gear)
+	if readout == _instrument_readout:
+		return
+	_instrument_readout = readout
+	_speed_label.text = "%03d" % int(readout.x)
+	_gear_label.text = str(gear) if gear > 0 else "N"
+	_rpm_label.text = "%d RPM" % int(readout.y)
+	for i in range(_rpm_segments.size()):
+		_rpm_segments[i].visible = float(i) / _rpm_segments.size() < clampf(rpm / 14000.0, 0, 1)
 
 
 func update_pose(lean: float, steering: float, wheel_rotation: float) -> void:
@@ -70,7 +93,7 @@ func _bar(a: Vector3, b: Vector3, radius: float, material: Material, parent: Nod
 	cylinder.top_radius = radius
 	cylinder.bottom_radius = radius
 	cylinder.height = a.distance_to(b)
-	cylinder.radial_segments = 12
+	cylinder.radial_segments = 24
 	var instance := _mesh(cylinder, material, parent, (a + b) * 0.5)
 	var axis := (b - a).normalized()
 	var tangent := Vector3.RIGHT
@@ -185,34 +208,73 @@ func _wheel(at: Vector3, radius: float, width: float, parent: Node3D, front: boo
 	return wheel
 
 
+## Shape preserving Hermite interpolation. Harmonic slopes stop at extrema,
+## keeping every interpolated dimension inside its authored segment bounds.
+func _bounded_hermite(previous: float, a: float, b: float, following: float, t: float, before_span := 1.0, span := 1.0, after_span := 1.0) -> float:
+	var slope := (b - a) / span
+	var before := (a - previous) / before_span
+	var after := (following - b) / after_span
+	var start_tangent := 0.0
+	var end_tangent := 0.0
+	if before * slope > 0:
+		start_tangent = 2.0 * before * slope / (before + slope)
+	if after * slope > 0:
+		end_tangent = 2.0 * slope * after / (slope + after)
+	var t2 := t * t
+	var t3 := t2 * t
+	var value := (2 * t3 - 3 * t2 + 1) * a + (t3 - 2 * t2 + t) * span * start_tangent + (-2 * t3 + 3 * t2) * b + (t3 - t2) * span * end_tangent
+	return clampf(value, minf(a, b), maxf(a, b))
+
+
 ## Each ring is (longitudinal z, center height, half width, half height).
-## Eight facets create creased, sculpted panels rather than stacked primitives.
+## Authored creases become bounded smooth shoulders, not inflated primitives.
 func _body_panel(rings: Array[Vector4], material: Material, parent: Node3D) -> void:
-	var surface := SurfaceTool.new()
-	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var profile: Array[Vector2] = [Vector2(-0.35, 0.99), Vector2(0, 1.015), Vector2(0.35, 0.99), Vector2(0.70, 0.87), Vector2(0.93, 0.60), Vector2(1, 0.24), Vector2(0.94, -0.22), Vector2(0.77, -0.68), Vector2(0.44, -0.96), Vector2(0, -1), Vector2(-0.44, -0.96), Vector2(-0.77, -0.68), Vector2(-0.94, -0.22), Vector2(-1, 0.24), Vector2(-0.93, 0.60), Vector2(-0.70, 0.87)]
+	var perimeter := PackedVector2Array()
+	for i in range(profile.size()):
+		var previous := profile[posmod(i - 1, profile.size())]
+		var a := profile[i]
+		var b := profile[(i + 1) % profile.size()]
+		var following := profile[(i + 2) % profile.size()]
+		for subdivision in range(4):
+			var t := float(subdivision) / 4
+			perimeter.append(Vector2(_bounded_hermite(previous.x, a.x, b.x, following.x, t), _bounded_hermite(previous.y, a.y, b.y, following.y, t)))
+	var interpolated: Array[Vector4] = []
+	for i in range(rings.size() - 1):
+		var a := rings[i]
+		var b := rings[i + 1]
+		var previous := rings[i - 1] if i > 0 else a * 2 - b
+		var following := rings[i + 2] if i + 2 < rings.size() else b * 2 - a
+		for subdivision in range(6):
+			var t := float(subdivision) / 6
+			var ring := Vector4(lerpf(a.x, b.x, t), 0, 0, 0)
+			for component in range(1, 4):
+				ring[component] = _bounded_hermite(previous[component], a[component], b[component], following[component], t, a.x - previous.x, b.x - a.x, following.x - b.x)
+			interpolated.append(ring)
+	interpolated.append(rings[-1])
 	var sections: Array[PackedVector3Array] = []
-	for ring in rings:
+	for ring in interpolated:
 		var section := PackedVector3Array()
-		for point in [
-			Vector2(-0.7, 1),
-			Vector2(0.7, 1),
-			Vector2(1, 0.35),
-			Vector2(0.83, -0.65),
-			Vector2(0.45, -1),
-			Vector2(-0.45, -1),
-			Vector2(-0.83, -0.65),
-			Vector2(-1, 0.35)
-		]:
+		for point in perimeter:
 			section.append(Vector3(point.x * ring.z, ring.y + point.y * ring.w, ring.x))
 		sections.append(section)
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	surface.set_smooth_group(0)
 	for i in range(sections.size() - 1):
-		for j in range(8):
-			var next := (j + 1) % 8
+		for j in range(perimeter.size()):
+			var next := (j + 1) % perimeter.size()
 			_triangle(surface, sections[i][j], sections[i + 1][j], sections[i + 1][next])
 			_triangle(surface, sections[i][j], sections[i + 1][next], sections[i][next])
+	# Cap seams intentionally stay sharp instead of blending into shoulder normals.
+	surface.set_smooth_group(-1)
 	for end in [0, sections.size() - 1]:
-		for j in range(1, 7):
-			_triangle(surface, sections[end][0], sections[end][j], sections[end][j + 1])
+		for j in range(1, perimeter.size() - 1):
+			if end == 0:
+				_triangle(surface, sections[end][0], sections[end][j], sections[end][j + 1])
+			else:
+				_triangle(surface, sections[end][0], sections[end][j + 1], sections[end][j])
+	surface.index()
 	surface.generate_normals()
 	_mesh(surface.commit(), material, parent)
 
@@ -310,7 +372,13 @@ func _build_body() -> void:
 					self
 				)
 	# Flush fuel cap.
-	_bar(Vector3(0, 1.018, -0.15), Vector3(0, 1.022, -0.15), 0.046, _metal, self)
+	_bar(Vector3(0, 1.031, -0.15), Vector3(0, 1.035, -0.15), 0.046, _metal, self)
+	_bar(Vector3(0, 1.035, -0.15), Vector3(0, 1.036, -0.15), 0.033, _black, self)
+	_box(Vector3(0.017, 0.002, 0.028), Vector3(0, 1.038, -0.15), _metal, self)
+	for i in range(6):
+		var angle := float(i) * TAU / 6
+		var center := Vector3(sin(angle) * 0.039, 1.036, -0.15 + cos(angle) * 0.039)
+		_bar(center, center + Vector3.UP * 0.001, 0.0028, _black, self)
 	var tail_light := _material(Color("ff3030"), 0, 0.25)
 	tail_light.emission_enabled = true
 	tail_light.emission = Color("e71922")
@@ -369,10 +437,114 @@ func _build_front() -> void:
 			Vector3(0.104, 0.015, 0.008), Vector3(side * 0.072, 0.58, -0.057), light, _front
 		)
 		lamp.rotation.z = side * -0.22
-	var screen := _box(Vector3(0.12, 0.015, 0.075), Vector3(0, 0.695, 0.16), _black, _front)
-	screen.rotation.x = -0.30
-	var display := _box(Vector3(0.095, 0.003, 0.052), Vector3(0, 0.704, 0.16), light, _front)
-	display.rotation.x = -0.30
+	_build_cockpit()
+
+
+func _instrument_text(text: String, at: Vector3, size: int, color: Color, parent: Node3D) -> Label3D:
+	var label := Label3D.new()
+	label.text = text
+	label.position = at
+	label.font_size = size
+	label.pixel_size = 0.00042
+	label.modulate = color
+	label.outline_size = 0
+	label.shaded = false
+	label.double_sided = false
+	parent.add_child(label)
+	return label
+
+
+func _beveled_panel(size: Vector2, depth: float, bevel: float, material: Material, parent: Node3D) -> void:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var half_size := size * 0.5
+	var outline: Array[Vector2] = [Vector2(-half_size.x + bevel, -half_size.y), Vector2(half_size.x - bevel, -half_size.y), Vector2(half_size.x, -half_size.y + bevel), Vector2(half_size.x, half_size.y - bevel), Vector2(half_size.x - bevel, half_size.y), Vector2(-half_size.x + bevel, half_size.y), Vector2(-half_size.x, half_size.y - bevel), Vector2(-half_size.x, -half_size.y + bevel)]
+	for i in range(outline.size()):
+		var a := outline[i]
+		var b := outline[(i + 1) % outline.size()]
+		_triangle(surface, Vector3(0, 0, depth * 0.5), Vector3(a.x, a.y, depth * 0.5), Vector3(b.x, b.y, depth * 0.5))
+		_triangle(surface, Vector3(a.x, a.y, -depth * 0.5), Vector3(b.x, b.y, -depth * 0.5), Vector3(b.x, b.y, depth * 0.5))
+		_triangle(surface, Vector3(a.x, a.y, -depth * 0.5), Vector3(b.x, b.y, depth * 0.5), Vector3(a.x, a.y, depth * 0.5))
+	surface.generate_normals()
+	_mesh(surface.commit(), material, parent)
+
+
+func _hose(points: Array[Vector3], radius: float, material: Material) -> void:
+	var curve := Curve3D.new()
+	for i in range(points.size()):
+		var previous := points[maxi(0, i - 1)]
+		var next := points[mini(points.size() - 1, i + 1)]
+		var tangent := (next - previous) * 0.16
+		curve.add_point(points[i], -tangent, tangent)
+	var vertices := curve.tessellate(2, 12)
+	for i in range(vertices.size() - 1):
+		_bar(vertices[i], vertices[i + 1], radius, material, _front)
+
+
+func _build_cockpit() -> void:
+	# Proportions and silhouette are guided by the provided Ken Moto cockpit
+	# footage. This is original geometry and an original functional display,
+	# not a reproduction of Ducati graphics or proprietary instrument firmware.
+	var polymer := _material(Color("151719"), 0.05, 0.62)
+	var dark_metal := _material(Color("353b3f"), 0.85, 0.31)
+	var markings := _material(Color("c6c9bd"), 0.1, 0.5)
+	var accent := _material(Color("9f1822"), 0.05, 0.47)
+	var display_material := _material(Color("080e15"), 0.05, 0.60)
+	display_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# Forged top yoke and risers, with visible fasteners and fork adjustment caps.
+	_box(Vector3(0.245, 0.028, 0.084), Vector3(0, 0.59, 0.245), dark_metal, _front)
+	for side in [-1.0, 1.0]:
+		_bar(Vector3(side * 0.094, 0.595, 0.25), Vector3(side * 0.094, 0.611, 0.25), 0.026, _gold, _front)
+		_bar(Vector3(side * 0.094, 0.611, 0.25), Vector3(side * 0.094, 0.615, 0.25), 0.012, _metal, _front)
+		_box(Vector3(0.036, 0.072, 0.043), Vector3(side * 0.045, 0.647, 0.27), dark_metal, _front)
+		_box(Vector3(0.036, 0.026, 0.05), Vector3(side * 0.045, 0.70, 0.27), polymer, _front)
+		for z in [0.253, 0.286]:
+			_bar(Vector3(side * 0.045, 0.713, z), Vector3(side * 0.045, 0.717, z), 0.004, _metal, _front)
+		# Circumferential grip grooves catch light without noisy normal textures.
+		for i in range(13):
+			var x: float = side * (0.305 + i * 0.0071)
+			var y: float = 0.715 - float(i) * 0.00105
+			var z: float = 0.25 + float(i) * 0.0014
+			_lathe([Vector2(-0.0009, 0.020), Vector2(-0.0009, 0.0218), Vector2(0.0009, 0.0218), Vector2(0.0009, 0.020)], polymer, _front, Vector3(x, y, z))
+		_bar(Vector3(side * 0.40, 0.70, 0.27), Vector3(side * 0.425, 0.696, 0.275), 0.019, dark_metal, _front)
+		var switchgear := Node3D.new()
+		switchgear.position = Vector3(side * 0.278, 0.717, 0.25)
+		switchgear.rotation.x = -0.3
+		_front.add_child(switchgear)
+		_beveled_panel(Vector2(0.047, 0.055), 0.047, 0.01, polymer, switchgear)
+		_box(Vector3(0.023, 0.010, 0.006), Vector3(0, 0.009, 0.027), accent if side > 0 else markings, switchgear)
+		_box(Vector3(0.014, 0.008, 0.006), Vector3(0, -0.009, 0.027), dark_metal, switchgear)
+		# Fluid pots have dark lids and a restrained translucent amber body color.
+		var fluid := _material(Color("696450"), 0.15, 0.43)
+		_bar(Vector3(side * 0.219, 0.70, 0.205), Vector3(side * 0.219, 0.745, 0.205), 0.028, fluid, _front)
+		_bar(Vector3(side * 0.219, 0.745, 0.205), Vector3(side * 0.219, 0.753, 0.205), 0.03, polymer, _front)
+		_bar(Vector3(side * 0.252, 0.713, 0.211), Vector3(side * 0.288, 0.704, 0.186), 0.009, dark_metal, _front)
+		_bar(Vector3(side * 0.288, 0.704, 0.186), Vector3(side * 0.372, 0.687, 0.167), 0.006, dark_metal, _front)
+		_bar(Vector3(side * 0.372, 0.687, 0.167), Vector3(side * 0.393, 0.69, 0.18), 0.007, dark_metal, _front)
+		_hose([Vector3(side * 0.23, 0.704, 0.215), Vector3(side * 0.20, 0.64, 0.10), Vector3(side * 0.12, 0.53, 0.12), Vector3(side * 0.11, 0.20, 0.06)], 0.0035, polymer)
+	# Display face normal points upward and toward the rider, not skyward.
+	var instruments := Node3D.new()
+	instruments.name = "LiveInstrumentCluster"
+	instruments.position = Vector3(0, 0.745, 0.12)
+	instruments.rotation.x = -0.55
+	_front.add_child(instruments)
+	_beveled_panel(Vector2(0.196, 0.119), 0.025, 0.015, polymer, instruments)
+	var face := Node3D.new()
+	face.position.z = 0.013
+	instruments.add_child(face)
+	_beveled_panel(Vector2(0.177, 0.097), 0.001, 0.008, display_material, face)
+	_instrument_text("TRACK", Vector3(-0.061, 0.036, 0.002), 15, Color("94a8ae"), face)
+	_instrument_text("km/h", Vector3(-0.033, -0.034, 0.002), 13, Color("a7b4b9"), face)
+	_instrument_text("GEAR", Vector3(0.057, -0.034, 0.002), 12, Color("a7b4b9"), face)
+	_speed_label = _instrument_text("000", Vector3(-0.032, -0.009, 0.002), 56, Color("eaf3ee"), face)
+	_gear_label = _instrument_text("N", Vector3(0.057, -0.009, 0.002), 56, Color("eaf3ee"), face)
+	_rpm_label = _instrument_text("0 RPM", Vector3(0.032, 0.036, 0.002), 14, Color("a7b4b9"), face)
+	for i in range(24):
+		var lit := _material(Color("d62a31") if i >= 19 else Color("e0e9d8"), 0, 1)
+		lit.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var segment := _box(Vector3(0.0057, 0.005 + float(i) * 0.00012, 0.0005), Vector3(-0.077 + float(i) * 0.0066, 0.022, 0.002), lit, face)
+		_rpm_segments.append(segment)
+	update_instruments(0, 1500, 1)
 
 
 func _build_chassis() -> void:

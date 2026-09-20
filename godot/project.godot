@@ -3,6 +3,8 @@ config_version=5
 
 [application]
 config/name="Thunderhill"
+config/icon="res://icon.svg"
+config/version="0.1.0"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 
@@ -14,6 +16,7 @@ window/size/window_height_override=800
 window/stretch/mode="canvas_items"
 
 [rendering]
+textures/vram_compression/import_etc2_astc=true
 renderer/rendering_method="mobile"
 renderer/rendering_method.mobile="mobile"
 textures/default_filters/use_nearest_mipmap_filter=false

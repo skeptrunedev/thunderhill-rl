@@ -3,7 +3,7 @@ extends RefCounted
 ## Explicitly stepped, reduced order motorcycle prototype. SI units throughout.
 ## This is original code, not validated Ducati or tire manufacturer dynamics.
 
-const MODEL_VERSION := "reduced-order-rider-v1"
+const MODEL_VERSION := "reduced-order-banked-rider-v2"
 const GRAVITY := 9.81
 const GEAR_RATIOS := [38.0 / 14.0, 36.0 / 17.0, 33.0 / 19.0, 32.0 / 21.0, 30.0 / 22.0, 30.0 / 24.0]
 
@@ -80,6 +80,11 @@ var rear_brake_applied := 0.0
 var shift_remaining := 0.0
 var last_shift_command := 0
 var last_controls: Dictionary = {}
+var road_bank_rad := 0.0
+var lean_relative_road_rad := 0.0
+var gravity_forward_m_s2 := 0.0
+var gravity_right_m_s2 := 0.0
+var gravity_normal_m_s2 := GRAVITY
 
 
 func reset(start_position: Vector3, start_heading: float, initial_speed: float = 0.0) -> void:
@@ -114,6 +119,11 @@ func reset(start_position: Vector3, start_heading: float, initial_speed: float =
 	shift_remaining = 0.0
 	last_shift_command = 0
 	last_controls = {}
+	road_bank_rad = 0.0
+	lean_relative_road_rad = 0.0
+	gravity_forward_m_s2 = 0.0
+	gravity_right_m_s2 = 0.0
+	gravity_normal_m_s2 = GRAVITY
 
 
 func mass_kg() -> float:
@@ -126,6 +136,25 @@ func mass_kg() -> float:
 
 func forward() -> Vector3:
 	return Vector3(sin(heading), 0.0, -cos(heading))
+
+
+func surface_forward(normal: Vector3) -> Vector3:
+	# Lift the horizontal heading onto the plane without changing its azimuth.
+	# Orthogonal projection would also change azimuth on combined bank and grade.
+	var direction := forward()
+	direction.y = -(normal.x * direction.x + normal.z * direction.z) / normal.y
+	return direction.normalized()
+
+
+func _update_surface_frame(normal: Vector3, tangent: Vector3) -> void:
+	var right := tangent.cross(normal).normalized()
+	var upright := Vector3.UP.slide(tangent).normalized()
+	var upright_right := tangent.cross(upright).normalized()
+	road_bank_rad = atan2(normal.dot(upright_right), normal.dot(upright))
+	lean_relative_road_rad = lean - road_bank_rad
+	gravity_forward_m_s2 = GRAVITY * Vector3.DOWN.dot(tangent)
+	gravity_right_m_s2 = GRAVITY * Vector3.DOWN.dot(right)
+	gravity_normal_m_s2 = GRAVITY * normal.y
 
 
 func validate_controls(controls: Dictionary) -> String:
@@ -191,7 +220,8 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	on_track = bool(road_sample.on_track)
 	var normal: Vector3 = road_sample.normal
 	normal = normal.normalized()
-	var tangent := forward().slide(normal).normalized()
+	var tangent := surface_forward(normal)
+	_update_surface_frame(normal, tangent)
 	position.y = float(road_sample.height)
 	if crashed:
 		speed = move_toward(speed, 0.0, float(parameters.fall_slide_deceleration_m_s2) * dt)
@@ -217,16 +247,17 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	)
 	_update_drivetrain(dt, int(controls.get("shift", 0)))
 	var total_mass := mass_kg()
-	var normal_gravity := GRAVITY * maxf(normal.y, 0.0)
+	var normal_gravity := gravity_normal_m_s2
 	var normal_force := total_mass * normal_gravity
 	var friction := float(parameters.asphalt_friction if on_track else parameters.offtrack_friction)
 	var roll_resistance := float(
 		parameters.rolling_coefficient if on_track else parameters.offtrack_rolling_coefficient
 	)
-	# Prior tick tire acceleration estimates pitch load transfer. Forward drive unloads front.
+	# Subtract grade gravity from prior acceleration: gravity alone creates no
+	# contact driven pitch moment. Forward drive unloads the front axle.
 	var transfer := (
 		total_mass
-		* longitudinal_acceleration
+		* (longitudinal_acceleration - gravity_forward_m_s2)
 		* float(parameters.cg_height_m)
 		/ float(parameters.wheelbase_m)
 	)
@@ -272,24 +303,31 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	)
 	var lateral_capacity := front_lateral_capacity + rear_lateral_capacity
 	_update_steering(dt, float(controls.get("steer", 0.0)), normal_gravity)
+	# Steering specifies total acceleration in the local road plane. Gravity's
+	# cross slope component is already a force and must not consume tire grip.
 	requested_lateral_force_n = (
-		total_mass * speed * speed * tan(steering) / float(parameters.wheelbase_m)
+		total_mass
+		* (speed * speed * tan(steering) / float(parameters.wheelbase_m) - gravity_right_m_s2)
 	)
 	lateral_force_n = clampf(requested_lateral_force_n, -lateral_capacity, lateral_capacity)
-	lateral_acceleration = lateral_force_n / total_mass
+	lateral_acceleration = lateral_force_n / total_mass + gravity_right_m_s2
 	grip_utilization = absf(requested_lateral_force_n) / maxf(lateral_capacity, 1.0)
 	var drag := (
 		0.5 * float(parameters.air_density_kg_m3) * float(parameters.drag_area_m2) * speed * speed
 	)
 	var resistance := roll_resistance * normal_force * clampf(speed, 0.0, 1.0)
-	var grade_acceleration := Vector3.DOWN.dot(tangent) * GRAVITY
+	var grade_acceleration := gravity_forward_m_s2
 	longitudinal_acceleration = (
 		(front_force_n + rear_force_n - drag - resistance) / total_mass + grade_acceleration
 	)
 	var next_speed := maxf(0.0, speed + longitudinal_acceleration * dt)
-	# Roll equation includes the destabilizing gravity term and countersteering response.
+	# In the road frame, gravity and inertial acceleration both contribute.
+	# lean is world upright roll; relative lean determines contact clearance.
 	var roll_acceleration := (
-		(normal_gravity * sin(lean) - lateral_acceleration * cos(lean))
+		(
+			normal_gravity * sin(lean_relative_road_rad)
+			+ (gravity_right_m_s2 - lateral_acceleration) * cos(lean_relative_road_rad)
+		)
 		/ float(parameters.cg_height_m)
 	)
 	if assist_enabled and speed < float(parameters.low_speed_assist_threshold_m_s):
@@ -300,14 +338,18 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	lean_rate += roll_acceleration * dt
 	lean += lean_rate * dt
 	if speed > 0.1:
-		heading = wrapf(heading + lateral_acceleration / speed * dt, -PI, PI)
-	tangent = forward().slide(normal).normalized()
+		var horizontal_length_squared := tangent.x * tangent.x + tangent.z * tangent.z
+		var azimuth_rate := lateral_acceleration / speed * normal.y / horizontal_length_squared
+		heading = wrapf(heading + azimuth_rate * dt, -PI, PI)
+	tangent = surface_forward(normal)
+	_update_surface_frame(normal, tangent)
 	position += tangent * (speed + next_speed) * 0.5 * dt
 	speed = next_speed
-	if absf(lean) >= float(parameters.fall_angle_rad):
+	if absf(lean_relative_road_rad) >= float(parameters.fall_angle_rad):
 		crashed = true
 		crash_reason = "lean_contact"
-		lean = signf(lean) * float(parameters.fall_angle_rad)
+		lean_relative_road_rad = signf(lean_relative_road_rad) * float(parameters.fall_angle_rad)
+		lean = road_bank_rad + lean_relative_road_rad
 		lean_rate = 0.0
 	elapsed += dt
 	tick += 1
@@ -324,8 +366,14 @@ func _update_steering(dt: float, command: float, normal_gravity: float) -> void:
 			- float(parameters.rider_roll_damping) * lean_rate
 		)
 		var requested_acceleration := (
-			(normal_gravity * sin(lean) - float(parameters.cg_height_m) * roll_acceleration)
-			/ maxf(cos(lean), 0.25)
+			gravity_right_m_s2
+			+ (
+				(
+					normal_gravity * sin(lean_relative_road_rad)
+					- float(parameters.cg_height_m) * roll_acceleration
+				)
+				/ maxf(cos(lean_relative_road_rad), 0.25)
+			)
 		)
 		requested_steering = atan(
 			requested_acceleration * float(parameters.wheelbase_m) / (speed * speed)
@@ -386,6 +434,11 @@ func telemetry() -> Dictionary:
 		"speed": speed,
 		"lean": lean,
 		"lean_rate": lean_rate,
+		"road_bank_rad": road_bank_rad,
+		"lean_relative_road_rad": lean_relative_road_rad,
+		"gravity_forward_m_s2": gravity_forward_m_s2,
+		"gravity_right_m_s2": gravity_right_m_s2,
+		"gravity_normal_m_s2": gravity_normal_m_s2,
 		"target_lean": target_lean,
 		"steering": steering,
 		"gear": gear,
@@ -420,6 +473,7 @@ func telemetry() -> Dictionary:
 			"wheelies",
 			"airborne_motion",
 			"crash_contacts",
-			"banked_roll_dynamics"
+			"surface_curvature_normal_load",
+			"surface_frame_rotation_dynamics"
 		],
 	}
