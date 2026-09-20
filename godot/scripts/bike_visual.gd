@@ -575,6 +575,56 @@ func _hose(points: Array[Vector3], radius: float, material: Material) -> void:
 		_bar(vertices[i], vertices[i + 1], radius, material, _front)
 
 
+## Original molded vessel and screw cap, within the previous cylinder bounds.
+## Profile entries are height, outer radius and radial grip recess depth.
+## These proportions are visual estimates from footage, not measured parts.
+func _reservoir_shell(cap: bool) -> ArrayMesh:
+	var profile: Array[Vector3]
+	if cap:
+		profile = [
+			Vector3(-0.004, 0.028, 0),
+			Vector3(-0.003, 0.030, 0.0012),
+			Vector3(0.0025, 0.030, 0.0012),
+			Vector3(0.004, 0.0285, 0)
+		]
+	else:
+		profile = [
+			Vector3(-0.0225, 0.024, 0),
+			Vector3(-0.020, 0.027, 0),
+			Vector3(-0.017, 0.028, 0),
+			Vector3(0.017, 0.027, 0),
+			Vector3(0.021, 0.024, 0),
+			Vector3(0.0225, 0.024, 0)
+		]
+	var segments := 96 if cap else 64
+	var rings: Array[PackedVector3Array] = []
+	for section in profile:
+		var ring := PackedVector3Array()
+		for i in segments:
+			var angle := TAU * float(i) / segments
+			# Twenty four vertical grip recesses, formed in the cap itself.
+			var radius := section.y - section.z * (0.5 + 0.5 * cos(24 * angle))
+			ring.append(Vector3(cos(angle) * radius, section.x, sin(angle) * radius))
+		rings.append(ring)
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	surface.set_smooth_group(0)
+	for i in range(rings.size() - 1):
+		for j in segments:
+			var next := (j + 1) % segments
+			_triangle(surface, rings[i][j], rings[i][next], rings[i + 1][next])
+			_triangle(surface, rings[i][j], rings[i + 1][next], rings[i + 1][j])
+	# Flat sealed ends share positions with the shell, but not smoothed normals.
+	surface.set_smooth_group(-1)
+	for j in segments:
+		var next := (j + 1) % segments
+		_triangle(surface, Vector3(0, profile[0].x, 0), rings[0][next], rings[0][j])
+		_triangle(surface, Vector3(0, profile[-1].x, 0), rings[-1][j], rings[-1][next])
+	surface.index()
+	surface.generate_normals()
+	return surface.commit()
+
+
 func _build_cockpit() -> void:
 	# Proportions and silhouette are guided by the provided Ken Moto cockpit
 	# footage. This is original geometry and an original functional display,
@@ -679,19 +729,17 @@ func _build_cockpit() -> void:
 			dark_metal,
 			_front
 		)
-		_bar(
-			Vector3(side * 0.219, reservoir_base, 0.205),
-			Vector3(side * 0.219, reservoir_base + 0.045, 0.205),
-			0.028,
+		_mesh(
+			_reservoir_shell(false),
 			fluid,
-			_front
+			_front,
+			Vector3(side * 0.219, reservoir_base + 0.0225, 0.205)
 		)
-		_bar(
-			Vector3(side * 0.219, reservoir_base + 0.045, 0.205),
-			Vector3(side * 0.219, reservoir_base + 0.053, 0.205),
-			0.03,
+		_mesh(
+			_reservoir_shell(true),
 			polymer,
-			_front
+			_front,
+			Vector3(side * 0.219, reservoir_base + 0.049, 0.205)
 		)
 		_bar(
 			Vector3(side * 0.252, 0.713, 0.211),

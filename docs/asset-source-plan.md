@@ -17,6 +17,24 @@ Verified 19 September 2026. This is a source inventory for the first playable se
 
 Both [ambientCG's license](https://docs.ambientcg.com/license/) and [Poly Haven's license](https://polyhaven.com/license) permit modifying and redistributing the asset files under CC0. Keep asset licenses separate from the repository's MIT code license. Poly Haven's website text, previews, and other website content are not automatically covered by its asset license. Use the downloadable asset files for shipped materials.
 
+## Motorcycle mesh search, 20 September 2026
+
+No current generation Streetfighter mesh with verified unrestricted source
+redistribution rights was found in this search. This is a search result, not
+proof that no such asset exists.
+
+The [OUTPISTON model](https://sketchfab.com/3d-models/2024-ducati-streetfighter-v4-s-c501252f8af64c559bf91dc306c3a550)
+is explicitly labeled 2024. Its [publisher API](https://api.sketchfab.com/v3/models/c501252f8af64c559bf91dc306c3a550)
+reports 102,000 faces and CC Attribution NonCommercial ShareAlike 4.0.
+That license permits redistribution under its restrictions, but does not make
+the mesh an unrestricted open asset or MIT licensed content. Its generation
+also needs visual verification because the description mixes the 2024 label
+with specifications associated with the newer motorcycle. It was not imported.
+
+Continue authoring original geometry against the onboard footage and Ducati
+manufacturer references. A marketplace render or availability of a download
+does not establish source redistribution permission.
+
 ## Original assets to author
 
 Create curb meshes, edge paint, braking boards, simple barriers, and buildings from documented dimensions and observed proportions. Model their visible layout from the reference collection. Author neutral markings until any specific graphics have a verified source. Keep curb collision geometry separate from texture detail; a normal map must not stand in for a curb's physical height.

@@ -75,3 +75,23 @@ Verification: the chamfer mesh test, 2,170 envelope checks, 115 sweep checks,
 and macOS export pass. The neutral cockpit render was inspected in
 `artifacts/chamfered-cockpit.png`. This improves original authored geometry
 without claiming measured Ducati manufacturing dimensions.
+
+## Molded reservoir silhouettes
+
+The straight vessel cylinders and plain cap cylinders now use original revolved
+profiles with rounded shoulder transitions, beveled lids and 24 molded grip
+recesses per cap. These are visual estimates from the supplied footage. Vessel
+height and maximum radius remain 45 mm and 28 mm; lid height and maximum radius
+remain 8 mm and 30 mm. These values describe the authored assets, not Ducati
+measurements. The existing opaque fluid shader remains an appearance estimate.
+
+Closed ends have sharp normal boundaries and the side profiles use smooth
+normals. The cockpit test checks finite unit normals, nondegenerate triangles,
+clockwise winding, closed edges, positive volume and the previous radial and
+height bounds. The same 304 collision components now contain 52,838 unique
+input points. All 2,170 envelope checks and 115 sweep checks pass, as does the
+rendered rider camera check and macOS export.
+
+Neutral and leaned track captures were visually inspected in
+`artifacts/reservoir-cockpit.png` and `artifacts/reservoir-on-track.png`.
+This build has not yet been verified in a foreground native Mac session.
