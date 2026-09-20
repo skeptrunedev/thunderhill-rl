@@ -702,8 +702,10 @@ func _process(dt: float) -> void:
 	if not screenshot_path.is_empty() and Engine.get_process_frames() > 12:
 		var path := screenshot_path
 		screenshot_path = ""
+		var diagnostics := {"before_draw": _capture_state()}
 		var wait_begin := Time.get_ticks_usec()
 		await RenderingServer.frame_post_draw
+		diagnostics["after_draw"] = _capture_state()
 		var read_begin := Time.get_ticks_usec()
 		var screenshot := get_viewport().get_texture().get_image()
 		var read_end := Time.get_ticks_usec()
@@ -712,7 +714,7 @@ func _process(dt: float) -> void:
 			benchmark.record_capture("gpu_readback", read_begin, read_end)
 		# The worker exclusively owns the CPU image and never accesses the scene or GPU.
 		screenshot_thread = Thread.new()
-		var error := screenshot_thread.start(_save_screenshot.bind(screenshot, path))
+		var error := screenshot_thread.start(_save_screenshot.bind(screenshot, path, diagnostics))
 		if error == OK:
 			while screenshot_thread.is_alive():
 				await get_tree().process_frame
@@ -723,13 +725,73 @@ func _process(dt: float) -> void:
 		screenshot_thread = null
 		print("SCREENSHOT ", path, " result=", error)
 		if preview_mode:
-			get_tree().quit()
+			get_tree().quit(0 if error == OK else 1)
 
 
-static func _save_screenshot(screenshot: Image, path: String) -> Dictionary:
+func _capture_state() -> Dictionary:
+	var viewport := get_viewport()
+	return {
+		"process_frames": Engine.get_process_frames(),
+		"frames_drawn": Engine.get_frames_drawn(),
+		"window_can_draw": get_window().can_draw(),
+		"window_focused": get_window().has_focus(),
+		"window_visible": get_window().visible,
+		"window_mode": get_window().mode,
+		"camera_current": viewport.get_camera_3d() == camera,
+		"camera_position": [camera.position.x, camera.position.y, camera.position.z],
+		"camera_fov": camera.fov,
+		"objects":
+		viewport.get_render_info(
+			Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_OBJECTS_IN_FRAME
+		),
+		"primitives":
+		viewport.get_render_info(
+			Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_PRIMITIVES_IN_FRAME
+		),
+		"draw_calls":
+		viewport.get_render_info(
+			Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME
+		),
+		"platform": OS.get_name(),
+		"display_server": DisplayServer.get_name(),
+	}
+
+
+static func _save_screenshot(
+	screenshot: Image, path: String, diagnostics: Dictionary = {}
+) -> Dictionary:
 	var begin_usec := Time.get_ticks_usec()
-	var error := screenshot.save_png(path)
-	return {"error": error, "begin_usec": begin_usec, "end_usec": Time.get_ticks_usec()}
+	var file_error := ERR_INVALID_DATA
+	var validation := "empty_image"
+	if screenshot != null and not screenshot.is_empty():
+		# Preserve the original capture even when validation fails.
+		file_error = screenshot.save_png(path)
+		var rgb := screenshot.duplicate() as Image
+		rgb.convert(Image.FORMAT_RGB8)
+		var pixels := rgb.get_data()
+		validation = "all_black" if pixels.count(0) == pixels.size() else "nonblack"
+		diagnostics["width"] = screenshot.get_width()
+		diagnostics["height"] = screenshot.get_height()
+	diagnostics["validation"] = validation
+	diagnostics["file_error"] = file_error
+	var sidecar := FileAccess.open(path + ".json", FileAccess.WRITE)
+	var sidecar_error := FileAccess.get_open_error()
+	if sidecar != null:
+		sidecar.store_string(JSON.stringify(diagnostics, "  "))
+		sidecar.flush()
+		sidecar_error = sidecar.get_error()
+		sidecar.close()
+	var error := file_error
+	if error == OK and validation != "nonblack":
+		error = ERR_INVALID_DATA
+	if error == OK:
+		error = sidecar_error
+	return {
+		"error": error,
+		"validation": validation,
+		"begin_usec": begin_usec,
+		"end_usec": Time.get_ticks_usec()
+	}
 
 
 func _update_visual(dt: float) -> void:

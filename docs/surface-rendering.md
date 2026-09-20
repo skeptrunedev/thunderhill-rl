@@ -61,3 +61,17 @@ The painted finish uses the source grain with reduced contrast and normal intens
 Final Vulkan Mobile renders at 1920 by 1200 were inspected for the divider and the Cyclone approach (`artifacts/concrete-wall-close.png`, `artifacts/concrete-curb-preview.png`). Imports and completed renders reported no shader or resource errors. The wall geometry check passed, the rendered contact suite passed 92 checks and the shared human controls check passed with zero failures. The short local control run reported median frame interval 17.361 ms and p95 18.407 ms on the RTX 2080 Ti. Native Mac verification of this material revision remains pending.
 
 The native Mac attempt for build `7258532317ea-fb7b4e5ea76a` completed on Metal 4 without logged shader or resource errors, but its 1920 by 1200 PNG was entirely black. Successful PNG writing is not rendering acceptance. The screen was locked and older review instances were open; the cause of the blank frame is not established. Startup instrumentation reached scene ready at 169.353 seconds and the first post draw signal at 250.645 seconds. Evidence is `artifacts/mac-concrete-preview.png`, `artifacts/mac-concrete-preview.log` and `artifacts/mac-concrete-startup.jsonl`. Native material appearance remains unverified.
+
+### Capture validation and native diagnostics
+
+Screenshot capture now writes a JSON sidecar with camera selection, window draw
+availability and focus, frame counters, and viewport objects, primitives and draw
+calls sampled before and after the draw signal. The CPU worker preserves the PNG,
+rejects empty or entirely black RGB data, and reports file or sidecar write errors.
+Preview mode exits unsuccessfully for a failed capture. A nonblack image alone is
+not an appearance acceptance test.
+
+The synthetic capture test covers RGB and RGBA black images, a colored pixel,
+empty images and failed output writes. A Linux Mobile rendered preview at
+1280 by 800 produced a visually inspected cockpit image and 183 draw calls.
+The previous black Mac capture remains unexplained pending native diagnostics.
