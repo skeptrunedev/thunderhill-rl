@@ -14,3 +14,7 @@ A new Godot motorcycle racing environment for training a language model on Thund
 Current status: reference evaluation and development environment preparation. No playable game or trained racing model yet.
 
 See [reference evaluation](docs/reference-evaluation.md) and [build sequence](docs/build-sequence.md).
+
+## License
+
+Original project code and documentation use the [MIT license](LICENSE). Referenced projects, models, footage, maps, and assets retain their own licenses and are not bundled here. Godot is [MIT licensed](https://godotengine.org/license/).
