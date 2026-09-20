@@ -69,6 +69,13 @@ func _ready() -> void:
 			preview_mode = true
 		if arg.begins_with("--replay="):
 			replay_path = arg.trim_prefix("--replay=")
+	if (
+		"--qa-controls" in OS.get_cmdline_user_args()
+		and (agent_mode or preview_mode or qa_target > 0 or not replay_path.is_empty())
+	):
+		push_error("Control checks require an ordinary human game session")
+		get_tree().quit(2)
+		return
 	track = TrackScript.new()
 	add_child(track)
 	var horizon = preload("res://scripts/horizon.gd").new()
@@ -133,6 +140,15 @@ func _ready() -> void:
 			{"port": server_port, "episode_id": episode_id, "track_samples": track.points.size()}
 		)
 	)
+
+	if "--qa-controls" in OS.get_cmdline_user_args():
+		_run_control_checks.call_deferred()
+
+
+func _run_control_checks() -> void:
+	var checks = preload("res://scripts/control_checks.gd").new()
+	var failures: int = await checks.run(self)
+	get_tree().quit(0 if failures == 0 else 1)
 
 
 func _environment() -> void:
