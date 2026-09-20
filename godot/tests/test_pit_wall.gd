@@ -42,6 +42,13 @@ func _initialize() -> void:
 	assert(
 		vertices.has(Vector3(0, 1.8, 10)), "Independent top elevation must follow changing height"
 	)
+	var folded := preload("res://scripts/pit_wall.gd").new()
+	var folded_profile: Dictionary = profile.duplicate(true)
+	folded_profile.rows[1].road_inward_xz = [-1, 0]
+	folded.build(track, folded_profile)
+	assert(not folded.initialization_error.is_empty(), "Folded solid must be rejected")
+	assert(folded.get_child_count() == 0, "Invalid solid must not leave partial geometry")
+	folded.free()
 	var bad := preload("res://scripts/pit_wall.gd").new()
 	profile.origin = {}
 	bad.build(track, profile)

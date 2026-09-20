@@ -1,5 +1,9 @@
 extends Node3D
-## Historical visual wall profile. Width is estimated and collision is not modeled.
+## Historical wall profile with solid collision matching its triangulated shell.
+## Width remains estimated. Motorcycle contact response is integrated separately.
+
+const COLLISION_LAYER := 1 << 4
+const QUAD_TRIANGLES := [0, 1, 2, 0, 2, 3]
 
 var initialization_error := ""
 
@@ -51,6 +55,9 @@ func build(track: Node3D, profile: Dictionary) -> void:
 				return
 			stations.append(stations[-1] + distance)
 		rings.append(ring)
+	var collision := _build_collision(rings)
+	if collision == null:
+		return
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	surface.set_smooth_group(-1)
@@ -87,10 +94,73 @@ func build(track: Node3D, profile: Dictionary) -> void:
 	instance.mesh = surface.commit()
 	instance.material_override = material
 	add_child(instance)
+	add_child(collision)
 
 
 func _quad(surface: SurfaceTool, points: Array, uv: Array) -> void:
-	for corner in [0, 1, 2, 0, 2, 3]:
+	for corner in QUAD_TRIANGLES:
 		surface.set_color(Color.WHITE)
 		surface.set_uv(uv[corner])
 		surface.add_vertex(points[corner])
+
+
+func _build_collision(rings: Array) -> StaticBody3D:
+	var pieces: Array = []
+	for section in rings.size() - 1:
+		var first: Array = rings[section]
+		var second: Array = rings[section + 1]
+		var footprint := PackedVector2Array()
+		for p: Vector3 in [first[0], second[0], second[3], first[3]]:
+			footprint.append(Vector2(p.x, p.z))
+		var orientation := 0.0
+		for i in 4:
+			var cross_value := (footprint[(i + 1) % 4] - footprint[i]).cross(
+				footprint[(i + 2) % 4] - footprint[(i + 1) % 4]
+			)
+			if absf(cross_value) < 0.00000001 or (i > 0 and cross_value * orientation <= 0):
+				initialization_error = "Pit wall section has a folded or degenerate footprint"
+				return null
+			orientation = cross_value
+		var center := Vector3.ZERO
+		for p: Vector3 in first + second:
+			center += p * 0.125
+		var faces: Array = []
+		for side in 4:
+			var next := (side + 1) % 4
+			faces.append([first[side], second[side], second[next], first[next]])
+		faces.append(first)
+		var end_cap: Array = second.duplicate()
+		end_cap.reverse()
+		faces.append(end_cap)
+		for face: Array in faces:
+			for triangle in [0, 3]:
+				var a: Vector3 = face[QUAD_TRIANGLES[triangle]]
+				var b: Vector3 = face[QUAD_TRIANGLES[triangle + 1]]
+				var c: Vector3 = face[QUAD_TRIANGLES[triangle + 2]]
+				# Godot front faces wind clockwise. The conventional cross product
+				# points inward, so this is positive for a center in the shell kernel.
+				var six_volume := (b - a).cross(c - a).dot(center - a)
+				if not is_finite(six_volume) or six_volume <= 0.000000001:
+					initialization_error = "Pit wall section cannot form a solid collision volume"
+					return null
+				pieces.append(
+					{
+						"center": center,
+						"points":
+						PackedVector3Array([Vector3.ZERO, a - center, b - center, c - center])
+					}
+				)
+	var body := StaticBody3D.new()
+	body.name = "PitDividerCollision"
+	body.collision_layer = COLLISION_LAYER
+	body.collision_mask = 0
+	body.set_meta("obstacle_kind", "pit_wall")
+	for piece: Dictionary in pieces:
+		var shape := ConvexPolygonShape3D.new()
+		shape.margin = 0.0
+		shape.points = piece.points
+		var instance := CollisionShape3D.new()
+		instance.shape = shape
+		instance.position = piece.center
+		body.add_child(instance)
+	return body
