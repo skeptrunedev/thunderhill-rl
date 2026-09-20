@@ -13,6 +13,8 @@ A new Godot motorcycle racing environment for training a language model on Thund
 
 Current status: reference evaluation and development environment preparation. No playable game or trained racing model yet.
 
+Current priority: build and review the playable game before starting any RL. The first bike is the 2026 Ducati Streetfighter V4S. The [reference readiness report](docs/reference-readiness.md) records inspected footage, acquired terrain and materials, the M3 Pro Mac target, and remaining realism gaps.
+
 See [reference evaluation](docs/reference-evaluation.md) and [build sequence](docs/build-sequence.md).
 
 The [RL game design contract](docs/rl-game-contract.md) defines the information the simulator and trainer must capture, action and reward semantics, isolated rollouts, and checkpoint replay requirements.

@@ -1,0 +1,284 @@
+{
+  "checked_utc": "2026-09-19",
+  "area_bbox_wgs84": [
+    -122.338,
+    39.534,
+    -122.325,
+    39.547
+  ],
+  "status": "Source metadata verified. Actual OSM snapshot and cropped 1 meter terrain acquired in ignored artifacts/reference/geometry using tools/fetch_geometry.py. Full regional raster and LAZ tiles not included. No post repave survey acquired.",
+  "catalog_queries": [
+    {
+      "dataset": "Digital Elevation Model (DEM) 1 meter",
+      "url": "https://tnmaccess.nationalmap.gov/api/v1/products?datasets=Digital+Elevation+Model+%28DEM%29+1+meter&bbox=-122.338%2C39.534%2C-122.325%2C39.547&max=100",
+      "response_sha256": "804165bc64405a228e992dc708a8ab9dfdf8513dc1810110adef267179732723",
+      "total": 2,
+      "products": [
+        {
+          "title": "USGS 1 Meter 10 x55y438 CA_NorthCoastRanges_B23",
+          "sourceId": "683e5a4fd4be0234870fdf99",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/683e5a4fd4be0234870fdf99",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/1_meter/geotiff/CA_NorthCoastRanges_B23/USGS_1M_10_x55y438_CA_NorthCoastRanges_B23.xml",
+          "publicationDate": "2025-05-30",
+          "sizeInBytes": 337547242,
+          "format": "GeoTIFF",
+          "downloadURL": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CA_NorthCoastRanges_B23/TIFF/USGS_1M_10_x55y438_CA_NorthCoastRanges_B23.tif",
+          "boundingBox": {
+            "minX": -122.41864672399998,
+            "maxX": -122.30148142899998,
+            "minY": 39.47750283700003,
+            "maxY": 39.568243016000054
+          }
+        },
+        {
+          "title": "USGS one meter x55y438 CA NoCAL Wildfires B2 2018",
+          "sourceId": "5e228311e4b014c853044da0",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/5e228311e4b014c853044da0",
+          "vendorMetaUrl": "http://nationalmap.gov/3DEP/3dep_prodmetadata.html",
+          "publicationDate": "2020-01-15",
+          "sizeInBytes": 364376086,
+          "format": "GeoTIFF",
+          "downloadURL": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/CA_NoCAL_Wildfires_B2_2018/TIFF/USGS_1m_x55y438_CA_NoCAL_Wildfires_B2_2018.tif",
+          "boundingBox": {
+            "minX": -122.41796438346533,
+            "maxX": -122.30231426075234,
+            "minY": 39.47744835859268,
+            "maxY": 39.568297426046875
+          }
+        }
+      ]
+    },
+    {
+      "dataset": "Lidar Point Cloud (LPC)",
+      "url": "https://tnmaccess.nationalmap.gov/api/v1/products?datasets=Lidar+Point+Cloud+%28LPC%29&bbox=-122.338%2C39.534%2C-122.325%2C39.547&max=100",
+      "response_sha256": "d677c2616edfec30f96deb0a20cc776b636421bc5e6edcfbba5de61ef172c113",
+      "total": 9,
+      "products": [
+        {
+          "title": "USGS Lidar Point Cloud CA_NoCAL_3DEP_Supp_Funding_2018_D18 w2214n2143",
+          "sourceId": "5e313d19e4b0a79317d6959d",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/5e313d19e4b0a79317d6959d",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NoCAL_Wildfires_B2_2018/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2214n2143.xml",
+          "publicationDate": "2020-01-24",
+          "sizeInBytes": 11516435,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NoCAL_3DEP_Supp_Funding_2018_D18/CA_NoCAL_Wildfires_B2_2018/LAZ/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2214n2143.laz",
+          "boundingBox": {
+            "minX": -122.33178520101035,
+            "maxX": -122.31728065054537,
+            "minY": 39.530203721713775,
+            "maxY": 39.54122700746488
+          }
+        },
+        {
+          "title": "USGS Lidar Point Cloud CA_NoCAL_3DEP_Supp_Funding_2018_D18 w2214n2144",
+          "sourceId": "5e313d19e4b0a79317d695a1",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/5e313d19e4b0a79317d695a1",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NoCAL_Wildfires_B2_2018/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2214n2144.xml",
+          "publicationDate": "2020-01-24",
+          "sizeInBytes": 15733032,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NoCAL_3DEP_Supp_Funding_2018_D18/CA_NoCAL_Wildfires_B2_2018/LAZ/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2214n2144.laz",
+          "boundingBox": {
+            "minX": -122.33499750477604,
+            "maxX": -122.32049095726174,
+            "minY": 39.5387865953108,
+            "maxY": 39.549810119964086
+          }
+        },
+        {
+          "title": "USGS Lidar Point Cloud CA_NoCAL_3DEP_Supp_Funding_2018_D18 w2215n2143",
+          "sourceId": "5e313d47e4b0a79317d6973d",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/5e313d47e4b0a79317d6973d",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NoCAL_Wildfires_B2_2018/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2215n2143.xml",
+          "publicationDate": "2020-01-24",
+          "sizeInBytes": 11382551,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NoCAL_3DEP_Supp_Funding_2018_D18/CA_NoCAL_Wildfires_B2_2018/LAZ/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2215n2143.laz",
+          "boundingBox": {
+            "minX": -122.34307868134142,
+            "maxX": -122.3285737735884,
+            "minY": 39.52776258852803,
+            "maxY": 39.538786570901564
+          }
+        },
+        {
+          "title": "USGS Lidar Point Cloud CA_NoCAL_3DEP_Supp_Funding_2018_D18 w2215n2144",
+          "sourceId": "5e313d47e4b0a79317d69741",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/5e313d47e4b0a79317d69741",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NoCAL_Wildfires_B2_2018/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2215n2144.xml",
+          "publicationDate": "2020-01-24",
+          "sizeInBytes": 9582679,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NoCAL_3DEP_Supp_Funding_2018_D18/CA_NoCAL_Wildfires_B2_2018/LAZ/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2215n2144.laz",
+          "boundingBox": {
+            "minX": -122.34629221871572,
+            "maxX": -122.33178520101035,
+            "minY": 39.536345165131955,
+            "maxY": 39.54736941077845
+          }
+        },
+        {
+          "title": "USGS Lidar Point Cloud CA_NoCAL_3DEP_Supp_Funding_2018_D18 w2215n2145",
+          "sourceId": "5e313d48e4b0a79317d69745",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/5e313d48e4b0a79317d69745",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NoCAL_Wildfires_B2_2018/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2215n2145.xml",
+          "publicationDate": "2020-01-24",
+          "sizeInBytes": 9554966,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NoCAL_3DEP_Supp_Funding_2018_D18/CA_NoCAL_Wildfires_B2_2018/LAZ/USGS_LPC_CA_NoCAL_3DEP_Supp_Funding_2018_D18_w2215n2145.laz",
+          "boundingBox": {
+            "minX": -122.34950652001405,
+            "maxX": -122.33499750477604,
+            "minY": 39.54492768348052,
+            "maxY": 39.55595216829128
+          }
+        },
+        {
+          "title": "USGS Lidar Point Cloud CA_NorthCoastRanges_B23 556376",
+          "sourceId": "682d310dd4be021a0d6bf8ef",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/682d310dd4be021a0d6bf8ef",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NorthCoastRanges_1_B23/USGS_LPC_CA_NorthCoastRanges_B23_556376.xml",
+          "publicationDate": "2025-05-17",
+          "sizeInBytes": 40100814,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NorthCoastRanges_B23/CA_NorthCoastRanges_1_B23/LAZ/USGS_LPC_CA_NorthCoastRanges_B23_556376.laz",
+          "boundingBox": {
+            "minX": -122.3425658649,
+            "maxX": -122.3308442143,
+            "minY": 39.5317333312,
+            "maxY": 39.5408095602
+          }
+        },
+        {
+          "title": "USGS Lidar Point Cloud CA_NorthCoastRanges_B23 556377",
+          "sourceId": "682d35f4d4be021a0d6c1433",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/682d35f4d4be021a0d6c1433",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NorthCoastRanges_1_B23/USGS_LPC_CA_NorthCoastRanges_B23_556377.xml",
+          "publicationDate": "2025-05-17",
+          "sizeInBytes": 42351545,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NorthCoastRanges_B23/CA_NorthCoastRanges_1_B23/LAZ/USGS_LPC_CA_NorthCoastRanges_B23_556377.laz",
+          "boundingBox": {
+            "minX": -122.3424808635,
+            "maxX": -122.33075767,
+            "minY": 39.5407432404,
+            "maxY": 39.5498194763
+          }
+        },
+        {
+          "title": "USGS Lidar Point Cloud CA_NorthCoastRanges_B23 557376",
+          "sourceId": "682d3918d4be021a0d6c3785",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/682d3918d4be021a0d6c3785",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NorthCoastRanges_1_B23/USGS_LPC_CA_NorthCoastRanges_B23_557376.xml",
+          "publicationDate": "2025-05-17",
+          "sizeInBytes": 43220774,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NorthCoastRanges_B23/CA_NorthCoastRanges_1_B23/LAZ/USGS_LPC_CA_NorthCoastRanges_B23_557376.laz",
+          "boundingBox": {
+            "minX": -122.3309306025,
+            "maxX": -122.3192074867,
+            "minY": 39.5316657772,
+            "maxY": 39.5407431496
+          }
+        },
+        {
+          "title": "USGS Lidar Point Cloud CA_NorthCoastRanges_B23 557377",
+          "sourceId": "682d34b5d4be021a0d6c0727",
+          "metaUrl": "https://www.sciencebase.gov/catalog/item/682d34b5d4be021a0d6c0727",
+          "vendorMetaUrl": "https://thor-f5.er.usgs.gov/ngtoc/metadata/waf/elevation/lidar_point_cloud/laz/CA_NorthCoastRanges_1_B23/USGS_LPC_CA_NorthCoastRanges_B23_557377.xml",
+          "publicationDate": "2025-05-17",
+          "sizeInBytes": 77673050,
+          "format": "LAZ",
+          "downloadURL": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/CA_NorthCoastRanges_B23/CA_NorthCoastRanges_1_B23/LAZ/USGS_LPC_CA_NorthCoastRanges_B23_557377.laz",
+          "boundingBox": {
+            "minX": -122.3308440971,
+            "maxX": -122.3191194377,
+            "minY": 39.5406756649,
+            "maxY": 39.5497530446
+          }
+        }
+      ]
+    }
+  ],
+  "osm": {
+    "url": "https://www.openstreetmap.org/api/0.6/way/28825115/full.json",
+    "way_id": 28825115,
+    "version": 18,
+    "timestamp": "2025-05-11T11:29:01Z",
+    "node_count_including_closure": 260,
+    "tags": {
+      "highway": "raceway",
+      "lit": "no",
+      "name": "Thunderhill Raceway",
+      "oneway": "yes",
+      "source": "yahoo",
+      "sport": "motor",
+      "surface": "asphalt"
+    },
+    "calculated_spherical_polyline_length_m": 4608.667599656424,
+    "license_url": "https://www.openstreetmap.org/copyright",
+    "license": "ODbL 1.0, separate from repository MIT license",
+    "limitations": [
+      "Approximate centerline, not surveyed boundaries",
+      "Predates repave",
+      "Course variant needs comparison against rider video and official maps"
+    ],
+    "geometry_not_redistributed": true,
+    "ordered_node_snapshot_sha256": "11e98648e3feb116eb788d81337dbbd1316d0a35ab118de002dd5cf839a3bf30"
+  },
+  "elevation_probe": {
+    "url": "https://epqs.nationalmap.gov/v1/json?x=-122.33146&y=39.5404&units=Meters&wkid=4326&includeDate=true",
+    "response": {
+      "location": {
+        "x": -122.33146,
+        "y": 39.5404,
+        "spatialReference": {
+          "wkid": 4326,
+          "latestWkid": 4326
+        }
+      },
+      "locationId": 0,
+      "value": "91.258209229",
+      "rasterId": 75386,
+      "resolution": 1,
+      "attributes": {
+        "AcquisitionDate": "11/5/2023"
+      }
+    }
+  },
+  "preferred_terrain_source": {
+    "project": "CA_NorthCoastRanges_B23",
+    "xml_time_range": [
+      "2023-09-16",
+      "2023-12-15"
+    ],
+    "metadata_time_current_field": "publication date (ambiguous, EPQS identifies local acquisition 2023-11-05)",
+    "grid_spacing_m": 1,
+    "horizontal_crs": "NAD83 / UTM zone 10N",
+    "vertical_datum": "NAVD88",
+    "elevation_units": "meters",
+    "license": "Public domain, per USGS product metadata",
+    "post_repave": false
+  },
+  "course_variants": {
+    "main_loop_contains_way": 892530996,
+    "main_loop_variant": "Consistent with Cyclone geometry, needs video/map confirmation",
+    "hill_bypass": {
+      "way_id": 1538451376,
+      "version": 1,
+      "timestamp": "2026-07-13T17:18:11Z",
+      "url": "https://www.openstreetmap.org/api/0.6/way/1538451376/full.json",
+      "shared_end_node_ids": [
+        8295518028,
+        8295518046
+      ]
+    },
+    "alternative_branch": {
+      "way_id": 892530996,
+      "version": 4,
+      "url": "https://www.openstreetmap.org/api/0.6/way/892530996/full.json"
+    },
+    "warning": "OSM edit date is not construction or survey date."
+  }
+}

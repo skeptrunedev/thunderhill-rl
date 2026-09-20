@@ -1,0 +1,121 @@
+{
+  "status": "Candidate materials, not a verified Thunderhill surface match",
+  "resolution": "1K",
+  "files": [
+    {
+      "asset": "Asphalt010",
+      "map": "archive",
+      "url": "https://ambientcg.com/get?file=Asphalt010_1K-JPG.zip",
+      "filename": "Asphalt010_1K-JPG.zip",
+      "metadata_url": "https://ambientcg.com/api/v2/full_json?id=Asphalt010&include=downloadData",
+      "source": "https://ambientcg.com/a/Asphalt010",
+      "author": "ambientCG / Lennart Demes",
+      "license": "CC0-1.0",
+      "license_url": "https://docs.ambientcg.com/license/",
+      "sha256": "716f9433ddef61ea025d3859a3b06de2cbff54a293b091bf3d736b3787071e7b",
+      "bytes": 8410675,
+      "extracted_maps": [
+        {
+          "filename": "Asphalt010_1K-JPG_Color.jpg",
+          "sha256": "412598f9cfa046ff222a76ecd66fde576e42f5141938ffe3be2e2c0e9082e5c8",
+          "bytes": 1093417
+        },
+        {
+          "filename": "Asphalt010_1K-JPG_NormalGL.jpg",
+          "sha256": "2dce239d12302f29d57ad92fe92377ca0533a17628a535a5d07677c10884617e",
+          "bytes": 2105657
+        },
+        {
+          "filename": "Asphalt010_1K-JPG_Roughness.jpg",
+          "sha256": "5f0f9ee453565de9fdf838140a425f59b215ca3c87a3c269e39247d6f688c13f",
+          "bytes": 746915
+        }
+      ]
+    },
+    {
+      "asset": "brown_mud_dry",
+      "map": "Diffuse",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_dry/brown_mud_dry_diff_1k.jpg",
+      "filename": "brown_mud_dry_diff_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/brown_mud_dry",
+      "source": "https://polyhaven.com/a/brown_mud_dry",
+      "author": "Rob Tuytel",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "0c0ad82fec60f091690c69c23657cb74",
+      "sha256": "a56281b644de614787340f3db45e28d2f72ec32fc19a442f99002bae0ab11398",
+      "bytes": 920456
+    },
+    {
+      "asset": "brown_mud_dry",
+      "map": "nor_gl",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_dry/brown_mud_dry_nor_gl_1k.jpg",
+      "filename": "brown_mud_dry_nor_gl_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/brown_mud_dry",
+      "source": "https://polyhaven.com/a/brown_mud_dry",
+      "author": "Rob Tuytel",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "a842517bea5187ccbceb69fd26629d1e",
+      "sha256": "4dd82ecb3e810d4de49d34c7d6cc30152129434a58b3bd786bc9952bc8874877",
+      "bytes": 1539092
+    },
+    {
+      "asset": "brown_mud_dry",
+      "map": "Rough",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_dry/brown_mud_dry_rough_1k.jpg",
+      "filename": "brown_mud_dry_rough_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/brown_mud_dry",
+      "source": "https://polyhaven.com/a/brown_mud_dry",
+      "author": "Rob Tuytel",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "4e047a601af768eded6468faab4ec615",
+      "sha256": "31fb99629f533924b1150a7dac8d9432de85450bb45cda5033e3eb723f8dda04",
+      "bytes": 390385
+    },
+    {
+      "asset": "withered_grass",
+      "map": "Diffuse",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/withered_grass/withered_grass_diff_1k.jpg",
+      "filename": "withered_grass_diff_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/withered_grass",
+      "source": "https://polyhaven.com/a/withered_grass",
+      "author": "Charlotte Baglioni",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "a6e00946839a9ab1975457ae4a39823b",
+      "sha256": "8bebfb639ef74f651bc445526c46c845beee52a86d831848b82eb2bbbf2d98ee",
+      "bytes": 1138384
+    },
+    {
+      "asset": "withered_grass",
+      "map": "nor_gl",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/withered_grass/withered_grass_nor_gl_1k.jpg",
+      "filename": "withered_grass_nor_gl_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/withered_grass",
+      "source": "https://polyhaven.com/a/withered_grass",
+      "author": "Charlotte Baglioni",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "1d86c19a4dd4826eeb6db9653f8736bb",
+      "sha256": "5afc122862b4c91fa5fc4d4290e1b61d5abfdfa36a2ae05b754b5a8e32e9a110",
+      "bytes": 1472149
+    },
+    {
+      "asset": "withered_grass",
+      "map": "Rough",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/withered_grass/withered_grass_rough_1k.jpg",
+      "filename": "withered_grass_rough_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/withered_grass",
+      "source": "https://polyhaven.com/a/withered_grass",
+      "author": "Charlotte Baglioni",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "bd4219a20ed41f88098166497cdbc05d",
+      "sha256": "81057bab0a684eed0ea2189ee522d4a982f65eec5a40b4b8762a28d217c1ac75",
+      "bytes": 824502
+    }
+  ],
+  "download_bytes": 14695643
+}
