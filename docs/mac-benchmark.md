@@ -41,3 +41,11 @@ Clean build `ff55d1fc3a64-59d626e0b262` completed the same native full circuit w
 Across 31,951 process intervals, median was 10.213 ms, p95 14.938 ms, p99 17.356 ms and maximum 60.695 ms. Wall time was 335.902994 seconds. The only interval above the diagnostic threshold began at 246.358645 seconds. This is close to the previous instrumented run's late stall at 246.293160 seconds, and warrants separate investigation of location dependent work. No cause is established yet. The large initial interval from the previous run did not recur; that alone does not establish a startup fix.
 
 Evidence is `artifacts/mac-worker-benchmark.log` and `artifacts/mac-worker-benchmark.png`. The installed build is `~/Applications/ThunderhillReview/ff55d1f/Thunderhill.app`. Existing human review windows remained open. This run demonstrates removal of the synchronous PNG saving stall, not certified display pacing, final physical realism or human control acceptance.
+
+## Continuous wall contact build
+
+The universal app from clean commit `271a52caadc3fb4ad57e25b19fa6b9edc3064517`, build `271a52caadc3-dff12e1d81cf`, was installed on the owner's M3 Pro. The received archive SHA256 matched `36652227ffd441d798fba8c774a386f173cebcf9c01a270039eff18217fa05df`, and macOS code signature verification passed.
+
+The shared native control check exited successfully with `HUMAN_CONTROLS_CHECK failures=0`. It exercised injected throttle, steering, both brakes, camera changes, pause and reset through the exported game. The 72 process frame intervals had median 66.667 ms and p95 74.723 ms. The screen was locked and six older review instances were open. Startup took several minutes; a process sample captured a wait inside Metal compilation during texture upload, while a subsequent sample showed progress beyond that wait. This does not isolate the full startup delay or establish acceptable foreground performance.
+
+Evidence is `artifacts/Thunderhill-controls-271a52c.log` and `artifacts/Thunderhill-startup-sample-271a52c.txt`. Installed app: `~/Applications/ThunderhillReview/271a52c/Thunderhill.app`. These checks do not include a native wall impact benchmark or physical keyboard delivery.

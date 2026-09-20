@@ -35,3 +35,11 @@ The full circuit diagnostic completed 40,383 ticks and all 32 ordered gates in 3
 The short rendered human control check passed with zero failures at 1920 by 1200 on the local RTX 2080 Ti. It recorded a median frame interval of 17.330 ms and p95 of 18.114 ms. This does not establish Mac or whole circuit performance.
 
 In an isolated local query diagnostic, clear broadphase rejection averaged 0.01138 ms. Ten authored bike steps parallel to a nearby wall had median 1.594 ms and maximum 1.764 ms. A complex authored helmet contact took 315.407 ms, which remains a material stall to optimize. Unbundled development recordings also hash the visual, envelope and sweep scripts, because edits to the artwork change the collision inputs. Native collision performance, physical impact dynamics and a polished crash presentation remain unfinished.
+
+## Performance investigation
+
+Optional `--profile-sweep` on the sweep and wall integration tests records vertex preparation, hull construction, engine query and initial overlap costs. The flag is diagnostic only and does not change the returned contact or recorded transition.
+
+The baseline helmet fixture spent approximately 190 ms constructing hulls, 68 ms preparing 263,424 input vertices, and 41 ms querying the resulting hulls. This identifies repeated padded hull construction as the main target. A larger proxy is not automatically faster: an inscribed sphere based endpoint expansion reduced the helmet timing but increased the historical wall step to 394.804 ms. A cached fixed hull proxy measured 521.151 ms and a hybrid measured 380.167 ms. These variants generated extra candidate intervals and are not accepted performance improvements.
+
+A separate checkout tested the engine's Jolt backend. The spherical query margin variant measured approximately 69 ms for the helmet and 54 ms for the historical wall, but failed the existing helmet uncertainty check. Both that variant and the original cube expansion emitted hull construction errors during the historical wall fixture. The subsequent null shape could produce an empty intersection result. Passing integration assertions alone therefore did not establish safe collision detection. This experiment is not grounds to switch the game's physics backend.
