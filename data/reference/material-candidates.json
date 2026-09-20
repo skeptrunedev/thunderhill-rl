@@ -115,7 +115,52 @@
       "publisher_md5": "bd4219a20ed41f88098166497cdbc05d",
       "sha256": "81057bab0a684eed0ea2189ee522d4a982f65eec5a40b4b8762a28d217c1ac75",
       "bytes": 824502
+    },
+    {
+      "asset": "rough_concrete",
+      "map": "Diffuse",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rough_concrete/rough_concrete_diff_1k.jpg",
+      "filename": "rough_concrete_diff_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/rough_concrete",
+      "source": "https://polyhaven.com/a/rough_concrete",
+      "author": "Dimitrios Savva",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "82909f2db1e0453500703ae54e806f5c",
+      "sha256": "dd7fc03e152eb8c2fd511248aa2e9bf7428a645bd0e0b74ac1d887ad136cb0bc",
+      "bytes": 1042065,
+      "published_width_m": 1.2
+    },
+    {
+      "asset": "rough_concrete",
+      "map": "nor_gl",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rough_concrete/rough_concrete_nor_gl_1k.jpg",
+      "filename": "rough_concrete_nor_gl_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/rough_concrete",
+      "source": "https://polyhaven.com/a/rough_concrete",
+      "author": "Dimitrios Savva",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "61f785d44cdbf0b9f3bc68e471177358",
+      "sha256": "54c85854ad5cafb16840df91a605c857bdf3d07fa79f11921c8327fccf6423ae",
+      "bytes": 1447537,
+      "published_width_m": 1.2
+    },
+    {
+      "asset": "rough_concrete",
+      "map": "Rough",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rough_concrete/rough_concrete_rough_1k.jpg",
+      "filename": "rough_concrete_rough_1k.jpg",
+      "metadata_url": "https://api.polyhaven.com/files/rough_concrete",
+      "source": "https://polyhaven.com/a/rough_concrete",
+      "author": "Dimitrios Savva",
+      "license": "CC0-1.0",
+      "license_url": "https://polyhaven.com/license",
+      "publisher_md5": "4b530c64e200c3190f527ccc04a4c919",
+      "sha256": "2d392a3e0d44087ddecc0cd3fd27367a6cc0c16f94bbba2e8fbfbdf77eb105be",
+      "bytes": 566436,
+      "published_width_m": 1.2
     }
   ],
-  "download_bytes": 14695643
+  "download_bytes": 17751681
 }

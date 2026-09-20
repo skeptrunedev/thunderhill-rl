@@ -40,7 +40,8 @@ def resolve():
                 "filename": chosen["fileName"], "metadata_url": url,
                 "source": "https://ambientcg.com/a/Asphalt010", "author": "ambientCG / Lennart Demes",
                 "license": "CC0-1.0", "license_url": "https://docs.ambientcg.com/license/"}]
-    for asset, author in [("brown_mud_dry", "Rob Tuytel"), ("withered_grass", "Charlotte Baglioni")]:
+    for asset, author in [("brown_mud_dry", "Rob Tuytel"), ("withered_grass", "Charlotte Baglioni"),
+                          ("rough_concrete", "Dimitrios Savva")]:
         url = "https://api.polyhaven.com/files/" + asset
         data = json.loads(fetch(url))
         for channel in ("Diffuse", "nor_gl", "Rough"):
@@ -50,6 +51,8 @@ def resolve():
                             "source": "https://polyhaven.com/a/" + asset, "author": author,
                             "license": "CC0-1.0", "license_url": "https://polyhaven.com/license",
                             "publisher_md5": selected["md5"]})
+            if asset == "rough_concrete":
+                entries[-1]["published_width_m"] = 1.2
     return {"status": "Candidate materials, not a verified Thunderhill surface match", "resolution": "1K", "files": entries}
 
 

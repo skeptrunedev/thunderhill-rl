@@ -215,6 +215,14 @@ func _build_road() -> void:
 	curb_mat.shader = preload("res://shaders/painted_concrete.gdshader")
 	curb_mat.set_shader_parameter("wear_amount", 0.28)
 	curb_mat.set_shader_parameter("curb_stripes", true)
+	curb_mat.set_shader_parameter("use_mesh_uv", true)
+	for pair in [
+		["concrete_color", "diff"], ["concrete_normal", "nor_gl"], ["concrete_roughness", "rough"]
+	]:
+		curb_mat.set_shader_parameter(
+			pair[0], load("res://assets/materials/rough_concrete_%s_1k.jpg" % pair[1])
+		)
+	curb_mat.set_shader_parameter("concrete_detail", true)
 	_mesh(curb, curb_mat, "ProvisionalCurbs")
 
 

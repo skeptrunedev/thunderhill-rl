@@ -84,11 +84,19 @@ func build(track: Node3D, profile: Dictionary) -> void:
 			cap.reverse()
 		_quad(surface, cap, [Vector2.ZERO, Vector2.UP, Vector2.ONE, Vector2.RIGHT])
 	surface.generate_normals()
+	surface.generate_tangents()
 	var material := ShaderMaterial.new()
 	material.shader = preload("res://shaders/painted_concrete.gdshader")
 	material.set_shader_parameter("paint_tint", Color("deddd0"))
 	material.set_shader_parameter("wear_amount", 0.08)
 	material.set_shader_parameter("use_mesh_uv", true)
+	for pair in [
+		["concrete_color", "diff"], ["concrete_normal", "nor_gl"], ["concrete_roughness", "rough"]
+	]:
+		material.set_shader_parameter(
+			pair[0], load("res://assets/materials/rough_concrete_%s_1k.jpg" % pair[1])
+		)
+	material.set_shader_parameter("concrete_detail", true)
 	var instance := MeshInstance3D.new()
 	instance.name = "ObservedPitDivider"
 	instance.mesh = surface.commit()

@@ -1,11 +1,17 @@
 shader_type spatial;
 render_mode cull_disabled;
 
-// Original material, metre scaled detail. It is not a surveyed curb surface.
+// Painted finish over sourced concrete detail. Appearance is not a surveyed material.
 uniform vec3 paint_tint : source_color = vec3(1.0);
 uniform float wear_amount : hint_range(0.0, 1.0) = 0.2;
 uniform bool curb_stripes = false;
 uniform bool use_mesh_uv = false;
+uniform bool concrete_detail = false;
+uniform sampler2D concrete_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D concrete_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D concrete_roughness : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float concrete_tile_m = 1.2;
+uniform float concrete_normal_depth = 0.16;
 uniform vec3 stripe_blue : source_color = vec3(0.0902, 0.3765, 0.6353);
 uniform vec3 stripe_white : source_color = vec3(0.898, 0.898, 0.863);
 varying vec3 world_position;
@@ -42,6 +48,21 @@ void fragment() {
         pigment = mix(stripe_white, stripe_blue, stripe);
     }
     vec3 concrete = vec3(0.25, 0.24, 0.21);
-    ALBEDO = mix(pigment, concrete, exposed) * mix(0.76, 1.0, stains);
-    ROUGHNESS = mix(0.78, 0.96, max(exposed, stains));
+    if (concrete_detail) {
+        // Publisher tile width is 1.2 m. Paint suppresses bare concrete contrast
+        // and relief; tint and response are artistic, not measured Thunderhill BRDF.
+        vec2 detail_uv = UV / concrete_tile_m;
+        float grain = dot(texture(concrete_color, detail_uv).rgb, vec3(0.2126, 0.7152, 0.0722));
+        float paint_variation = mix(0.90, 1.02, clamp(grain * 1.6, 0.0, 1.0));
+        float broad = surface_noise(p * vec2(0.21, 0.45));
+        ALBEDO = mix(pigment, concrete, exposed) * paint_variation * mix(0.97, 1.0, broad);
+        ROUGHNESS = clamp(0.70 + texture(concrete_roughness, detail_uv).r * 0.25, 0.70, 0.95);
+        NORMAL_MAP = texture(concrete_normal, detail_uv).rgb;
+        NORMAL_MAP_DEPTH = concrete_normal_depth;
+    } else {
+        ALBEDO = mix(pigment, concrete, exposed) * mix(0.76, 1.0, stains);
+        ROUGHNESS = mix(0.78, 0.96, max(exposed, stains));
+        NORMAL_MAP = vec3(0.5, 0.5, 1.0);
+        NORMAL_MAP_DEPTH = 0.0;
+    }
 }
