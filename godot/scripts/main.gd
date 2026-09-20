@@ -45,6 +45,8 @@ var preview_station := 1650.0
 var run_id: String
 var replay_path: String = ""
 var replay: RefCounted
+var benchmark: RefCounted
+var benchmark_path := ""
 var frame_times: Array = []
 var agent_camera: Node
 var agent_request_pending := false
@@ -68,6 +70,8 @@ func _ready() -> void:
 			camera_mode = int(arg.trim_prefix("--preview-camera="))
 		if arg == "--preview":
 			preview_mode = true
+		if arg.begins_with("--benchmark-recording="):
+			benchmark_path = arg.trim_prefix("--benchmark-recording=")
 		if arg.begins_with("--replay="):
 			replay_path = arg.trim_prefix("--replay=")
 	if (
@@ -75,6 +79,19 @@ func _ready() -> void:
 		and (agent_mode or preview_mode or qa_target > 0 or not replay_path.is_empty())
 	):
 		push_error("Control checks require an ordinary human game session")
+		get_tree().quit(2)
+		return
+	if (
+		not benchmark_path.is_empty()
+		and (
+			agent_mode
+			or preview_mode
+			or qa_target > 0
+			or not replay_path.is_empty()
+			or "--qa-controls" in OS.get_cmdline_user_args()
+		)
+	):
+		push_error("Benchmark requires an exclusive diagnostic session")
 		get_tree().quit(2)
 		return
 	track = TrackScript.new()
@@ -129,6 +146,19 @@ func _ready() -> void:
 			return
 		replay.apply_state(sim, replay.manifest.initial_state)
 		paused = false
+	if not benchmark_path.is_empty():
+		benchmark = preload("res://scripts/control_benchmark.gd").new()
+		var error: String = benchmark.open_trace(
+			benchmark_path, sim, FileAccess.get_sha256("res://data/track.json"), DT
+		)
+		if not error.is_empty():
+			push_error(error)
+			get_tree().quit(2)
+			return
+		reset_episode(float(benchmark.reader.manifest.start_station), "diagnostic-recorded-inputs")
+		benchmark.reader.apply_state(sim, benchmark.reader.manifest.initial_state)
+		paused = false
+		benchmark.start()
 	if server_port > 0:
 		var err := server.listen(server_port, "127.0.0.1")
 		if err != OK:
@@ -273,8 +303,23 @@ func _physics_process(_dt: float) -> void:
 		lap_time = sim.elapsed
 		wheel_rotation += sim.longitudinal_velocity * DT / 0.32
 		return
-	controls = _human_controls()
-	_step(controls)
+	if benchmark != null:
+		var action: Dictionary = benchmark.next_action()
+		if action.is_empty() or action.has("error"):
+			_finish_benchmark(str(action.get("error", "")))
+			return
+		controls = action.controls
+	else:
+		controls = _human_controls()
+	var result: Dictionary = _step(controls)
+	if benchmark != null:
+		if result.has("error"):
+			_finish_benchmark(str(result.error))
+			return
+		benchmark.record_step(sim, bool(result.track.on_track))
+		if sim.crashed:
+			_finish_benchmark("Motorcycle crashed during recorded input run")
+			return
 	if qa_target > 0:
 		qa_ticks += 1
 		if qa_ticks >= qa_target:
@@ -282,6 +327,17 @@ func _physics_process(_dt: float) -> void:
 			if recorder:
 				recorder.flush()
 			get_tree().quit()
+
+
+func _finish_benchmark(failure: String) -> void:
+	paused = true
+	var result: Dictionary = benchmark.report(sim, completed_laps, failure)
+	result["build"] = _build_provenance()
+	_record({"type": "benchmark_result", "result": result})
+	if recorder:
+		recorder.flush()
+	print("BENCHMARK_RESULT ", JSON.stringify(result))
+	get_tree().quit(0 if result.ok else 2)
 
 
 func _human_controls() -> Dictionary:
@@ -434,6 +490,8 @@ func observation() -> Dictionary:
 
 
 func _process(dt: float) -> void:
+	if benchmark != null and not paused:
+		benchmark.record_frame(get_viewport())
 	_poll_agent()
 	if engine_audio != null:
 		engine_audio.muted = paused or agent_mode
@@ -481,6 +539,8 @@ func _update_visual(dt: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.is_pressed() or event.is_echo():
+		return
+	if benchmark != null:
 		return
 	if event.keycode == KEY_ESCAPE and environment_failure.is_empty():
 		paused = not paused
