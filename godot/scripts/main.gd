@@ -168,6 +168,7 @@ func _ready() -> void:
 		return
 	_startup_mark("environment_and_bike_complete")
 	AgentCameraScript.assign_rider_layer(bike.rider)
+	AgentCameraScript.assign_rider_layer(bike._arms, AgentCameraScript.RIDER_LIMB_LAYER)
 	camera = Camera3D.new()
 	camera.far = 3000
 	camera.near = 0.06

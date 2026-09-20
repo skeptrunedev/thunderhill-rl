@@ -1,6 +1,6 @@
 extends RefCounted
 ## Shared original arm pose study. Artist dimensions, not measured anthropometry.
-## Not wired into gameplay until continuous collision bounds cover these joints.
+## Rendering, collision envelopes and continuous sweeps share these transforms.
 const VERSION := "rider-arm-study-v1"
 const STEERING_LIMIT := 0.5
 const BONE_LENGTH := 0.33
@@ -91,7 +91,7 @@ static func domain_bounds(
 		var low := distance - error
 		var high := distance + error
 		var cross_low := pole.cross(delta).length() - error
-		if low <= 0.0 or high >= 2.0 * BONE_LENGTH or cross_low <= 0.0:
+		if low <= 0.001 or high >= 2.0 * BONE_LENGTH or cross_low / high <= 0.001:
 			return {"error": "Rider interval cannot certify a nonsingular pose"}
 		d_min = minf(d_min, low)
 		d_max = maxf(d_max, high)

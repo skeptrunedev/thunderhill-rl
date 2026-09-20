@@ -6,6 +6,7 @@ const VERSION := "rider-rgb-v1"
 const WIDTH := 640
 const HEIGHT := 360
 const RIDER_LAYER := 1 << 19
+const RIDER_LIMB_LAYER := 1 << 18
 const EYE_HEIGHT_M := 1.23
 const EYE_FORWARD_M := 0.05
 const LOOK_DOWN_RAD := 0.08
@@ -27,16 +28,16 @@ func configure(world: World3D) -> void:
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
 	camera.near = 0.06
 	camera.far = 3000.0
-	camera.cull_mask = ((1 << 20) - 1) & ~RIDER_LAYER
+	camera.cull_mask = ((1 << 20) - 1) & ~(RIDER_LAYER | RIDER_LIMB_LAYER)
 	viewport.add_child(camera)
 	camera.current = true
 
 
-static func assign_rider_layer(node: Node) -> void:
+static func assign_rider_layer(node: Node, layer: int = RIDER_LAYER) -> void:
 	if node is VisualInstance3D:
-		node.layers = RIDER_LAYER
+		node.layers = layer
 	for child in node.get_children():
-		assign_rider_layer(child)
+		assign_rider_layer(child, layer)
 
 
 func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: String) -> Dictionary:

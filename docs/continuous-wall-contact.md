@@ -55,3 +55,15 @@ The endpoint cache holds at most 131,072 points and 2,048 entries per environmen
 An alternating comparison in the same process ran three historical wall contacts for each implementation. Baseline times were 335.455, 332.187 and 324.296 ms; the reduced implementation took 267.593, 253.611 and 250.875 ms. The median decreased from 332.187 to 253.611 ms (23.7 percent). All six contact records matched exactly. This comparison passed 142 checks and is recorded in `artifacts/sweep-reduction-wall-ab.log`. The remaining quarter second impact stall is unacceptable for final performance acceptance.
 
 The final support audit passed 52,203 checks, the sweep suite passed 96 checks and the wall integration suite passed 91 checks. The rendered human control diagnostic also passed with zero failures, with median process frame interval 17.290 ms and p95 17.825 ms on the local RTX 2080 Ti. These measurements do not certify native Mac impact performance.
+
+## Articulated arms
+
+The playable arms and gloves now use the shared `rider_pose.gd` transforms for
+rendering, envelope queries and sweep endpoints. Arm motion is nonlinear in
+steering; the sweep composes certified point derivative bounds with root and
+lean motion, including the mixed acceleration term. See `rider-rig-study.md`
+for the construction and assumptions. Full steering outside plus or minus
+0.5 radians is rejected before broadphase. An actual forearm obstacle test
+checks contact between clear endpoints. The updated sweep suite passes 115
+checks and wall integration passes 91. Geometry remains an artistic envelope,
+not measured human anatomy or a physical injury model.

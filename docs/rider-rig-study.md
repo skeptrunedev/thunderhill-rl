@@ -1,8 +1,8 @@
 # Rider glove and articulation study
 
-The original rider uses capsules and ellipsoids, with all limbs rigidly attached
-to the body. Close human cameras and the policy camera exclude the entire rider.
-Showing that rider in the cockpit would expose hands that do not follow steering.
+The playable rider now uses articulated arms and original glove meshes. Human
+close cameras show these limbs while excluding the helmet and torso. The policy
+camera continues to exclude all rider geometry.
 
 `godot/scripts/rider_glove.gd` is an original unbranded glove mesh study. A shaped
 palm and cuff shell replaces the initial overlapping ellipsoid study. Four curved
@@ -12,8 +12,8 @@ ArrayMesh. Dimensions and anatomy remain artistic estimates. The material is a
 plain leather appearance approximation; it is not a scanned or finished asset.
 The cuff is open to receive a future sleeve.
 
-The asset is deliberately not connected to the playable rider yet. It does not
-change current collision geometry, human camera output or agent observations.
+The asset is connected to the playable rider and included in collision geometry.
+Human close views show it; the versioned policy camera continues to exclude it.
 The final local preview is `artifacts/glove-study-smooth.png`. Run:
 
 ```
@@ -35,22 +35,11 @@ are calculations from the current artwork, not measured human dimensions.
 The current skeleton therefore cannot simply receive fixed shoulder two bone
 IK and remain attached at full steering lock.
 
-Next, establish wrist targets at the new cuff, arm dimensions and shoulder motion
-with positive reach and bend plane margins over the full steering range. Then
-share one pure pose function between rendering, collision envelope transforms and
-continuous sweep endpoint transforms. Existing envelope joints cover only body,
-front, front wheel and rear wheel. Gloves can use the front joint, but animated
-arms require explicit continuous speed and acceleration bounds. Clamping an
-unreachable target or using only endpoint rotations would not preserve the
-existing continuous contact guarantees.
-
-Verification must include both steering limits, intermediate steering, mirrored
-lean, grip attachment, continuity, construction from already moved poses, visual
-vertices versus envelope transforms and obstacles hit only between endpoints.
-The current sweep accepts arbitrary finite steering values, so any narrower
-valid arm domain must be checked before broadphase rejection. Camera visibility
-also needs a dedicated limb layer; placing hands under the front node without
-mask changes would silently alter policy RGB observations.
+The integrated rig uses a shared pure pose function for rendering, envelope
+transforms and continuous sweep endpoints. Six explicit limb joints complement
+the existing body, steering and wheel joints. Steering outside the certified
+range is rejected before broadphase queries. The arm root must have an identity
+transform and the same steering origin as the motorcycle.
 
 ## Shared pose prototype
 
@@ -78,7 +67,7 @@ fully extended and undefined bend plane configurations across the supported rang
 
 `point_motion_bounds` applies normalization and product rule bounds to the
 elbow and bone frames. For a local mesh point radius r it returns whole point
-reach P0 and first and second steering derivative bounds P1 and P2. Future
+reach P0 and first and second steering derivative bounds P1 and P2. The integrated
 sweep composition with root plus lean angular displacement w and steering
 change a is:
 
@@ -87,10 +76,15 @@ speed <= root_translation + w*P0 + a*P1
 acceleration <= w*w*P0 + 2*w*a*P1 + a*a*P2
 ```
 
-This motion bound implementation is not wired into the current gameplay sweep.
-Integration still requires new joint identification, independent envelope poses,
-whole bike broadphase reach, domain rejection before broadphase, and actual swept
-arm obstacle tests. The current playable bike still uses its original rider.
+The gameplay sweep uses these bounds for articulated arm parts and rigid steering
+bounds for gloves. The envelope version is `authored-convex-parts-v2` and the
+sweep version is `articulated-conservative-sweep-v3`. The envelope audit passed
+2,128 checks across 298 mesh parts. A real forearm fixture has clear endpoints
+but intersects a small obstacle during steering; independent engine overlap
+queries verify the sweep result. The sweep suite passed 115 checks, wall contact
+passed 91, and camera checks passed with both human close views including limbs
+and the agent view excluding them. The local cockpit capture is
+`artifacts/articulated-game.png`. Native verification remains outstanding.
 
 `test_rider_pose.gd` passed with zero failures across 2,002 sampled poses, checking
 bone lengths, grip and cuff attachment, bone frames, continuity, interval

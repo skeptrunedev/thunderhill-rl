@@ -146,12 +146,23 @@ func _run() -> void:
 	for mesh_node in meshes:
 		_check(paths.has(bike.get_path_to(mesh_node)), "mesh was not silently excluded")
 	_check(hidden_rider_count > 0, "hidden cockpit rider still has collision coverage")
-	for joint in ["body", "front", "rear_wheel", "front_wheel"]:
+	for joint in [
+		"body",
+		"front",
+		"rear_wheel",
+		"front_wheel",
+		"left_upper",
+		"left_lower",
+		"left_glove",
+		"right_upper",
+		"right_lower",
+		"right_glove"
+	]:
 		_check(joints.has(joint), "joint represented: " + joint)
 	var poses := [
 		[Vector3.ZERO, Vector3.ZERO, 0.0, 0.0, 0.0],
 		[Vector3(13, 4, -9), Vector3(0.22, 1.8, 0), 0.95, -0.48, 2.1],
-		[Vector3(-12, -2, 21), Vector3(-0.31, -2.4, 0), -1.05, 0.52, -4.7],
+		[Vector3(-12, -2, 21), Vector3(-0.31, -2.4, 0), -1.05, 0.5, -4.7],
 		[Vector3(0.1, 0.2, 0.3), Vector3(0.03, 3.13, 0), 0.02, -0.02, 7.2],
 	]
 	for pose in poses:

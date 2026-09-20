@@ -139,6 +139,70 @@ func _contact_case(
 	)
 
 
+func _check_articulated_forearm(authored: RefCounted) -> void:
+	# Isolate one actual authored mesh so no body, glove or wheel can mask a
+	# missing articulated collision joint. Its endpoints clear the small box.
+	var forearm := ENVELOPE.new()
+	forearm._front_origin = authored._front_origin
+	forearm.arms_enabled = true
+	for component: Dictionary in authored.components:
+		if component.joint == "left_lower":
+			forearm.components.append(component)
+	_check(forearm.components.size() == 1, "one actual forearm mesh selected")
+	if forearm.components.size() != 1:
+		return
+	var midpoint: Array = forearm.transforms(Transform3D.IDENTITY, 0.0, 0.0, 0.0)
+	await _place(midpoint[0].origin, Vector3.ONE * 0.012)
+	var a := _pose(Vector3.ZERO, Vector3.UP, 0, 0, -0.5)
+	var b := _pose(Vector3.ZERO, Vector3.UP, 0, 0, 0.5)
+	_check(not _hits(forearm, a), "articulated forearm starts clear")
+	_check(not _hits(forearm, b), "articulated forearm ends clear")
+	_check(_hits(forearm, _interpolate(a, b, 0.5)), "actual intermediate forearm overlaps")
+	var solver := SWEEP.new()
+	_check(solver.build(forearm).is_empty(), "actual articulated forearm sweep builds")
+	var result: Dictionary = solver.sweep(space, a, b, MASK)
+	print("articulated forearm sweep ", JSON.stringify(result))
+	_check(result.get("status", "") == "possible_contact", "sweep catches forearm only contact")
+	if result.get("status", "") == "possible_contact":
+		_check(result.component_id == forearm.components[0].id, "contact identifies forearm")
+		_check(
+			not _hits(forearm, _interpolate(a, b, result.safe_fraction)),
+			"articulated safe pose is independently clear"
+		)
+		_check(
+			result.spatial_uncertainty_m <= SWEEP.SPATIAL_TOLERANCE_M,
+			"articulated contact satisfies declared spatial tolerance"
+		)
+		var first := -1.0
+		for index in range(1, 1025):
+			var fraction := float(index) / 1024
+			if _hits(forearm, _interpolate(a, b, fraction)):
+				first = fraction
+				break
+		_check(first >= 0.0, "independent forearm overlap search succeeds")
+		if first >= 0.0:
+			var lo := maxf(0.0, first - 1.0 / 1024)
+			var hi := first
+			for iteration in 20:
+				var mid := (lo + hi) * 0.5
+				if _hits(forearm, _interpolate(a, b, mid)):
+					hi = mid
+				else:
+					lo = mid
+			_check(result.safe_fraction <= hi, "forearm safe bound precedes actual contact")
+	# Both endpoint positions are far from the obstacle: an early broadphase
+	# clear would hide an invalid pose if domain validation ran too late.
+	var valid := _pose(Vector3(100, 0, 0))
+	for steering in [-0.5001, 0.5001]:
+		var invalid := _pose(Vector3(100, 0, 0), Vector3.UP, 0, 0, steering)
+		for pair in [[invalid, valid], [valid, invalid]]:
+			var rejected: Dictionary = solver.sweep(space, pair[0], pair[1], MASK)
+			_check(
+				rejected.has("error"), "unsupported forearm steering rejected away from obstacle"
+			)
+			_check(solver.query_count == 0, "rider domain rejected before broadphase")
+
+
 func _run() -> void:
 	obstacle = StaticBody3D.new()
 	obstacle.collision_layer = MASK
@@ -249,6 +313,7 @@ func _run() -> void:
 	bike.set_rider_visible(false)
 	var authored := ENVELOPE.new()
 	_check(authored.build(bike).is_empty(), "authored bike builds")
+	await _check_articulated_forearm(authored)
 	await _place(Vector3(0, 1.485, -0.29), Vector3.ONE * 0.025)
 	_contact_case(
 		"authored hidden helmet lean",

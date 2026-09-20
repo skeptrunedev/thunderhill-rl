@@ -3,7 +3,8 @@ extends RefCounted
 ## Clear intervals are rejected by enclosing volumes. Possible contact is refined
 ## to a declared spatial bound, never presented as an exact physical impact.
 
-const MODEL_VERSION := "articulated-conservative-sweep-v2"
+const MODEL_VERSION := "articulated-conservative-sweep-v3"
+const RiderPose = preload("res://scripts/rider_pose.gd")
 const SPATIAL_TOLERANCE_M := 0.002
 const NUMERICAL_PADDING_M := 0.0005
 const MAX_ROOT_COORDINATE_M := 4096.0
@@ -69,6 +70,13 @@ func build(source: RefCounted) -> String:
 			reach += source._front_wheel_origin.length()
 		if component.joint == "rear_wheel":
 			reach += source._rear_origin.length()
+		if _is_rider_joint(component.joint):
+			var arm_bounds := _rider_bounds(
+				source, _parts[-1], -RiderPose.STEERING_LIMIT, RiderPose.STEERING_LIMIT
+			)
+			if arm_bounds.has("error"):
+				return arm_bounds.error
+			reach = arm_bounds.reach
 		_radius = maxf(_radius, reach)
 	envelope = source
 	return ""
@@ -97,6 +105,8 @@ func sweep(
 		var error := _validate_pose(pose)
 		if not error.is_empty():
 			return {"error": error}
+		if envelope.arms_enabled and absf(float(pose.steering)) > RiderPose.STEERING_LIMIT:
+			return {"error": "Sweep steering exceeds rider articulation domain"}
 	_space = space
 	_mask = collision_mask
 	_start = start
@@ -117,6 +127,8 @@ func sweep(
 	_profile_add("initial_overlap_us", overlap_started)
 	query_count += envelope.components.size()
 	if not initial.is_empty():
+		if initial[0].has("error"):
+			return initial[0]
 		return {
 			"status": "initial_overlap",
 			"safe_fraction": 0.0,
@@ -142,21 +154,38 @@ func sweep(
 	for part in _parts:
 		var speed := translation
 		var acceleration := 0.0
-		var rate := w0
-		if part.joint == "front" or part.joint == "front_wheel":
-			speed += envelope._front_origin.length() * w0
-			acceleration += envelope._front_origin.length() * w0 * w0
-			rate = ws
-		if part.joint == "front_wheel":
-			speed += envelope._front_wheel_origin.length() * ws
-			acceleration += envelope._front_wheel_origin.length() * ws * ws
-			rate += wheel
-		if part.joint == "rear_wheel":
-			speed += envelope._rear_origin.length() * w0
-			acceleration += envelope._rear_origin.length() * w0 * w0
-			rate += wheel
-		speed += part.radius * rate
-		acceleration += part.radius * rate * rate
+		if _is_rider_joint(part.joint):
+			var bounds := _rider_bounds(
+				envelope,
+				part,
+				minf(start.steering, finish.steering),
+				maxf(start.steering, finish.steering)
+			)
+			if bounds.has("error"):
+				return bounds
+			var change := absf(finish.steering - start.steering)
+			speed += w0 * bounds.reach + change * bounds.speed
+			acceleration = (
+				w0 * w0 * bounds.reach
+				+ 2.0 * w0 * change * bounds.speed
+				+ change * change * bounds.acceleration
+			)
+		else:
+			var rate := w0
+			if part.joint == "front" or part.joint == "front_wheel":
+				speed += envelope._front_origin.length() * w0
+				acceleration += envelope._front_origin.length() * w0 * w0
+				rate = ws
+			if part.joint == "front_wheel":
+				speed += envelope._front_wheel_origin.length() * ws
+				acceleration += envelope._front_wheel_origin.length() * ws * ws
+				rate += wheel
+			if part.joint == "rear_wheel":
+				speed += envelope._rear_origin.length() * w0
+				acceleration += envelope._rear_origin.length() * w0 * w0
+				rate += wheel
+			speed += part.radius * rate
+			acceleration += part.radius * rate * rate
 		var finest_h := pow(0.5, MAX_DEPTH)
 		var finest_uncertainty := (
 			speed * finest_h
@@ -261,6 +290,11 @@ func _joint_poses(fraction: float) -> Dictionary:
 		"rear_wheel": body * Transform3D(spin, envelope._rear_origin),
 		"front_wheel": front * Transform3D(spin, envelope._front_wheel_origin)
 	}
+	if envelope.arms_enabled:
+		for side in [-1.0, 1.0]:
+			var rider := RiderPose.solve(envelope._front_origin, side, pose.steering)
+			for key in ["upper", "lower", "glove"]:
+				result[("left_" if side < 0 else "right_") + key] = body * rider[key]
 	_poses[fraction] = result
 	return result
 
@@ -410,3 +444,27 @@ func _endpoint_cloud(part_index: int, fraction: float, pose: Transform3D) -> Dic
 func _profile_add(key: String, started: int) -> void:
 	if profiling_enabled:
 		profile[key] = profile.get(key, 0) + Time.get_ticks_usec() - started
+
+
+static func _is_rider_joint(joint: String) -> bool:
+	return (
+		joint
+		in ["left_upper", "left_lower", "left_glove", "right_upper", "right_lower", "right_glove"]
+	)
+
+
+static func _rider_bounds(
+	source: RefCounted, part: Dictionary, lower: float, upper: float
+) -> Dictionary:
+	var fields: PackedStringArray = part.joint.split("_")
+	var side := -1.0 if fields[0] == "left" else 1.0
+	var kind := fields[1]
+	if kind == "glove":
+		var reach := RiderPose.grip_transform(side).origin.length() + float(part.radius)
+		return {
+			"reach": source._front_origin.length() + reach, "speed": reach, "acceleration": reach
+		}
+	var domain := RiderPose.domain_bounds(source._front_origin, side, lower, upper)
+	if domain.has("error"):
+		return domain
+	return RiderPose.point_motion_bounds(domain, kind, part.radius)

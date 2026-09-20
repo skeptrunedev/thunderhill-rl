@@ -1,5 +1,5 @@
 extends Node3D
-## Articulated arm study. Gameplay integration requires matching swept collision.
+## Articulated rider meshes using the shared rendering and collision pose model.
 const Pose = preload("res://scripts/rider_pose.gd")
 var front_origin := Vector3.ZERO
 var joints: Dictionary = {}

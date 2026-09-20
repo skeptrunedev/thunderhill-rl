@@ -3,8 +3,11 @@ extends RefCounted
 ## visibility. This is an envelope of the artwork, not measured motorcycle CAD.
 ## Per mesh hulls fill local concavities (wheel centres, coils, panel recesses).
 
-const MODEL_VERSION := "authored-convex-parts-v1"
+const MODEL_VERSION := "authored-convex-parts-v2"
 
+const RiderPose = preload("res://scripts/rider_pose.gd")
+var arms_enabled := false
+var _arm_nodes: Dictionary = {}
 var components: Array[Dictionary] = []
 var _front_origin := Vector3.ZERO
 var _rear_origin := Vector3.ZERO
@@ -13,6 +16,8 @@ var _front_wheel_origin := Vector3.ZERO
 
 func build(bike: Node3D) -> String:
 	components.clear()
+	_arm_nodes.clear()
+	arms_enabled = false
 	if bike == null or not is_instance_valid(bike):
 		return "A constructed BikeVisual is required"
 	if not bike is BikeVisual:
@@ -29,6 +34,23 @@ func build(bike: Node3D) -> String:
 	_front_origin = bike._front.position
 	_rear_origin = bike._rear_wheel.position
 	_front_wheel_origin = bike._front_wheel.position
+	if not is_instance_valid(bike._arms) or bike._arms.get_parent() != bike:
+		return "Rider arms must be direct children of BikeVisual"
+	if not bike._arms.transform.is_equal_approx(Transform3D.IDENTITY):
+		return "Rider arm root must have an identity transform"
+	if not bike._arms.front_origin.is_equal_approx(_front_origin):
+		return "Rider arm steering origin does not match BikeVisual"
+	for side in [-1.0, 1.0]:
+		var bounds := RiderPose.domain_bounds(
+			_front_origin, side, -RiderPose.STEERING_LIMIT, RiderPose.STEERING_LIMIT
+		)
+		if bounds.has("error"):
+			return bounds.error
+		for key in ["upper", "lower", "glove"]:
+			if bike._arms.joints[side][key].get_parent() != bike._arms:
+				return "Rider meshes must be direct children of the arm root"
+			_arm_nodes[bike._arms.joints[side][key]] = ("left_" if side < 0 else "right_") + key
+	arms_enabled = true
 	var pending: Array[Dictionary] = []
 	var error := _collect(bike, bike, "body", Transform3D.IDENTITY, "root", pending)
 	if not error.is_empty():
@@ -58,6 +80,9 @@ func _collect(
 			relative = Transform3D.IDENTITY
 		elif node == bike._front_wheel:
 			joint = "front_wheel"
+			relative = Transform3D.IDENTITY
+		elif _arm_nodes.has(node):
+			joint = _arm_nodes[node]
 			relative = Transform3D.IDENTITY
 		elif node is Node3D:
 			relative = relative * node.transform
@@ -122,6 +147,14 @@ func transforms(
 		"rear_wheel": body * Transform3D(spin, _rear_origin),
 		"front_wheel": front * Transform3D(spin, _front_wheel_origin),
 	}
+	if arms_enabled:
+		for side in [-1.0, 1.0]:
+			var pose := RiderPose.solve(_front_origin, side, steering)
+			if pose.has("error"):
+				push_error(pose.error)
+				return []
+			for key in ["upper", "lower", "glove"]:
+				joints[("left_" if side < 0 else "right_") + key] = body * pose[key]
 	var result: Array[Transform3D] = []
 	for component in components:
 		result.append(joints[component.joint] * component.local_transform)
@@ -140,6 +173,8 @@ func overlaps(
 ) -> Array[Dictionary]:
 	var poses := transforms(root_pose, lean, steering, wheel_rotation)
 	var contacts: Array[Dictionary] = []
+	if poses.size() != components.size():
+		return [{"error": "Collision pose is outside the supported rider domain"}]
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.margin = 0.0
 	query.collision_mask = collision_mask

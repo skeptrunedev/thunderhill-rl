@@ -18,6 +18,7 @@ var _metal: StandardMaterial3D
 var _gold: StandardMaterial3D
 var _rubber: StandardMaterial3D
 var rider: Node3D
+var _arms: Node3D
 var _rider_visible := true
 var _speed_label: Label3D
 var _gear_label: Label3D
@@ -50,6 +51,8 @@ func set_rider_visible(value: bool) -> void:
 	_rider_visible = value
 	if is_instance_valid(rider):
 		rider.visible = value
+	if is_instance_valid(_arms):
+		_arms.visible = value
 
 
 ## Simulation speed is metres per second; dashboard displays kilometres per hour.
@@ -68,6 +71,11 @@ func update_instruments(speed_mps: float, rpm: float, gear: int) -> void:
 
 
 func update_pose(lean: float, steering: float, wheel_rotation: float) -> void:
+	if is_instance_valid(_arms):
+		var error: String = _arms.set_steering(steering)
+		if not error.is_empty():
+			push_error(error)
+			return
 	rotation.z = lean
 	if is_instance_valid(_front):
 		_front.rotation.y = steering
@@ -836,13 +844,7 @@ func _build_rider() -> void:
 	_mesh(surface.commit(), visor, rider)
 	for side in [-1.0, 1.0]:
 		var shoulder := Vector3(side * 0.185, 1.285, -0.12)
-		var elbow := Vector3(side * 0.31, 1.075, -0.18)
-		var wrist := Vector3(side * 0.335, 1.01, -0.48)
-		_rider_limb(shoulder, elbow, 0.064, leather)
-		_rider_limb(elbow, wrist, 0.052, leather)
 		_rider_ellipsoid(shoulder, Vector3(0.135, 0.105, 0.13), panels)
-		_rider_ellipsoid(elbow, Vector3(0.12, 0.12, 0.12), armor)
-		_rider_limb(wrist, Vector3(side * 0.365, 0.995, -0.492), 0.039, armor)
 		var hip := Vector3(side * 0.125, 0.948, 0.31)
 		var knee := Vector3(side * 0.247, 0.675, -0.075)
 		var ankle := Vector3(side * 0.253, 0.43, 0.28)
@@ -851,3 +853,10 @@ func _build_rider() -> void:
 		_rider_ellipsoid(knee + Vector3(side * 0.025, 0, 0), Vector3(0.095, 0.14, 0.12), panels)
 		_rider_limb(ankle, Vector3(side * 0.256, 0.405, 0.11), 0.055, armor)
 		_rider_ellipsoid(Vector3(side * 0.265, 0.47, 0.235), Vector3(0.095, 0.14, 0.11), armor)
+
+	_arms = preload("res://scripts/rider_arm_visual.gd").new()
+	_arms.name = "ArticulatedRiderArms"
+	add_child(_arms)
+	var arm_error: String = _arms.build(_front.position)
+	assert(arm_error.is_empty(), arm_error)
+	_arms.visible = _rider_visible

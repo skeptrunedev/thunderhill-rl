@@ -2,13 +2,13 @@
 
 20 September 2026. The human rider camera now follows the motorcycle's rendered pose directly. Previously it used the chase camera's world position smoothing; steady motion therefore caused the viewpoint to trail the motorcycle, rather than stay at the rider.
 
-The eye anchor is inside the original helmet mesh at local coordinates (0, 1.51, -0.30) metres. It follows pitch and lean. Gaze follows the road tangent with a 0.25 radian downward framing angle and 22 percent roll response. Vertical field of view is 90 degrees; switching to chase restores 64 degrees and its existing position smoothing. These are provisional presentation choices, not measurements of the reference camera or human head stabilization. The rendered rider remains excluded to prevent helmet occlusion.
+The eye anchor is inside the original helmet mesh at local coordinates (0, 1.51, -0.30) metres. It follows pitch and lean. Gaze follows the road tangent with a 0.25 radian downward framing angle and 22 percent roll response. Vertical field of view is 90 degrees; switching to chase restores 64 degrees and its existing position smoothing. These are provisional presentation choices, not measurements of the reference camera or human head stabilization. The helmet and torso remain excluded to prevent occlusion; articulated limbs use a separate visible layer.
 
 The dedicated agent observation camera remains at its existing versioned pose and intrinsics. Human presentation settings do not silently change policy observations. No physics or control inputs changed.
 
 `tests/test_rider_camera.gd` checks fixed eye attachment after large position changes, sloped road samples, mirrored lean and different frame intervals, plus visibility and field of view when switching modes. Actual Vulkan renders were inspected upright and at 0.4 radians lean. The dashboard remains visible near the bottom of the frame, with more road in view. Artifact paths are `artifacts/helmet-view-framing.png` and `artifacts/rider-camera-lean.png`.
 
-Camera motion and viewing comfort still need human riding review. This correction does not address the provisional motorcycle mesh, missing rider arm presentation, or the remaining track and dynamics realism work.
+Camera motion and viewing comfort still need human riding review. This correction does not address the provisional motorcycle mesh, provisional rider arm materials, or the remaining track and dynamics realism work.
 
 The clean exported build `7667d8f45deb-9b0c94c52cdf` was installed at `~/Applications/ThunderhillReview/7667d8f/Thunderhill.app`. The M3 Pro Metal renderer produced a 1920 by 1200 cockpit capture that was retrieved and visually inspected. Evidence is in `artifacts/mac-rider-preview.png` and `artifacts/mac-rider-preview.log`. The rendered human input diagnostic also passed on the local Vulkan renderer with zero failures. Native sustained riding comfort remains a human review item.
 
@@ -16,7 +16,7 @@ The clean exported build `7667d8f45deb-9b0c94c52cdf` was installed at `~/Applica
 
 The human camera cycle now offers chase, rider and onboard views. Press C or use Change camera in the pause menu; the HUD labels the selected view. The third view attaches to an approximate local anchor `(0, 1.23, -0.12)` metres, uses a 74 degree vertical field of view and a 0.38 radian downward angle. It exposes the handlebar controls and instrument cluster for comparison with the supplied Ken Moto footage. This is an appearance study, not a measured camera mount, calibrated lens or replacement for the helmet eye. The reference also supports a dark handlebar finish, now applied to the original bar geometry.
 
-The existing rider view retains its eye anchor and framing. Both human close views use the existing partial roll stabilization and hide the rider model. Rider hands and body presentation, precise cockpit shapes and camera comfort remain unfinished. The separate versioned agent observation camera is unchanged.
+The existing rider view retains its eye anchor and framing. Both human close views use the existing partial roll stabilization, hide the helmet and torso, and show articulated arms and gloves on a separate visibility layer. Rider material realism, precise cockpit shapes and camera comfort remain unfinished. The separate versioned agent observation camera is unchanged.
 
 The updated camera attachment and mode switching checks passed with zero failures. A rendered keyboard diagnostic cycled all three views and passed with zero failures; local frame intervals were median 17.242 ms and p95 17.746 ms at 1920 by 1200 on the RTX 2080 Ti. The final onboard view was inspected in `artifacts/onboard-framing-preview.png`. These checks establish the local presentation and control path, not exact reference camera calibration or native Mac visual acceptance.
 

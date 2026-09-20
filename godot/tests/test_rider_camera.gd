@@ -17,6 +17,17 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	game.paused = true
+	for side in [-1.0, 1.0]:
+		for key in ["upper", "lower", "glove"]:
+			check(
+				game.bike._arms.joints[side][key].layers == AgentCamera.RIDER_LIMB_LAYER,
+				"Articulated limb has incorrect visibility layer"
+			)
+	var policy_camera := AgentCamera.new()
+	game.add_child(policy_camera)
+	policy_camera.configure(game.get_world_3d())
+	check(not policy_camera.camera.get_cull_mask_value(19), "Policy camera includes limbs")
+	check(not policy_camera.camera.get_cull_mask_value(20), "Policy camera includes body")
 	game.camera_mode = 1
 	# Discontinuous positions expose any world-space chase lag in the rider view.
 	# Sloped track locations, mirrored lean and frame rates exercise pose attachment.
@@ -35,6 +46,7 @@ func run() -> void:
 				)
 				check(game.camera.global_basis.is_finite(), "Rider camera basis is not finite")
 				check(not game.camera.get_cull_mask_value(20), "Helmet obscures rider view")
+				check(game.camera.get_cull_mask_value(19), "Rider view hides arms")
 	check(game.camera.fov == 90.0, "Rider field of view was not applied")
 	game.camera_mode = 2
 	for lean in [-0.5, 0.0, 0.5]:
@@ -51,6 +63,7 @@ func run() -> void:
 		)
 		check(game.camera.global_basis.is_finite(), "Onboard camera basis is not finite")
 		check(not game.camera.get_cull_mask_value(20), "Rider body obscures onboard view")
+		check(game.camera.get_cull_mask_value(19), "Onboard view hides arms")
 	check(game.camera.fov == 74.0, "Onboard field of view was not applied")
 	game.menu_action("camera")
 	check(game.camera_mode == 0, "Camera menu did not cycle back to chase")
