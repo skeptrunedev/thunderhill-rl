@@ -10,7 +10,9 @@ These are candidates to test, not validated runtime selections. Source review is
 
 [Nonplanar Vehicle Control](https://github.com/thomasfork/Nonplanar-Vehicle-Control) provides Python and CasADi motorcycle dynamics, tire forces, nonplanar roads, and minimum time racelines. Its [paper](https://arxiv.org/abs/2406.01726) is the specification reference. Suspension and powertrain simplifications prevent treating it as the complete realistic game model. Evaluate numerical behavior over the valid action domain and repeatable initial conditions before using it for training or comparisons. An optimized raceline is a baseline within its model assumptions, not proof of a globally optimal real motorcycle lap.
 
-## Unity integration
+## Engine integration
+
+Godot is the selected engine because the project must not require buying an engine license. [Godot RL Agents](https://github.com/edbeeching/godot_rl_agents) is an integration reference for observations, actions, and training transport. Its conventional policy backends do not replace the required LLM training integration. [Godot Movie Maker](https://docs.godotengine.org/en/stable/tutorials/animation/creating_movies.html) is a candidate for offline checkpoint footage. Motorcycle dynamics remain subject to the research evaluation above.
 
 [ML Motorcycles](https://github.com/mbaske/ml-motorcycles) demonstrates motorcycle observations, controls, and rewards using Unity ML Agents. Read the existing agent and reset implementation before designing our integration. Its older dependencies and third party assets require separate review.
 

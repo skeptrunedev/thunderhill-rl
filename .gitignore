@@ -2,11 +2,7 @@
 __pycache__/
 .pytest_cache/
 artifacts/
-unity/Library/
-unity/Temp/
-unity/Logs/
-unity/Obj/
-unity/Builds/
-unity/UserSettings/
+godot/.godot/
+godot/builds/
 *.csproj
 *.sln

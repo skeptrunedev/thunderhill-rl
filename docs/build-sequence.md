@@ -2,13 +2,13 @@
 
 ## 1. Validate references and tooling
 
-Run the public motorcycle dynamics model with its supported dependency versions. Record source commits, solver configuration, actions, initial state, and outputs. Evaluate physical and numerical limits. Locate a working Unity editor and license before claiming Unity compilation or gameplay verification.
+Run the public motorcycle dynamics model with its supported dependency versions. Record source commits, solver configuration, actions, initial state, and outputs. Evaluate physical and numerical limits. Install and pin the free Godot editor before claiming compilation or gameplay verification.
 
 ## 2. Establish the simulation contract
 
 Use explicit reset, observe, and advance operations. Each advance applies bounded controls for a fixed number of physics ticks. Validate bounds against the selected motorcycle model rather than inventing arbitrary limits. Record simulation time separately from wall time. Every response identifies the episode, tick, terminal state, and configuration.
 
-Unity's [manual simulation API](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Physics.Simulate.html) does not by itself establish deterministic replay or cause all game scripts to advance correctly. Physics forces, controllers, observations, and reward calculations must participate in one explicitly ordered loop. Test consistency across different rendering frame rates and inference delays.
+Keep the validated dynamics implementation separate from Godot presentation. Physics forces, controllers, observations, and reward calculations must participate in one explicitly ordered loop. Test consistency across different rendering frame rates and inference delays. A fixed step alone does not establish deterministic replay. Godot's default vehicle body is not a validated motorcycle model.
 
 ## 3. Prove the training cycle
 

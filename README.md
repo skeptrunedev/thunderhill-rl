@@ -1,6 +1,6 @@
 # Thunderhill motorcycle RL
 
-A new Unity motorcycle racing environment for training a language model on Thunderhill East after the 2026 repave.
+A new Godot motorcycle racing environment for training a language model on Thunderhill East after the 2026 repave. No paid engine license is required.
 
 ## Acceptance criteria
 
