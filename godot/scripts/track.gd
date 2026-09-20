@@ -209,10 +209,14 @@ func _build_road() -> void:
 		)
 	_mesh(road, asphalt, "RacingSurface")
 	_mesh(shoulder, terrain_material, "RoadShoulders")
-	_mesh(paint, material(Color("e8e3ce")), "EdgePaint")
-	var curb_mat := material(Color.WHITE)
-	curb_mat.vertex_color_use_as_albedo = true
-	curb_mat.vertex_color_is_srgb = true
+	var paint_mat := ShaderMaterial.new()
+	paint_mat.shader = preload("res://shaders/painted_concrete.gdshader")
+	paint_mat.set_shader_parameter("paint_tint", Color("e8e3ce"))
+	paint_mat.set_shader_parameter("wear_amount", 0.12)
+	_mesh(paint, paint_mat, "EdgePaint")
+	var curb_mat := ShaderMaterial.new()
+	curb_mat.shader = preload("res://shaders/painted_concrete.gdshader")
+	curb_mat.set_shader_parameter("wear_amount", 0.28)
 	_mesh(curb, curb_mat, "ProvisionalCurbs")
 
 
