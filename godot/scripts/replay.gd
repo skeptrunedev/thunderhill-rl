@@ -17,6 +17,15 @@ func open_recording(path: String, expected_track_hash: String) -> String:
 	manifest = first
 	if manifest.get("track_sha256", "") != expected_track_hash:
 		return "Replay track hash differs from loaded track"
+	# Older recordings lack ground hashes. Keep their existing explicit state
+	# playback compatibility; new recordings must match their ground geometry.
+	for source in ["terrain", "surface"]:
+		var key: String = source + "_sha256"
+		if (
+			manifest.has(key)
+			and manifest[key] != FileAccess.get_sha256("res://data/" + source + ".json")
+		):
+			return "Replay " + source + " hash differs from loaded ground"
 	finished = false
 	consumed_ticks = 0
 	return ""

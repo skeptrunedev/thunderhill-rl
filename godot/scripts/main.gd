@@ -96,6 +96,9 @@ func _ready() -> void:
 		return
 	track = TrackScript.new()
 	add_child(track)
+	if not track.initialization_error.is_empty():
+		get_tree().quit(2)
+		return
 	var horizon = preload("res://scripts/horizon.gd").new()
 	add_child(horizon)
 	horizon.build(track)
@@ -269,6 +272,8 @@ func _start_recording(station: float) -> void:
 			"episode_id": episode_id,
 			"policy_id": policy_id,
 			"track_sha256": FileAccess.get_sha256("res://data/track.json"),
+			"terrain_sha256": FileAccess.get_sha256("res://data/terrain.json"),
+			"surface_sha256": FileAccess.get_sha256("res://data/surface.json"),
 			"physics_version": sim.MODEL_VERSION,
 			"physics_dt": DT,
 			"initial_state": sim.telemetry(),
@@ -387,10 +392,26 @@ func _human_controls() -> Dictionary:
 	}
 
 
+func _sample_ground_after_step() -> Dictionary:
+	if not sim.position.is_finite():
+		return {"error": "Integrated position is not finite", "failure_type": "infrastructure"}
+	var ground: Dictionary = track.sample_world(sim.position)
+	if (
+		not is_finite(float(ground.height))
+		or not ground.normal.is_finite()
+		or ground.normal.y <= 0.0
+	):
+		return {
+			"error": "Integrated position has invalid ground contact",
+			"failure_type": "infrastructure"
+		}
+	return ground
+
+
 func _step(action: Dictionary) -> Dictionary:
 	var old_tick: int = sim.tick
 	var road: Dictionary = track.sample_world(sim.position)
-	var result: Dictionary = sim.step(DT, action, road)
+	var result: Dictionary = sim.step(DT, action, road, _sample_ground_after_step)
 	if result.has("error"):
 		environment_failure = {
 			"type": "environment_failure",
@@ -410,7 +431,7 @@ func _step(action: Dictionary) -> Dictionary:
 		if qa_target > 0:
 			get_tree().quit(2)
 		return environment_failure.duplicate(true)
-	var after: Dictionary = track.sample_world(sim.position)
+	var after: Dictionary = result.ground_after
 	sim.position.y = after.height
 	sim.on_track = after.on_track
 	var difference := float(after.progress) - last_progress

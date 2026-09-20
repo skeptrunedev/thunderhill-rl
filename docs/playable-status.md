@@ -4,6 +4,7 @@ September 20, 2026. The requested end state remains an attractive, hyperrealisti
 
 ## Implemented
 
+* Road clipped terrain with source elevations restored outside a provisional shoulder transition, shared off road render/contact triangles, and terrain provenance hashes. See [conforming ground](conforming-ground.md).
 * Full closed East circuit from 1,536 measured geometry samples, historical lidar road elevation and cross slope, and explicitly provisional interpolated pavement widths.
 * Original Streetfighter inspired motorcycle and rider meshes, measured wheelbase and nominal tire sizes, dry ground and asphalt CC0 material maps, roadside vegetation, and provisional curb geometry.
 * Keyboard and gamepad riding paths, chase and rider cameras, pause, restart, Cyclone start location, speed, gears, lap clock, and course map.

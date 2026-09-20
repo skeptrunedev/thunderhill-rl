@@ -1,6 +1,7 @@
 class_name ThunderhillTrack
 extends Node3D
 
+var initialization_error := ""
 var data: Dictionary
 var samples: Array
 var terrain: Dictionary
@@ -9,6 +10,7 @@ var length_m: float
 var grid: Dictionary = {}
 var candidate_cache: Dictionary = {}
 var terrain_material: ShaderMaterial
+var offroad_surface := preload("res://scripts/offroad_surface.gd").new()
 const CELL: float = 25.0
 const ROAD_LIFT: float = 0.04
 const SHOULDER_WIDTH: float = 6.0
@@ -29,6 +31,10 @@ func _ready() -> void:
 			grid[cell] = []
 		grid[cell].append(i)
 	_build_terrain()
+	if not initialization_error.is_empty():
+		push_error(initialization_error)
+		get_tree().quit(2)
+		return
 	_build_road()
 
 
@@ -76,33 +82,26 @@ func _quad(
 		_vertex(st, v[0], v[1], color)
 
 
+func validate_surface_sources(mesh_data: Dictionary) -> String:
+	var metadata: Dictionary = mesh_data.get("metadata", {})
+	for source in ["track", "terrain"]:
+		if (
+			metadata.get(source + "_sha256", "")
+			!= FileAccess.get_sha256("res://data/" + source + ".json")
+		):
+			return "Offroad mesh " + source + " source mismatch"
+	return ""
+
+
 func _build_terrain() -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var nx: int = terrain.nx
-	var nz: int = terrain.nz
-	var spacing: float = terrain.step
-	var verts := PackedVector3Array()
-	for z in nz:
-		for x in nx:
-			var p := Vector3(
-				terrain.x0 + x * spacing, terrain.heights[z * nx + x], terrain.z0 + z * spacing
-			)
-			verts.append(p)
-	for z in nz - 1:
-		for x in nx - 1:
-			var a := z * nx + x
-			_quad(
-				st,
-				verts[a],
-				verts[a + 1],
-				verts[a + nx + 1],
-				verts[a + nx],
-				Vector2(x, z),
-				Vector2(x + 1, z),
-				Vector2(x + 1, z + 1),
-				Vector2(x, z + 1)
-			)
+	var mesh_data: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/surface.json")
+	)
+	initialization_error = validate_surface_sources(mesh_data)
+	if not initialization_error.is_empty():
+		return
+	offroad_surface.configure(mesh_data)
+	var st := offroad_surface.surface_tool()
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/terrain.gdshader")
 	mat.set_shader_parameter(
@@ -137,11 +136,9 @@ func _build_road() -> void:
 	var road := SurfaceTool.new()
 	var paint := SurfaceTool.new()
 	var curb := SurfaceTool.new()
-	var shoulder := SurfaceTool.new()
 	road.begin(Mesh.PRIMITIVE_TRIANGLES)
 	paint.begin(Mesh.PRIMITIVE_TRIANGLES)
 	curb.begin(Mesh.PRIMITIVE_TRIANGLES)
-	shoulder.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in points.size():
 		var j: int = (i + 1) % points.size()
 		var w: float = samples[i].width * 0.5
@@ -160,27 +157,6 @@ func _build_road() -> void:
 			Vector2(0, sj)
 		)
 		for side in [-1.0, 1.0]:
-			var offsets := [0.0, 1.0, 2.0, 4.0, SHOULDER_WIDTH]
-			for ring in offsets.size() - 1:
-				var a := edge_point(i, side * (w + offsets[ring]), 0.0)
-				var b := edge_point(i, side * (w + offsets[ring + 1]), 0.0)
-				var c := edge_point(j, side * (wj + offsets[ring + 1]), 0.0)
-				var d := edge_point(j, side * (wj + offsets[ring]), 0.0)
-				a.y = _surface_height(a, _road_sample(a), false)
-				b.y = _surface_height(b, _road_sample(b), false)
-				c.y = _surface_height(c, _road_sample(c), false)
-				d.y = _surface_height(d, _road_sample(d), false)
-				_quad(
-					shoulder,
-					a,
-					b,
-					c,
-					d,
-					Vector2(a.x, a.z),
-					Vector2(b.x, b.z),
-					Vector2(c.x, c.z),
-					Vector2(d.x, d.z)
-				)
 			_quad(
 				paint,
 				edge_point(i, side * (w - 0.18), 0.047),
@@ -215,7 +191,6 @@ func _build_road() -> void:
 			pair[0], load("res://assets/materials/Asphalt010_1K-JPG_%s.jpg" % pair[1])
 		)
 	_mesh(road, asphalt, "RacingSurface")
-	_mesh(shoulder, terrain_material, "RoadShoulders")
 	var paint_mat := ShaderMaterial.new()
 	paint_mat.shader = preload("res://shaders/painted_concrete.gdshader")
 	paint_mat.set_shader_parameter("paint_tint", Color("e8e3ce"))
@@ -282,9 +257,15 @@ func _surface_height(p: Vector3, road: Dictionary, include_curb: bool = true) ->
 		and lateral * road.curvature > 0.0
 	):
 		return plane + lerpf(0.01, 0.07, edge / 0.9)
-	if edge < SHOULDER_WIDTH:
-		return lerpf(plane, terrain_height(p), smoothstep(0.0, SHOULDER_WIDTH, edge))
-	return terrain_height(p)
+	var ground: Dictionary = offroad_surface.sample(p)
+	if ground.has("error"):
+		push_error(str(ground))
+		return NAN
+	# The cutout follows rendered edge segments. Close to a corner this may
+	# differ slightly from the analytic nearest-centerline classification.
+	if ground.road_cutout:
+		return plane
+	return float(ground.height)
 
 
 # Shared visible surface for scenery placement, including the finite road shoulder.
@@ -296,25 +277,33 @@ func sample_world(p: Vector3) -> Dictionary:
 	var road := _road_sample(p)
 	road.height = _surface_height(p, road)
 	var edge: float = road.planar_distance - road.width * 0.5
-	if edge >= SHOULDER_WIDTH:
-		road.normal = terrain_normal(p)
-	elif edge > 0.0:
-		const DELTA: float = 0.10
-		var dx := (
-			(
-				_surface_height(p + Vector3.RIGHT * DELTA, road)
-				- _surface_height(p - Vector3.RIGHT * DELTA, road)
-			)
-			/ (2.0 * DELTA)
+	if edge > 0.0:
+		var on_curb: bool = (
+			edge <= 0.9 and absf(road.curvature) > 0.012 and road.distance * road.curvature > 0.0
 		)
-		var dz := (
-			(
-				_surface_height(p + Vector3.BACK * DELTA, road)
-				- _surface_height(p - Vector3.BACK * DELTA, road)
+		if on_curb:
+			const DELTA: float = 0.10
+			var dx := (
+				(
+					_surface_height(p + Vector3.RIGHT * DELTA, road)
+					- _surface_height(p - Vector3.RIGHT * DELTA, road)
+				)
+				/ (2.0 * DELTA)
 			)
-			/ (2.0 * DELTA)
-		)
-		road.normal = Vector3(-dx, 1.0, -dz).normalized()
+			var dz := (
+				(
+					_surface_height(p + Vector3.BACK * DELTA, road)
+					- _surface_height(p - Vector3.BACK * DELTA, road)
+				)
+				/ (2.0 * DELTA)
+			)
+			road.normal = Vector3(-dx, 1.0, -dz).normalized()
+		else:
+			var ground: Dictionary = offroad_surface.sample(p)
+			if ground.has("error"):
+				road.height = NAN
+			elif not ground.road_cutout:
+				road.normal = ground.normal
 	return road
 
 

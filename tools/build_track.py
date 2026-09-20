@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "pyproj==3.7.2", "rasterio==1.4.4"]
+# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "pyproj==3.7.2", "rasterio==1.4.4", "shapely==2.1.2"]
 # ///
 """Build the playable historical East circuit from acquired reference geometry.
 
@@ -18,6 +18,7 @@ import rasterio
 from pyproj import Transformer
 from scipy.ndimage import gaussian_filter1d, map_coordinates
 from scipy.spatial import cKDTree
+from build_surface_mesh import build as build_surface_mesh
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "godot/data"
@@ -120,17 +121,7 @@ def build_terrain(origin: np.ndarray, road_xyz: np.ndarray, road_left: np.ndarra
         rows = (world_y - src.transform.f) / src.transform.e - 0.5
         heights = map_coordinates(src.read(1), [rows.ravel(), cols.ravel()], order=1, mode="nearest").reshape(xx.shape) - origin[2]
     assert np.all(np.isfinite(heights))
-    tree = cKDTree(road_xyz[:, [0, 2]])
-    distance, index = tree.query(np.column_stack([xx.ravel(), zz.ravel()]))
-    delta = np.column_stack([xx.ravel(), zz.ravel()]) - road_xyz[index][:, [0, 2]]
-    lateral = np.sum(delta * road_left[index][:, [0, 2]], axis=1)
-    road_plane = road_xyz[index, 1] + np.tan(banks[index]) * lateral
-    # Visual terrain only: recess the coarse mesh below the independent road.
-    margin = distance - widths[index] * 0.5
-    blend = np.clip((16.0 - margin) / 8.0, 0, 1)
-    lowered = np.minimum(heights.ravel(), road_plane - 0.65)
-    rendered = heights.ravel() * (1 - blend) + lowered * blend
-    terrain = {"schema_version": 1, "nx": len(xs), "nz": len(zs), "step": TERRAIN_SPACING, "x0": float(x0), "z0": float(z0), "heights": np.round(rendered, 3).tolist(), "metadata": {"source": "USGS 2023 1 meter DEM", "source_sha256": digest(source_path), "source_crs": "EPSG:26910", "source_vertical_datum": "NAVD88", "render_grid_spacing_m": TERRAIN_SPACING, "modifications": "Bilinear DEM sampling; visual terrain recessed below independent road within a feathered corridor to avoid coarse mesh intersections. Not a physics surface.", "license": "Terrain DEM public domain; road dressing derived from OSM under ODbL 1.0", "osm_attribution": "OpenStreetMap contributors", "osm_license_url": "https://www.openstreetmap.org/copyright"}}
+    terrain = {"schema_version": 1, "nx": len(xs), "nz": len(zs), "step": TERRAIN_SPACING, "x0": float(x0), "z0": float(z0), "heights": np.round(heights.ravel(), 3).tolist(), "metadata": {"source": "USGS 2023 1 meter DEM", "source_sha256": digest(source_path), "source_crs": "EPSG:26910", "source_vertical_datum": "NAVD88", "render_grid_spacing_m": TERRAIN_SPACING, "modifications": "Bilinear DEM sampling without terrain recess. The derived surface mesh supplies rendering and offroad contact, with a provisional shoulder blend.", "license": "Terrain DEM public domain; road dressing derived from OSM under ODbL 1.0", "osm_attribution": "OpenStreetMap contributors", "osm_license_url": "https://www.openstreetmap.org/copyright"}}
     assert len(terrain["heights"]) == terrain["nx"] * terrain["nz"]
     return terrain
 
@@ -177,6 +168,7 @@ def main() -> None:
     terrain = build_terrain(origin, xyz, left_xyz, widths, banks)
     (OUTPUT / "track.json").write_text(json.dumps(track, separators=(",", ":")) + "\n")
     (OUTPUT / "terrain.json").write_text(json.dumps(terrain, separators=(",", ":")) + "\n")
+    build_surface_mesh(OUTPUT)
     print(json.dumps({"samples": sample_count, "length_m": track["length_m"], "segment_m": [float(segments.min()), float(segments.max())], "height_m": [float(heights.min()), float(heights.max())], "width_m": [float(widths.min()), float(widths.max())], "maximum_bank_degrees": float(np.degrees(np.abs(banks)).max()), "plan_smoothing_max_displacement_m": max_displacement, "lidar_fit": fit_metadata, "terrain_grid": [terrain["nx"], terrain["nz"]]}, indent=2))
 
 

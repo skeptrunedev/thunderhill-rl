@@ -201,7 +201,9 @@ func validate_controls(controls: Dictionary) -> String:
 	return ""
 
 
-func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionary:
+func step(
+	dt: float, controls: Dictionary, road_sample: Dictionary, after_step: Callable = Callable()
+) -> Dictionary:
 	# Unsupported contact regimes invalidate this transition atomically. Keep the
 	# actual pre-step state, including actuator and drivetrain state, for reset/review.
 	var snapshot: Dictionary = {}
@@ -212,7 +214,13 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 				value.duplicate(true) if value is Dictionary or value is Array else value
 			)
 	var result := _integrate_step(dt, controls, road_sample)
-	if result.get("failure_type", "") == "unsupported_dynamics":
+	if not result.has("error") and after_step.is_valid():
+		var ground: Dictionary = after_step.call()
+		if ground.has("error"):
+			result = ground
+		else:
+			result["ground_after"] = ground
+	if result.has("error"):
 		for key: String in snapshot:
 			set(key, snapshot[key])
 		result["state"] = telemetry()
