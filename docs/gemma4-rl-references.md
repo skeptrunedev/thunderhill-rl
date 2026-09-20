@@ -28,4 +28,33 @@ This is the closest architecture to our requirement: observe, generate controls,
 
 ## Decision
 
-Use TRL as the primary environment integration reference, the Graph PRefLexOR repository for exact E4B adapter training details, and Unsloth 2048 for an inspectable game outcome reward example. Replace graph and code generation rewards with actual driving outcomes. Before long training, verify nonzero adapter updates, action dependent rewards, model synchronization after updates, peak memory, and sustained batched rollout throughput on the intended GPU. No concurrency or throughput number is established yet.
+Use the concrete TRL Gemma CARLA and Catch examples below as the primary control references, and the Graph PRefLexOR repository for exact E4B adapter training details. Unsloth 2048 remains a supplementary game outcome reward example. Before long training, verify nonzero adapter updates, action dependent rewards, model synchronization after updates, peak memory, and sustained batched rollout throughput on the intended GPU. No concurrency or throughput number is established yet.
+
+## Selected direct control references
+
+Personally inspected both complete scripts at TRL commit `a98fa6a4428f9aae58dfb26d729d7437f662f27a`.
+
+### Gemma CARLA driving
+
+[carla_vlm_gemma.py](https://github.com/huggingface/trl/blob/a98fa6a4428f9aae58dfb26d729d7437f662f27a/examples/grpo_carla/carla_vlm_gemma.py) is the closest concrete driving example found. It defaults to `google/gemma-4-E2B-it`, offers LoRA, exposes observe, emergency_stop, and lane_change tools, advances simulation ticks, and returns camera images and vehicle descriptions after actions. It passes each environment's resulting rubric reward to GRPOTrainer and calls trainer.train(). The LLM selects actions repeatedly, rather than generating a separate controller program.
+
+Limits: an emergency obstacle avoidance scenario, not racing or continuous motorcycle controls. The source requires at least two CARLA server URLs, with one concurrent connection per server. Its configuration does not enable vLLM. Its LoRA exclusions express the intention to omit vision components; actual trainable parameter names must be checked on E4B. We have inspected the code but not executed this training run.
+
+### Catch with colocated vLLM
+
+[grpo_catch.py](https://github.com/huggingface/trl/blob/a98fa6a4428f9aae58dfb26d729d7437f662f27a/examples/grpo_catch/grpo_catch.py) exposes move and stay actions. Each action steps OpenSpiel and returns an updated observation; completed catch outcomes supply GRPO rewards. The script documents a single GPU colocated vLLM mode and configures multiple candidate generations, training batches, and accumulation.
+
+Limits: it defaults to Qwen2.5 0.5B, uses text observations, and does not establish E4B throughput or adapter synchronization. Its candidate count is a configuration setting, not a measured number of simultaneous Godot simulations. For our environment, verify session isolation and identical reset states within each candidate group.
+
+### Combination for Thunderhill
+
+| Required component | Reference and intended adaptation |
+| --- | --- |
+| Gemma 4 E4B adapter training | Graph PRefLexOR's exact model configuration and TRL LoRA setup. Verify target modules on the loaded model. |
+| Repeated driving observations and actions | Gemma CARLA wrapper. Replace its emergency tools with validated motorcycle control inputs and fixed simulation steps. |
+| Batched generation on one GPU | Catch's colocated vLLM path. Establish E4B support, memory use, and correct weight updates before scaling. |
+| Racing reward | Godot trajectory outcomes: legal progress, completed laps, lap time, and crashes. Do not reuse graph judge rewards or emergency scenario rubrics. |
+| Harbor integration | Preserve the project's Harbor task and verifier requirement. CARLA and Catch use OpenEnv, so they supply control patterns, not a completed Harbor adapter. |
+| Recording | Save policy checkpoint identifiers, initial state, actions, and state trajectories for consistent evaluation replays. |
+
+First integration acceptance: two isolated simulator sessions from a shared initial state produce action dependent outcomes; the trainer updates E4B adapters; the rollout model receives those updates; held out evaluation and replay artifacts identify the exact checkpoint. Scale rollout counts only after measuring this loop on the intended RTX PRO. This is an implementation specification, not a claim that the integration is built.
