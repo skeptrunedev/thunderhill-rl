@@ -54,3 +54,24 @@ lock and leaned onboard captures were inspected in
 `artifacts/onboard-raised-pots.png`, `artifacts/onboard-close-lock.png` and
 `artifacts/onboard-close-lean.png`. These establish presentation and collision
 integration, not measured mount dimensions or native viewing comfort.
+
+## Clamp and yoke edge detail
+
+The existing top yoke, risers and upper clamps now use a closed chamfered box
+mesh within their previous outer dimensions. Bevel widths remain artistic
+estimates. Flat faces, edge strips and triangular corner patches produce edge
+highlights without changing the requested bounds. Upper clamps now share the
+dark metal finish, with small dark hexagonal socket markings on their fasteners.
+These markings depict socket appearance, not recessed mechanical geometry.
+
+The mesh check covers closed manifold edges, clockwise winding, outward normals,
+fixed extents and volume bounds. The actual motorcycle envelope includes the
+new geometry, including socket markings. Development recording provenance also
+includes the chamfer and rider geometry helper hashes; native packages retain
+their existing complete content manifest.
+
+Verification: the chamfer mesh test, 2,170 envelope checks, 115 sweep checks,
+99 wall contact and recording checks, the rendered human control diagnostic
+and macOS export pass. The neutral cockpit render was inspected in
+`artifacts/chamfered-cockpit.png`. This improves original authored geometry
+without claiming measured Ducati manufacturing dimensions.

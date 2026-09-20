@@ -139,6 +139,16 @@ func check_recording(game: Node3D) -> void:
 	game.recorder.flush()
 	var rows := FileAccess.get_file_as_string(game.recorder.get_path()).split("\n", false)
 	var manifest: Dictionary = JSON.parse_string(rows[0])
+	if manifest.get("build", {}).get("kind") == "unbundled_development":
+		for source in ["chamfered_box", "rider_pose", "rider_glove", "rider_arm_visual"]:
+			var path: String = "res://scripts/" + source + ".gd"
+			check(
+				(
+					manifest.build.get("geometry_helper_sha256", {}).get(path)
+					== FileAccess.get_sha256(path)
+				),
+				"Recording omitted geometry helper hash: " + source
+			)
 	check(
 		(
 			manifest.get("obstacle_collision", {}).get("pit_wall_sha256")

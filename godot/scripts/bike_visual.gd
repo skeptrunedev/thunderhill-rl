@@ -123,6 +123,12 @@ func _box(size: Vector3, at: Vector3, material: Material, parent: Node3D) -> Mes
 	return _mesh(box, material, parent, at)
 
 
+func _chamfered_box(
+	size: Vector3, at: Vector3, bevel: float, material: Material, parent: Node3D
+) -> MeshInstance3D:
+	return _mesh(preload("res://scripts/chamfered_box.gd").build(size, bevel), material, parent, at)
+
+
 func _triangle(surface: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
 	surface.add_vertex(a)
 	surface.add_vertex(b)
@@ -580,7 +586,7 @@ func _build_cockpit() -> void:
 	var display_material := _material(Color("080e15"), 0.05, 0.60)
 	display_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	# Forged top yoke and risers, with visible fasteners and fork adjustment caps.
-	_box(Vector3(0.245, 0.028, 0.084), Vector3(0, 0.59, 0.245), dark_metal, _front)
+	_chamfered_box(Vector3(0.245, 0.028, 0.084), Vector3(0, 0.59, 0.245), 0.005, dark_metal, _front)
 	for side in [-1.0, 1.0]:
 		_bar(
 			Vector3(side * 0.094, 0.595, 0.25),
@@ -596,8 +602,20 @@ func _build_cockpit() -> void:
 			_metal,
 			_front
 		)
-		_box(Vector3(0.036, 0.072, 0.043), Vector3(side * 0.045, 0.647, 0.27), dark_metal, _front)
-		_box(Vector3(0.036, 0.026, 0.05), Vector3(side * 0.045, 0.70, 0.27), polymer, _front)
+		_chamfered_box(
+			Vector3(0.036, 0.072, 0.043),
+			Vector3(side * 0.045, 0.647, 0.27),
+			0.004,
+			dark_metal,
+			_front
+		)
+		_chamfered_box(
+			Vector3(0.036, 0.026, 0.05),
+			Vector3(side * 0.045, 0.70, 0.27),
+			0.004,
+			dark_metal,
+			_front
+		)
 		for z in [0.253, 0.286]:
 			_bar(
 				Vector3(side * 0.045, 0.713, z),
@@ -606,6 +624,12 @@ func _build_cockpit() -> void:
 				_metal,
 				_front
 			)
+			var socket := CylinderMesh.new()
+			socket.top_radius = 0.0022
+			socket.bottom_radius = 0.0022
+			socket.height = 0.0002
+			socket.radial_segments = 6
+			_mesh(socket, polymer, _front, Vector3(side * 0.045, 0.7171, z))
 		# Circumferential grip grooves catch light without noisy normal textures.
 		for i in range(13):
 			var x: float = side * (0.305 + i * 0.0071)

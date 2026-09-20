@@ -1033,8 +1033,13 @@ func _build_provenance() -> Dictionary:
 			"source_dirty": manifest.source_dirty,
 			"content_sha256": manifest.content_sha256
 		}
+	var geometry_sources := {}
+	for source in ["chamfered_box", "rider_pose", "rider_glove", "rider_arm_visual"]:
+		var path: String = "res://scripts/" + source + ".gd"
+		geometry_sources[path] = FileAccess.get_sha256(path)
 	return {
 		"kind": "unbundled_development",
+		"geometry_helper_sha256": geometry_sources,
 		"physics_script_sha256": FileAccess.get_sha256("res://scripts/motorcycle.gd"),
 		"game_script_sha256": FileAccess.get_sha256("res://scripts/main.gd"),
 		"bike_visual_script_sha256": FileAccess.get_sha256("res://scripts/bike_visual.gd"),
