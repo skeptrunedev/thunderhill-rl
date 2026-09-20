@@ -163,3 +163,13 @@ which disables gameplay processing and enters the probe before track constructio
 Use `--probe-output=/absolute/path/prefix` after the argument separator. The
 CAPTURE_PROBE_BEGIN marker confirms the correct path. The same app entry mode
 passed all six local samples (`artifacts/capture-probe-linux-mode*`).
+
+Fence construction now uses the existing exact point height cache for interpolated
+endpoints. Consecutive segments share these coordinates; previously both sampled
+the full terrain path again. Segment count and point interpolation are unchanged.
+Rendered geometry hashes before and after match exactly:
+`8ecc20f4594f5df2264cc7dcb85384270382cb46ab0126bc983fcad29d14a6e9`.
+The local runs took 6337 ms and 6233 ms respectively, too close to establish a
+meaningful overall startup improvement from these individual measurements.
+Materials and pit wall collision code were not edited. Evidence is in
+`artifacts/landmark-cache-before.log` and `artifacts/landmark-cache-after.log`.

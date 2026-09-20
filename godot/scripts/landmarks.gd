@@ -228,8 +228,8 @@ func _build_fence(row: Dictionary) -> void:
 		for j in count:
 			var p := a.lerp(b, float(j) / count)
 			var q := a.lerp(b, float(j + 1) / count)
-			p.y = _track.terrain_surface_height(p)
-			q.y = _track.terrain_surface_height(q)
+			p.y = _point([p.x, p.z]).y
+			q.y = _point([q.x, q.z]).y
 			var height: float = row.height_m
 			if row.get("kind", "") == "pit_wall":
 				_beam(
