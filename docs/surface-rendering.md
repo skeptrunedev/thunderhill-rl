@@ -132,3 +132,25 @@ remains unproven. Do not infer that the scenery bake is visually accepted on Mac
 Evidence: `artifacts/Thunderhill-scenery-93e71c3.png`, its `.png.json` sidecar,
 `.jsonl` startup trace and `.log`. Local rendered input checks passed with zero
 failures, median frame interval 17.361 ms and p95 18.750 ms in 273 samples.
+
+### Readback isolation probe
+
+`godot/tools/probe_capture.gd` renders one unshaded box against a solid background
+in both the root viewport and an offscreen SubViewport. It captures samples 1,
+13 and 60, records readback durations, and compares CPU image hashes on the main
+thread and a worker. It saves every result and fails if any sample is empty,
+black, differs across threads, or cannot be saved. This is a diagnostic sequence,
+not a retry policy for gameplay capture. Six local Vulkan samples passed and the
+root image was visually inspected (`artifacts/capture-probe-linux*`).
+
+`tools/package_game.py --debug` now uses the debug export template and a distinct
+build identifier, exposing engine diagnostics omitted from release templates.
+One hypothesis requiring runtime evidence is an ignored Metal fence timeout.
+The pinned engine selects MTL3 even with a Metal 4 capability string:
+[driver selection](https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/drivers/metal/rendering_context_driver_metal.cpp#L90).
+Its timeout log is conditional on DEBUG_ENABLED:
+[fence wait](https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/drivers/metal/rendering_device_driver_metal3.cpp#L50).
+The rendering device does not check the wait return value:
+[frame stall](https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/servers/rendering/rendering_device.cpp#L8214).
+These facts establish a diagnostic lead, not the cause of our black captures.
+Game capture sidecars now also record GPU readback duration.

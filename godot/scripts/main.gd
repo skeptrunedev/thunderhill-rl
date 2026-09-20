@@ -713,6 +713,7 @@ func _process(dt: float) -> void:
 		var read_begin := Time.get_ticks_usec()
 		var screenshot := get_viewport().get_texture().get_image()
 		var read_end := Time.get_ticks_usec()
+		diagnostics["readback_usec"] = read_end - read_begin
 		if benchmark != null:
 			benchmark.record_capture("post_draw_wait", wait_begin, read_begin)
 			benchmark.record_capture("gpu_readback", read_begin, read_end)

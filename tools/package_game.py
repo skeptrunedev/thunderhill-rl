@@ -40,6 +40,7 @@ def main():
     parser.add_argument("--godot", required=True)
     parser.add_argument("--platform", choices=["macos", "linux"], default="macos")
     parser.add_argument("--allow-dirty", action="store_true")
+    parser.add_argument("--debug", action="store_true", help="Use the debug export template for engine diagnostics")
     args = parser.parse_args()
     validate_scenery_bake()
     dirty = bool(git("status", "--porcelain"))
@@ -57,10 +58,11 @@ def main():
             continue
         files[str(path.relative_to(ROOT / "godot"))] = hashlib.sha256(path.read_bytes()).hexdigest()
     content_hash = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
-    build_id = commit[:12] + "-" + content_hash[:12]
+    build_id = commit[:12] + "-" + content_hash[:12] + ("-debug" if args.debug else "")
     provenance = {"schema_version": 1, "build_id": build_id, "source_commit": commit,
                   "source_dirty": dirty, "content_sha256": content_hash,
                   "godot_version": version, "platform": args.platform, "files": files,
+                  "export_mode": "debug" if args.debug else "release",
                   "acceptance": "Development review candidate, not a realism or performance certification"}
     (ROOT / "godot/data/build-info.json").write_text(json.dumps(provenance, indent=2) + "\n")
     output = ROOT / "artifacts/builds" / build_id / args.platform
@@ -70,7 +72,7 @@ def main():
     log = output / "export.log"
     with log.open("w") as stream:
         result = subprocess.run([args.godot, "--headless", "--path", str(ROOT / "godot"),
-                                 "--export-release", preset, str(target)], stdout=stream,
+                                 "--export-debug" if args.debug else "--export-release", preset, str(target)], stdout=stream,
                                 stderr=subprocess.STDOUT, text=True)
     text = log.read_text()
     if result.returncode or "SCRIPT ERROR:" in text or "ERROR:" in text or not target.exists():
