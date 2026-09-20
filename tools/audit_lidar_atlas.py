@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "pyproj==3.7.2", "matplotlib==3.10.8"]
+# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "pyproj==3.7.2", "matplotlib==3.10.8", "shapely==2.1.2", "rasterio==1.4.4"]
 # ///
 """Audit full circuit atlas coverage, curvature and Godot parity inputs."""
 
@@ -28,6 +28,11 @@ def main():
         "--output",
         type=Path,
         default=ROOT / "artifacts/road-surface/lidar-atlas-circuit.json",
+    )
+    parser.add_argument(
+        "--exclusions",
+        type=Path,
+        default=ROOT / "data/reference/pavement-exclusions.json",
     )
     args = parser.parse_args()
     if not np.isfinite(args.step) or args.step <= 0:
@@ -87,6 +92,45 @@ def main():
     )
     raw_tree = cKDTree(raw_xz)
     nearest, _ = raw_tree.query(points)
+    usable = np.ones(len(raw), dtype=bool)
+    mask_info = data["metadata"].get("pavement_mask")
+    if mask_info is not None:
+        import shapely
+        from build_surface_mesh import road_edges
+
+        if (
+            hashlib.sha256(
+                (ROOT / "tools/build_surface_mesh.py").read_bytes()
+            ).hexdigest()
+            != mask_info["builder_sha256"]
+        ):
+            raise ValueError("Pavement mask builder changed")
+        footprint, _, _ = road_edges(track)
+        footprint = footprint.buffer(mask_info["buffer_m"])
+        if hashlib.sha256(footprint.wkb).hexdigest() != mask_info["polygon_wkb_sha256"]:
+            raise ValueError("Pavement mask differs from atlas")
+        usable &= shapely.contains_xy(footprint, raw_xz[:, 0], raw_xz[:, 1])
+        if int(sum(usable)) != mask_info["selected_points"]:
+            raise ValueError("Pavement observation count differs")
+    exclusion_queries = np.zeros(len(points), dtype=bool)
+    refit = data["metadata"].get("structural_exclusion_refit")
+    if refit is not None:
+        import shapely
+        from refit_lidar_exclusions import load_exclusions
+
+        if (
+            hashlib.sha256(args.exclusions.read_bytes()).hexdigest()
+            != refit["exclusions_sha256"]
+        ):
+            raise ValueError("Structural exclusion differs from atlas")
+        excluded = load_exclusions(
+            args.exclusions, track, data["metadata"]["provenance_sha256"]["track"]
+        )
+        usable &= ~shapely.intersects_xy(excluded, raw_xz[:, 0], raw_xz[:, 1])
+        if int(sum(usable)) != refit["remaining_observations"]:
+            raise ValueError("Usable observation count differs from refit")
+        exclusion_queries = shapely.intersects_xy(excluded, points[:, 0], points[:, 1])
+    nearest_usable, _ = cKDTree(raw_xz[usable]).query(points)
     discrepancy = result["height"] - np.array(old_heights)
     extrema = {}
     for label, index in [
@@ -100,6 +144,8 @@ def main():
             "normal_curvature_per_m": float(curvature[index]),
             "height_change_m": float(discrepancy[index]),
             "nearest_raw_point_m": float(nearest[index]),
+            "nearest_usable_point_m": float(nearest_usable[index]),
+            "inside_structural_exclusion": bool(exclusion_queries[index]),
         }
     raw_checks = {}
     for label, location in extrema.items():
@@ -136,6 +182,8 @@ def main():
             int(result["patch_count"].max()),
         ],
         "max_nearest_raw_point_m": float(nearest.max()),
+        "max_nearest_usable_point_m": float(nearest_usable.max()),
+        "queries_inside_structural_exclusion": int(sum(exclusion_queries)),
         "height_change_p95_abs_m": float(np.quantile(abs(discrepancy), 0.95)),
         "curvature_quantiles_per_m": np.quantile(
             curvature, [0, 0.01, 0.5, 0.99, 1]

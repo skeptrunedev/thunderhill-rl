@@ -51,3 +51,19 @@ The full atlas builder accepts `--pavement-mask-buffer 0` and records the select
 Station 392 has a different source problem. A reviewed aerial crop and the complete raw LAS returns show a raised structure over the queried location. Class 1 returns form a roof band around 97.7 m NAVD88, roughly six metres above nearby ground. Sparse ground classification under and beside this footprint cannot establish a rideable pavement crest.
 
 `data/reference/pavement-exclusions.json` records the observed roof convex hull, source LAZ hash, selection criteria and a proposed one metre fitting margin. The margin is interpretive, not a measured foundation or barrier boundary. Root verification reproduced the 152 point selection, its hull and the offset polygon from the retained raw extract, and verified both source hashes. The manifest does not alter gameplay or automatically remove observations. Any reconstructed road below this structure must remain marked as inferred.
+
+## Complete masked atlas and structural refit
+
+The complete pavement masked build finished all 809 patches. `tools/refit_lidar_exclusions.py` then rebuilt the six patches whose full 32 metre fitting squares intersect the reviewed structure exclusion. It removed 111 observations, retained 532,049 masked observations, and independently verified that all other 803 patch dictionaries remained exactly equal. The tool validates source hashes, fitting settings, mask geometry and exclusion coordinate provenance. Boundary tests ensure that a patch is included when the exclusion touches its fitting square, even outside its smaller blending support.
+
+Reproduce the corrected artifact with:
+
+```
+OPENBLAS_NUM_THREADS=1 uv run tools/build_lidar_atlas.py --workers 4 --pavement-mask-buffer 0 --output artifacts/road-surface/lidar-atlas-pavement.json
+OPENBLAS_NUM_THREADS=1 uv run tools/refit_lidar_exclusions.py --atlas artifacts/road-surface/lidar-atlas-pavement.json --output artifacts/road-surface/lidar-atlas-pavement-exclusions.json
+uv run tools/audit_lidar_atlas.py --atlas artifacts/road-surface/lidar-atlas-pavement-exclusions.json --output artifacts/road-surface/lidar-atlas-corrected-circuit.json
+```
+
+The corrected circuit audit still covers all 32,249 positions. Seventeen lie inside the structural exclusion. Maximum distance to a retained observation is 2.392934 m, explicitly exposing the inferred region rather than counting excluded returns as support. Godot matches the corrected Python surface at all samples with maximum component error 0.00000001367745.
+
+The sampled curvature extrema now occur at station 404, lateral negative 2 m (negative 0.044004 per metre), and station 70, lateral negative 4 m (positive 0.052542 per metre). Both are on the pit straight. They still require interpretation against pavement and structure boundaries before curvature drives tire loads. The corrected atlas is an improved geometric candidate, not a validated motorcycle road load model. The raw local fits and usable support distances accompany each extremum in the audit.
