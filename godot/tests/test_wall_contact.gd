@@ -244,9 +244,12 @@ func check_historical_wall(game: Node3D) -> void:
 		envelope.overlaps(space, game.bike_root.global_transform, 0, 0, 0, mask).is_empty(),
 		"Historical wall fixture starts overlapping"
 	)
+	game.collision_sweep.profiling_enabled = "--profile-sweep" in OS.get_cmdline_user_args()
 	var query_started := Time.get_ticks_usec()
 	var transition: Dictionary = game._step({"throttle": 0.0})
 	print("HISTORICAL_WALL_STEP_MS ", (Time.get_ticks_usec() - query_started) / 1000.0)
+	if game.collision_sweep.profiling_enabled:
+		print("HISTORICAL_WALL_PROFILE ", JSON.stringify(game.collision_sweep.profile))
 	check(not transition.has("error"), "Historical wall contact produced infrastructure failure")
 	check(
 		game.sim.tick == 1 and game.sim.crashed and game.sim.crash_reason == "pit_wall",

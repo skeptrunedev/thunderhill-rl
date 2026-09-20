@@ -91,11 +91,14 @@ func _contact_case(
 	_check(not _hits(envelope, a), label + " starts clear")
 	_check(not _hits(envelope, b), label + " ends clear")
 	var solver := SWEEP.new()
+	solver.profiling_enabled = "--profile-sweep" in OS.get_cmdline_user_args()
 	_check(solver.build(envelope).is_empty(), label + " builds")
 	var started := Time.get_ticks_usec()
 	var result: Dictionary = solver.sweep(space, a, b, MASK)
 	var elapsed_ms := (Time.get_ticks_usec() - started) / 1000.0
 	print(label, " sweep ", JSON.stringify(result), " ms=", elapsed_ms)
+	if solver.profiling_enabled:
+		print(label, " profile ", JSON.stringify(solver.profile))
 	_check(result.get("status", "") == "possible_contact", label + " catches intermediate contact")
 	if result.get("status", "") != "possible_contact":
 		return
@@ -153,6 +156,7 @@ func _run() -> void:
 		"fast translation", cube, _pose(Vector3(-10, 0, 0)), _pose(Vector3(10, 0, 0)), 20.0
 	)
 	var solver := SWEEP.new()
+	solver.profiling_enabled = "--profile-sweep" in OS.get_cmdline_user_args()
 	_check(solver.build(cube).is_empty(), "cube builds")
 	var initial: Dictionary = solver.sweep(space, _pose(), _pose(Vector3(10, 0, 0)), MASK)
 	_check(initial.get("status", "") == "initial_overlap", "initial overlap explicit")
