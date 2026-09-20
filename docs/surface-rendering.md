@@ -154,3 +154,12 @@ The rendering device does not check the wait return value:
 [frame stall](https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/servers/rendering/rendering_device.cpp#L8214).
 These facts establish a diagnostic lead, not the cause of our black captures.
 Game capture sidecars now also record GPU readback duration.
+
+The exported app does not honor the editor's `--script` entry option. The first
+native probe attempt therefore launched the normal game, as its THUNDERHILL_READY
+log established, and supplies no probe evidence. That diagnostic process was
+terminated explicitly. The app now has a dedicated `-- --capture-probe` mode
+which disables gameplay processing and enters the probe before track construction.
+Use `--probe-output=/absolute/path/prefix` after the argument separator. The
+CAPTURE_PROBE_BEGIN marker confirms the correct path. The same app entry mode
+passed all six local samples (`artifacts/capture-probe-linux-mode*`).

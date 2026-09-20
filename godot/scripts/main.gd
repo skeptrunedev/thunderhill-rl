@@ -59,6 +59,12 @@ var startup_previous_usec: int
 
 
 func _ready() -> void:
+	if "--capture-probe" in OS.get_cmdline_user_args():
+		set_process(false)
+		set_physics_process(false)
+		set_process_input(false)
+		add_child(preload("res://tools/probe_capture.gd").new())
+		return
 	startup_started_usec = Time.get_ticks_usec()
 	startup_previous_usec = startup_started_usec
 	for arg in OS.get_cmdline_user_args():

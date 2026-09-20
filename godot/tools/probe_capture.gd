@@ -1,12 +1,15 @@
-extends SceneTree
+extends Node
 ## Diagnostic only: compare root and offscreen readback without game assets.
 var output := "user://capture-probe"
 var offscreen: SubViewport
 var rows: Array = []
 var failures := 0
+var root: Window
 
 
-func _initialize() -> void:
+func _ready() -> void:
+	root = get_tree().root
+	print("CAPTURE_PROBE_BEGIN")
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--probe-output="):
 			output = argument.trim_prefix("--probe-output=")
@@ -16,7 +19,7 @@ func _initialize() -> void:
 func _run() -> void:
 	if DisplayServer.get_name() == "headless":
 		push_error("Capture probe requires a renderer")
-		quit(2)
+		get_tree().quit(2)
 		return
 	root.size = Vector2i(640, 360)
 	root.msaa_3d = Viewport.MSAA_2X
@@ -92,7 +95,7 @@ func _run() -> void:
 			print("CAPTURE_PROBE ", JSON.stringify(row))
 	var file := FileAccess.open(output + ".json", FileAccess.WRITE)
 	if file == null:
-		quit(2)
+		get_tree().quit(2)
 		return
 	file.store_string(
 		JSON.stringify(
@@ -106,7 +109,7 @@ func _run() -> void:
 		)
 	)
 	file.close()
-	quit(0 if failures == 0 else 1)
+	get_tree().quit(0 if failures == 0 else 1)
 
 
 static func inspect_image(captured: Image) -> Dictionary:
