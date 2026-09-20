@@ -4,6 +4,7 @@ extends Node3D
 ## Positions derive from OSM and inspected NAIP crowns, never random scattering.
 
 var _track: Node3D
+var _ground_height_cache: Dictionary = {}
 var initialization_error := ""
 var _walls := SurfaceTool.new()
 var _roofs := SurfaceTool.new()
@@ -15,6 +16,7 @@ var _paving := SurfaceTool.new()
 
 func build(track: Node3D) -> void:
 	_track = track
+	_ground_height_cache.clear()
 	var data: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://data/landmarks.json")
 	)
@@ -48,6 +50,7 @@ func build(track: Node3D) -> void:
 	_commit(_concrete, _material(Color("deddd0")), "VideoReferencedPitWall")
 	_commit(_paving, _material(Color("373d3d")), "MappedPaddockPaving")
 	_build_trees(data.trees)
+	_ground_height_cache.clear()
 
 
 func _material(color: Color, roughness: float = 0.85) -> StandardMaterial3D:
@@ -74,7 +77,12 @@ func _commit(surface: SurfaceTool, mat: Material, label: String) -> void:
 
 func _point(p: Array, lift: float = 0.0) -> Vector3:
 	var result := Vector3(float(p[0]), 0, float(p[1]))
-	result.y = _track.terrain_surface_height(result) + lift
+	# Subdivided pavement triangles share most vertices. The track is immutable
+	# during this build, so reuse the exact sampled height rather than resampling.
+	var key := Vector2(result.x, result.z)
+	if not _ground_height_cache.has(key):
+		_ground_height_cache[key] = _track.terrain_surface_height(result)
+	result.y = float(_ground_height_cache[key]) + lift
 	return result
 
 

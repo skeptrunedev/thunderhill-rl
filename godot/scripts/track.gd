@@ -2,6 +2,7 @@ class_name ThunderhillTrack
 extends Node3D
 
 var initialization_error := ""
+var startup_observer := Callable()
 var data: Dictionary
 var samples: Array
 var terrain: Dictionary
@@ -23,6 +24,7 @@ func _ready() -> void:
 	length_m = data.length_m
 	assert(length_m > 0.0, "Track length must be positive")
 	terrain = JSON.parse_string(FileAccess.get_file_as_string("res://data/terrain.json"))
+	_startup_mark("track_sources_parsed")
 	for i in samples.size():
 		var p: Array = samples[i].p
 		points.append(Vector3(p[0], p[1], p[2]))
@@ -30,6 +32,7 @@ func _ready() -> void:
 		if not grid.has(cell):
 			grid[cell] = []
 		grid[cell].append(i)
+	_startup_mark("track_index_complete")
 	_build_terrain()
 	if not initialization_error.is_empty():
 		push_error(initialization_error)
@@ -100,8 +103,11 @@ func _build_terrain() -> void:
 	initialization_error = validate_surface_sources(mesh_data)
 	if not initialization_error.is_empty():
 		return
+	_startup_mark("surface_sources_validated")
 	offroad_surface.configure(mesh_data)
+	_startup_mark("surface_contact_index_complete")
 	var st := offroad_surface.surface_tool()
+	_startup_mark("terrain_triangle_stream_complete")
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/terrain.gdshader")
 	mat.set_shader_parameter(
@@ -130,6 +136,7 @@ func _build_terrain() -> void:
 	mat.set_shader_parameter("macro_size", Vector2(macro.local_size_xz[0], macro.local_size_xz[1]))
 	terrain_material = mat
 	_mesh(st, mat, "MeasuredTerrain")
+	_startup_mark("terrain_render_mesh_complete")
 
 
 func edge_point(i: int, offset: float, lift: float = 0.04) -> Vector3:
@@ -384,3 +391,8 @@ func _road_sample(p: Vector3) -> Dictionary:
 		"bank": bank,
 		"curvature": float(samples[index].curvature)
 	}
+
+
+func _startup_mark(stage: String) -> void:
+	if startup_observer.is_valid():
+		startup_observer.call(stage)

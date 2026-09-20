@@ -51,9 +51,26 @@ var benchmark_path := ""
 var frame_times: Array = []
 var agent_camera: Node
 var agent_request_pending := false
+var startup_profile: FileAccess
+var startup_started_usec: int
+var startup_previous_usec: int
 
 
 func _ready() -> void:
+	startup_started_usec = Time.get_ticks_usec()
+	startup_previous_usec = startup_started_usec
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--startup-profile="):
+			startup_profile = FileAccess.open(
+				arg.trim_prefix("--startup-profile="), FileAccess.WRITE
+			)
+			if startup_profile == null:
+				push_error(
+					"Cannot open requested startup profile: %s" % FileAccess.get_open_error()
+				)
+				get_tree().quit(2)
+				return
+	_startup_mark("scene_ready_begin")
 	run_id = "%d_%d" % [Time.get_unix_time_from_system(), OS.get_process_id()]
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--agent-port="):
@@ -96,13 +113,16 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	track = TrackScript.new()
+	track.startup_observer = _startup_mark
 	add_child(track)
 	if not track.initialization_error.is_empty():
 		get_tree().quit(2)
 		return
+	_startup_mark("track_complete")
 	var horizon = preload("res://scripts/horizon.gd").new()
 	add_child(horizon)
 	horizon.build(track)
+	_startup_mark("horizon_complete")
 	var landmarks = preload("res://scripts/landmarks.gd").new()
 	add_child(landmarks)
 	landmarks.build(track)
@@ -110,9 +130,11 @@ func _ready() -> void:
 		push_error(landmarks.initialization_error)
 		get_tree().quit(2)
 		return
+	_startup_mark("landmarks_complete")
 	var scenery = preload("res://scripts/scenery.gd").new()
 	add_child(scenery)
 	scenery.build(track)
+	_startup_mark("scenery_complete")
 	sim = SimScript.new()
 	if DisplayServer.get_name() != "headless":
 		engine_audio = preload("res://scripts/engine_audio.gd").new()
@@ -123,6 +145,7 @@ func _ready() -> void:
 	add_child(bike_root)
 	bike = BikeScript.new()
 	bike_root.add_child(bike)
+	_startup_mark("environment_and_bike_complete")
 	AgentCameraScript.assign_rider_layer(bike.rider)
 	camera = Camera3D.new()
 	camera.far = 3000
@@ -184,8 +207,42 @@ func _ready() -> void:
 		)
 	)
 
+	_startup_mark("scene_ready_complete")
+	if startup_profile != null:
+		if DisplayServer.get_name() == "headless":
+			startup_profile.close()
+			startup_profile = null
+		else:
+			RenderingServer.frame_post_draw.connect(_startup_first_draw, CONNECT_ONE_SHOT)
 	if "--qa-controls" in OS.get_cmdline_user_args():
 		_run_control_checks.call_deferred()
+
+
+func _startup_mark(stage: String) -> void:
+	if startup_profile == null:
+		return
+	var now := Time.get_ticks_usec()
+	startup_profile.store_line(
+		JSON.stringify(
+			{
+				"stage": stage,
+				"elapsed_ms": (now - startup_started_usec) / 1000.0,
+				"interval_ms": (now - startup_previous_usec) / 1000.0,
+				"pid": OS.get_process_id(),
+				"platform": OS.get_name(),
+				"display_server": DisplayServer.get_name()
+			}
+		)
+	)
+	# Preserve completed stages while the next expensive operation is still running.
+	startup_profile.flush()
+	startup_previous_usec = now
+
+
+func _startup_first_draw() -> void:
+	_startup_mark("first_frame_post_draw")
+	startup_profile.close()
+	startup_profile = null
 
 
 func _run_control_checks() -> void:

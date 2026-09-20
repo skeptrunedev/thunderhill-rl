@@ -9,3 +9,5 @@ Placement targets 96,000 accepted clumps with a bounded attempt count, concentra
 Spatial MultiMesh batches retain the 80 metre visibility limit and disabled shadows. The higher density materially increases the potentially visible triangle count. A rendered control diagnostic at 1920 by 1200 on the local RTX 2080 Ti passed with zero failures, with 267 frame intervals reporting median 17.241 ms and 95th percentile 17.850 ms. This brief diagnostic is not whole circuit or native Mac performance acceptance.
 
 The straight preview confirms more visible grouped vegetation. The broad terrain color, scenery, motorcycle dynamics and overall photographic realism still require further work. No training has started.
+
+Native package `f1a08ae36121-bada8f9e0a72` subsequently completed the shared control diagnostic on the owner's M3 Pro using Metal 4.0 with zero failures. The 72 recorded frame intervals reported median 66.667 ms and 95th percentile 73.282 ms. The screen was locked and other review builds were running, so this does not establish foreground performance or isolate the effect of vegetation. The completed log is `artifacts/mac-grass-clumps-controls.log`.
