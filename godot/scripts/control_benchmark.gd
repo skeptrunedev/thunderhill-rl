@@ -9,6 +9,8 @@ var max_position_error_m := 0.0
 var offtrack_ticks := 0
 var expected_state: Dictionary
 var resolution := Vector2.ZERO
+var slow_frames: Array[Dictionary] = []
+var capture_events: Array[Dictionary] = []
 
 
 func open_trace(path: String, sim: RefCounted, track_hash: String, dt: float) -> String:
@@ -66,9 +68,30 @@ func record_step(sim: RefCounted, on_track: bool) -> void:
 func record_frame(viewport: Viewport) -> void:
 	var now := Time.get_ticks_usec()
 	if last_frame_usec > 0:
-		intervals_ms.append(float(now - last_frame_usec) / 1000.0)
+		var duration_ms := float(now - last_frame_usec) / 1000.0
+		intervals_ms.append(duration_ms)
+		if duration_ms >= 50.0:
+			slow_frames.append(
+				{
+					"frame_index": intervals_ms.size(),
+					"start_ms": float(last_frame_usec - start_usec) / 1000.0,
+					"end_ms": float(now - start_usec) / 1000.0,
+					"duration_ms": duration_ms
+				}
+			)
 	last_frame_usec = now
 	resolution = viewport.get_visible_rect().size
+
+
+func record_capture(stage: String, begin_usec: int, end_usec: int) -> void:
+	capture_events.append(
+		{
+			"stage": stage,
+			"start_ms": float(begin_usec - start_usec) / 1000.0,
+			"end_ms": float(end_usec - start_usec) / 1000.0,
+			"duration_ms": float(end_usec - begin_usec) / 1000.0
+		}
+	)
 
 
 func report(sim: RefCounted, laps: int, failure: String = "") -> Dictionary:
@@ -90,6 +113,9 @@ func report(sim: RefCounted, laps: int, failure: String = "") -> Dictionary:
 		"resolution": [resolution.x, resolution.y],
 		"platform": OS.get_name(),
 		"frame_intervals": intervals_ms.size(),
+		"slow_frame_threshold_ms": 50.0,
+		"slow_frames": slow_frames,
+		"capture_events": capture_events,
 		"crashed": sim.crashed,
 		"measurement":
 		"Wall clock process frame intervals, including physics and recording; startup excluded"

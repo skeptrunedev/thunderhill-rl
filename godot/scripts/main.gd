@@ -534,8 +534,17 @@ func _process(dt: float) -> void:
 	if not screenshot_path.is_empty() and Engine.get_process_frames() > 12:
 		var path := screenshot_path
 		screenshot_path = ""
+		var wait_begin := Time.get_ticks_usec()
 		await RenderingServer.frame_post_draw
-		var error := get_viewport().get_texture().get_image().save_png(path)
+		var read_begin := Time.get_ticks_usec()
+		var screenshot := get_viewport().get_texture().get_image()
+		var save_begin := Time.get_ticks_usec()
+		var error := screenshot.save_png(path)
+		var save_end := Time.get_ticks_usec()
+		if benchmark != null:
+			benchmark.record_capture("post_draw_wait", wait_begin, read_begin)
+			benchmark.record_capture("gpu_readback", read_begin, save_begin)
+			benchmark.record_capture("png_save", save_begin, save_end)
 		print("SCREENSHOT ", path, " result=", error)
 		if preview_mode:
 			get_tree().quit()

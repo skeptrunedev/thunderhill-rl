@@ -68,5 +68,11 @@ func _initialize() -> void:
 		if tick == 1:
 			check(action.controls.throttle == 0.5, "Recorded controls changed")
 			check(loader.next_action().is_empty(), "End of trace was not detected")
+	var timing := Benchmark.new()
+	timing.start_usec = 1000000
+	timing.record_capture("gpu_readback", 1010000, 1025000)
+	var event: Dictionary = timing.capture_events[0]
+	check(event.start_ms == 10.0 and event.end_ms == 25.0, "Capture clock origin changed")
+	check(event.duration_ms == 15.0, "Capture duration units changed")
 	print("BENCHMARK_CONTRACT_CHECK failures=", failures)
 	quit(failures)
