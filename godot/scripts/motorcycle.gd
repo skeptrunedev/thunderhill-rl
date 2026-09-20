@@ -3,7 +3,7 @@ extends RefCounted
 ## Explicitly stepped, reduced order motorcycle prototype. SI units throughout.
 ## This is original code, not validated Ducati or tire manufacturer dynamics.
 
-const MODEL_VERSION := "reduced-order-banked-rider-v2"
+const MODEL_VERSION := "reduced-order-contact-balance-v3"
 const GRAVITY := 9.81
 const GEAR_RATIOS := [38.0 / 14.0, 36.0 / 17.0, 33.0 / 19.0, 32.0 / 21.0, 30.0 / 22.0, 30.0 / 24.0]
 
@@ -52,6 +52,7 @@ var parameters: Dictionary = {
 var position := Vector3.ZERO
 var heading := 0.0
 var speed := 0.0
+var longitudinal_velocity := 0.0
 var lean := 0.0
 var lean_rate := 0.0
 var steering := 0.0
@@ -91,6 +92,7 @@ func reset(start_position: Vector3, start_heading: float, initial_speed: float =
 	position = start_position
 	heading = start_heading
 	speed = maxf(initial_speed, 0.0)
+	longitudinal_velocity = speed
 	lean = 0.0
 	lean_rate = 0.0
 	steering = 0.0
@@ -188,6 +190,24 @@ func validate_controls(controls: Dictionary) -> String:
 
 
 func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionary:
+	# Unsupported contact regimes invalidate this transition atomically. Keep the
+	# actual pre-step state, including actuator and drivetrain state, for reset/review.
+	var snapshot: Dictionary = {}
+	for property: Dictionary in get_property_list():
+		if int(property.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE and property.name != "parameters":
+			var value: Variant = get(property.name)
+			snapshot[property.name] = (
+				value.duplicate(true) if value is Dictionary or value is Array else value
+			)
+	var result := _integrate_step(dt, controls, road_sample)
+	if result.get("failure_type", "") == "unsupported_dynamics":
+		for key: String in snapshot:
+			set(key, snapshot[key])
+		result["state"] = telemetry()
+	return result
+
+
+func _integrate_step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionary:
 	var error := validate_controls(controls)
 	if not is_finite(dt) or dt <= 0.0 or dt > 0.02:
 		error = "Physics timestep must be positive and at most 0.02 seconds"
@@ -224,8 +244,11 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	_update_surface_frame(normal, tangent)
 	position.y = float(road_sample.height)
 	if crashed:
-		speed = move_toward(speed, 0.0, float(parameters.fall_slide_deceleration_m_s2) * dt)
-		position += tangent * speed * dt
+		longitudinal_velocity = move_toward(
+			longitudinal_velocity, 0.0, float(parameters.fall_slide_deceleration_m_s2) * dt
+		)
+		speed = absf(longitudinal_velocity)
+		position += tangent * longitudinal_velocity * dt
 		elapsed += dt
 		tick += 1
 		return telemetry()
@@ -253,18 +276,6 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	var roll_resistance := float(
 		parameters.rolling_coefficient if on_track else parameters.offtrack_rolling_coefficient
 	)
-	# Subtract grade gravity from prior acceleration: gravity alone creates no
-	# contact driven pitch moment. Forward drive unloads the front axle.
-	var transfer := (
-		total_mass
-		* (longitudinal_acceleration - gravity_forward_m_s2)
-		* float(parameters.cg_height_m)
-		/ float(parameters.wheelbase_m)
-	)
-	front_load_n = clampf(
-		normal_force * float(parameters.static_front_fraction) - transfer, 0.0, normal_force
-	)
-	rear_load_n = normal_force - front_load_n
 	var ratio := (
 		float(parameters.primary_ratio)
 		* float(GEAR_RATIOS[gear - 1])
@@ -286,15 +297,72 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 		/ float(parameters.rear_rolling_radius_m)
 	)
 	engine_brake *= clampf(speed / 5.0, 0.0, 1.0)
-	# Explicit ideal tire force limiter, not a claim to emulate proprietary ABS/TC.
-	front_force_n = -minf(
-		front_brake_applied * float(parameters.front_brake_capacity_n), friction * front_load_n
+	var front_brake_request := front_brake_applied * float(parameters.front_brake_capacity_n)
+	var rear_brake_request := rear_brake_applied * float(parameters.rear_brake_capacity_n)
+	# Aerodynamic drag and the effective rolling-resistance force are explicitly
+	# modeled through COM, with no pitching moment. Tire forces act at road level.
+	var drag := (
+		0.5 * float(parameters.air_density_kg_m3) * float(parameters.drag_area_m2) * speed * speed
 	)
-	rear_force_n = clampf(
-		drive_force - rear_brake_applied * float(parameters.rear_brake_capacity_n) - engine_brake,
-		-friction * rear_load_n,
-		friction * rear_load_n
+	var resistance := roll_resistance * normal_force * clampf(speed, 0.0, 1.0)
+	var contact: Dictionary
+	var travel_sign := signf(longitudinal_velocity)
+	if speed <= 0.0:
+		contact = _stationary_contact(
+			normal_force, friction, drive_force, front_brake_request, rear_brake_request
+		)
+	else:
+		contact = _contact_balance(
+			normal_force,
+			friction,
+			-travel_sign * front_brake_request,
+			drive_force - travel_sign * (rear_brake_request + engine_brake)
+		)
+	if contact.has("error"):
+		return contact
+	var acceleration := (
+		(
+			(
+				float(contact.front_force)
+				+ float(contact.rear_force)
+				- travel_sign * (drag + resistance)
+			)
+			/ total_mass
+		)
+		+ gravity_forward_m_s2
 	)
+	if contact.get("held", false):
+		acceleration = 0.0
+	var travel := longitudinal_velocity * dt + 0.5 * acceleration * dt * dt
+	var next_velocity := longitudinal_velocity + acceleration * dt
+	if (
+		(longitudinal_velocity > 0.0 and next_velocity <= 0.0)
+		or (longitudinal_velocity < 0.0 and next_velocity >= 0.0)
+	):
+		# Integrate to the actual stop event, not a trapezoid over a clipped speed.
+		var stop_time := -longitudinal_velocity / acceleration
+		travel = longitudinal_velocity * stop_time + 0.5 * acceleration * stop_time * stop_time
+		contact = _stationary_contact(
+			normal_force, friction, drive_force, front_brake_request, rear_brake_request
+		)
+		if contact.has("error"):
+			return contact
+		acceleration = (
+			(float(contact.front_force) + float(contact.rear_force)) / total_mass
+			+ gravity_forward_m_s2
+		)
+		if contact.get("held", false):
+			acceleration = 0.0
+		var remaining := dt - stop_time
+		next_velocity = acceleration * remaining
+		travel += 0.5 * acceleration * remaining * remaining
+	if absf(next_velocity) < 1e-10:
+		next_velocity = 0.0
+	front_load_n = contact.front_load
+	rear_load_n = normal_force - front_load_n
+	front_force_n = contact.front_force
+	rear_force_n = contact.rear_force
+	longitudinal_acceleration = acceleration
 	var front_lateral_capacity := sqrt(
 		maxf(0.0, pow(friction * front_load_n, 2.0) - front_force_n * front_force_n)
 	)
@@ -312,15 +380,6 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	lateral_force_n = clampf(requested_lateral_force_n, -lateral_capacity, lateral_capacity)
 	lateral_acceleration = lateral_force_n / total_mass + gravity_right_m_s2
 	grip_utilization = absf(requested_lateral_force_n) / maxf(lateral_capacity, 1.0)
-	var drag := (
-		0.5 * float(parameters.air_density_kg_m3) * float(parameters.drag_area_m2) * speed * speed
-	)
-	var resistance := roll_resistance * normal_force * clampf(speed, 0.0, 1.0)
-	var grade_acceleration := gravity_forward_m_s2
-	longitudinal_acceleration = (
-		(front_force_n + rear_force_n - drag - resistance) / total_mass + grade_acceleration
-	)
-	var next_speed := maxf(0.0, speed + longitudinal_acceleration * dt)
 	# In the road frame, gravity and inertial acceleration both contribute.
 	# lean is world upright roll; relative lean determines contact clearance.
 	var roll_acceleration := (
@@ -339,12 +398,15 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	lean += lean_rate * dt
 	if speed > 0.1:
 		var horizontal_length_squared := tangent.x * tangent.x + tangent.z * tangent.z
-		var azimuth_rate := lateral_acceleration / speed * normal.y / horizontal_length_squared
+		var azimuth_rate := (
+			lateral_acceleration / longitudinal_velocity * normal.y / horizontal_length_squared
+		)
 		heading = wrapf(heading + azimuth_rate * dt, -PI, PI)
 	tangent = surface_forward(normal)
 	_update_surface_frame(normal, tangent)
-	position += tangent * (speed + next_speed) * 0.5 * dt
-	speed = next_speed
+	position += tangent * travel
+	longitudinal_velocity = next_velocity
+	speed = absf(longitudinal_velocity)
 	if absf(lean_relative_road_rad) >= float(parameters.fall_angle_rad):
 		crashed = true
 		crash_reason = "lean_contact"
@@ -354,6 +416,128 @@ func step(dt: float, controls: Dictionary, road_sample: Dictionary) -> Dictionar
 	elapsed += dt
 	tick += 1
 	return telemetry()
+
+
+func _unsupported(reason: String) -> Dictionary:
+	return {"error": reason, "failure_type": "unsupported_dynamics", "rollout_valid": false}
+
+
+func _forces_at_load(
+	front_load: float, total_load: float, friction: float, front_request: float, rear_request: float
+) -> Dictionary:
+	return {
+		"front_load": front_load,
+		"front_force": clampf(front_request, -friction * front_load, friction * front_load),
+		"rear_force":
+		clampf(
+			rear_request,
+			-friction * (total_load - front_load),
+			friction * (total_load - front_load)
+		),
+	}
+
+
+func _contact_balance(
+	total_load: float, friction: float, front_request: float, rear_request: float
+) -> Dictionary:
+	# Fixed requests yield piecewise affine load balance. Enumerating every tire
+	# saturation breakpoint solves it without lag, iterative history, or load floors.
+	var ratio := float(parameters.cg_height_m) / float(parameters.wheelbase_m)
+	var static_front := float(parameters.static_front_fraction) * total_load
+	var tolerance := maxf(total_load, 1.0) * 1e-9
+	var points: Array[float] = [0.0, total_load]
+	if friction > 0.0:
+		for candidate: float in [
+			absf(front_request) / friction, total_load - absf(rear_request) / friction
+		]:
+			if candidate > 0.0 and candidate < total_load:
+				points.append(candidate)
+	points.sort()
+	var roots: Array[float] = []
+	for i in range(points.size() - 1):
+		var left := points[i]
+		var right := points[i + 1]
+		var a := _forces_at_load(left, total_load, friction, front_request, rear_request)
+		var b := _forces_at_load(right, total_load, friction, front_request, rear_request)
+		var ra := left - static_front + ratio * (float(a.front_force) + float(a.rear_force))
+		var rb := right - static_front + ratio * (float(b.front_force) + float(b.rear_force))
+		if right - left > tolerance and absf(ra) <= tolerance and absf(rb) <= tolerance:
+			return _unsupported(
+				"Nonunique quasistatic axle load equilibrium requires pitch dynamics"
+			)
+		var candidates: Array[float] = []
+		if absf(ra) <= tolerance:
+			candidates.append(left)
+		if absf(rb) <= tolerance:
+			candidates.append(right)
+		if ra * rb < 0.0:
+			candidates.append(left - ra * (right - left) / (rb - ra))
+		for candidate: float in candidates:
+			var duplicate := false
+			for existing: float in roots:
+				if absf(existing - candidate) <= tolerance:
+					duplicate = true
+			if not duplicate:
+				roots.append(candidate)
+	if roots.size() != 1:
+		return _unsupported(
+			"No unique two-contact axle equilibrium; wheel lift or pitch dynamics required"
+		)
+	return _forces_at_load(roots[0], total_load, friction, front_request, rear_request)
+
+
+func _stationary_contact(
+	total_load: float, friction: float, drive: float, front_brake: float, rear_brake: float
+) -> Dictionary:
+	# At rest brake force is a reaction within the commanded torque capacity,
+	# not a force that accelerates a parked motorcycle backwards. A signed fraction
+	# distributes that reaction proportionally between the commanded brakes.
+	var required_force := -mass_kg() * gravity_forward_m_s2
+	var ratio := float(parameters.cg_height_m) / float(parameters.wheelbase_m)
+	var front_load := float(parameters.static_front_fraction) * total_load - ratio * required_force
+	var tolerance := maxf(total_load, 1.0) * 1e-9
+	if front_load >= 0.0 and front_load <= total_load:
+		var low := -1.0
+		var high := 1.0
+		var minimum := _forces_at_load(
+			front_load, total_load, friction, -front_brake, drive - rear_brake
+		)
+		var maximum := _forces_at_load(
+			front_load, total_load, friction, front_brake, drive + rear_brake
+		)
+		var min_force := float(minimum.front_force) + float(minimum.rear_force)
+		var max_force := float(maximum.front_force) + float(maximum.rear_force)
+		if required_force >= min_force - tolerance and required_force <= max_force + tolerance:
+			var held: Dictionary
+			for iteration in 60:
+				var fraction := (low + high) * 0.5
+				held = _forces_at_load(
+					front_load,
+					total_load,
+					friction,
+					-fraction * front_brake,
+					drive - fraction * rear_brake
+				)
+				var force := float(held.front_force) + float(held.rear_force)
+				if force > required_force:
+					low = fraction
+				else:
+					high = fraction
+			held["held"] = true
+			return held
+	# If no stationary reaction is available, let gravity/drive choose breakaway
+	# direction, then apply brake torque opposite that impending motion.
+	var free := _contact_balance(total_load, friction, 0.0, drive)
+	if free.has("error"):
+		return free
+	var free_force := float(free.front_force) + float(free.rear_force) - required_force
+	var direction := signf(free_force)
+	var moving := _contact_balance(
+		total_load, friction, -direction * front_brake, drive - direction * rear_brake
+	)
+	if moving.has("error"):
+		return moving
+	return moving
 
 
 func _update_steering(dt: float, command: float, normal_gravity: float) -> void:
@@ -432,6 +616,7 @@ func telemetry() -> Dictionary:
 		"position": position,
 		"heading": heading,
 		"speed": speed,
+		"longitudinal_velocity": longitudinal_velocity,
 		"lean": lean,
 		"lean_rate": lean_rate,
 		"road_bank_rad": road_bank_rad,

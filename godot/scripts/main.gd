@@ -35,6 +35,7 @@ var action_cache: Dictionary = {}
 var action_requests: Dictionary = {}
 var policy_id := "human"
 var terminated := false
+var environment_failure: Dictionary = {}
 var server_port := 0
 var screenshot_path := ""
 var qa_ticks := 0
@@ -207,6 +208,7 @@ func reset_episode(station: float, checkpoint: String = "human") -> Dictionary:
 	next_gate = (int(last_progress * 32) + 1) % 32
 	lap_valid = true
 	terminated = false
+	environment_failure.clear()
 	wheel_rotation = 0
 	steering_input = 0
 	action_cache.clear()
@@ -259,7 +261,7 @@ func serializable(value: Variant) -> Variant:
 
 
 func _physics_process(_dt: float) -> void:
-	if agent_mode or paused:
+	if agent_mode or paused or not environment_failure.is_empty():
 		return
 	if replay != null:
 		var row: Dictionary = replay.next_state()
@@ -269,7 +271,7 @@ func _physics_process(_dt: float) -> void:
 			return
 		replay.apply_state(sim, row.state)
 		lap_time = sim.elapsed
-		wheel_rotation += sim.speed * DT / 0.32
+		wheel_rotation += sim.longitudinal_velocity * DT / 0.32
 		return
 	controls = _human_controls()
 	_step(controls)
@@ -322,7 +324,24 @@ func _step(action: Dictionary) -> Dictionary:
 	var road: Dictionary = track.sample_world(sim.position)
 	var result: Dictionary = sim.step(DT, action, road)
 	if result.has("error"):
-		return result
+		environment_failure = {
+			"type": "environment_failure",
+			"episode_id": episode_id,
+			"policy_id": policy_id,
+			"tick": old_tick,
+			"error": result.error,
+			"failure_type": result.get("failure_type", "infrastructure"),
+			"rollout_valid": false,
+			"requested_controls": action,
+			"state": sim.telemetry()
+		}
+		_record(environment_failure)
+		if recorder:
+			recorder.flush()
+		paused = not agent_mode
+		if qa_target > 0:
+			get_tree().quit(2)
+		return environment_failure.duplicate(true)
 	var after: Dictionary = track.sample_world(sim.position)
 	sim.position.y = after.height
 	sim.on_track = after.on_track
@@ -355,7 +374,7 @@ func _step(action: Dictionary) -> Dictionary:
 	last_progress = after.progress
 	if sim.crashed:
 		terminated = true
-	wheel_rotation += sim.speed * DT / 0.32
+	wheel_rotation += sim.longitudinal_velocity * DT / 0.32
 	var transition: Dictionary = {
 		"type": "transition",
 		"episode_id": episode_id,
@@ -407,7 +426,9 @@ func observation() -> Dictionary:
 				"completed_laps": completed_laps
 			},
 			"terminated": terminated,
-			"truncated": false
+			"truncated": not environment_failure.is_empty(),
+			"rollout_valid": environment_failure.is_empty(),
+			"environment_failure": environment_failure.duplicate(true)
 		}
 	)
 
@@ -461,7 +482,7 @@ func _update_visual(dt: float) -> void:
 func _input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.is_pressed() or event.is_echo():
 		return
-	if event.keycode == KEY_ESCAPE:
+	if event.keycode == KEY_ESCAPE and environment_failure.is_empty():
 		paused = not paused
 	if event.keycode == KEY_C:
 		camera_mode = (camera_mode + 1) % 2
@@ -482,7 +503,8 @@ func menu_action(action: String) -> void:
 		return
 	match action:
 		"ride":
-			paused = false
+			if environment_failure.is_empty():
+				paused = false
 		"reset":
 			reset_episode(0)
 			paused = false
@@ -584,6 +606,8 @@ func _request(request: Dictionary) -> Dictionary:
 			return action_cache[id]
 		if request.get("expected_tick", -1) != sim.tick:
 			return {"error": "Tick mismatch"}
+		if not environment_failure.is_empty():
+			return serializable(environment_failure)
 		if terminated:
 			return {"error": "Episode terminated; reset required"}
 		var action: Variant = request.get("controls", {})
@@ -597,13 +621,12 @@ func _request(request: Dictionary) -> Dictionary:
 		for tick in 12:
 			var transition: Dictionary = _step(action)
 			if transition.has("error"):
-				return {
-					"error": transition.error,
-					"failure_type": "infrastructure",
-					"rollout_valid": false,
-					"episode_id": episode_id,
-					"tick": sim.tick
-				}
+				var failure: Dictionary = serializable(transition)
+				failure["action_id"] = id
+				failure["transitions"] = transitions
+				action_cache[id] = failure
+				action_requests[id] = request.duplicate(true)
+				return failure
 			transitions.append(serializable(transition))
 			if terminated:
 				break

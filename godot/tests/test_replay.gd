@@ -58,6 +58,13 @@ func _initialize() -> void:
 			is_equal_approx(observed.heading, float(expected.heading)), "Playback heading differs"
 		)
 		check(is_equal_approx(observed.speed, float(expected.speed)), "Playback speed differs")
+		check(
+			is_equal_approx(
+				observed.longitudinal_velocity,
+				float(expected.get("longitudinal_velocity", expected.speed))
+			),
+			"Playback lost signed velocity"
+		)
 		check(observed.tick == expected.tick, "Playback tick differs")
 		check(is_equal_approx(observed.elapsed, float(expected.elapsed)), "Playback time differs")
 		count += 1

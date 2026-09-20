@@ -115,6 +115,11 @@ func _process(_dt: float) -> void:
 			else ("AGENT CONTROL" if game.agent_mode else ("PAUSED" if game.paused else "PRACTICE"))
 		)
 	)
+	if not game.environment_failure.is_empty():
+		status.text = "RIDING STATE NOT SUPPORTED YET / R TO RESTART"
+		status.tooltip_text = str(game.environment_failure.error)
+	else:
+		status.tooltip_text = ""
 	panel.visible = game.paused and not game.agent_mode
 	queue_redraw()
 

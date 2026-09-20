@@ -1,6 +1,6 @@
 # Initial motorcycle dynamics implementation
 
-The initial Godot model is a reduced order, explicitly stepped prototype for testing controls, scenes, replay and the RL interface. It is not validated hyperrealistic handling. The dynamics version is `reduced-order-banked-rider-v2`.
+The initial Godot model is a reduced order, explicitly stepped prototype for testing controls, scenes, replay and the RL interface. It is not validated hyperrealistic handling. The dynamics version is `reduced-order-contact-balance-v3`.
 
 `godot/scripts/motorcycle.gd` defines `MotorcycleSim`, a `RefCounted` object with no scene processing or wall clock access. Call `reset(position, heading, initial_speed)` and then `step(dt, controls, road_sample)`. Rendering and reading `telemetry()` do not advance it. The caller owns the fixed timestep, at most 0.02 seconds, and road sampling. Ground position is the contact reference. Positive heading turns right, with forward vector `(sin(heading), 0, -cos(heading))`. Positive lean is right. Velocities are metres per second and angles are radians.
 
@@ -14,13 +14,36 @@ Automatic shifting is enabled by default and can be disabled with `auto_shift`. 
 
 ## Forces and state
 
-Engine torque passes through the selected primary, gear and final ratios to the rear wheel. A broad estimated torque curve respects the published US peak torque and power. Shift interruption, drag, rolling resistance, engine braking and road grade affect speed. Separate brake requests act on their corresponding axle. Estimated mass, center of gravity and previous acceleration determine longitudinal load transfer, with drive unloading the front axle and braking loading it.
+Engine torque passes through the selected primary, gear and final ratios to the rear wheel. A broad estimated torque curve respects the published US peak torque and power. Shift interruption, drag, rolling resistance, engine braking and road grade affect speed. Separate brake requests act on their corresponding axle. Estimated mass, center of gravity and current tire forces determine a simultaneous longitudinal force and axle load balance, with drive unloading the front axle and braking loading it.
 
 Each tire's longitudinal force consumes part of a circular friction budget. The remaining front and rear budgets bound total lateral force. Steering requests lateral force using wheelbase and speed. The roll equation includes gravity and lateral acceleration; exceeding the ground contact lean threshold marks a fall. The fallen state slides to rest under a labeled estimated deceleration. The game server should stop RL episodes at the fall event, although human visualization may continue the slide.
 
 Leaving the road lowers grip and increases rolling resistance. It does not teleport or steer the motorcycle back onto the course. Track boundary and lap legality decisions belong to the episode and track logic.
 
-Important simplifications include no separate lateral velocity or wheel slip state, no tire relaxation or thermal model, no suspension, pitch, airborne motion, wheelies or crash collision geometry. The tire model is a force budget, not Pacejka. Bank and grade gravity are projected into a local road frame, with the contact assumptions explained below. Axle loads use the previous acceleration with grade gravity subtracted, which is an explicit numerical approximation rather than a coupled pitch solution. Changes in surface and sharp throttle or brake commands require timestep sensitivity testing.
+Important simplifications include no separate lateral velocity or wheel slip state, no tire relaxation or thermal model, no suspension, pitch, airborne motion, wheelies or crash collision geometry. The tire model is a force budget, not Pacejka. Bank and grade gravity are projected into a local road frame, with the contact assumptions explained below. Axle loads satisfy quasistatic pitch balance within the declared contact model. The summed lateral budgets do not establish individual axle lateral forces or yaw moment equilibrium, which remains a limitation during combined braking and cornering. Changes in surface and sharp throttle or brake commands require timestep sensitivity testing.
+
+## Longitudinal contact and stationary braking
+
+Version 3 removes the artificial previous acceleration memory from axle loads. With total normal support `N`, configured static front fraction `f`, height `h` and wheelbase `L`, the same tick must satisfy:
+
+```text
+front_load = f*N - (h/L)*(front_tire_force + rear_tire_force)
+rear_load = N - front_load
+```
+
+Each longitudinal tire force is its requested force limited by that tire's available friction. These relationships are piecewise linear in front load. The solver enumerates the saturation breakpoints, solves each interval exactly and accepts a unique solution with nonnegative front and rear loads. It never floors a negative normal force to keep a physically impossible two contact state running.
+
+Aerodynamic drag acts through the center of mass in this reduced model and contributes no pitching moment. Effective rolling resistance is also treated as a translational center of mass force, an explicit simplifying assumption rather than a measured tire deformation or rolling moment model. The contact height and static load split remain configured estimates. Dynamic pitch, suspension response and the complete leaned multibody contact geometry are not inferred from this algebraic model.
+
+At rest, commanded braking is a capacity constraint. A signed common fraction of the front and rear commands is chosen to oppose the actual drive and grade force. This allows a parked motorcycle to remain stationary on either incline direction without reporting fictitious full braking deceleration. If brakes cannot hold, signed motion begins under the remaining force. There is no hidden hill hold. `longitudinal_velocity` is now the signed velocity along heading; `speed` remains its nonnegative magnitude for existing instruments and observations. Forward drive remains forward during rollback, while brake, engine braking and resistance signs oppose travel. This is rollback with an automatic slipping clutch, not a reverse gear model.
+
+Rollback drivetrain behavior remains an approximation: engine speed is computed from wheel speed magnitude, and the engine braking term is a symmetric resisting torque. A real forward gearbox cannot impose that coupling during reverse wheel rotation without clutch slip or disengagement. The prototype does not solve clutch engagement, clutch slip torque, clutch temperature or engine rotational inertia. Signed rollback supports starts on grades, but backward drivetrain behavior is not a validated motorcycle model.
+
+When braking reaches zero velocity within a tick, position is integrated to the exact stop time. The stationary balance then governs the remaining tick, allowing holding or breakaway in either direction. Telemetry acceleration and force describe the end state; they are not necessarily the average acceleration across a tick containing a stop event. Normal forward motion uses the existing fixed step force integration.
+
+If no unique two contact solution exists, the simulator returns `failure_type: unsupported_dynamics` with a reason and unchanged pretransition state. Actuator, drivetrain, position and tick changes are rolled back atomically for that rejected transition. This is an invalid rollout caused by missing physical capability, not a rider crash or rewardable task outcome. No airborne or pitch trajectory is fabricated.
+
+`tests/test_longitudinal.gd` checks independent closed form saturated front and rear braking solutions, zero dependence on previous acceleration, static force balance on flat ground and both incline directions, unbraked rollback, stopping distance from `v²/(2a)`, braking while rolling backwards and atomic rejection of infeasible high grip contact. The original bank and motorcycle regressions also remain applicable.
 
 ## Bank and inclined plane mechanics
 

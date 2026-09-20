@@ -35,6 +35,8 @@ func next_state() -> Dictionary:
 func apply_state(sim: RefCounted, state: Dictionary) -> void:
 	var p: Array = state.position
 	sim.position = Vector3(p[0], p[1], p[2])
+	# Older models only supported forward motion.
+	sim.longitudinal_velocity = float(state.get("longitudinal_velocity", state.speed))
 	for key in [
 		"heading",
 		"speed",
