@@ -106,9 +106,19 @@ Its SHA256 is
 `2531614dc2ae78c37f96d63166b19e2d9bb2b6891287d78b8d6b9a5be4207e29`.
 Export validates the baked inputs, universal executable, bundle identity and
 unchanged source content. Nine package tool tests pass. This version includes the
-optional agent episode budget and current paint filtering. The Mac connection
-timed out during this export session, so this archive has not been installed or
-verified natively. Earlier native verification does not certify this build.
+optional agent episode budget and current paint filtering. After the owner brought
+the Mac online, this exact archive was copied to Downloads as
+`Thunderhill-closeout.zip`, its SHA256 matched, and the application was installed
+under `~/Applications/ThunderhillReview/4b6929eece72-8bf7fb8bfdc8/`.
+Strict deep signature verification passed. The application launched with Metal on
+the Apple M3 Pro and captured a nonblack 1280 by 800 onboard image at station 1150,
+then exited successfully. The image was visually inspected. Evidence:
+`artifacts/Thunderhill-closeout-native.png`, its JSON sidecar, and native log.
+The window was visible and drawable but not focused during this brief capture;
+this verifies native launch and rendering, not sustained gameplay performance or
+human acceptance. The normal game was then opened for owner review. The archive's
+original export manifest remains unchanged; this paragraph records subsequent
+runtime evidence.
 
 
 Install the official Godot 4.7.2 export templates. From a clean committed tree, run `python3 tools/package_game.py --godot /path/to/godot --platform macos` (or `--platform linux`). Packages and manifests are written under `artifacts/builds/`. The Mac archive contains a universal application with builtin ad hoc signing. No Apple notarization or Mac runtime verification is implied by a successful export. `--allow-dirty` is only for explicitly marked development candidates.
