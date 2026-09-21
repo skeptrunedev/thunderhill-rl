@@ -158,10 +158,46 @@ def geometry_samples(points, widths, origin, source_stations):
     return samples, segments, heights, banks, xyz, left_xyz, fit_metadata
 
 
+def apply_plan_study(track, study):
+    """Apply pinned horizontal candidates without reinterpreting sample stations."""
+    encoded = json.dumps(track, separators=(",", ":")) + "\n"
+    if hashlib.sha256(encoded.encode()).hexdigest() != study["track_sha256"]:
+        raise ValueError("Plan study baseline track changed")
+    samples = track["samples"]
+    stations = np.array([row["s"] for row in samples])
+    points = np.array([row["p"] for row in samples], dtype=float)[:, [0, 2]]
+    start, end = study["station_interval_m"]
+    if not 0 <= start < end <= track["length_m"]:
+        raise ValueError("Invalid plan study interval")
+    selected = (stations >= start) & (stations <= end)
+    candidate = study["candidate"]
+    targets = np.asarray(candidate["candidate_xz_m"], dtype=float)
+    if not np.array_equal(np.asarray(candidate["stations_m"]), stations[selected]):
+        raise ValueError("Plan candidate stations differ from baseline samples")
+    if targets.shape != points[selected].shape or not np.isfinite(targets).all():
+        raise ValueError("Invalid plan candidate coordinates")
+    displacement = np.zeros_like(points)
+    displacement[selected] = targets - points[selected]
+    maximum = float(np.linalg.norm(displacement, axis=1).max())
+    recorded = float(candidate["maximum_center_displacement_m"])
+    if not np.isfinite(recorded) or abs(maximum - recorded) > 1e-9:
+        raise ValueError("Plan candidate displacement differs from reviewed report")
+    return displacement, {
+        "baseline_track_sha256": study["track_sha256"],
+        "baseline_length_m": track["length_m"],
+        "baseline_station_interval_m": [start, end],
+        "maximum_center_displacement_m": maximum,
+        "changed_samples": int(np.count_nonzero(np.linalg.norm(displacement, axis=1))),
+        "status": "Provisional horizontal reconstruction; lidar height and bank refitted, station labels recomputed from resulting 3D geometry",
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT)
     parser.add_argument("--pavement-envelope", type=Path, default=ROOT / "data/reference/pit-envelope.json")
+    parser.add_argument("--plan-study", type=Path,
+                        help="Apply a hash pinned horizontal study and refit lidar, then regenerate terrain interfaces")
     args = parser.parse_args()
     output = args.output_dir
     output.mkdir(parents=True, exist_ok=True)
@@ -197,6 +233,14 @@ def main() -> None:
     track["metadata"]["lidar"] = fit_metadata
     track["metadata"]["pavement_envelope"] = {"source_sha256": digest(args.pavement_envelope), "baseline_track_sha256": envelope["baseline_track_sha256"], **correction}
     track["metadata"]["width_and_center_status"] = "Historical aerial and lidar pit envelope applied to the provisional eight section baseline; unresolved apron and paint interpretation retained in source manifest"
+    if args.plan_study is not None:
+        displacement, plan_metadata = apply_plan_study(track, load_json(args.plan_study))
+        corrected_points += displacement * [1, -1]
+        samples, segments, heights, banks, xyz, left_xyz, fit_metadata = geometry_samples(corrected_points, widths, origin, source_stations)
+        track["samples"] = samples
+        track["length_m"] = round(float(segments.sum()), 3)
+        track["metadata"]["lidar"] = fit_metadata
+        track["metadata"]["plan_study"] = {"source_sha256": digest(args.plan_study), **plan_metadata}
     terrain = build_terrain(origin, xyz, left_xyz, widths, banks)
     (output / "track.json").write_text(json.dumps(track, separators=(",", ":")) + "\n")
     (output / "terrain.json").write_text(json.dumps(terrain, separators=(",", ":")) + "\n")
