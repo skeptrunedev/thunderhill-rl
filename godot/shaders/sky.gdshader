@@ -2,6 +2,7 @@ shader_type sky;
 
 uniform sampler2D panorama : filter_linear_mipmap, repeat_enable;
 // Appearance tuning, not calibrated radiometry. Background exposure is separate.
+uniform float background_energy : hint_range(0.0, 2.0) = 0.7;
 uniform float lighting_energy : hint_range(0.0, 2.0) = 0.45;
 
 void sky() {
@@ -11,5 +12,7 @@ void sky() {
     COLOR = texture(panorama, uv).rgb;
     if (AT_CUBEMAP_PASS) {
         COLOR *= lighting_energy;
+    } else {
+        COLOR *= background_energy;
     }
 }
