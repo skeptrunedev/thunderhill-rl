@@ -60,6 +60,27 @@ def local_polygon(vertices, extent, dimensions, origin, transform):
     return polygon
 
 
+def adjust_boundary(polygon, road, expansion_m, clearance_m):
+    """Expand an authored field while retaining its side of the road boundary."""
+    if not np.isfinite([expansion_m, clearance_m]).all() or not (
+        0 <= expansion_m <= 30 and 0.25 <= clearance_m <= 10
+    ):
+        raise ValueError("Invalid field expansion or road clearance")
+    if polygon.intersects(road):
+        raise ValueError("Original field annotation intersects road geometry")
+    expanded = polygon.buffer(expansion_m).difference(road.buffer(clearance_m))
+    # An expansion across the full road can create an unrelated outside island.
+    # Keep only components overlapping the original authored field interior.
+    parts = [
+        part
+        for part in shapely.get_parts(expanded)
+        if part.intersection(polygon).area > 0
+    ]
+    if not parts:
+        raise ValueError("Road exclusion removed the entire field region")
+    return shapely.union_all(parts)
+
+
 def rasterize(regions, lower, size, dimensions):
     """Evaluate interior distance at local output pixel centers; outside is zero."""
     width, height = dimensions
@@ -125,6 +146,11 @@ def build(output_dir, annotation_path):
     overlap_policy = annotations.get("overlap_policy", "reject")
     if overlap_policy not in ("reject", "source_over"):
         raise ValueError("Unknown overlap policy")
+    surface_path = ROOT / "godot/data/surface.json"
+    road = shapely.GeometryCollection()
+    # Boundary rings include infield holes; even odd filling preserves them.
+    for ring in json.loads(surface_path.read_text())["road_rings"]:
+        road = road.symmetric_difference(shapely.Polygon(ring))
     regions = []
     ids = set()
     for region in annotations["regions"]:
@@ -134,6 +160,11 @@ def build(output_dir, annotation_path):
         polygon = local_polygon(
             region["polygon_pixels"], extent, dimensions, origin, transform
         )
+        adjustment = region.get("boundary_adjustment")
+        if adjustment is not None:
+            polygon = adjust_boundary(
+                polygon, road, adjustment["expansion_m"], adjustment["road_clearance_m"]
+            )
         if overlap_policy == "reject" and any(
             polygon.intersection(previous[0]).area > 0 for previous in regions
         ):
@@ -150,11 +181,6 @@ def build(output_dir, annotation_path):
         )
     if not regions:
         raise ValueError("No annotated regions")
-    surface_path = ROOT / "godot/data/surface.json"
-    road = shapely.GeometryCollection()
-    # Boundary rings include infield holes; even odd filling preserves them.
-    for ring in json.loads(surface_path.read_text())["road_rings"]:
-        road = road.symmetric_difference(shapely.Polygon(ring))
     road_clearance = [float(polygon.distance(road)) for polygon, *_ in regions]
     if min(road_clearance) <= 0:
         raise ValueError("Field annotation intersects road geometry")
@@ -177,6 +203,7 @@ def build(output_dir, annotation_path):
         "overlap_policy": overlap_policy,
         "annotation_path": str(annotation_path.relative_to(ROOT)),
         "annotation_sha256": sha256(annotation_path),
+        "builder_sha256": sha256(Path(__file__)),
         "horizontal_datum": datum,
         "track_sha256": sha256(track_path),
         "surface_sha256": sha256(surface_path),
@@ -186,10 +213,11 @@ def build(output_dir, annotation_path):
         "output_pixel_m": (size / output_dimensions).tolist(),
         "mapping": "uv = (world_xz - local_origin_xz) / local_size_xz; PNG top is north; outside rectangle has zero alpha",
         "encoding": "RGBA8 linear numerical data without sRGB conversion. R target grass coverage; G pale straw response weight; B unused zero; A regional blend weight. Outside annotations RGBA is zero.",
-        "algorithm": "Source pixel center annotation polygons densified to one pixel then inverse transformed using pinned datum grids. Interior boundary distance at local output pixel centers controls smoothstep alpha; regions use straight alpha source over in listed order when explicitly enabled; no exterior feather and no invented stripes.",
+        "algorithm": "Source pixel center annotation polygons densified to one pixel then inverse transformed using pinned datum grids. Optional metric region expansion is clipped by buffered road geometry and disconnected outside islands are discarded. Interior boundary distance at local output pixel centers controls smoothstep alpha; regions use straight alpha source over in listed order when explicitly enabled; no exterior feather and no invented stripes.",
         "regions": [
             {
                 "id": annotation["id"],
+                "boundary_adjustment": annotation.get("boundary_adjustment"),
                 "local_area_m2": polygon.area,
                 "road_clearance_m": clearance,
                 "target_grass_coverage": coverage,

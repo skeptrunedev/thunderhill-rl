@@ -8,7 +8,7 @@ import unittest
 
 import numpy as np
 import shapely
-from build_field_coverage import local_polygon, rasterize
+from build_field_coverage import adjust_boundary, local_polygon, rasterize
 from pyproj import Transformer
 
 
@@ -48,6 +48,19 @@ class FieldCoverageTests(unittest.TestCase):
         np.testing.assert_allclose(values[:, 0], [0.9, 0.9, 0.7, 0.5])
         np.testing.assert_allclose(values[:, 1], [0.8, 0.8, 0.5, 0.2])
         np.testing.assert_allclose(values[:, 3], 1)
+
+    def test_expansion_stays_on_original_road_side(self):
+        field = shapely.box(-8, -2, -4, 2)
+        road = shapely.box(-2, -50, 2, 50)
+        expanded = adjust_boundary(field, road, 10, 1)
+        self.assertTrue(expanded.covers(field))
+        self.assertAlmostEqual(expanded.bounds[2], -3)
+        self.assertAlmostEqual(expanded.distance(road), 1)
+        self.assertEqual(expanded.geom_type, "Polygon")
+        self.assertTrue(adjust_boundary(field, road, 0, 1).equals(field))
+        for expansion, clearance in [(float("nan"), 1), (-1, 1), (2, 0), (31, 1)]:
+            with self.assertRaises(ValueError):
+                adjust_boundary(field, road, expansion, clearance)
 
     def test_invalid_polygon_and_parameters_fail(self):
         extent = {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10}
