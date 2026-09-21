@@ -20,17 +20,46 @@ void vertex() {
     world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
+// Each shared lattice vertex owns one deterministic source transform. Adjacent
+// cells therefore agree along their common edge; no per-cell hard swaps.
+vec3 patch_hash(vec2 lattice) {
+    vec3 p = fract(vec3(lattice.xyx) * vec3(0.1031, 0.1030, 0.0973));
+    p += dot(p, p.yxz + 33.33);
+    return fract((p.xxy + p.yzz) * p.zyx);
+}
+
+vec3 grass_patch(vec2 uv, vec2 dx, vec2 dy, vec2 lattice) {
+    vec3 seed = patch_hash(lattice);
+    float angle = seed.z * 6.28318530718;
+    mat2 rotation = mat2(vec2(cos(angle), sin(angle)), vec2(-sin(angle), cos(angle)));
+    vec2 transformed = rotation * uv + seed.xy * 2.0;
+    vec2 mirrored = vec2(1.0) - abs(vec2(1.0) - mod(transformed, vec2(2.0)));
+    vec2 mirror_sign = mix(vec2(1.0), vec2(-1.0), step(vec2(1.0), mod(transformed, vec2(2.0))));
+    return textureGrad(grass_color, mirrored, (rotation * dx) * mirror_sign, (rotation * dy) * mirror_sign).rgb;
+}
+
+vec3 grass_surface(vec2 uv) {
+    vec2 cell = floor(uv);
+    vec2 f = fract(uv);
+    // Quintic interpolation has zero first and second derivatives at cell
+    // borders. This matters because relief differentiates the blended albedo.
+    vec2 w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    // Concentrate overlap to retain straw contrast; preserve smooth endpoints.
+    vec2 lo = (vec2(1.0) - w) * (vec2(1.0) - w);
+    vec2 hi = w * w;
+    w = hi / (lo + hi);
+    vec2 dx = dFdx(uv);
+    vec2 dy = dFdy(uv);
+    vec3 a = grass_patch(uv, dx, dy, cell);
+    vec3 b = grass_patch(uv, dx, dy, cell + vec2(1.0, 0.0));
+    vec3 c = grass_patch(uv, dx, dy, cell + vec2(0.0, 1.0));
+    vec3 d = grass_patch(uv, dx, dy, cell + vec2(1.0));
+    return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
+}
+
 void fragment() {
-    // The generated grass study has no measured dimensions. Use a two metre
-    // tile based on the riding view comparison; the soil source tile is 1.3 m.
-    // Mirrored sampling is continuous at tile boundaries without averaging away
-    // the fine straw structure. Geographic gains break up broad repetition.
-    vec2 uv = world_pos.xz / grass_tile_m;
-    vec2 mirrored_uv = vec2(1.0) - abs(vec2(1.0) - mod(uv, vec2(2.0)));
-    // Preserve the footprint across mirror folds; implicit derivatives can
-    // cancel there and select a sharp mip that shimmers while riding.
-    vec2 mirror_sign = mix(vec2(1.0), vec2(-1.0), step(vec2(1.0), mod(uv, vec2(2.0))));
-    vec3 grass = textureGrad(grass_color, mirrored_uv, dFdx(uv) * mirror_sign, dFdy(uv) * mirror_sign).rgb;
+    // Original texture scale is an appearance estimate, not a surveyed measure.
+    vec3 grass = grass_surface(world_pos.xz / grass_tile_m);
     vec3 soil = texture(soil_color, world_pos.xz / 1.3).rgb;
     vec2 macro_uv = (world_pos.xz - macro_origin) / macro_size;
     vec2 edge_distance = min(macro_uv, vec2(1.0) - macro_uv) * macro_size;

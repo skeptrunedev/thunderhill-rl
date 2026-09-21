@@ -14,7 +14,9 @@ The paired Godot study compares albedos at the same 2 metre tile size, with
 identical camera, geometry, lighting and derived relief shader. The previous
 unrelated grass normal and roughness maps are no longer used. Mirrored sampling
 uses clamped edges and explicit gradients for mip selection at mirror folds.
-The texture reads more like continuous straw near the camera, but repetition
+Four smoothly blended world space patches rotate and offset the source to
+break up its repeated bands. The texture reads more like continuous straw near
+the camera, but repetition
 and distance detail remain unresolved. It does not establish photographic realism.
 
 ## Exact generation prompt

@@ -119,3 +119,20 @@ Near straw detail is more continuous, but distant fields remain too smooth and
 standing grass too sparse. A rider view at station 520 was also inspected.
 Human controls pass with zero failures. Near one to one visual acceptance remains
 unmet. No training was run.
+
+## Breaking up grass repetition
+
+Each shared vertex of a square world space lattice now supplies a deterministic
+rotation and offset into the grass source. Four clamped, mirrored samples blend
+with quintic interpolation and concentrated overlap. Shared transforms agree at
+cell boundaries, and blend weight first and second derivatives vanish there.
+This is necessary because the relief differentiates the blended albedo. Source
+texture gradients still use the rotated, unfolded UV footprint.
+
+The same twelve camera positions were rendered in
+`artifacts/grass-smooth-patch-motion/` and compared with
+`artifacts/grass-relief-motion/`. Long repeated parallel bands are less obvious;
+the source still contributes broad swirls and the middle distance remains too
+smooth. Sampled stills do not prove temporal stability. The surface requires
+four grass texture reads instead of one. The rendered human control check passes
+with zero failures on Linux. This does not establish Mac performance.
