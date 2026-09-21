@@ -52,3 +52,10 @@ used under the project's MIT license. The built in imagegen tool used the suppli
 video frame only as a cloud morphology reference. The source image, exact prompt,
 hash and authoring limitations are in `assets/source/sky-studies/README.md` at the
 repository root. Its `.res` stores color mipmaps filtered in linear light.
+
+`materials/dense_straw_v7.png` is the current original generated straw albedo,
+used under the project's MIT license. The image generator received text only.
+Source dimensions, SHA256, exact prompt and estimated shader parameters are
+recorded in `assets/source/material-studies/README.md` at the repository root.
+The sibling `.res` contains linear light filtered color mipmaps. This is an
+artist material, not a measured scan or extracted video frame.

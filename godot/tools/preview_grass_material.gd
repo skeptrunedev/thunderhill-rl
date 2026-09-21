@@ -384,7 +384,7 @@ func _run() -> void:
 				replacement.shader = shader
 				replacement.set_shader_parameter("ground_tint", ThunderhillTrack.DRY_GROUND_TINT)
 				replacement.set_shader_parameter(
-					"grass_color", load("res://assets/materials/dry_cut_grass_v2.res")
+					"grass_color", load("res://assets/materials/dense_straw_v7.res")
 				)
 				stubble_materials.append(
 					{

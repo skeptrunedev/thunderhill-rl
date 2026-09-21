@@ -23,7 +23,7 @@ Create an original seamless photorealistic PBR BASE COLOR texture for freshly re
 
 ## Flattened straw revision
 
-`dry-cut-grass-v2.png` is the current ground and stubble albedo, copied to
+`dry-cut-grass-v2.png` was the ground and stubble albedo before v7, copied to
 `godot/assets/materials/dry_cut_grass_v2.png`. Runtime uses the sibling `.res`
 with mip levels averaged in linear light, built by the existing color mipmap
 baker; base level source pixels are preserved exactly. The built in imagegen tool produced
@@ -137,3 +137,21 @@ reference. The exact prompt is in `short-cut-straw-v6-prompt.txt`. Requested
 Scale, morphology and diffuse lighting are artistic estimates, not measured
 material properties. A paired Turn 2 render with linear light mipmaps did not
 show a convincing improvement in realism. Retained as a study only.
+
+## Dense straw v7 production material
+
+`dense-straw-v7.png` is the current ground and stubble albedo. The built in
+image generator received text only; the exact prompt is saved in
+[dense-straw-v7-prompt.txt](dense-straw-v7-prompt.txt). Requested 1536 square,
+actual output 1254 square RGB. SHA256:
+`70396a6fa81ac61f0e51b94629bf284902afc9febcf47859c8ff607c7b25efeb`.
+
+The source contains dense chopped straw rather than the broad soil openings
+already supplied by the terrain compositor. Paired renders at stations 1065
+and 400 showed fewer conspicuous tangled pale patches than v2. The runtime
+uses a half metre tile and 5 mm luminance derived relief, both artistic
+estimates. Linear light mipmaps preserve the source base level. Terrain and
+short ribbon vegetation share the same material source. This is original
+artwork, not a measured scan or a one to one reconstruction of the footage.
+Inspection artifacts are in `artifacts/dense-straw-v7-turn2`,
+`artifacts/dense-straw-v7-field`, and `artifacts/dense-straw-v7-production`.

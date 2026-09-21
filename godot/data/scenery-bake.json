@@ -1,15 +1,15 @@
 {
-  "build_ms": 11781.871,
-  "geometry_sha256": "5a5a376378a915b75e1c71d39fd7c2039e8eea192e07ef00feda2dd39d172f7b",
+  "build_ms": 11477.557,
+  "geometry_sha256": "0e1ddc705bffdb7e017d6d3c53453fe462124f42b73ae3ae3ad969119f2c5267",
   "godot_version": "4.7.2-stable (official)",
   "grass_instances": 96000,
-  "load_ms": 34.786,
-  "scene_sha256": "1fb83d910b12a758e614b34e9746c759036a319c777a7b87aff8a773058799ce",
+  "load_ms": 37.469,
+  "scene_sha256": "77a0fb03ad5e7bf04b270dee8c71700f18791d30f70e69f2557bfc88da190430",
   "schema_version": 1,
   "sources": {
-    "assets/materials/dry_cut_grass_v2.json": "fa62a179b7b248178a21def97c8ed4182f9ea84e7e51fbb7d579b90dd6699ec0",
-    "assets/materials/dry_cut_grass_v2.png": "d9799490c3e2fe24a52905a80ccf2713292b354d92cd4cd4eb116d92ffd20c02",
-    "assets/materials/dry_cut_grass_v2.res": "5e3a32679199c953a21e2541aa8bce8fa29a4512be89fbcbdd82c7e0fec65e3e",
+    "assets/materials/dense_straw_v7.json": "c6e393597f40f59e58f61f3cfb204108ed1d30fb7fc05fded544eb3e3607e010",
+    "assets/materials/dense_straw_v7.png": "70396a6fa81ac61f0e51b94629bf284902afc9febcf47859c8ff607c7b25efeb",
+    "assets/materials/dense_straw_v7.res": "fb9a509584c44364e9059687989483ab48c2b44c643daad1874eb66d1ff542ba",
     "data/curb-placement.json": "7357ddab1a1ecece0ae147747104c6b3170f1cfcc5d6c4c4e38073f507c1d7c7",
     "data/field-coverage.json": "63dc5a1c9a2ed6edc113762067fa6a71eb034ac88305ea25203ba3a790837524",
     "data/landmarks.json": "d5b43fb77e3ad5c8de2464d8c25d1ca9639a37efcd9b200ee07befb942b4e085",
@@ -21,10 +21,10 @@
     "scripts/curb_surface.gd": "b2de99aba0dd705d76d11c2541a0bf9484b65e91c04b59e2fdc5b4f2baa72cb4",
     "scripts/field_coverage.gd": "1c0891c7978f2e50e7c9e88e41a474addb0a72cc130526fa7127413f7fcc2c4e",
     "scripts/offroad_surface.gd": "744a4e65b018e1fca24b5d4bbfd6b41202bc596795d83328a6188315ea2099d9",
-    "scripts/scenery.gd": "8e2cfe6b9e66ad72327abf0449ac6c9e689cbb418c94af3dfd6ec1d37178c146",
-    "scripts/track.gd": "8ad2cef3dbcab888263650ad0f83dfd1928209807f325a1732e8678b2250df18",
+    "scripts/scenery.gd": "bb40a036712f15db228d233e1949b82a2dbc5302357c5045f43c8f71605e3b3a",
+    "scripts/track.gd": "741bcdf5d075bd9d64fce8b0d1c88a44e726301628444d2581fca5e716f50405",
     "scripts/triangle_ribbon.gd": "16d950de47fc6840aa2a819706a2695fb2746d90de991000fc4cf86f7e642eed",
     "shaders/dry_stubble.gdshader": "194d945483027844bec1124744484b1924128b1a7c527578dbaecc10ed44ab53",
-    "tools/bake_scenery.gd": "5b9555eba3c1486403e7b5010dc3c546cef360dd36995ea318143fb3b6bc3431"
+    "tools/bake_scenery.gd": "97b5a03e9036b25f5d35512eaa3fa1901d3e5db093f3251365a0112a34f8bed6"
   }
 }

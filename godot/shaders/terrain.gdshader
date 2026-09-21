@@ -32,12 +32,12 @@ uniform vec2 mowing_bend_center = vec2(306.70854, 686.54039);
 // Zero preserves the existing regional appearance; no bare patches are restored.
 uniform float retained_swath_strength : hint_range(0.0, 1.0) = 0.0;
 // Original appearance parameters, not measured plant height or reflectance.
-uniform float grass_tile_m = 1.0;
+uniform float grass_tile_m = 0.5;
 // One retains full random rotation; zero preserves the source straw direction.
 uniform float grass_rotation_spread : hint_range(0.0, 1.0) = 1.0;
 // Independent patch scale study; zero preserves the production source scale.
 uniform float grass_scale_spread : hint_range(0.0, 1.0) = 0.0;
-uniform float grass_relief_m = 0.010;
+uniform float grass_relief_m = 0.005;
 // Luminance ranks pale straw over soil for material blending, not measured height.
 uniform float grass_height_blend : hint_range(0.0, 1.0) = 1.0;
 // Estimated field microtopography for shading only, not surveyed contact heights.

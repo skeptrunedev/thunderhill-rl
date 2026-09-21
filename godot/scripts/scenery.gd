@@ -53,9 +53,7 @@ func _add_cut_grass(mesh: ArrayMesh, random: RandomNumberGenerator) -> void:
 	var material := ShaderMaterial.new()
 	material.shader = preload("res://shaders/dry_stubble.gdshader")
 	material.set_shader_parameter("ground_tint", ThunderhillTrack.DRY_GROUND_TINT)
-	material.set_shader_parameter(
-		"grass_color", load("res://assets/materials/dry_cut_grass_v2.res")
-	)
+	material.set_shader_parameter("grass_color", load("res://assets/materials/dense_straw_v7.res"))
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for blade in 132:
