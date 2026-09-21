@@ -1,11 +1,12 @@
 # Local GPU validation
 
 Use Hugging Face TRL as the primary training framework, with PEFT adapters.
-The eventual control integration should use `GRPOTrainer.environment_factory`.
+The interactive [bike harness](HARNESS.md) now uses `GRPOTrainer.environment_factory`.
 The launch probe here deliberately uses the simpler reward callback to first
 verify the chain from model sampling to actual Godot outcomes to GPU updates.
-It does not yet implement repeated observations and decisions within an episode,
-Harbor integration, camera training, or Gemma 4 E4B training.
+That original launch probe does not implement repeated observations and decisions
+within an episode. The separate interactive harness does. Harbor integration,
+camera training and Gemma 4 E4B training remain unverified.
 
 Run from the repository root:
 

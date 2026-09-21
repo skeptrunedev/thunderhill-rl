@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
 import math
+import re
 import sys
 import time
 from contextlib import ExitStack
@@ -18,111 +20,11 @@ from trl import GRPOConfig, GRPOTrainer
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
+from agent_harness import ThunderhillEnv
 from check_parallel import worker
 
 MODEL = "Qwen/Qwen3-0.6B"
 REVISION = "c1899de289a04d12100db370d81485cdf75e47ca"
-
-
-class ThunderhillLaunch:
-    """Two observed control decisions; each instance owns a distinct process."""
-
-    def __init__(self, client, index, trace, step):
-        self._client, self._index, self._trace, self._step = client, index, trace, step
-        self._observation = None
-        self._reward = 0.0
-        self._calls = 0
-
-    def _log(self, kind, **fields):
-        self._trace.write(
-            json.dumps(
-                {
-                    "type": kind,
-                    "worker": self._index,
-                    "episode_id": self._observation["episode_id"],
-                    "policy_step": self._step(),
-                    **fields,
-                }
-            )
-            + "\n"
-        )
-        self._trace.flush()
-
-    def _view(self):
-        return {
-            "tick": self._observation["tick"],
-            "speed_m_s": self._observation["state"]["speed"],
-            "done": self._observation["terminated"] or self._observation["truncated"],
-        }
-
-    def reset(self, **kwargs) -> str:
-        self._observation = self._client.request(
-            {"op": "reset", "policy_id": f"interactive-step-{self._step()}"}
-        )
-        if "error" in self._observation:
-            raise RuntimeError(self._observation)
-        self._reward, self._calls = 0.0, 0
-        self._log("reset", observation=self._view())
-        return (
-            "You control a motorcycle stopped on a straight. Use the drive tool twice, "
-            "making one call at a time and reading each resulting observation before the next call. "
-            "Explore throttle values between 0 and 1. More forward progress earns more reward. "
-            "Once done is true, answer Done and stop calling tools. Initial observation: "
-            + json.dumps(self._view())
-        )
-
-    def drive(self, throttle: float) -> str:
-        """Apply throttle for 0.1 simulated seconds and observe the updated motorcycle.
-
-        Args:
-            throttle: Throttle fraction between zero and one.
-
-        Returns:
-            Current tick, speed and whether the episode is finished.
-        """
-        if self._view()["done"]:
-            raise ValueError("Episode finished; no further action allowed")
-        if (
-            isinstance(throttle, bool)
-            or not isinstance(throttle, (float, int))
-            or not math.isfinite(throttle)
-            or not 0 <= throttle <= 1
-        ):
-            raise ValueError("Throttle must be a finite number between zero and one")
-        before = self._view()
-        result = self._client.request(
-            {
-                "op": "advance",
-                "episode_id": self._observation["episode_id"],
-                "expected_tick": before["tick"],
-                "action_id": str(before["tick"]),
-                "controls": {"throttle": throttle},
-            }
-        )
-        if "error" in result or not result["rollout_valid"]:
-            # Persist and flag infrastructure faults; the final validation also rejects them.
-            self._log("infrastructure_failure", result=result)
-            raise RuntimeError(result)
-        self._observation = result
-        self._calls += 1
-        self._reward += sum(
-            row["reward_components"]["legal_progress_m"]
-            for row in result["transitions"]
-        )
-        self._log(
-            "action",
-            throttle=throttle,
-            before=before,
-            after=self._view(),
-            cumulative_reward=self._reward,
-        )
-        return json.dumps(self._view())
-
-    def get_reward(self) -> float:
-        self._log(
-            "reward", value=self._reward, calls=self._calls, observation=self._view()
-        )
-        return self._reward
 
 
 class AuditedGRPO(GRPOTrainer):
@@ -187,7 +89,7 @@ def main():
                     ("--agent-max-episode-ticks=24",),
                 )
             )
-            env = ThunderhillLaunch(
+            env = ThunderhillEnv(
                 client, index, trace, lambda: holder["trainer"].state.global_step
             )
             instances.append((env, data))
@@ -203,7 +105,7 @@ def main():
                 per_device_train_batch_size=1,
                 gradient_accumulation_steps=4,
                 num_generations=4,
-                max_completion_length=256,
+                max_completion_length=512,
                 max_tool_calling_iterations=2,
                 learning_rate=1e-4,
                 temperature=1.1,
@@ -236,12 +138,14 @@ def main():
         }
         assert before and all("lora_" in n for n in before)
         trained = trainer.train()
-        delta = max(
+        deltas = [
             (p.detach().cpu() - before[n]).abs().max().item()
             for n, p in trainer.model.named_parameters()
             if n in before
-        )
-        assert math.isfinite(delta) and delta > 0
+        ]
+        assert all(math.isfinite(value) for value in deltas), "Nonfinite adapter update"
+        delta = max(deltas)
+        assert delta > 0
         trainer.save_model(str(out / "adapter"))
         tokenizer.save_pretrained(str(out / "adapter"))
         for env, _ in instances:
@@ -286,6 +190,92 @@ def main():
         ]
         transitions = [row for row in rows if row["type"] == "transition"]
         assert len(transitions) == sum(row["observation"]["tick"] for row in rewards)
+        assert len(traces) == len(rewards) == len({row["episode_id"] for row in traces})
+        assert {row["episode_id"] for row in traces} == {
+            row["episode_id"] for row in rewards
+        }
+        for trace_row in traces:
+            episode = trace_row["episode_id"]
+            actions = [
+                row
+                for row in events
+                if row["episode_id"] == episode and row["type"] == "action"
+            ]
+            reward_row = next(row for row in rewards if row["episode_id"] == episode)
+            recorded = [row for row in transitions if row["episode_id"] == episode]
+            assert [row["tick"] for row in recorded] == list(
+                range(1, reward_row["observation"]["tick"] + 1)
+            )
+            assert all(
+                row["policy_id"] == f"interactive-step-{trace_row['policy_step']}"
+                for row in recorded
+            )
+            assert math.isclose(
+                sum(row["reward_components"]["legal_progress_m"] for row in recorded),
+                reward_row["value"],
+                abs_tol=1e-10,
+            )
+            masked_text = tokenizer.decode(
+                [
+                    token
+                    for token, c, t in zip(
+                        trace_row["tokens"],
+                        trace_row["completion_mask"],
+                        trace_row["tool_mask"],
+                        strict=True,
+                    )
+                    if c and not t
+                ]
+            )
+            generated_text = tokenizer.decode(
+                [
+                    token
+                    for token, c, t in zip(
+                        trace_row["tokens"],
+                        trace_row["completion_mask"],
+                        trace_row["tool_mask"],
+                        strict=True,
+                    )
+                    if c and t
+                ]
+            )
+            calls = [
+                (match.start(), json.loads(match[1]))
+                for match in re.finditer(
+                    r"<tool_call>\s*(.*?)\s*</tool_call>", trace_row["text"], re.DOTALL
+                )
+            ]
+            responses = [
+                (match.end(), json.loads(match[1]))
+                for match in re.finditer(
+                    r"<tool_response>\s*(\{.*?\})\s*</tool_response>",
+                    trace_row["text"],
+                    re.DOTALL,
+                )
+            ]
+            for action in actions[1:]:
+                token = action["before"]["observation_token"]
+                response_end = next(
+                    end
+                    for end, value in responses
+                    if value.get("observation_token") == token
+                )
+                call_start = next(
+                    start
+                    for start, value in calls
+                    if value.get("name") == "control_bike"
+                    and value.get("arguments", {}).get("observation_token") == token
+                )
+                assert response_end < call_start, (
+                    "Second action was chosen before its observation"
+                )
+                observation_json = json.dumps(action["before"])
+                assert observation_json in masked_text, (
+                    "Observation tokens were not fully excluded"
+                )
+                assert observation_json not in generated_text, (
+                    "Observation leaked into policy loss"
+                )
         summary = {
             "ok": True,
             "framework": "TRL environment_factory",
@@ -297,12 +287,24 @@ def main():
             "calls_per_rollout": [row["calls"] for row in rewards],
             "rewards": [row["value"] for row in rewards],
             "recorded_transitions": len(transitions),
+            "observed_action_order_verified": True,
+            "per_episode_recording_and_mask_verified": True,
             "excluded_environment_tokens": excluded,
             "max_adapter_delta": delta,
             "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated(),
             "seconds": time.monotonic() - started,
             "train_metrics": trained.metrics,
             "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "harness_sha256": hashlib.sha256(
+                (Path(__file__).parent / "agent_harness.py").read_bytes()
+            ).hexdigest(),
+            "versions": {
+                name: importlib.metadata.version(name)
+                for name in ("torch", "transformers", "trl", "peft")
+            },
+            "lock_sha256": hashlib.sha256(
+                (Path(__file__).parent / "uv.lock").read_bytes()
+            ).hexdigest(),
             "scope": "Two telemetry decisions per rollout with Qwen3 0.6B; not Gemma4 or camera training",
         }
         (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

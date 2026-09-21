@@ -136,3 +136,18 @@ recorded transition equality, immutable server configuration and invalid startup
 arguments. Current evidence is `artifacts/episode-limit-check.json`. Existing
 agent transport, authoritative replay, environment failure and rendered human
 control checks also pass after the change.
+
+## Initial tool harness validation
+
+The [bike agent harness](../training/HARNESS.md) now exposes `observe` and
+`control_bike` through TRL's `environment_factory`. The control tool includes
+throttle, steering, both brakes and gear changes. Fresh observation receipts
+prevent queued actions from reusing unseen state. Trainer lifecycle methods own
+reset and rewards. Infrastructure faults abort reward collection even when the
+trainer catches tool exceptions.
+
+A local Qwen3 0.6B GRPO run completed eight two action telemetry rollouts across
+four isolated Godot workers, with nonzero adapter updates and audited observation
+masking and episode attribution. This is a harness integration result, not a
+Gemma 4, camera, Harbor or racing competence result. See the linked reproduction
+instructions and explicit remaining work.
