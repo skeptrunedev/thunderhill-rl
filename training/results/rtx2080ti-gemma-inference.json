@@ -1,0 +1,105 @@
+{
+  "model": "unsloth/gemma-3-270m-it",
+  "revision": "23cf460f6bb16954176b3ddcc8d4f250501458a9",
+  "adapter_sha256": "b0ec9199e2d2b853061e8dee00a07e0fb53f3ff1fb9f6d522522dac85391048c",
+  "prompts_sha256": "2ca49419361c9ccb6ac0d058a231da46d369984e9c085c105ed458b1c09ffc40",
+  "source_rows": [
+    0,
+    55,
+    110,
+    164,
+    219,
+    274,
+    329,
+    384,
+    439,
+    493,
+    548,
+    603
+  ],
+  "prompt_lengths": [
+    186,
+    185,
+    185,
+    174,
+    177,
+    172,
+    183,
+    184,
+    184,
+    177,
+    171,
+    177
+  ],
+  "torch": "2.14.0+cu130",
+  "transformers": "5.17.0",
+  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+  "compute_capability": [
+    7,
+    5
+  ],
+  "dtype": "float32",
+  "input_tokens_padded": 256,
+  "cache_tokens": 288,
+  "max_new_tokens": 32,
+  "modes": {
+    "eager": {
+      "warmup_seconds": 2.7499244711361825,
+      "calls": 24,
+      "mean_seconds_per_control": 0.31003186642192304,
+      "median_seconds_per_control": 0.30737582640722394,
+      "controls_per_second": 3.2254748892138005,
+      "generated_tokens_per_second": 44.08149015258861,
+      "peak_cuda_allocated_bytes": 1095501312,
+      "token_mismatches_vs_eager": 0
+    },
+    "eager_padded": {
+      "warmup_seconds": 1.1319798449985683,
+      "calls": 24,
+      "mean_seconds_per_control": 0.3379002348713887,
+      "median_seconds_per_control": 0.33230217220261693,
+      "controls_per_second": 2.959453403104674,
+      "generated_tokens_per_second": 40.445863175763876,
+      "peak_cuda_allocated_bytes": 1101031936,
+      "token_mismatches_vs_eager": 0
+    },
+    "compiled_padded": {
+      "warmup_seconds": 69.93113611405715,
+      "calls": 24,
+      "mean_seconds_per_control": 0.12795842165360227,
+      "median_seconds_per_control": 0.1267334120348096,
+      "controls_per_second": 7.815038565473335,
+      "generated_tokens_per_second": 106.80552706146891,
+      "peak_cuda_allocated_bytes": 1112855552,
+      "token_mismatches_vs_eager": 0
+    }
+  },
+  "cuda_graph_mode_requested": "reduce-overhead",
+  "cuda_graph_execution_verified": true,
+  "all_controls_valid_and_tokens_equal": true,
+  "profile_verification": {
+    "available": true,
+    "trace": "compiled-control.trace.json",
+    "source_row": 0,
+    "completion_ids": [
+      8607,
+      236779,
+      32974,
+      753,
+      236800,
+      236743,
+      236770,
+      236800,
+      236743,
+      236771,
+      236743,
+      236771,
+      106
+    ],
+    "tokens_equal_eager": true,
+    "cuda_graph_launch_events": 12,
+    "cuda_kernel_events": 5584,
+    "reason": "CUDA runtime graph launch events recorded"
+  },
+  "timing_limitation": "Measured concurrently with a separate lap evaluation on the same GPU, not an isolated hardware benchmark."
+}

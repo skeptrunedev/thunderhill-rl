@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--samples", type=int, default=12)
     parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument("--warmup", type=int, default=3)
+    parser.add_argument("--profile", action="store_true")
     args = parser.parse_args()
     if min(args.samples, args.repeats, args.warmup) < 1:
         parser.error("samples, repeats and warmup must be positive")
@@ -163,6 +164,56 @@ def main():
                 "token_mismatches_vs_eager": mismatches,
             }
             summary["modes"][mode] = result
+            if compiled and args.profile:
+                activities = torch.profiler.supported_activities()
+                if torch.profiler.ProfilerActivity.CUDA not in activities:
+                    summary["profile"] = {
+                        "available": False,
+                        "reason": "torch.profiler does not report CUDA tracing support",
+                        "supported_activities": sorted(str(x) for x in activities),
+                    }
+                else:
+                    torch.cuda.synchronize()
+                    with (
+                        torch.profiler.profile(
+                            activities=[
+                                torch.profiler.ProfilerActivity.CPU,
+                                torch.profiler.ProfilerActivity.CUDA,
+                            ]
+                        ) as profiler,
+                        torch.profiler.record_function("warmed_compiled_control"),
+                    ):
+                        profile_tokens = generate(0)
+                        torch.cuda.synchronize()
+                    profile_path = out / "compiled-control.trace.json"
+                    profiler.export_chrome_trace(str(profile_path))
+                    events = json.loads(profile_path.read_text())["traceEvents"]
+                    graph_launches = [
+                        event
+                        for event in events
+                        if event.get("cat") == "cuda_runtime"
+                        and event.get("name", "").startswith("cudaGraphLaunch")
+                    ]
+                    kernel_events = sum(
+                        event.get("cat") == "kernel" for event in events
+                    )
+                    matches = profile_tokens == baseline[0]
+                    passed &= matches
+                    summary["cuda_graph_execution_verified"] = bool(graph_launches)
+                    summary["profile"] = {
+                        "available": True,
+                        "trace": profile_path.name,
+                        "source_row": indices[0],
+                        "completion_ids": profile_tokens,
+                        "tokens_equal_eager": matches,
+                        "cuda_graph_launch_events": len(graph_launches),
+                        "cuda_kernel_events": kernel_events,
+                        "reason": (
+                            "CUDA runtime graph launch events recorded"
+                            if graph_launches
+                            else "No cudaGraphLaunch runtime events in profiler trace"
+                        ),
+                    }
             summary["all_controls_valid_and_tokens_equal"] = passed
             (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
             print(json.dumps({"mode": mode, **result}), flush=True)

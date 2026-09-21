@@ -136,3 +136,27 @@ parsed controls, adapter identity, harness events and authoritative Godot state
 recordings. Malformed commands stop evaluation rather than triggering a fallback.
 A completed lap must pass ordered gates, track validity and recording checks.
 Training loss alone is not evidence of a successful lap.
+
+
+For a long local CUDA evaluation, add `--compile` to `evaluate_lap.py`. The
+compiled mode pads prompts on the left to 256 tokens and uses a 288 token static
+cache. Full graph compilation uses `dynamic=True` because Gemma's sliding cache
+increments a Python position counter during generation. Making that counter
+static forces recompilation at each token. Compilation failures are not hidden.
+
+The [measured inference check](results/rtx2080ti-gemma-inference.json) compared 24
+generations over 12 held out prompts. Compiled outputs matched eager tokens
+exactly, with average control generation falling from 310 to 128 milliseconds.
+These timings include another lap evaluator sharing the GPU. A separate profiler
+check verified 12 CUDA graph launches during one 13 token control generation.
+The evaluator also checks adapter merge logit equivalence on its initial state.
+
+```sh
+TORCH_LOGS=perf_hints uv run --project training python training/benchmark_lap_inference.py \
+  --adapter /absolute/adapter --prompts /absolute/eval.jsonl \
+  --output artifacts/new-inference-check --samples 12 --repeats 2 --profile
+```
+
+`--device cpu` supports independent checks while GPU training is running. It is
+not the recommended throughput path. All optimizer checkpoints are retained by
+new training runs so their generated driving episodes can be compared later.
