@@ -17,6 +17,7 @@ func _run() -> void:
 	var asphalt_study := "production"
 	var asphalt_study_metadata := {}
 	var ground_study := "production"
+	var canopy_strength := NAN
 	var ground_study_metadata := {}
 	var photographic_contrast := 0.0
 	var photographic_height_blend := 0.0
@@ -64,7 +65,18 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--photographic-planar-uv":
+		if arg.begins_with("--canopy-backscatter="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 4.0
+			):
+				_fail("Canopy strength must be finite and within zero to four")
+				return
+			canopy_strength = float(value)
+		elif arg == "--photographic-planar-uv":
 			photographic_curved_uv = false
 		elif arg == "--photographic-curved-uv":
 			photographic_curved_uv = true
@@ -663,6 +675,13 @@ func _run() -> void:
 	elif ground_study == "geometry":
 		game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
 		ground_study_metadata = load("res://scripts/straw_geometry_study.gd").setup(game)
+	if is_finite(canopy_strength):
+		if ground_study != "production":
+			_fail("Canopy study requires production terrain")
+			return
+		ground_study_metadata = load("res://scripts/canopy_light_study.gd").apply(
+			game.track, canopy_strength
+		)
 	if ground_study_metadata.has("error"):
 		_fail(ground_study_metadata.error)
 		return

@@ -80,6 +80,8 @@ uniform vec2 field_tint_strengths[16];
 // Flattened straw can retain its surface texture while removing upright blades.
 uniform float field_grass_retentions[16];
 varying vec3 world_pos;
+// Fragment to light coverage for the isolated canopy study only.
+varying float canopy_coverage;
 
 void vertex() {
     world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -354,6 +356,7 @@ void fragment() {
     float resolved_straw = 1.0 - smoothstep(0.008, 0.05, length(fwidth(world_pos.xz)) / grass_tile_m);
     grass_coverage = mix(grass_coverage, layered_coverage, grass_height_blend * resolved_straw);
     float soil_weight = (1.0 - grass_coverage) * macro_weight;
+    canopy_coverage = 1.0 - soil_weight;
     ALBEDO = mix(grass * straw_color_gain, soil * mix(soil_value, 1.0, corridor * (1.0 - retained_grass)), soil_weight) * ground_tint * macro_gain * detail_gain * mix(vec3(1.0), region.rgb, corridor) * field_structure;
     // A single albedo does not contain measured PBR maps. Bright straw over
     // darker soil supplies an explicitly artistic relief/roughness estimate.
@@ -419,6 +422,7 @@ void fragment() {
             photo_dy = mix(photo_dy, dFdy(sparse_height), sparse_weight);
             photo_roughness = mix(photo_roughness, 0.96, sparse_weight);
         }
+        canopy_coverage = mix(canopy_coverage, 1.0, mask);
         ALBEDO = mix(ALBEDO, photographic * 0.55 * photographic_gain, mask);
         ROUGHNESS = mix(ROUGHNESS, photo_roughness, mask);
         height_dx = mix(height_dx, photo_dx, mask);

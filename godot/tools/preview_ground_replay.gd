@@ -9,13 +9,26 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var mode := ""
+	var canopy_strength := NAN
 	var replay := ""
 	var directional_wear := NAN
 	var hybrid_aggregate := false
 	var curved_uv := true
 	var directional_composition := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--photographic-planar-uv":
+		if arg.begins_with("--canopy-backscatter="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 4.0
+			):
+				push_error("Canopy strength must be finite and within zero to four")
+				quit(2)
+				return
+			canopy_strength = float(value)
+		elif arg == "--photographic-planar-uv":
 			curved_uv = false
 		elif arg == "--photographic-curved-uv":
 			curved_uv = true
@@ -102,6 +115,19 @@ func _run() -> void:
 	report["terrain_shader_sha256"] = FileAccess.get_sha256(
 		game.track.terrain_material.shader.resource_path
 	)
+	if is_finite(canopy_strength):
+		if mode != "production":
+			push_error("Canopy study requires production terrain")
+			quit(2)
+			return
+		var canopy: Dictionary = load("res://scripts/canopy_light_study.gd").apply(
+			game.track, canopy_strength
+		)
+		if canopy.has("error"):
+			push_error(canopy.error)
+			quit(2)
+			return
+		report["canopy_study"] = canopy
 	var pavement: ShaderMaterial = game.track.get_node("RacingSurface").material_override
 	if is_finite(directional_wear):
 		pavement.set_shader_parameter("directional_wear_strength", directional_wear)

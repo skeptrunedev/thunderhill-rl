@@ -382,3 +382,46 @@ Human controls passed with zero failures and five agent camera observations
 passed the existing capture and serialization checks in
 `artifacts/curved-default-camera-qa`. These local checks do not establish native
 Mac performance. Shader compilation, preview formatting and diff checks passed.
+
+
+## Isolated canopy angular response
+
+The static and replay tools accept `--canopy-backscatter=0..4` with production
+terrain. A dedicated helper copies its shader and uniform values, then appends
+a direct light function from `canopy_light_study.gdshaderinc`. Production never
+installs this function. Terrain exposes a coverage varying only; the production
+straight capture is byte identical to `curved-default-straight` after that edit.
+
+Both the zero control and candidate use Burley diffuse and omit direct specular.
+The diffuse expression follows the engine source at revision ed1daf0bf, with
+its MIT notice included in asset attribution. The original additional response
+is `strength * coverage * max(dot(VIEW,LIGHT),0)^2`, multiplied into direct
+diffuse before shadow attenuation. Ambient is unchanged. This is an uncalibrated,
+non energy conserving appearance hypothesis, not a physical canopy model.
+The photographic region is treated as canopy for this experiment, including
+soil present in its source image; that approximation must be revisited before
+any production adoption.
+
+An initial fourth power lobe produced only modest change (`canopy3-exit`). The
+broader squared lobe gives a stronger exit field response without changing the
+forward field patch. Root and independent review found the initial response
+moves the relative view brightness in the right direction. The broad motion
+trial becomes quite golden late in the bend and remains experimental. It does
+not establish that the complete custom material is preferable to production:
+the control differs by its missing direct specular. A production implementation
+must preserve the existing lighting terms and account for energy and coverage.
+
+`artifacts/canopy-isolation-check.json` records per-channel difference extrema
+for explicit image crops. Road [450,350,800,550] and sky [0,0,1280,200] are
+identical between zero and broad strength three in both views. Field
+[50,295,250,330] is identical on the straight and changes at the exit, with
+maximum channel changes of 35,33,24. This checks selected pixels, not an entire
+scene shadow invariance claim. `artifacts/canopy-comparison` contains the pairs.
+
+The final replay `artifacts/canopy-broad3-motion.mp4` completed 2699 transitions
+and 700 frames. Eleven sampled frames show gradual field brightening through
+the bend, without an obvious discontinuous switch. This sparse inspection is
+not a complete shimmer or native performance test. The known ObjectDB exit
+warning remains. Real Vulkan compilation passed for control and candidate;
+out-of-range input returned exit two. GDScript format and diff checks passed.
+No default rendering, physics or agent behavior changed.
