@@ -164,3 +164,38 @@ a limited component improvement. Overall cockpit shape and materials remain
 visibly approximate. The mesh regression, cockpit readout check and rendered
 human controls check pass. Local Linux frame timing was median 17.224 ms and
 p95 17.907 ms across 274 frames, not a native Mac performance measurement.
+
+## Molded instrument housing
+
+The instrument housing now has rounded XY corners and rounded front and back
+rims. The previous eight sided extrusion had sharp depth edges and large flat
+corner cuts, visible in `artifacts/housing-sharp-baseline/`. The new
+`rounded_panel.gd` retains the 196 by 119 by 25 mm outer envelope. Its 12 mm
+outline radius and 2.5 mm rim radius are original appearance estimates guided
+by the footage, not Ducati part measurements. This does not resolve the model
+generation and TFT proportion uncertainty documented above.
+
+The existing rounded box helper uses one radius on all axes. The panel needs
+independent outline and depth rim radii, so it uses a separate closed mesh with
+448 triangles and analytic normals. Both caps remain planar. The display face,
+readings, filtering, materials, placement and camera settings are unchanged.
+
+Root inspected the production and wider views in
+`artifacts/housing-rounded-candidate/`. The curved silhouette removes the
+conspicuous clipped corners without introducing a bright metallic rim. This
+is a limited component improvement; the overall cockpit still looks approximate.
+`preview_cockpit.gd --legacy-housing` restores the existing extrusion in a
+comparison run and records the selected mode and new helper hash.
+
+The mesh check passed exact outer bounds, planar caps, finite unit normals,
+clockwise outward winding, nondegenerate triangles and closed welded topology
+for three aspect ratios. The existing front cap normal regression now selects
+the actual cap plane, allowing the curved rim to have its intended normals.
+Live cockpit readouts and rider visibility passed. Collision envelope checks
+passed all 2268 assertions.
+The legacy comparison replay matched all four earlier baseline PNGs exactly.
+Human controls passed with zero failures; local Linux timing was median
+17.337 ms and p95 25.244 ms across 266 frames, not a controlled benchmark or
+native Mac result. Formatting and diff checks pass.
+Mac export passed as `0bfbfab0b087-139504d114d0`; native Mac execution has not
+been verified for this build.

@@ -13,12 +13,15 @@ func _run() -> void:
 	var steering := 0.0
 	var display_filtered := true
 	var wall_density := 1.0
+	var legacy_housing := false
 	var arguments := OS.get_cmdline_user_args()
 	if "--display-filtered" in arguments and "--display-unfiltered" in arguments:
 		_fail("Choose one display filtering mode")
 		return
 	for arg in arguments:
-		if arg == "--display-filtered":
+		if arg == "--legacy-housing":
+			legacy_housing = true
+		elif arg == "--display-filtered":
 			display_filtered = true
 		elif arg == "--display-unfiltered":
 			display_filtered = false
@@ -74,6 +77,17 @@ func _run() -> void:
 		_fail("Steering exceeds simulation limits")
 		return
 	game.bike.update_pose(0.0, steering, 0.0)
+	if legacy_housing:
+		var housing: MeshInstance3D = game.bike.find_child("InstrumentHousing", true, false)
+		if housing == null:
+			_fail("Instrument housing missing")
+			return
+		var temporary := Node3D.new()
+		game.bike._beveled_panel(
+			Vector2(0.196, 0.119), 0.025, 0.015, housing.material_override, temporary
+		)
+		housing.mesh = temporary.get_child(0).mesh
+		temporary.free()
 	var display_count := 0
 	var reservoir_count := 0
 	var wall_absorption := Vector3.ZERO
@@ -154,6 +168,9 @@ func _run() -> void:
 						{
 							"station_m": 400,
 							"display_filtered": display_filtered,
+							"legacy_housing": legacy_housing,
+							"housing_builder_sha256":
+							FileAccess.get_sha256("res://scripts/rounded_panel.gd"),
 							"display_has_mipmaps": display_has_mipmaps,
 							"display_shader_sha256":
 							FileAccess.get_sha256("res://shaders/instrument_screen.gdshader"),

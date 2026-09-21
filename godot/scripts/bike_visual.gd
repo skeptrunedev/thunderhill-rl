@@ -862,7 +862,15 @@ func _build_cockpit() -> void:
 	instruments.position = Vector3(0, 0.745, 0.12)
 	instruments.rotation.x = -0.55
 	_front.add_child(instruments)
-	_beveled_panel(Vector2(0.196, 0.119), 0.025, 0.015, polymer, instruments)
+	# Original molded outline and rim radii estimated from cockpit footage.
+	var housing := _mesh(
+		preload("res://scripts/rounded_panel.gd").build(
+			Vector2(0.196, 0.119), 0.025, 0.012, 0.0025
+		),
+		polymer,
+		instruments
+	)
+	housing.name = "InstrumentHousing"
 	var face := Node3D.new()
 	face.position.z = 0.013
 	instruments.add_child(face)

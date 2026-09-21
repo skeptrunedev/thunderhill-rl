@@ -28,17 +28,18 @@ func _run() -> void:
 		if not _check_reservoir(bike._reservoir_shell(cap), cap):
 			quit(1)
 			return
-	# The reflective face must be planar and face the rider, not inherit side normals.
+	# The front cap must stay planar; the rounded rim has independent smooth normals.
 	var housing: MeshInstance3D = bike._front.get_node("LiveInstrumentCluster").get_child(0)
 	var panel_arrays := housing.mesh.surface_get_arrays(0)
 	var panel_vertices: PackedVector3Array = panel_arrays[Mesh.ARRAY_VERTEX]
 	var panel_normals: PackedVector3Array = panel_arrays[Mesh.ARRAY_NORMAL]
 	var checked := 0
+	var front_z: float = housing.mesh.get_aabb().end.z
 	for triangle in range(0, panel_vertices.size(), 3):
 		if (
-			panel_vertices[triangle].z > 0
-			and panel_vertices[triangle + 1].z > 0
-			and panel_vertices[triangle + 2].z > 0
+			absf(panel_vertices[triangle].z - front_z) < 0.000001
+			and absf(panel_vertices[triangle + 1].z - front_z) < 0.000001
+			and absf(panel_vertices[triangle + 2].z - front_z) < 0.000001
 		):
 			for vertex in range(triangle, triangle + 3):
 				assert(
@@ -46,7 +47,7 @@ func _run() -> void:
 					"Front normal: " + str(panel_normals[vertex])
 				)
 			checked += 1
-	assert(checked == 8)
+	assert(checked > 0, "No front cap triangles checked")
 	bike.set_rider_visible(false)
 	bike.update_instruments(25.0, 7200.0, 3, 72.34)
 	assert(bike._display.speed_text == "090")
