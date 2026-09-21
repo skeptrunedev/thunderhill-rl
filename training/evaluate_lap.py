@@ -1,0 +1,165 @@
+"""Evaluate a saved Gemma adapter with no teacher controller or fallback actions."""
+
+import argparse
+import hashlib
+import json
+import time
+from contextlib import ExitStack
+from pathlib import Path
+
+import torch
+from agent_harness import ThunderhillEnv
+from lap_policy import RoadTelemetry, parse_action
+from peft import PeftModel
+from smoke_grpo import MODEL, REVISION, worker
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--adapter", type=Path, required=True)
+    p.add_argument("--godot", required=True)
+    p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--max-actions", type=int, default=9000)
+    args = p.parse_args()
+    out = args.output.resolve()
+    out.mkdir(parents=True, exist_ok=False)
+    tokenizer = AutoTokenizer.from_pretrained(args.adapter)
+    model = PeftModel.from_pretrained(
+        AutoModelForCausalLM.from_pretrained(
+            MODEL, revision=REVISION, dtype=torch.float32, attn_implementation="sdpa"
+        ).cuda(),
+        str(args.adapter),
+    ).eval()
+    adapter_hash = hashlib.sha256(
+        (args.adapter / "adapter_model.safetensors").read_bytes()
+    ).hexdigest()
+    road = RoadTelemetry()
+    started = time.monotonic()
+    with ExitStack() as stack:
+        client, data = stack.enter_context(
+            worker(
+                args.godot,
+                out / "environment",
+                90,
+                (f"--agent-max-episode-ticks={args.max_actions * 12}",),
+            )
+        )
+        trace = stack.enter_context((out / "harness.jsonl").open("w"))
+        decisions = stack.enter_context((out / "decisions.jsonl").open("w"))
+        env = ThunderhillEnv(client, 0, trace, lambda: "lap-eval-" + adapter_hash[:12])
+        env.reset()
+        episode = env._observation["episode_id"]
+        reason = "action_budget"
+        actions = 0
+        for index in range(args.max_actions):
+            prompt = road.prompt(env._observation)
+            inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+            with torch.inference_mode():
+                output = model.generate(
+                    **inputs,
+                    max_new_tokens=32,
+                    do_sample=False,
+                    pad_token_id=tokenizer.pad_token_id,
+                    eos_token_id=tokenizer.eos_token_id,
+                )
+            tokens = output[0, inputs["input_ids"].shape[1] :].tolist()
+            text = tokenizer.decode(tokens, skip_special_tokens=True)
+            row = {
+                "action_index": index,
+                "episode_id": episode,
+                "prompt": prompt,
+                "completion": text,
+                "completion_ids": tokens,
+                "adapter_sha256": adapter_hash,
+            }
+            try:
+                controls = parse_action(text)
+            except ValueError as error:
+                row["error"] = str(error)
+                decisions.write(json.dumps(row) + "\n")
+                reason = "invalid_model_action"
+                break
+            env.control_bike(env._receipt, **controls)
+            actions += 1
+            obs = env._observation
+            row["tick"] = obs["tick"]
+            row["controls"] = controls
+            decisions.write(json.dumps(row) + "\n")
+            decisions.flush()
+            if index % 50 == 0:
+                print(
+                    json.dumps(
+                        {
+                            "actions": actions,
+                            "progress": obs["track"]["progress"],
+                            "speed": obs["state"]["speed"],
+                            "lateral": obs["track"]["lateral_m"],
+                            "wall_seconds": time.monotonic() - started,
+                        }
+                    ),
+                    flush=True,
+                )
+            if obs["terminated"] or obs["truncated"]:
+                reason = (
+                    obs.get("termination_reason")
+                    or obs.get("truncation_reason")
+                    or "finished"
+                )
+                break
+            if not obs["track"]["lap_valid"]:
+                reason = "track_limits"
+                break
+        final = env._observation
+        client.request({"op": "reset", "policy_id": "evaluation-finished"})
+        recordings = []
+        rows = []
+        for path in data.rglob("*.jsonl"):
+            recorded = [json.loads(line) for line in path.read_text().splitlines()]
+            if recorded and recorded[0]["episode_id"] == episode:
+                recordings.append(str(path))
+                rows.extend(row for row in recorded if row["type"] == "transition")
+        gates = [
+            event["gate"]
+            for row in rows
+            for event in row["events"]
+            if event["type"] == "gate"
+        ]
+        offtrack = sum(not row["track"]["on_track"] for row in rows)
+        ordered = [row["tick"] for row in rows] == list(range(1, len(rows) + 1))
+        success = (
+            final["track"]["completed_laps"] == 1
+            and final["track"]["lap_valid"]
+            and not final["state"]["crashed"]
+            and not final["truncated"]
+            and gates == list(range(1, 32)) + [0]
+            and offtrack == 0
+            and ordered
+        )
+        summary = {
+            "success": success,
+            "reason": reason,
+            "model": MODEL,
+            "adapter_sha256": adapter_hash,
+            "teacher_used_at_inference": False,
+            "observation_mode": "privileged_road_telemetry",
+            "actions": actions,
+            "sim_seconds": final["sim_time"],
+            "wall_seconds": time.monotonic() - started,
+            "recorded_transitions": len(rows),
+            "gates": gates,
+            "offtrack_ticks": offtrack,
+            "recordings": recordings,
+            "final_observation": final,
+        }
+        (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+        print(
+            json.dumps({k: v for k, v in summary.items() if k != "final_observation"}),
+            flush=True,
+        )
+        if not success:
+            raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
