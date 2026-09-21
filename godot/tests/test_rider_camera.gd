@@ -144,7 +144,7 @@ func run() -> void:
 		check(game.camera.global_basis.is_finite(), "Onboard camera basis is not finite")
 		check(not game.camera.get_cull_mask_value(20), "Rider body obscures onboard view")
 		check(game.camera.get_cull_mask_value(19), "Onboard view hides arms")
-	check(game.camera.fov == 74.0, "Onboard field of view was not applied")
+	check(game.camera.fov == 90.0, "Onboard field of view was not applied")
 	game.menu_action("camera")
 	check(game.camera_mode == 0, "Camera menu did not cycle back to chase")
 	game.camera_mode = 0

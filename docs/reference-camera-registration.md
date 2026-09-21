@@ -75,3 +75,45 @@ of 145.81 degrees. Review of straight headings and reference frames 20, 30 and
 shadow onset may therefore reflect the lighting error instead of later track
 position. Do not treat the previous conditional station ordering as established.
 See `docs/sky-lighting.md` for the controlled comparison and elevation limits.
+
+## Upright framing correction
+
+The earlier onboard height of 1.37 metres placed the dashboard too high in the
+frame. A combined trial at the modeled eye height of 1.51 metres and downward
+pitch of ten degrees lowered the dashboard excessively and moved the horizon
+too far down. Keeping the original 0.30 radian pitch while raising height alone
+improves cockpit placement at station 850 without that horizon displacement.
+
+The height only candidate was also checked at station 1350 and in the existing
+station 1150 leaned pose. Root and independent review prefer it. The onboard
+view now uses 1.51 metres, matching the existing modeled rider eye height.
+This is a plausible framing choice, not a recovered video camera mount. The
+manufacturer based motorcycle dimensions, field of view, pitch and lighting
+are unchanged, as is the separate agent camera.
+
+Evidence: `artifacts/camera-upright-straight` and `camera-upright-exit` contain
+the rejected pitch trial. `camera-height151-straight`, `camera-height151-exit`
+and `camera-height151-apex` contain the height only candidate. Labeled source
+comparisons are in `artifacts/camera-height151-comparison`.
+
+Frame 50 still places the cockpit lower and to the left; gaze, station and rider
+posture remain unregistered. With the new game framing the helmet shadow begins
+to appear above the display at the existing sun elevation. This reinforces the
+need to constrain camera and shadow jointly before adjusting solar elevation.
+
+The existing rider camera test passed, including attachment on slopes and lean,
+visibility layers, camera cycling and rider shadow checks. Its stale onboard FOV
+assertion was corrected from 74 to the existing 90 degree setting; the game FOV
+was not changed by this work.
+
+The production replay completed 2699 transitions and produced
+`artifacts/camera-height151-motion.mp4` (700 frames, fixed 30 FPS). Twelve sampled
+frames show the lower cockpit framing through the turn with no obvious geometry
+clipping. Sparse frame inspection is not full temporal verification; the existing
+initial dark frame and ObjectDB exit warning remain unresolved. Human controls
+passed with zero failures and five agent camera captures passed the existing
+image and serialization checks. This is not a training result.
+
+Mac export `a3aa913a6cff-c13d8d829fb8` completed. The package has not yet been
+verified on the physical laptop. Production still opens in chase view unless
+the launch selects another camera; the onboard view is available by cycling C.

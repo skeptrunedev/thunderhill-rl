@@ -6,8 +6,9 @@ extends Node3D
 
 ## Approximate eye location inside the original helmet mesh, not measured rider data.
 const RIDER_EYE_LOCAL := Vector3(0.0, 1.51, -0.30)
-## Approximate onboard framing anchor, not a measured eye or camera mount.
-const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.37, -0.30)
+## Use the modeled eye height for the reference guided onboard framing.
+## This remains an estimate, not a recovered physical camera mount.
+const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.51, -0.30)
 const ONBOARD_LOOK_DOWN := 0.30
 const ONBOARD_FOV_DEG := 90.0
 ## Reference guided framing estimates, not a recovered camera calibration.
