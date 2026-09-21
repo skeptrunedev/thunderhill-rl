@@ -714,3 +714,47 @@ Linux frame timing was median 17.361 ms and p95 22.277 ms over 266 frames.
 These are not native Mac measurements.
 Mac export passed as `a869083b5357-ca4c44fda88b`; native execution remains
 unverified for this build.
+
+## Longitudinal pavement mottling and band breakup
+
+The 00:20 reference contains irregular longitudinal tone and a narrow wandering
+dark mark. The 00:40 reference also shows elongated variation, but does not
+establish that the same mark continues around the circuit. The production
+shader's dominant feature was an uninterrupted broad band, with only weak
+smaller variation. Root and independent image inspection identified that
+uniformity as a mismatch. Neither the marks nor their physical cause can be
+measured from these compressed moving frames.
+
+The custom asphalt shader now adds two scales of longitudinal albedo variation
+and varies the existing band's center, width and opacity over shorter distances.
+Both new fine domains are annular, closing at the lap boundary; their radial
+offset follows cross track distance. Derivative filtering fades unresolved
+noise cells toward their mean. No texture allocation or draw call is added.
+The scales and strength are original artistic estimates, not a tire history,
+surveyed construction map, recovered reflectance or optimal racing line.
+
+`artifacts/pavement-mottling-study/` tried albedo variation alone at strength
+0.65. `artifacts/pavement-broken-band-study/` adds band breakup at 0.85.
+Root and independent review prefer the latter to the unchanged baseline,
+especially at stations 900 and 3000. It reduces the smooth ribbon appearance
+without an obvious cloudy or wet effect in these captures. The improvement at
+400 is subtler. The narrow mark in the video remains absent and the broad
+lighting gradient still dominates. Roughness constants are retained, but the
+existing small roughness term follows the altered band weight, so this is not
+strictly an albedo only experiment.
+
+`artifacts/pavement-mottling-filtered/` contains baseline/candidate captures at
+six positions spaced 0.5 metres apart at each of three stations. Root inspected
+selected filtered captures after adding derivative filtering. These sampled
+stationary views are not a continuous motion or full lap flicker test. The
+candidate explicitly sets 0.85; the subsequent default change from 0.65 to
+0.85 adopts that captured value without changing the shader equations.
+
+The preview tool validates `--binder-mottling` and excludes simultaneous
+texture/lighting diagnostics or a second material comparison. Metadata records
+actual material parameters rather than inferring them from labels. A nonfinite
+value exits with status 2. Human controls passed with zero failures. Linux
+timing was median 17.361 ms and p95 22.440 ms over 265 frames, not a native Mac
+measurement. Physics, grip and the agent interface are unchanged.
+Mac export passed as `3e5adf905695-22da0d631573`; native execution of this build
+is unverified.

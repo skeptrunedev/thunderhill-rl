@@ -11,6 +11,8 @@ uniform float authored_tile_m = 0.8;
 uniform float authored_relief_m = 0.00035;
 // Original broad binder variation, not a surveyed rubber or racing line.
 uniform float surface_variation_strength : hint_range(0.0, 1.0) = 1.0;
+// Original longitudinal binder mottling, not a recovered tire or friction map.
+uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.85;
 // Historical aerial tone, not a measured material or friction field.
 uniform sampler2D pavement_tone : filter_linear_mipmap_anisotropic, repeat_enable;
 // The historical trial did not improve reference fidelity enough for production.
@@ -39,6 +41,12 @@ float pavement_noise(vec2 p) {
     f = f * f * (3.0 - 2.0 * f);
     return mix(mix(pavement_hash(cell), pavement_hash(cell + vec2(1.0, 0.0)), f.x),
                mix(pavement_hash(cell + vec2(0.0, 1.0)), pavement_hash(cell + vec2(1.0)), f.x), f.y);
+}
+
+float filtered_pavement_noise(vec2 p) {
+    // Fade unresolved procedural cells instead of letting them crawl at distance.
+    float footprint = max(length(dFdx(p)), length(dFdy(p)));
+    return mix(pavement_noise(p), 0.5, smoothstep(0.25, 0.8, footprint));
 }
 
 void fragment() {
@@ -72,11 +80,24 @@ void fragment() {
     float band_phase = UV.y / lap_length_m * TAU;
     vec2 band_domain = vec2(cos(band_phase), sin(band_phase)) * (lap_length_m / (TAU * 80.0));
     float band_drift = pavement_noise(band_domain) - 0.5;
-    float band_center = 0.62 + band_drift * 0.12;
-    float band_width = 0.22 + band_drift * 0.06;
+    float breakup_strength = binder_mottling_strength * (authored_surface ? 1.0 : 0.0);
+    float band_breakup = pavement_noise(band_domain * 4.0 + vec2(51.0, 17.0));
+    float band_center = 0.62 + band_drift * 0.12 + (band_breakup - 0.5) * 0.12 * breakup_strength;
+    float band_width = (0.22 + band_drift * 0.06) * mix(1.0, 0.45 + band_breakup, breakup_strength);
     float broad_band = 1.0 - smoothstep(band_width * 0.35, band_width, abs(across - band_center));
     float band_weight = broad_band * surface_variation_strength * (authored_surface ? 1.0 : 0.0);
+    band_weight *= mix(1.0, 0.35 + band_breakup, breakup_strength);
     ALBEDO *= 1.0 - band_weight * 0.50;
+    // Annular domains close at the lap seam and give independent cross-track
+    // and longitudinal scales. The radial offset is in cross-track metres.
+    vec2 station_direction = vec2(cos(band_phase), sin(band_phase));
+    vec2 binder_domain = station_direction * (lap_length_m / (TAU * 7.0) + UV.x / 0.85);
+    vec2 streak_domain = station_direction * (lap_length_m / (TAU * 3.5) + UV.x / 0.23);
+    float binder_patches = filtered_pavement_noise(binder_domain + vec2(71.0, 29.0));
+    float binder_streaks = filtered_pavement_noise(streak_domain + vec2(13.0, 47.0));
+    float binder_pattern = mix(binder_patches, binder_streaks, 0.30);
+    float mottling = (binder_pattern - 0.5) * binder_mottling_strength * (authored_surface ? 1.0 : 0.0);
+    ALBEDO *= 1.0 + mottling * 0.80;
     float tone_interior = smoothstep(0.10, 0.22, min(across, 1.0 - across));
     float observed_tone = texture(pavement_tone, vec2(across, UV.y / lap_length_m)).r * 2.0;
     ALBEDO *= mix(1.0, observed_tone, pavement_tone_strength * tone_interior);
