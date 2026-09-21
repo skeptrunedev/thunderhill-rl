@@ -50,18 +50,12 @@ func _grass_meshes() -> Array[ArrayMesh]:
 func _add_cut_grass(mesh: ArrayMesh, random: RandomNumberGenerator) -> void:
 	# Original bent ribbons add low stubble rather than more tall seed stalks.
 	# Dimensions are appearance estimates from the footage, not plant surveys.
-	var material := StandardMaterial3D.new()
-	var tint := ThunderhillTrack.DRY_GROUND_TINT
-	material.albedo_color = Color(tint.x, tint.y, tint.z).linear_to_srgb()
-	material.albedo_texture = load("res://assets/materials/dry_cut_grass_v2.png")
-	material.roughness = 0.95
-	material.backlight_enabled = true
-	material.backlight = Color(0.3, 0.24, 0.15).linear_to_srgb()
-	material.metallic_specular = 0.1
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.vertex_color_use_as_albedo = true
-	material.vertex_color_is_srgb = true
-	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://shaders/dry_stubble.gdshader")
+	material.set_shader_parameter("ground_tint", ThunderhillTrack.DRY_GROUND_TINT)
+	material.set_shader_parameter(
+		"grass_color", load("res://assets/materials/dry_cut_grass_v2.png")
+	)
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for blade in 132:

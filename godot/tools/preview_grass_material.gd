@@ -20,8 +20,11 @@ func _run() -> void:
 	var field_patch_strength := -1.0
 	var soil_value := -1.0
 	var grass_tile_m := -1.0
+	var stubble_shader_path := ""
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--grass-tile-m="):
+		if arg.begins_with("--stubble-shader="):
+			stubble_shader_path = arg.trim_prefix("--stubble-shader=")
+		elif arg.begins_with("--grass-tile-m="):
 			var value := arg.trim_prefix("--grass-tile-m=")
 			if (
 				not value.is_valid_float()
@@ -143,6 +146,39 @@ func _run() -> void:
 	game.set_physics_process(false)
 	game.bike.visible = false
 	game.hud.visible = false
+	var stubble_materials: Array = []
+	if not stubble_shader_path.is_empty():
+		if not FileAccess.file_exists(stubble_shader_path):
+			_fail("Stubble shader does not exist")
+			return
+		var shader: Shader = load(stubble_shader_path)
+		if shader == null:
+			_fail("Cannot load stubble shader")
+			return
+		var seen: Dictionary = {}
+		for node in game.find_children("DryGrass_*", "MultiMeshInstance3D", true, false):
+			var mesh: Mesh = node.multimesh.mesh
+			if seen.has(mesh.get_instance_id()):
+				continue
+			seen[mesh.get_instance_id()] = true
+			for surface in mesh.get_surface_count():
+				var replacement := ShaderMaterial.new()
+				replacement.shader = shader
+				replacement.set_shader_parameter("ground_tint", ThunderhillTrack.DRY_GROUND_TINT)
+				replacement.set_shader_parameter(
+					"grass_color", load("res://assets/materials/dry_cut_grass_v2.png")
+				)
+				stubble_materials.append(
+					{
+						"mesh": mesh,
+						"surface": surface,
+						"original": mesh.surface_get_material(surface),
+						"candidate": replacement
+					}
+				)
+		if stubble_materials.is_empty():
+			_fail("No stubble surfaces found")
+			return
 	var track = game.track
 	if not is_finite(station_m) or station_m < 0.0 or station_m >= track.length_m:
 		_fail("Station must be within the lap")
@@ -202,6 +238,10 @@ func _run() -> void:
 		game.camera.global_position = pose
 		game.camera.look_at(pose + target - position)
 		for name: String in ["existing", "candidate"]:
+			for item in stubble_materials:
+				item.mesh.surface_set_material(
+					item.surface, item.original if name == "existing" else item.candidate
+				)
 			material.set_shader_parameter(
 				"grass_color", original if name == "existing" else texture
 			)
@@ -234,6 +274,13 @@ func _run() -> void:
 							"ground_tint_linear": [ground_tint.x, ground_tint.y, ground_tint.z],
 							"field_soil_strength": field_soil_strength,
 							"field_patch_strength": field_patch_strength,
+							"stubble_shader": stubble_shader_path,
+							"stubble_shader_sha256":
+							(
+								""
+								if stubble_shader_path.is_empty()
+								else FileAccess.get_sha256(stubble_shader_path)
+							),
 							"soil_value": soil_value,
 							"terrain_shader_sha256":
 							FileAccess.get_sha256("res://shaders/terrain.gdshader"),

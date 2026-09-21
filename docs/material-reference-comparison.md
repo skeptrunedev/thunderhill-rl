@@ -513,3 +513,38 @@ in places, so this does not resolve all vegetation appearance issues or certify
 motion stability. Invalid scale, nonfinite soil value and out of range patch
 strength exited with status 2. Mac export passed as
 `16d5c95a5f56-631e58d2fc0b`.
+
+## Custom stubble canopy shader
+
+The controlled pair in `artifacts/stubble-canopy-study/` compares the prior
+StandardMaterial3D ribbons with the original `dry_stubble.gdshader` at station
+3000. Texture, geometry, camera and lighting are held fixed. Both root and
+independent visual review found fewer isolated dark stems near the camera and
+less distant stippling. This supports changing ribbon lighting, but does not
+establish a measured physical model of dry stalks.
+
+The shader orients the ribbon normal toward the local canopy hemisphere and
+blends it 0.65 toward the transformed tuft up direction. It retains the original
+grass texture, shared ground tint, instance color, roughness and backlighting.
+The blend is an artistic approximation for unresolved short vegetation. The
+tradeoff is flatter individual blade shading. It does not add geometric detail
+or reconstruct the field variation visible in the video.
+
+Scenery serialization now verifies ShaderMaterial source, effective uniforms
+and external texture hashes. Unsupported material dependencies fail explicitly.
+A focused rendered test verifies uniform, default, source and texture changes,
+and preservation across saved scene reload. Both scenery bakes passed. Human
+controls passed with zero failures; local Linux frame times were median
+17.327 ms and p95 25.0 ms over 269 frames. These short runs do not certify full
+lap stability or native Mac performance. The MacBook was offline in this pass.
+
+The final baked shader was inspected at station 400 in
+`artifacts/stubble-final-close/existing_00.png` and `existing_05.png`, with
+camera positions 1.5 metres apart. Grass remains visible without the previous
+concentration of dark sticks, though some distant stippling remains. The local
+comparison sheet `artifacts/stubble-video-comparison/00.png` places the supplied
+video frame beside this render without color correction. Its different camera
+and position are labeled explicitly. The sheet makes the remaining excessive
+uniformity, simplified architecture and lighting mismatch clear; this pass is
+not a 1:1 result. Video frames and comparison sheets remain local artifacts.
+Mac export passed as `3cd028be5f4b-70c27e42dfa9`; it has not been run on the Mac.

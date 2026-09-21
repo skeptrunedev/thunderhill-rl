@@ -3,6 +3,7 @@ extends SceneTree
 const OUTPUT := "res://assets/generated/scenery.scn"
 const SOURCES := [
 	"scripts/scenery.gd",
+	"shaders/dry_stubble.gdshader",
 	"scripts/track.gd",
 	"scripts/offroad_surface.gd",
 	"scripts/curb_surface.gd",
@@ -45,6 +46,9 @@ func _run() -> void:
 			)
 	assert(instance_count == 96000, "Expected all authored grass instances")
 	var expected := fingerprint(scenery)
+	if expected.is_empty():
+		quit(2)
+		return
 	_set_owners(scenery, scenery)
 	scenery.set_script(null)
 	var packed := PackedScene.new()
@@ -61,7 +65,12 @@ func _run() -> void:
 		. instantiate()
 	)
 	var load_ms := (Time.get_ticks_usec() - started) / 1000.0
-	assert(fingerprint(restored) == expected, "Scenery changed during serialization")
+	var restored_fingerprint := fingerprint(restored)
+	if restored_fingerprint.is_empty() or restored_fingerprint != expected:
+		push_error("Scenery changed during serialization or material verification failed")
+		restored.free()
+		quit(2)
+		return
 	var hashes := {}
 	for source in SOURCES:
 		hashes[source] = FileAccess.get_sha256("res://" + source)
@@ -93,11 +102,12 @@ func _set_owners(node: Node, owner_root: Node) -> void:
 static func fingerprint(node: Node) -> String:
 	var digest := HashingContext.new()
 	digest.start(HashingContext.HASH_SHA256)
-	_hash_node(node, digest)
+	if not _hash_node(node, digest):
+		return ""
 	return digest.finish().hex_encode()
 
 
-static func _hash_node(node: Node, digest: HashingContext) -> void:
+static func _hash_node(node: Node, digest: HashingContext) -> bool:
 	digest.update(var_to_bytes(str(node.name)))
 	if node is Node3D:
 		digest.update(var_to_bytes(node.transform))
@@ -108,26 +118,35 @@ static func _hash_node(node: Node, digest: HashingContext) -> void:
 			)
 		)
 	if node is MeshInstance3D:
-		_hash_material(node.material_override, digest)
+		if not _hash_material(node.material_override, digest):
+			return false
 		for surface in node.mesh.get_surface_count():
 			digest.update(var_to_bytes(node.mesh.surface_get_arrays(surface)))
-			_hash_material(node.mesh.surface_get_material(surface), digest)
+			if not _hash_material(node.mesh.surface_get_material(surface), digest):
+				return false
 	if node is MultiMeshInstance3D:
 		for surface in node.multimesh.mesh.get_surface_count():
 			digest.update(var_to_bytes(node.multimesh.mesh.surface_get_arrays(surface)))
-			_hash_material(node.multimesh.mesh.surface_get_material(surface), digest)
+			if not _hash_material(node.multimesh.mesh.surface_get_material(surface), digest):
+				return false
 		for index in node.multimesh.instance_count:
 			digest.update(var_to_bytes(node.multimesh.get_instance_transform(index)))
 			digest.update(var_to_bytes(node.multimesh.get_instance_color(index)))
 	for child in node.get_children():
-		_hash_node(child, digest)
+		if not _hash_node(child, digest):
+			return false
+	return true
 
 
-static func _hash_material(material: Material, digest: HashingContext) -> void:
+static func _hash_material(material: Material, digest: HashingContext) -> bool:
 	if material == null:
 		digest.update(var_to_bytes(null))
-		return
-	assert(material is StandardMaterial3D, "Extend scenery verifier for new material type")
+		return true
+	if material is ShaderMaterial:
+		return _hash_shader_material(material, digest)
+	if not material is StandardMaterial3D:
+		push_error("Unsupported scenery material type: " + material.get_class())
+		return false
 	var values := []
 	for property in material.get_property_list():
 		if (
@@ -139,7 +158,77 @@ static func _hash_material(material: Material, digest: HashingContext) -> void:
 		):
 			var value: Variant = material.get(property.name)
 			if value is Resource:
-				assert(not value.resource_path.is_empty(), "Unverified embedded material resource")
+				if value.resource_path.is_empty():
+					push_error("Unverified embedded material resource")
+					return false
 				value = value.resource_path
 			values.append([property.name, value])
 	digest.update(var_to_bytes(values))
+	return true
+
+
+static func _hash_shader_material(material: ShaderMaterial, digest: HashingContext) -> bool:
+	var shader := material.shader
+	if shader == null or shader.code.is_empty():
+		push_error("Scenery ShaderMaterial requires shader source")
+		return false
+	# Includes and global/instance uniforms require additional dependency tracking.
+	# Refuse them rather than certify incomplete material provenance.
+	var unsupported := RegEx.new()
+	unsupported.compile("(#\\s*include\\b|\\b(global|instance)\\s+uniform\\b)")
+	if unsupported.search(shader.code) != null:
+		push_error("Scenery shader includes or nonmaterial uniforms are not supported")
+		return false
+	var names: Array[String] = []
+	for uniform in shader.get_shader_uniform_list():
+		if uniform.usage & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP):
+			continue
+		names.append(str(uniform.name))
+	names.sort()
+	var values := []
+	for name in names:
+		var value: Variant = material.get_shader_parameter(name)
+		if value == null:
+			value = RenderingServer.shader_get_parameter_default(shader.get_rid(), name)
+		if value == null:
+			value = shader.get_default_texture_parameter(name)
+		var encoded := _shader_value(value, name)
+		if not encoded.ok:
+			return false
+		values.append([name, encoded.value])
+	if material.next_pass != null:
+		push_error("Scenery shader next_pass is not supported")
+		return false
+	digest.update(
+		var_to_bytes(
+			["ShaderMaterial", shader.code.sha256_text(), material.render_priority, values]
+		)
+	)
+	return true
+
+
+static func _shader_value(value: Variant, name: String) -> Dictionary:
+	if value == null:
+		return {"ok": true, "value": null}
+	if value is Array:
+		var encoded := []
+		for element in value:
+			var entry := _shader_value(element, name)
+			if not entry.ok:
+				return {"ok": false}
+			encoded.append(entry.value)
+		return {"ok": true, "value": encoded}
+	if value is Texture2D:
+		var path: String = value.resource_path
+		if path.is_empty() or "::" in path or not FileAccess.file_exists(path):
+			push_error("Unverified embedded scenery shader texture: " + name)
+			return {"ok": false}
+		var checksum := FileAccess.get_sha256(path)
+		if checksum.is_empty():
+			push_error("Cannot hash scenery shader texture: " + path)
+			return {"ok": false}
+		return {"ok": true, "value": {"path": path, "sha256": checksum}}
+	if typeof(value) in [TYPE_OBJECT, TYPE_DICTIONARY, TYPE_CALLABLE, TYPE_SIGNAL, TYPE_RID]:
+		push_error("Unsupported scenery shader uniform value: " + name)
+		return {"ok": false}
+	return {"ok": true, "value": value}

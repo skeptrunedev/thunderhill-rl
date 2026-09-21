@@ -40,6 +40,9 @@ func _run() -> void:
 	assert(landmarks.initialization_error.is_empty(), landmarks.initialization_error)
 	var build_ms := (Time.get_ticks_usec() - started) / 1000.0
 	var expected := fingerprint(landmarks)
+	if expected.is_empty():
+		quit(2)
+		return
 	_prepare(landmarks, landmarks)
 	landmarks.set_script(null)
 	var packed := PackedScene.new()
@@ -96,18 +99,23 @@ func _prepare(node: Node, owner_root: Node) -> void:
 static func fingerprint(node: Node) -> String:
 	var digest := HashingContext.new()
 	digest.start(HashingContext.HASH_SHA256)
-	digest.update(Verifier.fingerprint(node).to_utf8_buffer())
-	_hash_visibility_and_instances(node, digest)
+	var geometry := Verifier.fingerprint(node)
+	if geometry.is_empty():
+		return ""
+	digest.update(geometry.to_utf8_buffer())
+	if not _hash_visibility_and_instances(node, digest):
+		return ""
 	return digest.finish().hex_encode()
 
 
-static func _hash_visibility_and_instances(node: Node, digest: HashingContext) -> void:
+static func _hash_visibility_and_instances(node: Node, digest: HashingContext) -> bool:
 	if node is Node3D:
 		digest.update(var_to_bytes(node.visible))
 	if node is VisualInstance3D:
 		digest.update(var_to_bytes(node.layers))
 	if node is MultiMeshInstance3D:
-		Verifier._hash_material(node.material_override, digest)
+		if not Verifier._hash_material(node.material_override, digest):
+			return false
 		digest.update(
 			var_to_bytes(
 				[
@@ -125,4 +133,6 @@ static func _hash_visibility_and_instances(node: Node, digest: HashingContext) -
 				"Missing tree instance transform"
 			)
 	for child in node.get_children():
-		_hash_visibility_and_instances(child, digest)
+		if not _hash_visibility_and_instances(child, digest):
+			return false
+	return true
