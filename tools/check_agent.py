@@ -131,10 +131,16 @@ def main() -> None:
                 recordings = list((Path(directory) / "data").rglob("*.jsonl"))
                 policies = set()
                 transition_count = 0
+                decision_count = 0
                 replay_recording = None
                 for recording in recordings:
                     for line in recording.read_text().splitlines():
                         record = json.loads(line)
+                        if record.get("type") == "model_decision":
+                            decision_count += 1
+                            assert record["tick"] == 0 and record["elapsed"] == 0
+                            assert record["action_id"] == "first"
+                            assert record["text"] == "control_bike " + json.dumps(record["controls"], separators=(",", ":"))
                         if record.get("type") == "transition":
                             policies.add(record["policy_id"])
                             transition_count += 1
@@ -145,6 +151,8 @@ def main() -> None:
                                 replay_recording = recording
                 assert policies == {"checkpoint-alpha", "checkpoint-beta", "checkpoint-coast"}, policies
                 assert transition_count == 36, f"Unexpected recorded transitions, duplicate may have executed: {transition_count}"
+                assert decision_count == 3, "Duplicate or rejected request generated a decision event"
+                result["checks"].append("recorded_decisions_once_per_accepted_call")
                 result["checks"].append("recorded_checkpoint_transitions")
                 result["recorded_transitions"] = transition_count
                 assert replay_recording is not None, "No recording available for playback check"

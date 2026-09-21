@@ -171,3 +171,28 @@ show that the field remains too smooth, the cockpit too approximate and the
 camera too upright compared with the supplied footage. Sampling every two
 seconds cannot establish absence of fine temporal shimmer. Native Mac playback
 and human visual acceptance remain outstanding.
+
+### Model decision feed in recordings
+
+Agent recordings now include a `model_decision` event before each accepted
+control call, with the simulation tick, elapsed time, action identifier and
+actual `control_bike` arguments. Retries do not duplicate events. The HUD shows
+the five latest calls in the upper left during live agent control and replay;
+the newest call is first. Repeated identical commands still appear separately.
+The feed shows issued controls, not generated explanations or inferred reasoning.
+
+For older evaluation recordings, join the saved model completions before clipping:
+
+```sh
+python3 tools/clip_replay.py /absolute/episode.jsonl --decisions /absolute/decisions.jsonl --start 222 --end 240.78 --output /absolute/decision-clip.jsonl
+```
+
+This validates episode identity, contiguous ticks and every applied control
+against the original episode. Decision end ticks are mapped to the first
+transition controlled by that call. A clip carries the call active at its start,
+without displaying future calls early. Native events need no sidecar and survive
+subsequent clipping. Render the enriched clip with the same movie command above.
+
+Verified with real headless agent transport and replay checks, seven clipping
+tests, and a rendered cockpit clip inspected for legible text. The example clip
+is the failed baseline corner attempt, not a completed lap.

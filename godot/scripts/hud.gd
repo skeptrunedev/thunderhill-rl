@@ -10,6 +10,8 @@ var timing: Label
 var help: Label
 var panel: PanelContainer
 var minimap: Control
+var decision_panel: PanelContainer
+var decision_text: Label
 
 
 func label(text: String, size: int, color := Color.WHITE) -> Label:
@@ -53,6 +55,22 @@ func _ready() -> void:
 	help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	help.position = Vector2(-780, -38)
 	add_child(help)
+	decision_panel = PanelContainer.new()
+	decision_panel.position = Vector2(38, 100)
+	decision_panel.custom_minimum_size = Vector2(450, 0)
+	decision_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var feed_style := StyleBoxFlat.new()
+	feed_style.bg_color = Color(0.018, 0.027, 0.036, 0.90)
+	feed_style.set_corner_radius_all(8)
+	feed_style.content_margin_left = 16
+	feed_style.content_margin_right = 16
+	feed_style.content_margin_top = 12
+	feed_style.content_margin_bottom = 12
+	decision_panel.add_theme_stylebox_override("panel", feed_style)
+	add_child(decision_panel)
+	decision_text = label("", 17, Color("e3ede8"))
+	decision_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	decision_panel.add_child(decision_text)
 	panel = PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.position = Vector2(-250, -230)
@@ -121,7 +139,14 @@ func _process(_dt: float) -> void:
 		status.tooltip_text = str(game.environment_failure.error)
 	else:
 		status.tooltip_text = ""
-	panel.visible = game.paused and not game.agent_mode
+	panel.visible = game.paused and not game.agent_mode and game.replay == null
+	decision_panel.visible = not game.decision_feed.is_empty()
+	var lines: PackedStringArray = ["MODEL TOOL CALLS  •  latest first"]
+	for decision in game.decision_feed:
+		var seconds: float = float(decision.get("elapsed", float(decision.tick) * game.DT))
+		var identity: String = str(decision.get("action_id", decision.get("action_index", "")))
+		lines.append("%06.2fs  ·  %s\n%s" % [seconds, identity, str(decision.text)])
+	decision_text.text = "\n\n".join(lines)
 	queue_redraw()
 
 

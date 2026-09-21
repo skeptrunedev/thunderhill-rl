@@ -69,6 +69,7 @@ var preview_station := 1650.0
 var run_id: String
 var replay_path: String = ""
 var replay: RefCounted
+var decision_feed: Array[Dictionary] = []
 var benchmark: RefCounted
 var benchmark_path := ""
 var frame_times: Array = []
@@ -455,6 +456,7 @@ func reset_episode(
 	_collision_start_pose = {}
 	# Tick and lap clocks retain source history; each branch receives a full budget.
 	episode_initial_tick = sim.tick
+	decision_feed.clear()
 	_start_recording(station)
 	return observation()
 
@@ -541,6 +543,8 @@ func _physics_process(_dt: float) -> void:
 			paused = true
 			print("REPLAY_COMPLETE ticks=", replay.consumed_ticks)
 			return
+		for decision in replay.pending_decisions:
+			_show_decision(decision)
 		replay.apply_state(sim, row.state)
 		lap_time = sim.elapsed
 		wheel_rotation += sim.longitudinal_velocity * DT / 0.32
@@ -1196,6 +1200,16 @@ func _request(request: Dictionary) -> Dictionary:
 		var error: String = sim.validate_controls(action)
 		if not error.is_empty():
 			return {"error": error}
+		var decision := {
+			"type": "model_decision",
+			"tick": sim.tick,
+			"elapsed": sim.elapsed,
+			"action_id": id,
+			"controls": action.duplicate(true),
+			"text": "control_bike " + JSON.stringify(action)
+		}
+		_record(decision)
+		_show_decision(decision)
 		# Server owned action duration, 12 ticks / 100ms, never chosen by the policy.
 		var transitions: Array = []
 		for tick in 12:
@@ -1219,6 +1233,12 @@ func _request(request: Dictionary) -> Dictionary:
 			recorder.flush()
 		return response
 	return {"error": "Unknown operation"}
+
+
+func _show_decision(decision: Dictionary) -> void:
+	decision_feed.push_front(decision)
+	if decision_feed.size() > 5:
+		decision_feed.pop_back()
 
 
 func _exit_tree() -> void:

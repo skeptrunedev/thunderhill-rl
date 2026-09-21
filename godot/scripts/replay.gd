@@ -5,6 +5,7 @@ var file: FileAccess
 var manifest: Dictionary
 var finished := false
 var consumed_ticks := 0
+var pending_decisions: Array[Dictionary] = []
 
 
 func open_recording(path: String, expected_track_hash: String) -> String:
@@ -40,8 +41,11 @@ func open_recording(path: String, expected_track_hash: String) -> String:
 
 
 func next_state() -> Dictionary:
+	pending_decisions.clear()
 	while file and file.get_position() < file.get_length():
 		var row: Variant = JSON.parse_string(file.get_line())
+		if row is Dictionary and row.get("type", "") == "model_decision":
+			pending_decisions.append(row)
 		if row is Dictionary and row.get("type", "") == "transition":
 			consumed_ticks += 1
 			return row

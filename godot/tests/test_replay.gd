@@ -49,6 +49,14 @@ func _initialize() -> void:
 			check(false, "Playback returned extra transitions")
 			break
 		check(row == expected_rows[count], "Playback row differs from independent recording read")
+		if count == 0:
+			check(replay.pending_decisions.size() == 1, "Missing decision before first transition")
+			if not replay.pending_decisions.is_empty():
+				check(
+					replay.pending_decisions[0].tick == row.previous_tick, "Decision timing differs"
+				)
+		else:
+			check(replay.pending_decisions.is_empty(), "Decision repeated between calls")
 		replay.apply_state(sim, row.state)
 		var observed: Dictionary = sim.telemetry()
 		var expected: Dictionary = expected_rows[count].state

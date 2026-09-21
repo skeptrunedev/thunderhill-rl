@@ -43,5 +43,94 @@ class ReplayClipTest(unittest.TestCase):
                 clip_replay(source, Path(folder) / "invalid.jsonl", 0, 2)
 
 
+class DecisionClipTest(unittest.TestCase):
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
+        self.source = Path(self.folder.name) / "episode.jsonl"
+        self.sidecar = Path(self.folder.name) / "decisions.jsonl"
+        self.output = Path(self.folder.name) / "clip.jsonl"
+        self.controls = {"steer": 0, "throttle": 0.5}
+        self.rows = [{"type": "episode", "episode_id": "e",
+                      "initial_state": {"tick": 0, "elapsed": 0}}]
+        self.rows += [{"type": "transition", "episode_id": "e", "tick": i,
+                       "previous_tick": i - 1, "requested_controls": self.controls,
+                       "state": {"tick": i, "elapsed": i * 0.25}}
+                      for i in range(1, 9)]
+        self.calls = [{"episode_id": "e", "action_index": i,
+                       "tick": (i + 1) * 2, "controls": self.controls,
+                       "completion": "control_bike 0 50 0 0"}
+                      for i in range(4)]
+        self.write()
+
+    def write(self):
+        self.source.write_text("\n".join(map(json.dumps, self.rows)))
+        self.sidecar.write_text("\n".join(map(json.dumps, self.calls)))
+
+    def read(self, path=None):
+        return [json.loads(line) for line in (path or self.output).read_text().splitlines()]
+
+    def test_call_start_and_identical_calls_preserved(self):
+        result = clip_replay(self.source, self.output, 0, 1.5, self.sidecar)
+        rows = self.read()
+        events = [r for r in rows if r["type"] == "model_decision"]
+        self.assertEqual([e["tick"] for e in events], [0, 2, 4])
+        self.assertEqual([e["action_index"] for e in events], [0, 1, 2])
+        self.assertEqual(result["model_decisions"], 3)
+        for i, row in enumerate(rows):
+            if row["type"] == "model_decision":
+                self.assertEqual(rows[i + 1]["previous_tick"], row["tick"])
+                self.assertEqual(row["text"], self.calls[0]["completion"])
+        # The call at the final state tick has not yet controlled any clip frame.
+        self.assertNotIn(3, [e["action_index"] for e in events])
+
+    def test_inside_call_retains_active_event_and_reclip(self):
+        clip_replay(self.source, self.output, 1, 2, self.sidecar)
+        rows = self.read()
+        self.assertEqual(rows[0]["initial_state"]["tick"], 3)
+        self.assertEqual(rows[1]["tick"], 2)
+        self.assertEqual(rows[1]["elapsed"], 0.5)
+        second = self.output.with_name("second.jsonl")
+        clip_replay(self.output, second, 1.5, 2)
+        events = [r for r in self.read(second) if r["type"] == "model_decision"]
+        self.assertEqual([r["tick"] for r in events], [4, 6])
+        self.assertEqual([r["action_index"] for r in events], [2, 3])
+
+    def test_exact_call_boundary_excludes_previous_call(self):
+        clip_replay(self.source, self.output, 1.25, 2, self.sidecar)
+        events = [r for r in self.read() if r["type"] == "model_decision"]
+        self.assertEqual([r["tick"] for r in events], [4, 6])
+
+    def test_rejects_wrong_episode_controls_order_and_coverage(self):
+        variants = [lambda: self.calls[1].update(episode_id="other"),
+                    lambda: self.calls[1].update(controls={"steer": 1}),
+                    lambda: self.calls[1].update(action_index=0),
+                    lambda: self.calls[1].update(tick=2),
+                    lambda: self.calls.pop()]
+        original = json.dumps(self.calls)
+        for mutate in variants:
+            with self.subTest(mutate=mutate):
+                self.calls = json.loads(original)
+                mutate()
+                self.write()
+                with self.assertRaises(ValueError):
+                    clip_replay(self.source, self.output, 0, 0.5, self.sidecar)
+                self.assertFalse(self.output.exists())
+
+    def test_rejects_future_embedded_event(self):
+        self.rows.insert(1, {"type": "model_decision", "tick": 2,
+                             "text": "future"})
+        self.write()
+        with self.assertRaises(ValueError):
+            clip_replay(self.source, self.output, 0, 2)
+
+    def test_rejected_final_completion_is_not_an_applied_call(self):
+        self.calls.append({"action_index": 4, "episode_id": "e",
+                           "completion": "invalid", "error": "invalid controls"})
+        self.write()
+        result = clip_replay(self.source, self.output, 0, 2, self.sidecar)
+        self.assertEqual(result["model_decisions"], 4)
+
+
 if __name__ == "__main__":
     unittest.main()
