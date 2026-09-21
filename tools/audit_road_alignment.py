@@ -176,6 +176,69 @@ def lidar_checks(surface, track, extrema):
     }
 
 
+def sample_aerial_profile(image, extent, xy):
+    """Nearest source pixels, with continuous corner based column/row coordinates.
+
+    RGB is reported on the source 0..255 scale. Repeated pixels are retained;
+    subpixel query spacing is not extra observational resolution.
+    """
+    image, xy = np.asarray(image), np.asarray(xy, dtype=float)
+    if image.ndim != 3 or image.shape[2] not in (3, 4):
+        raise ValueError("Expected RGB or RGBA source image")
+    if xy.ndim != 2 or xy.shape[1] != 2 or not np.isfinite(xy).all():
+        raise ValueError("Invalid projected profile coordinates")
+    height, width = image.shape[:2]
+    spacing = np.array(
+        [
+            (extent["xmax"] - extent["xmin"]) / width,
+            (extent["ymax"] - extent["ymin"]) / height,
+        ]
+    )
+    if not np.isfinite(spacing).all() or (spacing <= 0).any():
+        raise ValueError("Invalid aerial extent")
+    uv = np.column_stack(
+        [
+            (xy[:, 0] - extent["xmin"]) / spacing[0],
+            (extent["ymax"] - xy[:, 1]) / spacing[1],
+        ]
+    )
+    if (uv < 0).any() or (uv[:, 0] >= width).any() or (uv[:, 1] >= height).any():
+        raise ValueError("Profile falls outside source imagery")
+    ij = np.floor(uv).astype(int)
+    values = image[ij[:, 1], ij[:, 0]].astype(float)
+    maximum = 255.0 if image.dtype == np.uint8 else 1.0
+    if not np.isfinite(values).all() or (values < 0).any() or (values > maximum).any():
+        raise ValueError("Invalid or missing source pixel")
+    if values.shape[1] == 4 and (values[:, 3] != maximum).any():
+        raise ValueError("Profile contains missing or partially transparent pixels")
+    rgb = values[:, :3] * (255.0 / maximum)
+    score = (rgb[:, 0] - rgb[:, 2]) / np.maximum(rgb[:, 0] + rgb[:, 2], 1.0)
+    return {
+        "aerial_easting_northing": xy.tolist(),
+        "source_pixel_column_row": uv.tolist(),
+        "sampled_pixel_column_row": ij.tolist(),
+        "rgb_255": rgb.tolist(),
+        "neutral_color_score": score.tolist(),
+        "source_pixel_spacing_m": spacing.tolist(),
+    }
+
+
+def section_points(center, left_edge, half_width, offsets):
+    """Extend the actual interpolated production edge frame, positive left."""
+    center, left_edge, offsets = map(np.asarray, (center, left_edge, offsets))
+    if (
+        center.shape != (3,)
+        or left_edge.shape != (3,)
+        or offsets.ndim != 1
+        or not all(np.isfinite(a).all() for a in (center, left_edge, offsets))
+        or not np.isfinite(half_width)
+        or half_width <= 0
+        or np.linalg.norm((left_edge - center)[[0, 2]]) <= 0
+    ):
+        raise ValueError("Invalid production section frame")
+    return center + offsets[:, None] * (left_edge - center) / half_width
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start", type=float, default=1750.0)
@@ -206,7 +269,33 @@ def main():
         action="store_true",
         help="Acquire openly licensed PROJ datum grids into this project's reference artifacts",
     )
+    parser.add_argument(
+        "--section-stations",
+        type=float,
+        nargs="+",
+        help="Production stations for historical RGB profiles; never inferred boundaries",
+    )
+    parser.add_argument(
+        "--sections-output",
+        type=Path,
+        help="Optional profile PNG path; otherwise OUTPUT stem plus .sections.png",
+    )
     args = parser.parse_args()
+    if args.sections_output and not args.section_stations:
+        raise ValueError("Section output requires --section-stations")
+    if args.section_stations and (not args.production or args.plan_smoothing_m):
+        raise ValueError("Sections require unchanged --production geometry")
+    section_output = args.sections_output or args.output.with_name(
+        args.output.stem + ".sections.png"
+    )
+    if args.section_stations and (
+        section_output.suffix.lower() != ".png"
+        or section_output.resolve()
+        in (args.output.resolve(), args.output.with_suffix(".json").resolve())
+    ):
+        raise ValueError("Section output must be a separate PNG")
+    if args.section_stations and section_output.exists():
+        raise FileExistsError("Refusing to overwrite section evidence")
     if not np.isfinite(args.plan_smoothing_m) or args.plan_smoothing_m < 0:
         raise ValueError("Plan smoothing must be finite and nonnegative")
     if args.plan_smoothing_m and not args.production:
@@ -223,6 +312,13 @@ def main():
     period = track["length_m"] if args.production else surface["period_m"]
     if not 0 <= args.start < args.end <= period:
         raise ValueError("Choose an ordered interval within the track period")
+    if args.section_stations and any(
+        not np.isfinite(station) or not args.start <= station <= args.end
+        for station in args.section_stations
+    ):
+        raise ValueError(
+            "Section stations must be finite and inside the audited interval"
+        )
     image_path = ROOT / "artifacts/reference/ortho/east-2022.png"
     source_pin = json.loads(
         (ROOT / "godot/assets/materials/terrain_macro.json").read_text()
@@ -333,6 +429,27 @@ def main():
     lower, upper = joined.min(axis=0) - 18, joined.max(axis=0) + 18
     midpoint = (lower + upper) / 2
     image = plt.imread(image_path)
+    sections = []
+    if args.section_stations:
+        offsets = np.linspace(-15.0, 15.0, 101)
+        for station in args.section_stations:
+            half_width = float(np.interp(station, stations, widths)) / 2
+            local = section_points(
+                production_points([station], 0)[0],
+                production_points([station], 1)[0],
+                half_width,
+                offsets,
+            )
+            sections.append(
+                {
+                    "station_m": station,
+                    "positive_offset_direction": "left of production travel",
+                    "modeled_half_width_m": half_width,
+                    "offsets_m": offsets.tolist(),
+                    "local_xyz_m": local.tolist(),
+                    **sample_aerial_profile(image, extent, projected(local)),
+                }
+            )
     height, width = image.shape[:2]
     dx, dy = (
         (extent["xmax"] - extent["xmin"]) / width,
@@ -424,6 +541,61 @@ def main():
         "plot_sha256": digest(args.output),
         "limitations": "Visual registration aid only. Historic color boundaries, source georeferencing and datum operations have uncertainty. No edge measurements accepted automatically.",
     }
+    if sections:
+        section_fig, section_axes = plt.subplots(
+            len(sections),
+            3,
+            figsize=(15, 3 * len(sections)),
+            squeeze=False,
+            layout="constrained",
+        )
+        for row, section in zip(section_axes, sections):
+            offsets = np.array(section["offsets_m"])
+            rgb = np.array(section["rgb_255"])
+            row[0].imshow(
+                rgb[None, :, :] / 255.0,
+                aspect="auto",
+                interpolation="nearest",
+                extent=[offsets[0] - 0.15, offsets[-1] + 0.15, 0, 1],
+            )
+            row[0].set_yticks([])
+            row[0].set_title(f"Station {section['station_m']:g} m, sampled source RGB")
+            for channel, color in enumerate(["red", "green", "blue"]):
+                row[1].step(
+                    offsets, rgb[:, channel], where="mid", color=color, label=color
+                )
+            row[1].set_ylim(0, 255)
+            row[1].set_ylabel("Source RGB (0..255)")
+            row[1].legend()
+            row[2].step(
+                offsets, section["neutral_color_score"], where="mid", color="black"
+            )
+            row[2].set_ylabel("(R minus B) / max(R plus B, 1)")
+            for ax in row:
+                ax.axvline(
+                    -section["modeled_half_width_m"], color="#00bcd4", linestyle=":"
+                )
+                ax.axvline(
+                    section["modeled_half_width_m"], color="#ee2244", linestyle=":"
+                )
+                ax.set_xlabel("Offset (m), negative right / positive left")
+                ax.set_xlim(-15, 15)
+        section_fig.suptitle(
+            "Historical color only, no detected boundaries. Dotted lines: modeled road edges. "
+            "0.3 m queries oversample 0.6 m imagery."
+        )
+        section_output.parent.mkdir(parents=True, exist_ok=True)
+        section_fig.savefig(section_output, dpi=160)
+        plt.close(section_fig)
+        report["cross_sections"] = {
+            "plot": str(section_output),
+            "plot_sha256": digest(section_output),
+            "sampling_step_m": 0.3,
+            "source_resolution_m": 0.6,
+            "method": "Nearest source pixel, neutral color score from tools/measure_ortho.py; no thresholds or edge extraction",
+            "limitations": "0.3 m queries do not improve the 0.6 m source resolution. Pixel footprint, georeferencing, datum accuracy and historical changes remain uncertain. Curbs, soil and shadows can share pavement colors. Offsets follow the interpolated production edge frame, whose horizontal length can differ slightly from nominal offset at bends. No measured boundaries or geometry updates are produced.",
+            "sections": sections,
+        }
     if not args.production:
         surface_audit = json.loads(args.surface.with_suffix(".audit.json").read_text())
         report["lidar_checks"] = lidar_checks(

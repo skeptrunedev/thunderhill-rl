@@ -7,7 +7,52 @@
 import unittest
 
 import numpy as np
-from audit_road_alignment import fit_height_graph, smooth_plan_candidate
+from audit_road_alignment import (
+    fit_height_graph,
+    smooth_plan_candidate,
+    sample_aerial_profile,
+    section_points,
+)
+
+
+class AerialSectionTests(unittest.TestCase):
+    def test_north_up_pixels_rgb_and_neutral_score(self):
+        image = np.array(
+            [[[20, 30, 20], [90, 60, 30]], [[0, 0, 0], [100, 80, 50]]], dtype=np.uint8
+        )
+        extent = {"xmin": 100, "xmax": 101.2, "ymin": 200, "ymax": 201.2}
+        result = sample_aerial_profile(image, extent, [[100.3, 200.9], [100.9, 200.3]])
+        np.testing.assert_allclose(
+            result["source_pixel_column_row"], [[0.5, 0.5], [1.5, 1.5]]
+        )
+        self.assertEqual(result["sampled_pixel_column_row"], [[0, 0], [1, 1]])
+        self.assertEqual(result["rgb_255"], [[20, 30, 20], [100, 80, 50]])
+        np.testing.assert_allclose(result["neutral_color_score"], [0, 1 / 3])
+        floating = sample_aerial_profile(
+            image.astype(float) / 255, extent, [[100.3, 200.9]]
+        )
+        np.testing.assert_allclose(floating["rgb_255"], [[20, 30, 20]])
+
+    def test_outside_nonfinite_and_missing_pixels_rejected(self):
+        image = np.ones((2, 2, 4))
+        extent = {"xmin": 0, "xmax": 2, "ymin": 0, "ymax": 2}
+        for xy in [[[-0.01, 1]], [[2, 1]], [[1, 0]], [[1, 2.01]], [[np.nan, 1]]]:
+            with self.assertRaises(ValueError):
+                sample_aerial_profile(image, extent, xy)
+        image[0, 0, 3] = 0
+        with self.assertRaisesRegex(ValueError, "missing"):
+            sample_aerial_profile(image, extent, [[0.5, 1.5]])
+        image[0, 0] = np.nan
+        with self.assertRaises(ValueError):
+            sample_aerial_profile(image, extent, [[0.5, 1.5]])
+
+    def test_positive_left_recovers_modeled_edge_with_bank(self):
+        # Eastbound travel has north (negative local z) on its left.
+        result = section_points([10, 2, 20], [10, 2.6, 14], 6, [-6, 0, 6])
+        np.testing.assert_allclose(result, [[10, 1.4, 26], [10, 2, 20], [10, 2.6, 14]])
+        for half_width in [0, -1, np.nan]:
+            with self.assertRaises(ValueError):
+                section_points([0, 0, 0], [0, 0, -6], half_width, [0])
 
 
 class PlanStudyTests(unittest.TestCase):
