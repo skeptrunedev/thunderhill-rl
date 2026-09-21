@@ -680,3 +680,13 @@ frames show broad gradual light changes without an obvious hard switch. This
 does not establish complete shimmer absence or live Mac performance. Existing
 ObjectDB exit warning remains. Human controls, rendered agent camera checks,
 formatting and diff checks passed. Native export verification follows separately.
+
+Clean build `aa4b0031d1f0-dbc1a55c628a` exported successfully, transferred with
+matching SHA256 and passed strict deep signature verification. The Mac M3 Pro
+Metal renderer captured station 1150 with camera 2 and exited zero. Root
+inspected `artifacts/Thunderhill-pavement-native.png` against the preceding
+native capture at the same camera position. The short blue streaks are removed;
+broad cooler reflection remains. The comparison is
+`artifacts/pavement-native-comparison/00.png`. The sidecar records a visible,
+focused, drawable window, but this is a rendering check, not a performance
+benchmark. The revised app is installed under its build ID in ThunderhillReview.
