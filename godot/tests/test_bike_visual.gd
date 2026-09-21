@@ -11,8 +11,23 @@ func _run() -> void:
 	root.add_child(stage)
 	var bike = load("res://scripts/bike_visual.gd").new()
 	stage.add_child(bike)
+	if not _check_tank(bike.get_node("FuelTank").mesh):
+		quit(1)
+		return
+	var control_rings: Array[Vector4] = [
+		Vector4(-0.5, 0.95, 0.12, 0.10), Vector4(0.4, 0.95, 0.10, 0.10)
+	]
+	var control: MeshInstance3D = bike._body_panel(control_rings, StandardMaterial3D.new(), stage)
+	# Fault injection verifies a rejected helper cannot fall through to PASS.
+	var inject_invalid := "--inject-invalid-tank" in OS.get_cmdline_user_args()
+	if not _check_tank(control.mesh, inject_invalid):
+		quit(1)
+		return
+	control.free()
 	for cap in [false, true]:
-		_check_reservoir(bike._reservoir_shell(cap), cap)
+		if not _check_reservoir(bike._reservoir_shell(cap), cap):
+			quit(1)
+			return
 	# The reflective face must be planar and face the rider, not inherit side normals.
 	var housing: MeshInstance3D = bike._front.get_node("LiveInstrumentCluster").get_child(0)
 	var panel_arrays := housing.mesh.surface_get_arrays(0)
@@ -73,7 +88,7 @@ func _run() -> void:
 	quit()
 
 
-func _check_reservoir(mesh: ArrayMesh, cap: bool) -> void:
+func _check_reservoir(mesh: ArrayMesh, cap: bool) -> bool:
 	var arrays := mesh.surface_get_arrays(0)
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
@@ -105,3 +120,64 @@ func _check_reservoir(mesh: ArrayMesh, cap: bool) -> void:
 	for count in edges.values():
 		assert(count == 2)
 	assert(signed_volume > 0 and signed_volume <= PI * radius * radius * 2 * half_height)
+
+	return true
+
+
+func _check_tank(mesh: ArrayMesh, hollow_expected := true) -> bool:
+	var arrays := mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var edges := {}
+	var volume := 0.0
+	var front_caps := 0
+	var rear_caps := 0
+	for i in range(0, indices.size(), 3):
+		var a := vertices[indices[i]]
+		var b := vertices[indices[i + 1]]
+		var c := vertices[indices[i + 2]]
+		var cross := (b - a).cross(c - a)
+		assert(cross.length() > 0.000000001, "Degenerate tank triangle")
+		assert(
+			cross.dot(normals[indices[i]] + normals[indices[i + 1]] + normals[indices[i + 2]]) < 0,
+			"Tank winding disagrees with normals"
+		)
+		volume -= a.dot(b.cross(c)) / 6.0
+		if absf(a.z - b.z) < 0.000001 and absf(a.z - c.z) < 0.000001:
+			var expected := Vector3.FORWARD if a.z < 0.0 else Vector3.BACK
+			for j in [i, i + 1, i + 2]:
+				assert(normals[indices[j]].dot(expected) > 0.999, "Tank cap faces inward")
+			if a.z < 0.0:
+				front_caps += 1
+			else:
+				rear_caps += 1
+		for edge in [[a, b], [b, c], [c, a]]:
+			var key: Array = edge.duplicate()
+			key.sort()
+			edges[key] = edges.get(key, 0) + 1
+	for count in edges.values():
+		assert(count == 2, "Tank shell is not watertight")
+	assert(front_caps > 0 and rear_caps > 0)
+	assert(volume > 0.0, "Tank has inward winding")
+	# The rear crown stays convex and points outward after hollowing the nose.
+	var checked_crown := false
+	var front_center := -INF
+	var front_shoulder := -INF
+	var front_z := mesh.get_aabb().position.z
+	for i in vertices.size():
+		if absf(vertices[i].z - front_z) < 0.000001:
+			if absf(vertices[i].x) < 0.001:
+				front_center = maxf(front_center, vertices[i].y)
+			elif absf(vertices[i].x) > 0.05 and absf(vertices[i].x) < 0.09:
+				front_shoulder = maxf(front_shoulder, vertices[i].y)
+		if vertices[i].y > 1.01 and absf(vertices[i].x) < 0.03 and absf(normals[i].z) < 0.999:
+			assert(normals[i].y > 0.0, "Tank crown normal faces inward")
+			checked_crown = true
+	assert(checked_crown)
+	assert(is_finite(front_center) and is_finite(front_shoulder))
+	if hollow_expected:
+		assert(front_center < front_shoulder - 0.03, "Tank nose lost its hollow")
+	else:
+		assert(front_center > front_shoulder, "Control loft should remain convex")
+	return true

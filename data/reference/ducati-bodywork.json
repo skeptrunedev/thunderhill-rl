@@ -1,0 +1,27 @@
+{
+  "source_url": "https://assets.ctfassets.net/x7j9qwvpvr5s/Z3gSyjiYdKDRsM18ftaXf/800e57b01a1476bab97f6cff5272c87d/Brochure_MY25_Streetfighter_V4_ENG_Web.pdf",
+  "source_sha256": "cbe2b580645c26eceaf118e426f0f257d9a603774e3f4cdea1a6a91d6c0c4787",
+  "publisher": "Ducati",
+  "model_year": 2025,
+  "inspected_pdf_pages_1_based": [
+    5,
+    6,
+    7,
+    16
+  ],
+  "observations": [
+    "Page 7 center image shows distinct tank shoulders around a depressed forward upper center.",
+    "Page 16 describes a hollow upper section and shows the side silhouette.",
+    "Pages 5 and 6 distinguish red headlight covers, dark insets and separate lateral aerodynamic surfaces."
+  ],
+  "implementation": {
+    "tank_front_hollow_m": 0.075,
+    "hollow_longitudinal_extent_m": 0.23,
+    "status": "Original artistic estimates, not measured manufacturer dimensions"
+  },
+  "limitations": [
+    "Does not establish the model year of the motorcycle in the supplied onboard video.",
+    "Perspective images do not establish exact tank surface dimensions.",
+    "Publisher pages remain ignored local reference artifacts, not redistributed game textures."
+  ]
+}

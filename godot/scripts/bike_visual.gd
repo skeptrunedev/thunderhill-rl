@@ -253,7 +253,9 @@ func _bounded_hermite(
 
 ## Each ring is (longitudinal z, center height, half width, half height).
 ## Authored creases become bounded smooth shoulders, not inflated primitives.
-func _body_panel(rings: Array[Vector4], material: Material, parent: Node3D) -> void:
+func _body_panel(
+	rings: Array[Vector4], material: Material, parent: Node3D, front_hollow_m := 0.0
+) -> MeshInstance3D:
 	var profile: Array[Vector2] = [
 		Vector2(-0.35, 0.99),
 		Vector2(0, 1.015),
@@ -312,7 +314,13 @@ func _body_panel(rings: Array[Vector4], material: Material, parent: Node3D) -> v
 	for ring in interpolated:
 		var section := PackedVector3Array()
 		for point in perimeter:
-			section.append(Vector3(point.x * ring.z, ring.y + point.y * ring.w, ring.x))
+			var vertex := Vector3(point.x * ring.z, ring.y + point.y * ring.w, ring.x)
+			# The reference tank has raised shoulders around a hollow upper nose.
+			# Depth and extent are original estimates; keep the outer envelope.
+			var longitudinal := 1.0 - smoothstep(rings[0].x, rings[0].x + 0.23, ring.x)
+			var center := 1.0 - smoothstep(0.0, 0.70, absf(point.x))
+			vertex.y -= front_hollow_m * longitudinal * center * smoothstep(0.0, 0.70, point.y)
+			section.append(vertex)
 		sections.append(section)
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -320,24 +328,38 @@ func _body_panel(rings: Array[Vector4], material: Material, parent: Node3D) -> v
 	for i in range(sections.size() - 1):
 		for j in range(perimeter.size()):
 			var next := (j + 1) % perimeter.size()
-			_triangle(surface, sections[i][j], sections[i + 1][j], sections[i + 1][next])
-			_triangle(surface, sections[i][j], sections[i + 1][next], sections[i][next])
+			_triangle(surface, sections[i][j], sections[i + 1][next], sections[i + 1][j])
+			_triangle(surface, sections[i][j], sections[i][next], sections[i + 1][next])
 	# Cap seams intentionally stay sharp instead of blending into shoulder normals.
 	surface.set_smooth_group(-1)
 	for end in [0, sections.size() - 1]:
-		for j in range(1, perimeter.size() - 1):
-			if end == 0:
-				_triangle(surface, sections[end][0], sections[end][j], sections[end][j + 1])
-			else:
-				_triangle(surface, sections[end][0], sections[end][j + 1], sections[end][j])
+		if front_hollow_m > 0.0:
+			# A hollow makes the cap concave, so a triangle fan would fill the recess.
+			var outline := PackedVector2Array()
+			for vertex in sections[end]:
+				outline.append(Vector2(vertex.x, vertex.y))
+			var triangles := Geometry2D.triangulate_polygon(outline)
+			assert(not triangles.is_empty(), "Cannot triangulate hollow body cap")
+			for index in range(0, triangles.size(), 3):
+				var a := sections[end][triangles[index]]
+				var b := sections[end][triangles[index + 1]]
+				var c := sections[end][triangles[index + 2]]
+				_triangle(surface, a, b if end == 0 else c, c if end == 0 else b)
+		else:
+			for j in range(1, perimeter.size() - 1):
+				if end == 0:
+					_triangle(surface, sections[end][0], sections[end][j + 1], sections[end][j])
+				else:
+					_triangle(surface, sections[end][0], sections[end][j], sections[end][j + 1])
+
 	surface.index()
 	surface.generate_normals()
-	_mesh(surface.commit(), material, parent)
+	return _mesh(surface.commit(), material, parent)
 
 
 func _build_body() -> void:
 	# Tank shoulder, pinched knee pocket and raised narrow tail.
-	_body_panel(
+	var tank := _body_panel(
 		[
 			Vector4(-0.48, 0.85, 0.10, 0.07),
 			Vector4(-0.29, 0.89, 0.235, 0.14),
@@ -345,8 +367,10 @@ func _build_body() -> void:
 			Vector4(0.23, 0.79, 0.13, 0.055)
 		],
 		_red,
-		self
+		self,
+		0.075
 	)
+	tank.name = "FuelTank"
 	_body_panel(
 		[
 			Vector4(0.11, 0.822, 0.12, 0.025),

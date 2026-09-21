@@ -116,3 +116,28 @@ The new hardware adds recognizable detail but is not positioned like the
 obscured ignition area in the video. It does not resolve the tank silhouette,
 display generation mismatch or the broader cockpit realism gap. The existing
 front assembly steering pivot is also a simplified visual mechanism.
+
+
+## Tank upper profile and loft winding
+
+The MY25 brochure was downloaded successfully from Ducati's content host and
+its PDF pages 5, 6, 7 and 16 inspected visually. Source URL and SHA256 are in
+`data/reference/ducati-bodywork.json`. The center photograph on PDF page 7 and
+ergonomics discussion on page 16 support a hollow forward upper tank between
+raised shoulders. The implemented 75 mm depth and 230 mm longitudinal blend
+are visual estimates, not dimensions recovered from the photograph. The outer
+width and rear crown are retained; other body panels use no hollow.
+
+Concave tank end caps are triangulated as polygons. Verification exposed an
+older inward winding error in the shared body loft and convex cap triangle fan.
+Their winding now points outward. Tests cover watertight edges, positive signed
+volume, cap normals, crown normals, a depressed front center and an independent
+zero hollow control loft. Helper assertions now propagate a failed status back
+to the executable test rather than letting it print PASS after a helper abort.
+The initial failing test is retained in `artifacts/tank-test.log`; the corrected
+run is `artifacts/tank-test-final.log`.
+
+`artifacts/tank-hollow-fixed/production.png` shows the split shoulder silhouette
+in the actual renderer. It is visibly closer to an exposed central neck than
+the previous continuous red surface, but reveals simplified blocky hardware.
+This remains an original reconstruction, not a verified matching cockpit.
