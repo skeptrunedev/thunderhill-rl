@@ -20,6 +20,8 @@ func _run() -> void:
 	var curved_uv := true
 	var sparse_aligned := false
 	var stochastic := false
+	var field_patches := 0.0
+	var photographic_aerial := 0.0
 	var directional_composition := 0.0
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--asphalt-analytic-scuff":
@@ -40,6 +42,30 @@ func _run() -> void:
 				quit(2)
 				return
 			canopy_strength = float(value)
+		elif arg.begins_with("--photographic-aerial="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				push_error("Photographic aerial strength must be finite and within zero to one")
+				quit(2)
+				return
+			photographic_aerial = float(value)
+		elif arg.begins_with("--photographic-field-patches="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				push_error("Field patch strength must be finite and within zero to one")
+				quit(2)
+				return
+			field_patches = float(value)
 		elif arg == "--photographic-stochastic":
 			stochastic = true
 		elif arg == "--photographic-sparse-aligned":
@@ -153,6 +179,10 @@ func _run() -> void:
 	report["photographic_curved_uv"] = curved_uv
 	game.track.terrain_material.set_shader_parameter("photographic_stochastic", stochastic)
 	report["photographic_stochastic"] = stochastic
+	game.track.terrain_material.set_shader_parameter("photographic_field_patches", field_patches)
+	report["photographic_field_patches"] = field_patches
+	game.track.terrain_material.set_shader_parameter("photographic_aerial", photographic_aerial)
+	report["photographic_aerial"] = photographic_aerial
 	report["photographic_sparse_aligned"] = sparse_aligned
 	report["photographic_directional_composition"] = directional_composition
 	report["terrain_shader_sha256"] = FileAccess.get_sha256(

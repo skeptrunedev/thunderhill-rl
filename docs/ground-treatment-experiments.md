@@ -569,3 +569,42 @@ or Mac performance measurement. The existing ObjectDB exit warning remains.
 Recordings and contact sheets are `artifacts/radical-dry-scan-motion*` and
 `artifacts/radical-stochastic-motion*`. The geometry trial has static inspection
 only. More surface detail alone has not produced photographic equivalence.
+
+## Field composition isolation
+
+Two additional developer controls isolate larger composition from source texel
+detail. Both default to zero and accept only finite values from zero to one.
+
+`--photographic-aerial` restores the existing pinned macro and detail color
+gains through the photographic replacement. Previously the replacement discarded
+these gains wherever its mask was full. This is an appearance hypothesis:
+historical aerial illumination is not calibrated surface reflectance. The apex
+and exit trials (`artifacts/photo-aerial-apex` and `photo-aerial-exit`) add only
+small distinctions, and independent review found no substantial realism gain.
+The compatible replay completed 600 transitions and 180 movie frames. Nine
+sampled frames in `photo-aerial-motion-review` show no obvious broad jump;
+this is not a complete temporal aliasing or native performance test.
+
+`--photographic-field-patches` now blends the existing fine earth material into
+the photographic straw using interrupted curved patterns. Color, roughness and
+independently computed relief gradients share coverage. Pattern dimensions and
+the soil color gain are authored estimates. Bare access corridor exclusions and
+the existing field mask still apply. Final mixing retains at least 35 percent
+of the straw texture, with small scale interruptions at the boundaries.
+
+Earlier multiplicative versions (`field-patches-apex`, `field-patches-soft-apex`
+and `field-patches-soft-exit`) looked either artificially shaded or too subtle.
+The first material mixture (`field-soil-composition-apex`) produced conspicuous
+clean ribbons. The final `field-soil-broken-apex` breaks their boundaries but
+still looks patterned and muddy. Do not promote either control. The evidence
+supports composing specific observed field features rather than applying more
+generic noise across the whole region. `artifacts/field-composition-review`
+contains footage comparisons, with the camera and exposure limitations labeled.
+
+Actual Vulkan renders compiled successfully, invalid nonfinite and out of range
+inputs returned exit two, and GDScript formatting and diff checks passed.
+These experiments do not change the production material defaults or physics.
+The fresh default apex capture is pixel identical to the preceding control
+(`field-composition-default-check/pixel-check.json`). Rendered human controls
+passed with zero failures. This checks the existing playable path, not acceptance
+of either new material experiment.

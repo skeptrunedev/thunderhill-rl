@@ -26,6 +26,8 @@ func _run() -> void:
 	var photographic_curved_uv := true
 	var photographic_sparse_aligned := false
 	var photographic_stochastic := false
+	var field_patches := 0.0
+	var photographic_aerial := 0.0
 	var sky_source := ""
 	var solar_haze := 0.0
 	var solar_haze_broad := false
@@ -87,6 +89,28 @@ func _run() -> void:
 				_fail("Canopy strength must be finite and within zero to four")
 				return
 			canopy_strength = float(value)
+		elif arg.begins_with("--photographic-aerial="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Photographic aerial strength must be finite and within zero to one")
+				return
+			photographic_aerial = float(value)
+		elif arg.begins_with("--photographic-field-patches="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Field patch strength must be finite and within zero to one")
+				return
+			field_patches = float(value)
 		elif arg == "--photographic-stochastic":
 			photographic_stochastic = true
 		elif arg == "--photographic-sparse-aligned":
@@ -687,6 +711,8 @@ func _run() -> void:
 			"exit_scuff_texture_enabled", false
 		)
 	var production_terrain_material: ShaderMaterial = game.track.terrain_material
+	production_terrain_material.set_shader_parameter("photographic_aerial", photographic_aerial)
+	production_terrain_material.set_shader_parameter("photographic_field_patches", field_patches)
 	production_terrain_material.set_shader_parameter(
 		"photographic_stochastic", photographic_stochastic
 	)
@@ -982,6 +1008,8 @@ func _run() -> void:
 							"photographic_contrast_preservation": photographic_contrast,
 							"photographic_sparse_aligned": photographic_sparse_aligned,
 							"photographic_stochastic": photographic_stochastic,
+							"photographic_field_patches": field_patches,
+							"photographic_aerial": photographic_aerial,
 							"photographic_height_blend": photographic_height_blend,
 							"photographic_directional_composition":
 							photographic_directional_composition,

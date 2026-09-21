@@ -27,6 +27,10 @@ uniform bool photographic_curved_uv = true;
 uniform bool photographic_sparse_aligned = false;
 // Opt in triangular patch blend, fixed source scale and preserved linear variance.
 uniform bool photographic_stochastic = false;
+// Original multiscale field composition, bounded to photographic coverage.
+uniform float photographic_field_patches : hint_range(0.0, 1.0) = 0.0;
+// Restore pinned historical ground variation through the replacement texture.
+uniform float photographic_aerial : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_directional_composition : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_height_blend : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_contrast_preservation : hint_range(0.0, 1.0) = 0.0;
@@ -464,6 +468,26 @@ void fragment() {
             photo_dy = mix(photo_dy, dFdy(sparse_height), sparse_weight);
             photo_roughness = mix(photo_roughness, 0.96, sparse_weight);
         }
+        if (photographic_field_patches > 0.0) {
+            // Broken narrow swaths sit inside broader irregular dry/soil patches.
+            // Coordinates follow mowing travel, but sizes are artistic estimates.
+            vec2 lay = mowing_coordinates(world_pos.xz);
+            lay.x += coverage_noise(lay / vec2(9.0, 17.0)) * 1.8;
+            float broad = coverage_noise(lay / vec2(7.0, 11.0));
+            float broken = coverage_noise(lay / vec2(0.65, 7.0) + vec2(21.0, 9.0));
+            float fragments = coverage_noise(lay / vec2(0.22, 2.8) + vec2(4.0, 37.0));
+            float edge_fragments = coverage_noise(world_pos.xz / 0.12);
+            float exposure_pattern = broken + broad * 0.45 + fragments * 0.30 + edge_fragments * 0.55;
+            float exposed = smoothstep(-0.10, 0.25, exposure_pattern) * photographic_field_patches * 0.65;
+            // Mix distinct earth and straw surfaces instead of painting dark
+            // shading on the straw. Compensate the final photographic gain.
+            // This is an appearance hypothesis, not surveyed exposed soil.
+            photographic = mix(photographic, soil * (0.28 / 0.55), exposed);
+            photo_roughness = mix(photo_roughness, soil_r, exposed);
+            photo_dx = mix(photo_dx, dFdx(soil_luminance) * soil_relief_m, exposed);
+            photo_dy = mix(photo_dy, dFdy(soil_luminance) * soil_relief_m, exposed);
+        }
+        photographic *= mix(vec3(1.0), macro_gain * detail_gain, photographic_aerial);
         canopy_coverage = mix(canopy_coverage, 1.0, mask);
         ALBEDO = mix(ALBEDO, photographic * 0.55 * photographic_gain, mask);
         ROUGHNESS = mix(ROUGHNESS, photo_roughness, mask);
