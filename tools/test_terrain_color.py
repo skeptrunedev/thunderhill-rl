@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "Pillow==12.1.1", "pyproj==3.7.2"]
+# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "Pillow==12.1.1", "pyproj==3.7.2", "shapely==2.1.2"]
 # ///
 """Behavior contracts for aerial terrain color filtering."""
 
@@ -12,6 +12,8 @@ from build_terrain_color import (
     local_raster_bounds,
     resample_local_gains,
     terrain_gains,
+    terrain_detail_gains,
+    shoulder_coverage,
 )
 from pyproj import Transformer
 
@@ -89,6 +91,29 @@ class TerrainColorTests(unittest.TestCase):
             (1, 1),
         )
         np.testing.assert_array_equal(outside, np.ones((1, 1, 3)))
+
+    def test_detail_rejects_color_bleed_and_retains_coherent_variation(self):
+        base = np.full((80, 80, 3), [0.55, 0.48, 0.37])
+        for rejected in ([0, 0, 0], [0.4, 0.4, 0.4], [0, 0.8, 0], [1, 1, 1]):
+            altered = base.copy()
+            altered[10:70, 10:70] = rejected
+            np.testing.assert_allclose(terrain_detail_gains(altered, (1, 1)), 1, atol=1e-12)
+        base[:, 35:40] *= 0.88
+        detail = terrain_detail_gains(base, (1, 1))
+        self.assertLess(detail[40, 37, 0], 0.9)
+        self.assertGreater(detail[40, 30, 0], 1.01)
+        self.assertGreaterEqual(detail.min(), 0.75)
+        self.assertLessEqual(detail.max(), 1.25)
+
+    def test_shoulder_distance_and_pixel_center_mapping(self):
+        # Rectangle right edge is x=0, well away from the other three edges.
+        ring = [[-20, -20], [0, -20], [0, 20], [-20, 20]]
+        actual = shoulder_coverage([ring], [0, -0.5], [5, 1], [5, 1])
+        np.testing.assert_allclose(actual, [[0, 7 / 27, 20 / 27, 1, 1]], atol=1e-14)
+        # Nearest corner, distance sqrt(2), checks segments rather than infinite lines.
+        corner = shoulder_coverage([ring], [0.5, 20.5], [1, 1], [1, 1])
+        t = (np.sqrt(2) - 0.5) / 3
+        np.testing.assert_allclose(corner, [[t * t * (3 - 2 * t)]])
 
     def test_all_rejected_source_fails(self):
         with self.assertRaisesRegex(ValueError, "No accepted"):

@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "Pillow==12.1.1", "pyproj==3.7.2"]
+# dependencies = ["numpy==2.4.3", "scipy==1.17.1", "Pillow==12.1.1", "pyproj==3.7.2", "shapely==2.1.2"]
 # ///
 """Build restrained terrain color gains from historical public domain NAIP.
 
@@ -16,6 +16,8 @@ import json
 from pathlib import Path
 
 import numpy as np
+import shapely
+from shapely import STRtree
 from PIL import Image
 from pyproj.enums import TransformDirection
 from scipy.ndimage import gaussian_filter, map_coordinates
@@ -60,17 +62,19 @@ def dry_terrain_mask(rgb):
     )
 
 
-def terrain_gains(rgb, pixel_m):
+def terrain_gains(rgb, pixel_m, smoothing_sigma_m=6.0):
     if rgb.ndim != 3 or rgb.shape[2] != 3 or not np.isfinite(rgb).all():
         raise ValueError("Expected finite RGB image")
     if np.min(rgb) < 0 or np.max(rgb) > 1 or min(pixel_m) <= 0:
         raise ValueError("RGB and pixel spacing are outside valid ranges")
+    if not np.isfinite(smoothing_sigma_m) or smoothing_sigma_m <= 0:
+        raise ValueError("Expected positive finite smoothing sigma")
     valid = dry_terrain_mask(rgb)
     if not valid.any():
         raise ValueError("No accepted dry terrain pixels; review source and classifier")
     linear = srgb_to_linear(rgb)
     median = np.median(linear[valid], axis=0)
-    sigma = tuple(SETTINGS["smoothing_sigma_m"] / p for p in pixel_m)
+    sigma = tuple(smoothing_sigma_m / p for p in pixel_m)
     blur_options = {
         "sigma": sigma,
         "mode": "reflect",
@@ -91,6 +95,52 @@ def terrain_gains(rgb, pixel_m):
     )
     gains = np.clip(smooth / median, *SETTINGS["gain_range"])
     return gains, valid, median
+
+
+def terrain_detail_gains(rgb, pixel_m):
+    """Retain accepted aerial detail relative to the existing broad color layer."""
+    broad, _, _ = terrain_gains(rgb, pixel_m)
+    fine, _, _ = terrain_gains(rgb, pixel_m, smoothing_sigma_m=0.6)
+    return np.clip(fine / broad, 0.75, 1.25)
+
+
+def shoulder_coverage(road_rings, lower, size, dimensions):
+    """Visual grass coverage only, using exact horizontal road boundary distance."""
+    segments = []
+    for ring in road_rings:
+        vertices = np.asarray(ring, dtype=float)
+        if vertices.ndim != 2 or vertices.shape[1] != 2 or len(vertices) < 3:
+            raise ValueError("Invalid road boundary ring")
+        if not np.isfinite(vertices).all():
+            raise ValueError("Nonfinite road boundary")
+        if not np.array_equal(vertices[0], vertices[-1]):
+            vertices = np.vstack((vertices, vertices[0]))
+        pairs = np.stack((vertices[:-1], vertices[1:]), axis=1)
+        segments.extend(pairs[np.any(pairs[:, 0] != pairs[:, 1], axis=1)])
+    if not segments:
+        raise ValueError("No road boundary segments")
+    tree = STRtree(shapely.linestrings(np.asarray(segments)))
+    width, height = dimensions
+    pixel = np.asarray(size) / [width, height]
+    result = np.empty((height, width), dtype=float)
+    # Bounded row batches keep point geometries modest for the full circuit map.
+    for start in range(0, height, 64):
+        stop = min(start + 64, height)
+        x, z = np.meshgrid(
+            lower[0] + (np.arange(width) + 0.5) * pixel[0],
+            lower[1] + (np.arange(start, stop) + 0.5) * pixel[1],
+        )
+        indices, distances = tree.query_nearest(
+            shapely.points(np.column_stack((x.ravel(), z.ravel()))),
+            return_distance=True, all_matches=False,
+        )
+        if not np.array_equal(np.sort(indices[0]), np.arange(x.size)):
+            raise ValueError("Nearest boundary query must return every pixel exactly once")
+        ordered = np.empty(x.size, dtype=float)
+        ordered[indices[0]] = distances
+        t = np.clip((ordered - 0.5) / 3.0, 0, 1)
+        result[start:stop] = (t * t * (3 - 2 * t)).reshape(x.shape)
+    return result
 
 
 def local_raster_bounds(extent, origin, transform):
@@ -225,6 +275,48 @@ def build():
     (output_dir / "terrain_macro.json").write_text(
         json.dumps(metadata, indent=2) + "\n"
     )
+    detail_dimensions = np.ceil(local_size).astype(int).tolist()
+    detail_gains = terrain_detail_gains(np.asarray(image, dtype=float) / 255, spacing)
+    detail_rgb = resample_local_gains(
+        detail_gains, extent, origin, transform, lower, local_size, detail_dimensions
+    )
+    surface_path = ROOT / "godot/data/surface.json"
+    surface = json.loads(surface_path.read_text())
+    coverage = shoulder_coverage(
+        surface["road_rings"], lower, local_size, detail_dimensions
+    )
+    detail_rgba = np.concatenate((detail_rgb * 0.5, coverage[:, :, None]), axis=2)
+    detail_path = output_dir / "terrain_detail.png"
+    Image.fromarray(np.rint(np.clip(detail_rgba, 0, 1) * 255).astype(np.uint8)).save(detail_path)
+    detail_metadata = {
+        "schema_version": 1,
+        "purpose": "Historical aerial detail and estimated visual shoulder blend; not friction or land cover classification",
+        "source": metadata["source"],
+        "horizontal_datum": datum,
+        "track_sha256": sha256(ROOT / "godot/data/track.json"),
+        "surface_sha256": sha256(surface_path),
+        "local_origin_xz": lower.tolist(),
+        "local_size_xz": local_size.tolist(),
+        "mapping": metadata["mapping"],
+        "output_dimensions": detail_dimensions,
+        "output_pixel_m": (local_size / detail_dimensions).tolist(),
+        "settings": {
+            "fine_smoothing_sigma_m": 0.6,
+            "broad_smoothing_sigma_m": 6.0,
+            "detail_gain_range": [0.75, 1.25],
+            "grass_blend_distance_m": [0.5, 3.5],
+            "target_output_pixel_m": 1.0,
+            "color_filter": SETTINGS,
+        },
+        "algorithm": "Accepted tan pixels only; ratio of fine to broad normalized convolution gains; same datum transform and 4 by 4 quadrature as macro. Alpha uses smoothstep of exact horizontal distance to surface road ring segments at output pixel centers.",
+        "encoding": "RGBA8 linear data; RGB decodes as texture.rgb * 2.0; alpha is visual dry grass coverage (0 soil, 1 grass). No sRGB conversion.",
+        "output_sha256": sha256(detail_path),
+        "limitations": metadata["limitations"] + [
+            "Shoulder transition distances are artistic material choices, not surveyed vegetation boundaries",
+            "Boundary distance is unsigned; map is intended for offroad terrain shading only",
+        ],
+    }
+    (output_dir / "terrain_detail.json").write_text(json.dumps(detail_metadata, indent=2) + "\n")
     print(
         json.dumps(
             {

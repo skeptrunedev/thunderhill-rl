@@ -135,6 +135,23 @@ func _build_terrain() -> void:
 	var macro: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://assets/materials/terrain_macro.json")
 	)
+	var detail: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://assets/materials/terrain_detail.json")
+	)
+	for source: String in ["track", "surface"]:
+		if (
+			detail.get(source + "_sha256", "")
+			!= FileAccess.get_sha256("res://data/" + source + ".json")
+		):
+			initialization_error = "Terrain detail " + source + " source mismatch"
+			return
+	if (
+		detail.get("local_origin_xz") != macro.local_origin_xz
+		or detail.get("local_size_xz") != macro.local_size_xz
+	):
+		initialization_error = "Terrain detail and macro mapping mismatch"
+		return
+	mat.set_shader_parameter("terrain_detail", load("res://assets/materials/terrain_detail.png"))
 	mat.set_shader_parameter("terrain_macro", load("res://assets/materials/terrain_macro.png"))
 	mat.set_shader_parameter(
 		"macro_origin", Vector2(macro.local_origin_xz[0], macro.local_origin_xz[1])

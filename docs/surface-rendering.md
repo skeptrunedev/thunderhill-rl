@@ -301,3 +301,31 @@ It refuses to overwrite captures and rejects black or incorrectly sized images.
 This corrects a rendering interpretation error; it does not calibrate foliage
 reflectance or make the existing box shaped branches and procedural leaves
 photorealistic. Those visible geometry limitations remain.
+
+## Fine aerial detail and shoulder material blend
+
+The terrain now combines the existing six metre smoothed aerial color map with
+an additional approximately one metre data texture. Its RGB channels preserve
+accepted tan pixel detail relative to the broad layer, using a 0.6 metre Gaussian
+and limiting relative gains to 0.75 through 1.25. Rejected source colors do not
+enter either convolution. Existing macro assets remain byte identical.
+
+The independent alpha channel blends bare soil into dry grass according to
+horizontal distance from the actual road polygon boundary. The transition from
+0.5 to 3.5 metres is an artistic choice, not a surveyed vegetation boundary.
+This replaces the generic noise driven soil mixture. Neither contact geometry
+nor surface grip uses this map. Runtime loading verifies track and surface
+hashes and shared geographic mapping. Import retains numerical RGB and alpha:
+no sRGB decoding, alpha border correction or premultiplication; mipmaps enabled.
+
+Eight builder tests pass, including rejected color isolation, retained fine
+variation, pixel centre mapping and distance to polygon corners. Both static
+scenes were regenerated and their serialization fingerprints verified. Actual
+Vulkan Mobile renders were inspected at stations 1830 and 400 using rider camera
+1 at 1280 by 800. The rendered human control check has zero failures.
+
+The visual improvement is modest: shoulders are more distinct, but distant
+ground remains smooth and the paddock buildings and vegetation still look
+simplified. This is not photographic appearance acceptance. Evidence is local
+in `artifacts/terrain-detail-after.png`, `artifacts/terrain-detail-straight.png`
+and `artifacts/terrain-detail-human.log`.
