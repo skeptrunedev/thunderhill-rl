@@ -28,7 +28,7 @@ uniform float straw_swath_strength : hint_range(0.0, 1.0) = 1.0;
 // Spacing and contrast are authored estimates, not recovered mowing records.
 uniform float mowing_band_strength : hint_range(0.0, 1.0) = 1.0;
 // Interrupted fine straw streaks follow the same continuous mowing coordinates.
-uniform float mowing_detail_strength : hint_range(0.0, 1.0) = 0.0;
+uniform float mowing_detail_strength : hint_range(0.0, 1.0) = 1.0;
 uniform vec2 mowing_bend_center = vec2(306.70854, 686.54039);
 // Study only: retain centered swath color inside the authored field map.
 // Zero preserves the existing regional appearance; no bare patches are restored.
@@ -154,7 +154,7 @@ float mowing_gain(vec2 point) {
     mowing_phase += field_noise(point / vec2(19.0, 23.0)) * 0.55;
     float mowing_visibility = 1.0 - smoothstep(0.20, 0.75, fwidth(mowing_phase));
     float mowing_region = smoothstep(140.0, 175.0, point.x) * smoothstep(14.0, 30.0, mowing_distance)
-                * (1.0 - smoothstep(83.0, 94.0, mowing_distance));
+                * (1.0 - smoothstep(94.0, 104.0, mowing_distance));
     float mowing_bands = sin(mowing_phase * TAU) * 0.12
                + sin(mowing_phase * TAU * 0.47 + 1.3) * 0.05;
     float continuity = 0.65 + coverage_noise(point / vec2(17.0, 21.0)) * 0.7;
@@ -272,10 +272,14 @@ void fragment() {
         mapped_straw_gain *= mix(vec3(1.0), retained_swath_gain, retained_swath_strength);
         straw_color_gain = mix(straw_color_gain, mapped_straw_gain, mapped_weight);
     }
-    straw_color_gain *= mowing_gain(world_pos.xz);
+    // Mowing structure belongs to the field surface, including sparse earth
+    // between cut strands. Applying it only to grass erased it at the shoulder.
+    float field_structure = mowing_gain(world_pos.xz);
     float retained_grass;
     vec4 region = cleared_field(world_pos.xz, retained_grass);
     float corridor = region.a;
+    // Bare access corridors do not inherit the surrounding cut field pattern.
+    field_structure = mix(field_structure, 1.0, corridor * (1.0 - retained_grass));
     grass_coverage *= 1.0 - corridor * (1.0 - retained_grass);
     float straw = dot(grass, vec3(0.2126, 0.7152, 0.0722));
     // The source already includes earth beneath the straw. Preserve resolved
@@ -286,7 +290,7 @@ void fragment() {
     float resolved_straw = 1.0 - smoothstep(0.008, 0.05, length(fwidth(world_pos.xz)) / grass_tile_m);
     grass_coverage = mix(grass_coverage, layered_coverage, grass_height_blend * resolved_straw);
     float soil_weight = (1.0 - grass_coverage) * macro_weight;
-    ALBEDO = mix(grass * straw_color_gain, soil * mix(soil_value, 1.0, corridor * (1.0 - retained_grass)), soil_weight) * ground_tint * macro_gain * detail_gain * mix(vec3(1.0), region.rgb, corridor);
+    ALBEDO = mix(grass * straw_color_gain, soil * mix(soil_value, 1.0, corridor * (1.0 - retained_grass)), soil_weight) * ground_tint * macro_gain * detail_gain * mix(vec3(1.0), region.rgb, corridor) * field_structure;
     // A single albedo does not contain measured PBR maps. Bright straw over
     // darker soil supplies an explicitly artistic relief/roughness estimate.
     // Derivatives of the filtered sample naturally remove unresolved relief.

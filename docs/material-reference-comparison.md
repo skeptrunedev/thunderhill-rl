@@ -1623,3 +1623,29 @@ for each custom lamp panel. Rendered human controls passed with zero failures.
 Linux Mobile rendering measured 17.30 ms median and 24.67 ms p95 across 265
 samples; these are not MacBook performance results. Physical dynamics and
 agent action or observation schemas are unchanged.
+
+## Field structure through the sparse shoulder
+
+The shader multiplied mowing detail into the grass color before blending with
+soil. Consequently the pattern vanished precisely where cut vegetation became
+sparse near the road. The radial region also faded between 83 and 94 metres
+from the Turn 2 mowing center, attenuating the inner roadside appearance.
+The existing grass coverage generator fades from soil to grass between 0.5 and
+3.5 metres from the road boundary; its role remains unchanged.
+
+Mowing now modulates the composed field surface. Explicit bare access corridors
+are excluded using the existing clearance weight and grass retention. The
+outer regional fade moves to 94 through 104 metres, and the previously optional
+fine directional structure is enabled. These are bounded artistic placement
+choices, not surveyed mowing dimensions. Texture resolution, physics geometry,
+friction and agent observations are unchanged.
+
+The matched apex comparison is `artifacts/mowing-shoulder-comparison/00.png`;
+`01.png` compares footage with the new render without color grading. Entry and
+midturn captures are in `artifacts/mowing-shoulder-entry` and
+`artifacts/mowing-shoulder-midturn`. The roadside field has modestly more
+continuous variation. Doubling fine pattern amplitude was separately rejected:
+its soft bands looked like furrows rather than irregular flattened straw.
+Both root and independent review preferred the original amplitude. The field
+still looks too smooth and uniform overall. These fixed views do not establish
+motion stability or a photographic match.
