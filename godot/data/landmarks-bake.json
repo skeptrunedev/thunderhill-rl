@@ -1,10 +1,10 @@
 {
-  "build_ms": 9072.227,
+  "build_ms": 9174.656,
   "collision": "Runtime pit wall construction unchanged; no collision in this scene",
   "geometry_sha256": "1753578de1d75b1a0d2128bf7df201a49527698d02da78477b9daa6170f61638",
   "godot_version": "4.7.2-stable (official)",
-  "load_ms": 9.72,
-  "scene_sha256": "4e190a37992b7f301d3063729db64b572b054e94ac6f97a3d05a6c4363ba3150",
+  "load_ms": 9.691,
+  "scene_sha256": "95d88b4646bc8dba3eeff7e4981875381a2edccfc9f2ef96b35f4908fa865949",
   "schema_version": 1,
   "sources": {
     "data/clubhouse-profile.json": "19deb349d55dcc322f533d7e09953a72cf7344b0e6d8effb5556ca8375581b65",
@@ -20,6 +20,6 @@
     "scripts/track.gd": "dcb5fd4a9853aa418986de9973396c4680afd6eda27bea673823f203ca667419",
     "scripts/triangle_ribbon.gd": "cf097ef2009e7073216ca56619f3dcd7cd19d64e2220687762744e4ad4418fe1",
     "tools/bake_landmarks.gd": "ed3dffd6eb46692f89582ba40ad4e739521f986ba6aff8374e19f545b3fbbc3f",
-    "tools/bake_scenery.gd": "30848ea919a0019d57b862e9dbb1f7e7d7870abfcd1d564407354e169ea15dbe"
+    "tools/bake_scenery.gd": "1a3a97734e69c20e8f9779ec5da13ec96b63615d92f830b2de008581bdad0d7d"
   }
 }

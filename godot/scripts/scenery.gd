@@ -23,7 +23,7 @@ func build(track: Node3D) -> void:
 		for point: Array in row.points:
 			polygon.append(Vector2(point[0], point[1]))
 		# Keep the whole clump clear, including its largest authored footprint.
-		for expanded: PackedVector2Array in Geometry2D.offset_polygon(polygon, 0.4):
+		for expanded: PackedVector2Array in Geometry2D.offset_polygon(polygon, 0.9):
 			_grass_exclusions.append(expanded)
 	_build_grass()
 	_build_boards()
@@ -62,11 +62,9 @@ func _grass_meshes() -> Array[ArrayMesh]:
 	for variant in range(3):
 		var surface := SurfaceTool.new()
 		surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-		for source_index: int in [0, 1, 1, 2, 2, 2]:
+		for source_index: int in [1, 2]:
 			var row: Dictionary = data.meshes[source_index]
-			var scale := clump_random.randf_range(0.75, 1.15)
-			if source_index == 0:
-				scale *= 0.7
+			var scale := clump_random.randf_range(0.50, 0.75)
 			var basis := Basis(Vector3.UP, clump_random.randf() * TAU)
 			var angle := clump_random.randf() * TAU
 			var radius := sqrt(clump_random.randf()) * 0.16
@@ -82,8 +80,59 @@ func _grass_meshes() -> Array[ArrayMesh]:
 					surface.set_uv(Vector2(uv[0], uv[1]))
 					surface.add_vertex(basis * Vector3(p[0], p[1], p[2]) * scale + offset)
 		surface.set_material(material)
-		meshes.append(surface.commit())
+		var mesh := surface.commit()
+		_add_cut_grass(mesh, clump_random)
+		meshes.append(mesh)
 	return meshes
+
+
+func _add_cut_grass(mesh: ArrayMesh, random: RandomNumberGenerator) -> void:
+	# Original bent ribbons add low stubble rather than more tall seed stalks.
+	# Dimensions are appearance estimates from the footage, not plant surveys.
+	var material := StandardMaterial3D.new()
+	var tint := ThunderhillTrack.DRY_GROUND_TINT
+	material.albedo_color = Color(tint.x, tint.y, tint.z).linear_to_srgb()
+	material.albedo_texture = load("res://assets/materials/dry_cut_grass_v1.png")
+	material.roughness = 0.95
+	material.backlight_enabled = true
+	material.backlight = Color(0.3, 0.24, 0.15).linear_to_srgb()
+	material.metallic_specular = 0.1
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.vertex_color_use_as_albedo = true
+	material.vertex_color_is_srgb = true
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for blade in 96:
+		var angle := random.randf() * TAU
+		var radius := sqrt(random.randf()) * 0.45
+		var base := Vector3(cos(angle), 0, sin(angle)) * radius
+		var heading := random.randf() * TAU
+		var forward := Vector3(cos(heading), 0, sin(heading))
+		var right := Vector3(-forward.z, 0, forward.x)
+		var height := random.randf_range(0.020, 0.050)
+		var width := random.randf_range(0.0007, 0.0018)
+		var lean := random.randf_range(0.020, 0.070)
+		var middle := base + Vector3.UP * height * 0.65 + forward * lean * 0.3
+		var tip := base + Vector3.UP * height + forward * lean
+		var vertices := [
+			base - right * width,
+			base + right * width,
+			middle - right * width * 0.7,
+			middle + right * width * 0.7,
+			tip - right * width * 0.15,
+			tip + right * width * 0.15
+		]
+		for index: int in [0, 2, 1, 1, 2, 3, 2, 4, 3, 3, 4, 5]:
+			var vertex: Vector3 = vertices[index]
+			var slope := float(index / 2) / 2.0
+			var bend := lerpf(0.3, 0.7, slope)
+			var rise := lerpf(0.65, 0.35, slope)
+			surface.set_normal((Vector3.UP * lean * bend - forward * height * rise).normalized())
+			surface.set_uv(Vector2(vertex.x, vertex.z) + Vector2(0.5, 0.5))
+			surface.add_vertex(vertex)
+	surface.set_material(material)
+	surface.commit(mesh)
 
 
 func _excluded_grass(position: Vector3) -> bool:

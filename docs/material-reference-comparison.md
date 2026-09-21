@@ -136,3 +136,31 @@ the source still contributes broad swirls and the middle distance remains too
 smooth. Sampled stills do not prove temporal stability. The surface requires
 four grass texture reads instead of one. The rendered human control check passes
 with zero failures on Linux. This does not establish Mac performance.
+
+## Short cut grass geometry
+
+The former clump combined one tall source stalk with five small source stems.
+It now combines two small CC0 stems with 96 original bent ribbon blades. The
+96,000 instance placements still use sampled terrain heights and normals.
+Building and paving exclusions expand by 0.9 metres to cover the wider clumps.
+Each mesh uses 525 triangles instead of 634, but has two material surfaces
+instead of one, so triangle reduction alone does not establish lower GPU cost.
+
+The ribbons use the generated straw texture. Their unscaled heights range from
+0.020 to 0.050 metres and widths from 0.0014 to 0.0036 metres. Placement scaling
+changes those dimensions. These are visual estimates, not field measurements.
+Bent ribbon normals follow the surface slope. Thin material transmission uses
+Godot's [backlight material feature](https://docs.godotengine.org/en/stable/classes/class_basematerial3d.html#class-basematerial3d-property-backlight),
+with an estimated straw tint. There is no claim of measured plant scattering.
+
+The bake verifies all instances and serialization of transforms and geometry.
+The generated grass texture is now included in its source provenance. Because
+landmark baking shares the scenery fingerprint helper, its bake was refreshed
+as well.
+
+The final riding height diagnostic is
+`artifacts/cut-grass-fine/existing_00.png`. Short ground vegetation replaces the
+previous isolated tall weeds; distant terrain still lacks field structure.
+The rendered human control test passes with zero failures. Local frame samples
+are not a Mac performance certification. The macOS development export is
+validated separately, and the game remains below the requested realism target.

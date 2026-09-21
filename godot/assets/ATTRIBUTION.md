@@ -25,3 +25,8 @@ used with custom estimated relief and roughness in `terrain.gdshader`. The exact
 prompt, reference use and limitations are recorded in
 `assets/source/material-studies/README.md` at the repository root. No source
 video frame is redistributed in this texture. It is not a scanned PBR material.
+
+The short bent ribbon blades added by `scenery.gd` are original procedural
+geometry, using the generated cut grass albedo. Each clump combines 96 ribbons
+with two small CC0 Poly Haven stems. Blade dimensions and placement are visual
+estimates, not surveyed vegetation.
