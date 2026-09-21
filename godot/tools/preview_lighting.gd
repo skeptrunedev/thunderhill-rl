@@ -13,6 +13,10 @@ func _run() -> void:
 	var sky_source := ""
 	var camera_mode := 2
 	var station_m := 400.0
+	var lean_deg := 0.0
+	var lateral_m := 0.0
+	var view_yaw_deg := 0.0
+	var view_roll_deg := NAN
 	var match_sun_azimuth := false
 	var production_only := false
 	var sky_yaw := 0.0
@@ -22,7 +26,36 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--station-m="):
+		if arg.begins_with("--lateral-m="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or absf(float(value)) > 20.0
+			):
+				_fail("Lateral position must be finite and within twenty metres")
+				return
+			lateral_m = float(value)
+		elif (
+			arg.begins_with("--lean-deg=")
+			or arg.begins_with("--view-roll-deg=")
+			or arg.begins_with("--view-yaw-deg=")
+		):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or absf(float(value)) > 65.0
+			):
+				_fail("Pose angles must be finite and between minus and plus 65 degrees")
+				return
+			if arg.begins_with("--lean-deg="):
+				lean_deg = float(value)
+			elif arg.begins_with("--view-roll-deg="):
+				view_roll_deg = float(value)
+			else:
+				view_yaw_deg = float(value)
+		elif arg.begins_with("--station-m="):
 			var value := arg.trim_prefix("--station-m=")
 			if not value.is_valid_float() or not is_finite(float(value)) or float(value) < 0.0:
 				_fail("Station must be finite and nonnegative")
@@ -53,6 +86,9 @@ func _run() -> void:
 				_fail("Camera must be 0, 1 or 2")
 				return
 			camera_mode = int(value)
+	if (is_finite(view_roll_deg) or view_yaw_deg != 0.0) and camera_mode == 0:
+		_fail("View roll study requires a rider or onboard camera")
+		return
 	if not output.is_absolute_path() or DisplayServer.get_name() == "headless":
 		_fail("Use a real renderer and an absolute --output-dir")
 		return
@@ -153,7 +189,22 @@ func _run() -> void:
 		_fail("Station exceeds lap length")
 		return
 	game.reset_episode(station_m)
+	var pose_road: Dictionary = game.track.sample_world(game.sim.position)
+	if absf(lateral_m) >= float(pose_road.width) * 0.5:
+		_fail("Lateral position must remain inside the track at the selected station")
+		return
+	game.sim.position += pose_road.left * lateral_m
+	game.sim.position.y = game.track.sample_world(game.sim.position).height
+	game.sim.lean = deg_to_rad(lean_deg)
 	game._update_visual(1.0)
+	if view_yaw_deg != 0.0:
+		game.camera.rotate(Vector3.UP, deg_to_rad(view_yaw_deg))
+	if is_finite(view_roll_deg):
+		# Preserve eye position and gaze. Set optical roll relative to world up
+		# independently from motorcycle lean to compare reference framing.
+		var gaze: Vector3 = -game.camera.global_basis.z
+		game.camera.look_at(game.camera.global_position + gaze, Vector3.UP)
+		game.camera.rotate_object_local(Vector3.FORWARD, deg_to_rad(view_roll_deg))
 	var environment: Environment
 	var sun: DirectionalLight3D
 	for child in game.get_children():
@@ -236,37 +287,61 @@ func _run() -> void:
 	if file == null:
 		_fail("Cannot write study")
 		return
-	file.store_string(
-		(
-			JSON.stringify(
-				{
-					"sky_source": sky_source,
-					"runtime_panorama_path":
-					environment.sky.sky_material.get_shader_parameter("panorama").resource_path,
-					"source_sha256": source_sha256,
-					"panorama_is_srgb": panorama_is_srgb,
-					"panorama_energy": panorama_energy,
-					"panorama_seam_overlap": seam_overlap,
-					"use_ground_radiance":
-					environment.sky.sky_material.get_shader_parameter("use_ground_radiance"),
-					"ground_radiance":
-					str(environment.sky.sky_material.get_shader_parameter("ground_radiance")),
-					"panorama_yaw_radians": sky_yaw,
-					"minimum_source_elevation_deg": minimum_elevation,
-					"matched_sun_azimuth": match_sun_azimuth,
-					"toward_sun":
-					[sun.global_basis.z.x, sun.global_basis.z.y, sun.global_basis.z.z],
-					"sky_shader_sha256": FileAccess.get_sha256("res://shaders/sky.gdshader"),
-					"station_m": station_m,
-					"camera": camera_mode,
-					"fov": game.camera.fov,
-					"camera_transform": str(game.camera.global_transform),
-					"variants": variants,
-					"limitation": "Artistic appearance study, not calibrated radiometry"
-				},
-				"  "
+	(
+		file
+		. store_string(
+			(
+				(
+					JSON
+					. stringify(
+						{
+							"sky_source": sky_source,
+							"runtime_panorama_path":
+							(
+								environment
+								. sky
+								. sky_material
+								. get_shader_parameter("panorama")
+								. resource_path
+							),
+							"source_sha256": source_sha256,
+							"panorama_is_srgb": panorama_is_srgb,
+							"panorama_energy": panorama_energy,
+							"panorama_seam_overlap": seam_overlap,
+							"use_ground_radiance":
+							environment.sky.sky_material.get_shader_parameter(
+								"use_ground_radiance"
+							),
+							"ground_radiance":
+							str(
+								environment.sky.sky_material.get_shader_parameter("ground_radiance")
+							),
+							"panorama_yaw_radians": sky_yaw,
+							"minimum_source_elevation_deg": minimum_elevation,
+							"matched_sun_azimuth": match_sun_azimuth,
+							"toward_sun":
+							[sun.global_basis.z.x, sun.global_basis.z.y, sun.global_basis.z.z],
+							"sky_shader_sha256":
+							FileAccess.get_sha256("res://shaders/sky.gdshader"),
+							"station_m": station_m,
+							"motorcycle_lean_deg": lean_deg,
+							"lateral_m": lateral_m,
+							"view_yaw_deg": view_yaw_deg,
+							"view_roll_override_deg":
+							view_roll_deg if is_finite(view_roll_deg) else null,
+							"pose_status":
+							"Artistic static framing study, not reconstructed physical lean or lens calibration",
+							"camera": camera_mode,
+							"fov": game.camera.fov,
+							"camera_transform": str(game.camera.global_transform),
+							"variants": variants,
+							"limitation": "Artistic appearance study, not calibrated radiometry"
+						},
+						"  "
+					)
+				)
+				+ "\n"
 			)
-			+ "\n"
 		)
 	)
 	file.flush()
