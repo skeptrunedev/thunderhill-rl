@@ -196,7 +196,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT)
     parser.add_argument("--pavement-envelope", type=Path, default=ROOT / "data/reference/pit-envelope.json")
-    parser.add_argument("--plan-study", type=Path,
+    parser.add_argument("--plan-study", type=Path, default=ROOT / "data/reference/turn2-plan-study.json",
                         help="Apply a hash pinned horizontal study and refit lidar, then regenerate terrain interfaces")
     args = parser.parse_args()
     output = args.output_dir

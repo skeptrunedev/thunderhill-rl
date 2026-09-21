@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "track_sha256": "a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04",
   "limitations": [
     "Visual reconstruction only; consult each source reference for evidence and uncertainty",
     "Pale access corridor is traced from historical aerial imagery; Turn 2 flattened band is an original video guided estimate",
@@ -41,52 +41,52 @@
     {
       "points_local_xz": [
         [
-          308.254143,
-          773.353656
+          308.211327,
+          772.975762
         ],
         [
-          329.890171,
-          770.248745
+          329.842658,
+          769.788849
         ],
         [
-          350.11526,
-          761.941005
+          349.981004,
+          761.52518
         ],
         [
-          367.461196,
-          748.749979
+          367.190253,
+          748.421664
         ],
         [
-          380.798523,
-          731.413766
+          380.484956,
+          731.219395
         ],
         [
-          389.890317,
-          711.264283
+          389.459144,
+          711.186157
         ],
         [
-          393.616633,
-          687.419695
+          393.255786,
+          687.108405
         ],
         [
-          391.239343,
-          665.247508
+          390.697917,
+          665.521984
         ],
         [
-          383.228622,
-          645.303597
+          382.810145,
+          645.277093
         ],
         [
-          370.196254,
-          627.212762
+          370.024157,
+          627.775945
         ],
         [
-          353.747947,
-          613.65452
+          353.175409,
+          613.788162
         ],
         [
-          333.416935,
-          604.375102
+          333.320615,
+          604.51028
         ]
       ],
       "width_m": 1.6,
@@ -134,7 +134,7 @@
     },
     {
       "path": "data/reference/turn2-field-band-study.json",
-      "sha256": "87a90fcc84a6de255dc98117e4f3ee66a7f38d5d16849759100e7201be59ba3a"
+      "sha256": "da1a01698cde97c147dc6c57ff9c1ae4dacc6a3448b1dcb6f3c4c3da8116ec60"
     }
   ]
 }

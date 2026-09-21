@@ -2,7 +2,7 @@
   "source_sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
   "source_export_sha256": "f776b342ff9aa6cd2830ecacf57c1c6ac015794557f4f781b2db6d66eae44165",
   "source_request": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=json&bbox=556880%2C4376248%2C558008%2C4377699&bboxSR=26910&imageSR=26910&size=1880%2C2419&format=png&interpolation=RSP_NearestNeighbor&mosaicRule=%7B%22mosaicMethod%22%3A+%22esriMosaicLockRaster%22%2C+%22lockRasterIds%22%3A+%5B23435%5D%7D",
-  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "track_sha256": "a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04",
   "generator_sha256": "34c7181994bd927f94f9341c7ffb9a0ebfe9568b992c1954c222b162fc1bbdf4",
   "horizontal_datum": {
     "source_crs": "EPSG:6339",
@@ -17,12 +17,12 @@
     "manifest_sha256": "950e9e57d04f62b12f8c9284dacfd9146dddb0df6a97d0d86d4157a437e32604",
     "vertical": "Horizontal transformation only; NAVD88 heights are unchanged"
   },
-  "output_sha256": "36331650b2b679dd65b879ed99bfbffa096d2dc8537e55eaa9bb71707dc02195",
+  "output_sha256": "1ad8812b6915aae7f063809f58b7beaff3e617551a81496dc897f1ce98643180",
   "dimensions": [
     64,
     2048
   ],
-  "accepted_pixel_fraction": 0.8246994018554688,
+  "accepted_pixel_fraction": 0.8267364501953125,
   "gain_range": [
     0.65,
     1.35

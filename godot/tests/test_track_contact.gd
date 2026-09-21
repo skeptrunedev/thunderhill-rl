@@ -289,8 +289,12 @@ func _test_rendered_pavement(track: Node3D) -> void:
 
 func _test_removed_t2_curbs(track: Node3D) -> void:
 	var count := 0
-	for index in range(324, 416):
-		if float(track.samples[index].curvature) <= 0.012:
+	var original: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://tests/fixtures/curb-curvature-baseline.json")
+	)
+	for item: Array in original.segments_and_sides:
+		var index := int(item[0])
+		if int(item[1]) != 1 or index < 324 or index >= 416:
 			continue
 		var next := index + 1
 		var a: Vector3 = track.edge_point(

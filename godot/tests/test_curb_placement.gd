@@ -54,10 +54,17 @@ func _initialize() -> void:
 	)
 	var retained := 0
 	var removed := 0
+	# Curvature changes with source reconstruction. Placements must retain the
+	# original reviewed inventory, not be regenerated from the new curvature.
+	var original: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://tests/fixtures/curb-curvature-baseline.json")
+	)
+	var baseline_segments: Dictionary = {}
+	for item: Array in original.segments_and_sides:
+		baseline_segments[Vector2i(item[0], item[1])] = true
 	for index in track.samples.size():
 		for side: int in [-1, 1]:
-			var curvature: float = track.samples[index].curvature
-			var baseline: bool = absf(curvature) > 0.012 and side * curvature > 0.0
+			var baseline: bool = baseline_segments.has(Vector2i(index, side))
 			# Reviewed T2 inner arc contains only the 23 rejected runs C08..C30.
 			var rejected: bool = side == 1 and index >= 324 and index <= 415
 			var expected: bool = baseline and not rejected

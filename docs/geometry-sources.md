@@ -82,3 +82,71 @@ pavement, terrain interface, contact and dependent placements together.
 Five analytical tests pass, including local smoothing on a nonuniform sampled
 closed path, exact preservation outside its interval, source immutability,
 invalid parameter rejection and the existing lidar curvature checks.
+
+### Turn 2 reconstruction integrated
+
+The following integration supersedes the candidate only runtime status above.
+The immutable study remains the input record; `build_track.py` now applies it
+by default after reconstructing and validating its pinned baseline. The builder
+rejects stale baseline hashes, mismatched sample station correspondence, invalid
+coordinates and changed displacement reports. It applies only horizontal deltas
+and refits elevations and banking from the original lidar, then regenerates the
+road conforming terrain. It does not copy old heights onto the moved road.
+
+The new track hash is
+`a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04`.
+Sample count, order, source station identity and widths are preserved. Maximum
+rounded horizontal movement is 0.645035 m, elevation change is 0.0203 m and
+bank change is 0.133889 degrees. Horizontal coordinates outside the study
+interval are exactly unchanged. Physical station labels are recalculated; lap
+length becomes 4605.866 m, 1.419 m shorter. A second default build reproduced
+the new track and terrain surface JSON hashes exactly.
+
+The pavement builder regenerated a shared boundary with 13,622 triangles.
+Coverage error is zero; triangle overlap is within floating point roundoff.
+Both graphical scene bakes were regenerated. Terrain detail shoulder alpha,
+pavement tone and field map provenance were refreshed. The field control PNG
+remains identical, while its nearest road clearance is now 6.744 m. Pit wall
+measurement and geometry were rebuilt through unchanged source station identity.
+The historical spline used as pit baseline evidence was preserved.
+
+`tools/migrate_plan_placements.py` maps authored features through corresponding
+old and new sample intervals. Its default is report only; `--apply` writes the
+reviewed migration. It verifies source hashes, selected sample identities and
+existing field points before writing. All 89 curb runs and their 261 segments
+remain unchanged. Original curb evidence is retained, with migration provenance
+appended. The aerial access corridor remains fixed. The Turn 2 flattened straw
+band retains its selected sample identities and visual parameters; maximum
+point movement is 0.607025 m. The local paving joint endpoints are now
+1263.588613 and 1508.580953 m, preserving their relative physical placement.
+
+Root and independent review accepted
+`artifacts/turn2-smooth-production/production.png` against
+`artifacts/cirrus-v2-baseline/production.png`: the conspicuous pointed inside
+edge now rounds continuously into the bend, with no obvious pavement gap,
+shoulder tear or detached field strip. Both captures use the same requested
+station and rider pose; the road change slightly changes the camera transform,
+so this is not a pixel isolated material comparison. The historical boundary
+alignment discrepancy and broader visual fidelity gaps remain unresolved.
+
+Three plan application tests and five placement migration tests pass. Two
+existing curb tests previously recomputed historical placement expectations
+from current curvature, incorrectly dropping every removed footprint after
+smoothing. Their expectations now use an immutable source pinned baseline
+fixture, preserving the reviewed 261 retained and 36 removed segments.
+Integrated contact verification passes 54,488 pavement interior samples,
+35,138 boundary samples, 2,088 curb samples and all 36 removed footprints.
+Maximum pavement height disagreement is 0.000005546 m. These checks establish
+internal contact agreement, not surveyed accuracy.
+
+Human controls pass. Local Linux timing is median 17.361 ms and p95 22.222 ms
+over 266 frames, not a controlled Mac benchmark. The privileged QA driver
+completed a valid full lap in 3,301 actions with zero recorded offtrack ticks,
+39,604 ordered ticks and all 32 gates in sequence. This is a conservative
+18 m/s path following check, not RL training or a racing performance claim.
+
+A second production still at station 1135 was inspected in
+`artifacts/turn2-smooth-apex/production.png`; the curved boundary is continuous
+without an obvious gap. This does not substitute for a visual review in motion.
+Mac export passed as `c1fb210ca641-898abdf5fc3f`. The MacBook was offline at
+the reachability check, so this build has not been verified natively.

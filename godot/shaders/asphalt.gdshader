@@ -17,7 +17,7 @@ uniform float surface_variation_strength : hint_range(0.0, 1.0) = 0.35;
 uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.85;
 // Frame 50 appearance study: local paving pass boundary, not surveyed or friction data.
 uniform float paving_joint_strength : hint_range(0.0, 1.0) = 1.0;
-uniform vec2 paving_joint_station_m = vec2(1265.0, 1510.0);
+uniform vec2 paving_joint_station_m = vec2(1263.588613, 1508.580953);
 uniform float paving_joint_across = 0.46;
 uniform float paving_joint_width_m = 0.018;
 // Historical aerial tone, not a measured material or friction field.

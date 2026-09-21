@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "track_sha256": "a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04",
   "sample_count": 1536,
   "width_m": 0.9,
   "inner_height_m": 0.05,
   "outer_height_m": 0.11,
   "source_reference": "data/reference/turn2-curb-review.json",
-  "source_reference_sha256": "b348df035ad88d7da5b768a64d6bc9e7cf45913d163b7a5e92574dfeb7f3de81",
+  "source_reference_sha256": "69615dd5d29071df2591b7267bde17e4b8c8413bf203758dad88deda27e26438",
   "runs": [
     {
       "id": "C01",
@@ -891,6 +891,23 @@
         1518
       ],
       "status": "Unreviewed provisional placement retained from curvature baseline"
+    }
+  ],
+  "placement_migrations": [
+    {
+      "baseline_track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+      "track_sha256": "a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04",
+      "baseline_length_m": 4607.285,
+      "length_m": 4605.866,
+      "sample_identity": "Unchanged count, ordering and source_s; physical stations interpolated through corresponding sample intervals",
+      "builder_sha256": "75901abc96e47dd2df7fdf3e0e31470921c3270236a8b2a99d2bde47359fb3ca",
+      "source_files_sha256": {
+        "godot/data/curb-placement.json": "2da692adfa60a5658901fe83b3add16ee2a4b724291496b350e6c1292c40b388",
+        "data/reference/turn2-curb-review.json": "b348df035ad88d7da5b768a64d6bc9e7cf45913d163b7a5e92574dfeb7f3de81",
+        "godot/data/field-coverage.json": "2ebfc7b0361c5f420cfd3c467ed9b3f9c7b445742865c2e5512488b5683fe4c2",
+        "data/reference/turn2-field-band-study.json": "87a90fcc84a6de255dc98117e4f3ee66a7f38d5d16849759100e7201be59ba3a",
+        "godot/shaders/asphalt.gdshader": "b4667b82c9ab5e0292f28f1fb1d37f23e400b8ab5744a62cc3f248f2615088ff"
+      }
     }
   ]
 }

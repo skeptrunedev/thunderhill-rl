@@ -26,78 +26,92 @@
     1750,
     2160
   ],
-  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "track_sha256": "a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04",
   "construction": {
     "requested_stations_m": [
-      990,
-      1015,
-      1040,
-      1065,
-      1090,
-      1115,
-      1140,
-      1165,
-      1190,
-      1215,
-      1240,
-      1265
+      989.877986,
+      1014.773053,
+      1039.66117,
+      1064.538398,
+      1089.426567,
+      1114.331621,
+      1139.200047,
+      1164.081574,
+      1188.946353,
+      1213.823111,
+      1238.69648,
+      1263.588613
     ],
-    "method": "Nearest track sample p.xz + left.xz * (width / 2 + 4), piecewise linear centerline",
+    "method": "Preserved selected sample indices; p.xz + left.xz * (width / 2 + offset), piecewise linear centerline",
     "offset_inside_left_pavement_edge_m": 4.0,
     "parameter_status": "All offsets, point widths, feather and color are artistic estimates",
     "tint_color_space": "Linear multiplier, not measured reflectance",
     "grass_retention": "Preserve existing ground straw coverage, remove upright stubble from core during scenery bake",
-    "tint_variation": "Original strength values at each centerline point, interpolated by segment distance to interrupt dark stretches. Bright gaps remain flattened."
+    "tint_variation": "Original strength values at each centerline point, interpolated by segment distance to interrupt dark stretches. Bright gaps remain flattened.",
+    "selected_sample_indices": [
+      330,
+      338,
+      346,
+      354,
+      362,
+      370,
+      379,
+      387,
+      395,
+      403,
+      411,
+      419
+    ]
   },
   "corridor": {
     "points_local_xz": [
       [
-        308.254143,
-        773.353656
+        308.211327,
+        772.975762
       ],
       [
-        329.890171,
-        770.248745
+        329.842658,
+        769.788849
       ],
       [
-        350.11526,
-        761.941005
+        349.981004,
+        761.52518
       ],
       [
-        367.461196,
-        748.749979
+        367.190253,
+        748.421664
       ],
       [
-        380.798523,
-        731.413766
+        380.484956,
+        731.219395
       ],
       [
-        389.890317,
-        711.264283
+        389.459144,
+        711.186157
       ],
       [
-        393.616633,
-        687.419695
+        393.255786,
+        687.108405
       ],
       [
-        391.239343,
-        665.247508
+        390.697917,
+        665.521984
       ],
       [
-        383.228622,
-        645.303597
+        382.810145,
+        645.277093
       ],
       [
-        370.196254,
-        627.212762
+        370.024157,
+        627.775945
       ],
       [
-        353.747947,
-        613.65452
+        353.175409,
+        613.788162
       ],
       [
-        333.416935,
-        604.375102
+        333.320615,
+        604.51028
       ]
     ],
     "width_m": 1.6,
@@ -143,5 +157,171 @@
     "Surface composition is uncertain; flattened vegetation is an artistic interpretation",
     "The 2022 aerial predates repaving and does not prove current ground cover",
     "No contact heights, tire grip, collision, rewards or observations are changed"
+  ],
+  "original_placement": {
+    "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+    "construction": {
+      "requested_stations_m": [
+        990,
+        1015,
+        1040,
+        1065,
+        1090,
+        1115,
+        1140,
+        1165,
+        1190,
+        1215,
+        1240,
+        1265
+      ],
+      "method": "Nearest track sample p.xz + left.xz * (width / 2 + 4), piecewise linear centerline",
+      "offset_inside_left_pavement_edge_m": 4.0,
+      "parameter_status": "All offsets, point widths, feather and color are artistic estimates",
+      "tint_color_space": "Linear multiplier, not measured reflectance",
+      "grass_retention": "Preserve existing ground straw coverage, remove upright stubble from core during scenery bake",
+      "tint_variation": "Original strength values at each centerline point, interpolated by segment distance to interrupt dark stretches. Bright gaps remain flattened."
+    },
+    "corridor": {
+      "points_local_xz": [
+        [
+          308.254143,
+          773.353656
+        ],
+        [
+          329.890171,
+          770.248745
+        ],
+        [
+          350.11526,
+          761.941005
+        ],
+        [
+          367.461196,
+          748.749979
+        ],
+        [
+          380.798523,
+          731.413766
+        ],
+        [
+          389.890317,
+          711.264283
+        ],
+        [
+          393.616633,
+          687.419695
+        ],
+        [
+          391.239343,
+          665.247508
+        ],
+        [
+          383.228622,
+          645.303597
+        ],
+        [
+          370.196254,
+          627.212762
+        ],
+        [
+          353.747947,
+          613.65452
+        ],
+        [
+          333.416935,
+          604.375102
+        ]
+      ],
+      "width_m": 1.6,
+      "feather_m": 0.8,
+      "tint_linear": [
+        0.58,
+        0.58,
+        0.58
+      ],
+      "grass_retention": 1.0,
+      "point_widths_m": [
+        0,
+        0.8,
+        1.4,
+        1,
+        1.6,
+        1.2,
+        1.5,
+        0.8,
+        1.2,
+        1.4,
+        0.7,
+        0
+      ],
+      "point_tint_strengths": [
+        0,
+        0.6,
+        0.05,
+        0.8,
+        0,
+        0.65,
+        0.1,
+        0.75,
+        0.05,
+        0.6,
+        0.15,
+        0
+      ]
+    }
+  },
+  "placement_migrations": [
+    {
+      "baseline_track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+      "track_sha256": "a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04",
+      "baseline_length_m": 4607.285,
+      "length_m": 4605.866,
+      "sample_identity": "Unchanged count, ordering and source_s; physical stations interpolated through corresponding sample intervals",
+      "builder_sha256": "75901abc96e47dd2df7fdf3e0e31470921c3270236a8b2a99d2bde47359fb3ca",
+      "source_files_sha256": {
+        "godot/data/curb-placement.json": "2da692adfa60a5658901fe83b3add16ee2a4b724291496b350e6c1292c40b388",
+        "data/reference/turn2-curb-review.json": "b348df035ad88d7da5b768a64d6bc9e7cf45913d163b7a5e92574dfeb7f3de81",
+        "godot/data/field-coverage.json": "2ebfc7b0361c5f420cfd3c467ed9b3f9c7b445742865c2e5512488b5683fe4c2",
+        "data/reference/turn2-field-band-study.json": "87a90fcc84a6de255dc98117e4f3ee66a7f38d5d16849759100e7201be59ba3a",
+        "godot/shaders/asphalt.gdshader": "b4667b82c9ab5e0292f28f1fb1d37f23e400b8ab5744a62cc3f248f2615088ff"
+      },
+      "previous_requested_stations_m": [
+        990,
+        1015,
+        1040,
+        1065,
+        1090,
+        1115,
+        1140,
+        1165,
+        1190,
+        1215,
+        1240,
+        1265
+      ],
+      "mapped_requested_stations_m": [
+        989.877986,
+        1014.773053,
+        1039.66117,
+        1064.538398,
+        1089.426567,
+        1114.331621,
+        1139.200047,
+        1164.081574,
+        1188.946353,
+        1213.823111,
+        1238.69648,
+        1263.588613
+      ],
+      "paving_joint_previous_station_m": [
+        1265.0,
+        1510.0
+      ],
+      "paving_joint_mapped_station_m": [
+        1263.588613,
+        1508.580953
+      ]
+    }
   ]
 }

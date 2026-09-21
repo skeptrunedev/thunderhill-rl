@@ -34,8 +34,8 @@
     "manifest_sha256": "950e9e57d04f62b12f8c9284dacfd9146dddb0df6a97d0d86d4157a437e32604",
     "vertical": "Horizontal transformation only; NAVD88 heights are unchanged"
   },
-  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
-  "surface_sha256": "c0fbcf8df2ff73ac5dec213f67978091c57c9019302ef12a77eab9868b967dae",
+  "track_sha256": "a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04",
+  "surface_sha256": "bb30314c7971eb3eea745afe37e9920305c8492d847dcb1fa47dd950f9de9ad4",
   "local_origin_xz": [
     -586.5781278515933,
     -466.00422843545675
@@ -59,7 +59,7 @@
     {
       "id": "turn2_interior_pale_straw",
       "local_area_m2": 28541.859774598204,
-      "road_clearance_m": 7.147790480821207,
+      "road_clearance_m": 6.743860497413553,
       "target_grass_coverage": 0.95,
       "pale_straw_response": 0.8,
       "interior_feather_m": 3.0
