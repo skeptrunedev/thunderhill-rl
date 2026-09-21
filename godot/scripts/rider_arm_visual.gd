@@ -15,9 +15,7 @@ func build(origin: Vector3) -> String:
 	front_origin = origin
 	var leather := _leather_material()
 	leather.albedo_color = Color("24282a")
-	var glove_material := _leather_material()
-	glove_material.vertex_color_use_as_albedo = true
-	glove_material.vertex_color_is_srgb = true
+	var glove_material := glove_finish()
 	for side in [-1.0, 1.0]:
 		var row := {}
 		for key in ["upper", "lower", "glove"]:
@@ -38,6 +36,12 @@ func build(origin: Vector3) -> String:
 			row[key] = instance
 		joints[side] = row
 	return set_steering(0.0)
+
+
+static func glove_finish() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://shaders/glove_finish.gdshader")
+	return material
 
 
 static func _leather_material() -> StandardMaterial3D:

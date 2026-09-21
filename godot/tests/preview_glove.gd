@@ -8,10 +8,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var stage := Node3D.new()
 	root.add_child(stage)
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.vertex_color_is_srgb = true
-	material.roughness = 0.65
+	var material := preload("res://scripts/rider_arm_visual.gd").glove_finish()
 	for side in [-1.0, 1.0]:
 		var glove := MeshInstance3D.new()
 		glove.mesh = preload("res://scripts/rider_glove.gd").build(side)

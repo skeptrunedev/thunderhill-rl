@@ -1239,9 +1239,9 @@ Increasing constant bias from 0.1 to 0.2 leaves stipple; 0.4 removes the
 pattern but also loses close shadows in the controlled light comparison.
 Neither change was adopted. Doubling normal bias, changing the near split,
 disabling blur, and using 32 bit shadow depth did not produce an acceptable
-replacement. Blur zero exposes triangular self shadow artifacts. The
-precise renderer interaction remains unresolved, so this is not reported
-as a fixed material issue.
+replacement. Blur zero exposed triangular shadow boundaries, initially
+misinterpreted as self shadowing. The caster isolation and filter diagnosis
+below supersede that interpretation.
 
 `preview_cockpit.gd` now records the light direction and shadow settings and
 accepts bounded shadow diagnostic overrides. `--diagnostic-sun` uses an
@@ -1264,3 +1264,82 @@ comparison. Geometry and dashboard validation pass. This change does not
 establish a photographic match to the Ducati footage.
 Mac export passed as `10783bb35ddc-d9dc16c3ab73`. It has not been verified
 running natively on the Mac.
+
+## Cockpit shadow filter diagnosis
+
+Further caster isolation supersedes the initial tentative self shadow diagnosis.
+Disabling only fuel tank casting, changing its material to back face culling,
+and reversing sunlight shadow culling with that tank override produced no
+meaningful tank pixel change. Disabling the front assembly's shadow casting
+removed the pattern. Removing rider casting did not. Both standard and custom
+materials in the front assembly contribute cast shadows on the tank.
+These are diagnostic overrides only. No caster removal was adopted.
+
+The dominant regular stipple comes from sampling these received shadows with
+Godot's default Soft Low directional filter. The
+[Godot 4.7.2 PCF implementation](https://github.com/godotengine/godot/blob/4.7.2-stable/servers/rendering/renderer_rd/shaders/scene_forward_lights_inc.glsl#L305-L336)
+rotates its sample disk at every screen pixel using interleaved gradient noise.
+The [quality settings implementation](https://github.com/godotengine/godot/blob/4.7.2-stable/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp#L1220-L1260)
+uses four samples for Soft Low, eight for Medium and sixteen for High. High
+also increases the kernel radius from two to three. Therefore the candidate
+uses High and `shadow_blur = 2.0 / 3.0` to preserve the previous effective
+filter radius. Bias, normal bias, cascade distances and shadow depth remain
+unchanged. This improves sampling rather than removing nearby cast shadows.
+Godot's [shadow filter guidance](https://docs.godotengine.org/en/stable/tutorials/3d/lights_and_shadows.html#shadow-filter-mode)
+also describes this dithering on smooth surfaces.
+
+The matched candidate is `artifacts/cockpit-shadow-high-matched-blur`, with
+`artifacts/cockpit-shadow-medium` as the intermediate comparison. Root
+independently reviewed the High wider view and confirmed a clear reduction
+in the pattern with the shadow retained. The controlled light study at
+`artifacts/cockpit-shadow-high-diagnostic` also retains hardware and tank
+shadows. The earlier bias 0.4 study had lost nearby shadows.
+
+A local noise proxy uses the smooth tank rectangle `(590, 610, 750, 640)` in
+the 1280 by 720 wider view. Encoded luminance residual RMS after a one pixel
+Gaussian blur is 2.945 for Low, 1.282 for Medium and 0.663 for High with matched
+radius. The calculation, image hashes and limits are recorded in
+`artifacts/cockpit-shadow-filter-metrics.json`. This is not a physical
+radiometric error or a realism score. Glove materials changed independently
+during the study; the measured rectangle contains only the tank.
+
+`preview_cockpit.gd` records the effective directional filter quality from
+project defaults or the explicit study override, separately from override
+booleans. It rejects simultaneous Medium and High overrides. Caster group,
+tank culling and tank casting controls preserve the isolated diagnostic.
+This study does not establish an exact match to the reference illumination,
+prove that every shadow artifact is gone, or measure native Mac performance.
+
+
+## Custom glove finish and accepted shadow filtering
+
+The glove now uses an original object space shader, `glove_finish.gdshader`.
+Explicit UV2 part tags separate the smooth molded protector from leather.
+The shader supplies restrained leather grain, a tailored dorsal panel,
+filtered seam relief and a limited warm cuff accent. The 0.8 mm grain pitch,
+12 micrometre grain relief, 30 micrometre seam relief and roughness values
+are artistic estimates, not measurements recovered from compressed footage.
+Vertex positions and articulation remain unchanged. The existing standalone
+glove preview now uses the production material.
+
+The first red hand shell candidate was rejected. A close crop identified the
+red and black object beside the right grip in frame 10 as a phone mounting
+bracket, not a glove. Actual gloves in frames 20 and 30 are predominantly
+black with limited warm orange red and white cuff accents. Those frames guide
+the adopted palette. They do not resolve microscopic grain or exact seams.
+The image comparison in `artifacts/glove-material-final-comparison` preserves
+original pixels without enlarging the small reference crop. Differing hand
+pose and framing are explicitly labeled. The modeled glove remains too
+smooth and simple to reproduce the reference folds and articulated padding.
+
+Production now uses directional shadow filter High with blur 2/3. The final
+four cockpit views are in `artifacts/cockpit-black-glove-production`; metadata
+records quality enum 4 and unchanged biases. `artifacts/rider-shadow-high-filter`
+confirms that rider ground shadows remain visible. Root visually inspected
+the wider cockpit view and rider shadow capture. Human controls pass with
+zero failures after the filter change; local Linux median was 17.361 ms and
+p95 24.125 ms over 261 frames. This is a runtime check, not an isolated GPU
+benchmark or proof of Mac performance. Dashboard and glove geometry checks
+also pass. The Mac peer reported online, but SSH timed out during this pass,
+so native Mac verification remains outstanding.
+Mac export passed as `b95fc47a2bbe-f2b3e8086617`; native execution is unverified.

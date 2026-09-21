@@ -304,6 +304,8 @@ func _environment() -> void:
 	sun.light_color = Color("fff0d5")
 	sun.light_energy = 1.0
 	sun.shadow_enabled = true
+	# High PCF uses 1.5 times the blur radius. Keep the original penumbra width.
+	sun.shadow_blur = 2.0 / 3.0
 	sun.directional_shadow_max_distance = 160
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	# Reserve the nearest cascade for cockpit and rider contact shadows.

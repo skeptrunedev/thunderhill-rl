@@ -21,12 +21,36 @@ func _run() -> void:
 	var near_split := -1.0
 	var shadow_blur := -1.0
 	var depth32 := false
+	var tank_back_cull := false
+	var tank_casts_shadow := true
+	var reverse_cull := false
+	var no_shadow_group := ""
+	var medium_shadow_filter := false
+	var high_shadow_filter := false
 	var arguments := OS.get_cmdline_user_args()
+	if "--medium-shadow-filter" in arguments and "--high-shadow-filter" in arguments:
+		_fail("Choose one shadow filter override")
+		return
 	if "--display-filtered" in arguments and "--display-unfiltered" in arguments:
 		_fail("Choose one display filtering mode")
 		return
 	for arg in arguments:
-		if arg == "--shadow-depth32":
+		if arg == "--high-shadow-filter":
+			high_shadow_filter = true
+		elif arg == "--medium-shadow-filter":
+			medium_shadow_filter = true
+		elif arg.begins_with("--no-shadow-group="):
+			no_shadow_group = arg.trim_prefix("--no-shadow-group=")
+			if no_shadow_group not in ["bike", "rider", "front", "front_shader", "front_standard"]:
+				_fail("Unknown shadow group")
+				return
+		elif arg == "--tank-no-shadow":
+			tank_casts_shadow = false
+		elif arg == "--reverse-shadow-cull":
+			reverse_cull = true
+		elif arg == "--tank-back-cull":
+			tank_back_cull = true
+		elif arg == "--shadow-depth32":
 			depth32 = true
 		elif arg == "--diagnostic-sun":
 			diagnostic_sun = true
@@ -129,6 +153,17 @@ func _run() -> void:
 			),
 			false
 		)
+	var shadow_filter_quality := int(
+		ProjectSettings.get_setting_with_override(
+			"rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality"
+		)
+	)
+	if medium_shadow_filter:
+		shadow_filter_quality = RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM
+	elif high_shadow_filter:
+		shadow_filter_quality = RenderingServer.SHADOW_QUALITY_SOFT_HIGH
+	if medium_shadow_filter or high_shadow_filter:
+		RenderingServer.directional_soft_shadow_filter_set_quality(shadow_filter_quality)
 	root.size = SIZE
 	root.content_scale_size = SIZE
 	var game = load("res://main.tscn").instantiate()
@@ -154,6 +189,8 @@ func _run() -> void:
 		var toward: Vector3 = game.bike.global_basis * Vector3(0.3, 0.8, -0.5).normalized()
 		sun.look_at(-toward, Vector3.UP)
 	sun.shadow_enabled = sun_shadows
+	if reverse_cull:
+		sun.shadow_reverse_cull_face = true
 	if shadow_bias >= 0.0:
 		sun.shadow_bias = shadow_bias
 	if normal_bias >= 0.0:
@@ -173,6 +210,29 @@ func _run() -> void:
 		)
 		housing.mesh = temporary.get_child(0).mesh
 		temporary.free()
+	if not no_shadow_group.is_empty():
+		var group: Node = game.bike
+		if no_shadow_group == "rider":
+			group = game.bike.rider
+		elif no_shadow_group.begins_with("front"):
+			group = game.bike._front
+		for node in group.find_children("*", "MeshInstance3D", true, false):
+			if no_shadow_group == "front_shader" and not node.material_override is ShaderMaterial:
+				continue
+			if (
+				no_shadow_group == "front_standard"
+				and not node.material_override is StandardMaterial3D
+			):
+				continue
+			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if not tank_casts_shadow:
+		var tank: MeshInstance3D = game.bike.find_child("FuelTank", true, false)
+		tank.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if tank_back_cull:
+		var tank: MeshInstance3D = game.bike.find_child("FuelTank", true, false)
+		var tank_material: StandardMaterial3D = tank.material_override.duplicate()
+		tank_material.cull_mode = BaseMaterial3D.CULL_BACK
+		tank.material_override = tank_material
 	var display_count := 0
 	var reservoir_count := 0
 	var wall_absorption := Vector3.ZERO
@@ -255,6 +315,13 @@ func _run() -> void:
 							"display_filtered": display_filtered,
 							"legacy_housing": legacy_housing,
 							"sun_shadows": sun.shadow_enabled,
+							"tank_back_cull": tank_back_cull,
+							"tank_casts_shadow": tank_casts_shadow,
+							"no_shadow_group": no_shadow_group,
+							"medium_shadow_filter_override": medium_shadow_filter,
+							"high_shadow_filter_override": high_shadow_filter,
+							"directional_shadow_filter_quality": shadow_filter_quality,
+							"reverse_shadow_cull": sun.shadow_reverse_cull_face,
 							"diagnostic_sun": diagnostic_sun,
 							"toward_sun": str(sun.global_basis.z),
 							"shadow_bias": sun.shadow_bias,
