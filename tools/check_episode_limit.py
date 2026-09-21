@@ -15,9 +15,11 @@ from check_parallel import worker
 
 
 def verify(client, data, limit):
-    initial = client.request(
+    rejected = client.request(
         {"op": "reset", "policy_id": "budget-check", "max_episode_ticks": 9999}
     )
+    assert "error" in rejected, "Client supplied budget override was accepted"
+    initial = client.request({"op": "reset", "policy_id": "budget-check"})
     episode = initial["episode_id"]
     tick = 0
     transitions = []

@@ -6,6 +6,21 @@ const SimScript = preload("res://scripts/motorcycle.gd")
 const HudScript = preload("res://scripts/hud.gd")
 const AgentCameraScript = preload("res://scripts/agent_camera.gd")
 const DT: float = 1.0 / 120.0
+const MAX_AGENT_SNAPSHOTS := 64
+# Simulation bookkeeping only. Rendering interpolation and static geometry caches
+# cannot influence an agent step; the collision sweep initializes its own cache.
+const SNAPSHOT_GAME_FIELDS := [
+	"lap_time",
+	"completed_laps",
+	"lap_valid",
+	"last_progress",
+	"legal_distance",
+	"next_gate",
+	"passed_gates",
+	"wheel_rotation",
+	"steering_input",
+	"controls",
+]
 var track: Node3D
 var sim: RefCounted
 var collision_sweep: RefCounted
@@ -35,6 +50,8 @@ var server := TCPServer.new()
 var clients: Array = []
 var action_cache: Dictionary = {}
 var action_requests: Dictionary = {}
+var agent_snapshots: Dictionary = {}
+var episode_snapshot: Dictionary = {}
 var policy_id := "human"
 var terminated := false
 var termination_reason := ""
@@ -389,7 +406,10 @@ func _environment() -> void:
 
 
 func reset_episode(
-	station: float, checkpoint: String = "human", initial_state: Dictionary = {}
+	station: float,
+	checkpoint: String = "human",
+	initial_state: Dictionary = {},
+	snapshot: Dictionary = {}
 ) -> Dictionary:
 	var index := 0
 	for i in track.samples.size():
@@ -422,6 +442,18 @@ func reset_episode(
 	action_requests.clear()
 	if not initial_state.is_empty():
 		preload("res://scripts/replay.gd").new().apply_state(sim, initial_state)
+	episode_snapshot = {}
+	if not snapshot.is_empty():
+		# Native copies preserve Vector3 and numeric precision. JSON replay telemetry
+		# is intentionally not the restore source, nor is any client supplied state.
+		var restored: Dictionary = snapshot.duplicate(true)
+		for key: String in restored.sim:
+			sim.set(key, restored.sim[key])
+		for key: String in SNAPSHOT_GAME_FIELDS:
+			set(key, restored.game[key])
+		episode_snapshot = restored.provenance
+	_collision_start_pose = {}
+	# Tick and lap clocks retain source history; each branch receives a full budget.
 	episode_initial_tick = sim.tick
 	_start_recording(station)
 	return observation()
@@ -458,6 +490,8 @@ func _start_recording(station: float) -> void:
 				"pit_wall_sha256": FileAccess.get_sha256("res://data/pit-wall.json"),
 				"response": "terminal_freeze_no_impact_dynamics"
 			},
+			"snapshot": episode_snapshot.duplicate(true),
+			"initial_track": _snapshot_game_state(),
 			"initial_state": sim.telemetry(),
 			"parameters": sim.parameters,
 			"engine": Engine.get_version_info(),
@@ -1059,11 +1093,74 @@ func _capture_request(request: Dictionary) -> Dictionary:
 	return captured
 
 
+func _snapshot_game_state() -> Dictionary:
+	var state: Dictionary = {}
+	for key: String in SNAPSHOT_GAME_FIELDS:
+		var value: Variant = get(key)
+		state[key] = value.duplicate(true) if value is Dictionary or value is Array else value
+	return state
+
+
+func _create_snapshot(request: Dictionary) -> Dictionary:
+	for key: Variant in request:
+		if key not in ["op", "episode_id", "expected_tick"]:
+			return {"error": "Unknown snapshot field: " + str(key)}
+	if request.get("expected_tick", -1) != sim.tick:
+		return {"error": "Tick mismatch"}
+	if terminated or not truncation_reason.is_empty() or not environment_failure.is_empty():
+		return {"error": "Cannot snapshot a finished or invalid episode"}
+	if agent_snapshots.size() >= MAX_AGENT_SNAPSHOTS:
+		return {"error": "Worker snapshot limit reached"}
+	var id := Crypto.new().generate_random_bytes(16).hex_encode()
+	var state: Dictionary = {}
+	# Same script property contract used for atomic rollback inside sim.step.
+	# Include parameters too: the source state is authoritative, never client data.
+	for property: Dictionary in sim.get_property_list():
+		if int(property.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE:
+			var value: Variant = sim.get(property.name)
+			state[property.name] = (
+				value.duplicate(true) if value is Dictionary or value is Array else value
+			)
+	var provenance := {
+		"version": "worker-snapshot-v1",
+		"snapshot_id": id,
+		"source_episode_id": episode_id,
+		"source_policy_id": policy_id,
+		"source_tick": sim.tick,
+		"source_episode_initial_tick": episode_initial_tick,
+		"parent_snapshot_id": episode_snapshot.get("snapshot_id", ""),
+		"budget": "fresh_duration_from_preserved_tick",
+	}
+	agent_snapshots[id] = {
+		"sim": state,
+		"game": _snapshot_game_state(),
+		"provenance": provenance,
+		"station": last_progress * track.length_m,
+	}
+	_record({"type": "snapshot", "provenance": provenance})
+	if recorder:
+		recorder.flush()
+	return provenance.duplicate(true)
+
+
 func _request(request: Dictionary) -> Dictionary:
 	if not agent_mode:
 		return {"error": "Agent stepping requires --agent-port"}
 	var op: String = request.get("op", "")
 	if op == "reset":
+		for key: Variant in request:
+			if key not in ["op", "station", "policy_id", "snapshot_id"]:
+				return {"error": "Unknown reset field: " + str(key)}
+		if request.has("snapshot_id"):
+			var id: Variant = request.snapshot_id
+			if request.has("station"):
+				return {"error": "Snapshot reset cannot also select station"}
+			if not id is String or id.length() != 32 or not agent_snapshots.has(id):
+				return {"error": "Unknown worker snapshot"}
+			var snapshot: Dictionary = agent_snapshots[id]
+			return reset_episode(
+				snapshot.station, str(request.get("policy_id", "unassigned")), {}, snapshot
+			)
 		var station: Variant = request.get("station", 0.0)
 		if (
 			not (station is float or station is int)
@@ -1077,6 +1174,8 @@ func _request(request: Dictionary) -> Dictionary:
 		return {"error": "Episode mismatch"}
 	if op == "observe":
 		return observation()
+	if op == "snapshot":
+		return _create_snapshot(request)
 	if op == "advance":
 		var id: String = str(request.get("action_id", ""))
 		if id.is_empty():

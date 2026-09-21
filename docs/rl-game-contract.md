@@ -112,7 +112,7 @@ queued advance and reset requests remained serialized. Evidence is in
 
 Start an agent worker with `--agent-max-episode-ticks=N`, where N is a positive
 integer. The limit counts successful physics ticks since reset, including resets
-from a supplied initial state. It is fixed at process startup and cannot be
+from an authoritative worker snapshot. It is fixed at process startup and cannot be
 changed through reset or action requests. Omission preserves unlimited prototype
 behavior; human mode rejects this option. Recordings include `episode_limits`
 with version `tick-budget-v1` and `max_physics_ticks` (zero means unlimited).
@@ -153,3 +153,40 @@ four isolated Godot workers, with nonzero adapter updates and audited observatio
 masking and episode attribution. This is a harness integration result, not a
 Gemma 4, camera, Harbor or racing competence result. See the linked reproduction
 instructions and explicit remaining work.
+
+
+## Authoritative worker snapshots
+
+Trainer socket clients may capture a moving state with
+`{"op":"snapshot","episode_id":"current episode","expected_tick":123}`.
+The reply contains an opaque `snapshot_id` and source episode, policy and tick
+provenance. The request does not advance physics. Snapshots remain in that
+worker's memory across resets, up to 64 entries, and disappear when it exits.
+Unknown identifiers cannot restore snapshots. Stale episodes or ticks, finished
+episodes and infrastructure failures cannot produce snapshots. A known healthy
+snapshot can reset a worker after a failed candidate. Unknown reset fields are rejected.
+
+Use `{"op":"reset","snapshot_id":"returned handle","policy_id":"candidate"}`
+to branch. This operation restores native simulator variables, including actuator,
+shift, contact and parameter state, plus lap time, gates, validity, legal distance,
+progress and wheel/controller bookkeeping. It never accepts arbitrary client
+states or reads snapshot files. Station and snapshot reset modes are mutually
+exclusive. The bike tools do not expose either administration operation to the
+policy; the local socket is a trusted trainer interface, not an authentication
+boundary between hostile clients.
+
+Each branch receives a new episode identifier and policy attribution, empty
+action retry caches, cleared terminal/failure flags and a fresh duration budget.
+Absolute simulation tick, elapsed time and lap history remain those of the source.
+Recordings contain `snapshot` provenance, the inherited `initial_track` bookkeeping,
+exact `initial_state` and source road station. A branch finishing the lap is only
+a suffix completion unless its recorded source lineage is also verified. Restoring
+a snapshot is not evidence that the policy independently drove the prefix.
+
+`tools/check_snapshots.py --godot /path/to/godot` compares every recorded state,
+track value, reward and event over two identical moving branches, verifies gate
+history, fresh episode attribution and retry behavior, rejects invalid and foreign
+handles and arbitrary state injection, checks the memory bound, and verifies a
+fresh duration budget and rejection of terminal snapshot capture. Snapshot
+reproducibility is verified within one worker and build; cross process snapshot
+migration and identical rendered camera interpolation are not supported.
