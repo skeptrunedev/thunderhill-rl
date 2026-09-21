@@ -20,15 +20,14 @@ The rough concrete diffuse, OpenGL normal and roughness JPGs are Rough Concrete 
 
 The leather normal and roughness JPGs are Leather Red 02 by Rob Tuytel / Poly Haven, CC0: https://polyhaven.com/a/leather_red_02 . License: https://polyhaven.com/license . The published tile width is 0.6 metres. Publisher MD5 and acquired SHA256 hashes are pinned in `data/reference/material-candidates.json`. The original black rider colors are retained, with object space triplanar grain, reduced normal intensity and adjusted roughness. This is a generic leather reference, not a scan of the rider's equipment.
 
-`materials/dry_cut_grass_v1.png` is an original generated grass material study,
+`materials/dry_cut_grass_v1.png` and `materials/dry_cut_grass_v2.png` are original generated grass material studies,
 used with custom estimated relief and roughness in `terrain.gdshader`. The exact
 prompt, reference use and limitations are recorded in
 `assets/source/material-studies/README.md` at the repository root. No source
 video frame is redistributed in this texture. It is not a scanned PBR material.
 
 The short bent ribbon blades added by `scenery.gd` are original procedural
-geometry, using the generated cut grass albedo. Each clump combines 96 ribbons
-with two small CC0 Poly Haven stems. Blade dimensions and placement are visual
+geometry, using the generated cut grass albedo. Each clump contains 132 original bent ribbons. Blade dimensions and placement are visual
 estimates, not surveyed vegetation.
 
 `materials/fine_shoulder_v1.png` is an original generated fine soil and straw

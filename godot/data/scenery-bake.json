@@ -1,13 +1,13 @@
 {
-  "build_ms": 11102.031,
-  "geometry_sha256": "290646a845c902ba8011facd0379e7f34645afa7027805c173a30629b153c397",
+  "build_ms": 10817.214,
+  "geometry_sha256": "20b2656ceccb78e343e758cf4509e3c95b2846e0f2649cb6f8daea2251fe6781",
   "godot_version": "4.7.2-stable (official)",
   "grass_instances": 96000,
-  "load_ms": 33.431,
-  "scene_sha256": "ebef4c903aa220669c847fbe1a1a618fc0ec9c4036ab5bf8db86c20b06b03498",
+  "load_ms": 34.806,
+  "scene_sha256": "e14c019a1f5794d04133618f70a74abd5058ca0c33bde8b38a52dae752656c09",
   "schema_version": 1,
   "sources": {
-    "assets/materials/dry_cut_grass_v1.png": "b9bf41b3edc1cbb14d24590338733200a533ec23549ff6b3834d91d8adb9eda8",
+    "assets/materials/dry_cut_grass_v2.png": "d9799490c3e2fe24a52905a80ccf2713292b354d92cd4cd4eb116d92ffd20c02",
     "data/landmarks.json": "d5b43fb77e3ad5c8de2464d8c25d1ca9639a37efcd9b200ee07befb942b4e085",
     "data/pavement.json": "3d8eb1ad0dbf4de04d589eec0f5db9c839242c7c80a6ff2c21f88affe84ef8f9",
     "data/surface.json": "c0fbcf8df2ff73ac5dec213f67978091c57c9019302ef12a77eab9868b967dae",
@@ -15,9 +15,9 @@
     "data/track.json": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
     "scripts/curb_surface.gd": "b2de99aba0dd705d76d11c2541a0bf9484b65e91c04b59e2fdc5b4f2baa72cb4",
     "scripts/offroad_surface.gd": "744a4e65b018e1fca24b5d4bbfd6b41202bc596795d83328a6188315ea2099d9",
-    "scripts/scenery.gd": "40fe0201b9124364d3c3db1656df806fba101b36d94ccb4466498e1f2557419e",
-    "scripts/track.gd": "44219dbfb6ef187369b2a4f0e6afc6c88471b851205a5f7cb305c9c3b68c54cf",
+    "scripts/scenery.gd": "f925fec56011e2eeeb60078123be350feb2bf30902080128ab0b078539b7e8b8",
+    "scripts/track.gd": "25b593239f3acc8d76d9df65b119e305ed807d209b3bbf2a86f562b7fa38f10d",
     "scripts/triangle_ribbon.gd": "16d950de47fc6840aa2a819706a2695fb2746d90de991000fc4cf86f7e642eed",
-    "tools/bake_scenery.gd": "0df65e8fcaa18e262bb12a4f0908de455bd820bf8037516353ba176c65e7b933"
+    "tools/bake_scenery.gd": "86c884f63f881821fa5d41e4d8b861acd0532a5db4fcfd722abdff13b437b5f4"
   }
 }

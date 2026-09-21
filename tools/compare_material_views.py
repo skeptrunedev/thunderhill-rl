@@ -43,7 +43,8 @@ def main():
         sheet = Image.new("RGB", (width * 2 + 36, height + 100), "#14191d")
         draw = ImageDraw.Draw(sheet)
         draw.text((12, 10), pair["label"], fill="white")
-        for index, (side, image) in enumerate(zip(("Video reference", "Game render"), images)):
+        labels = (pair.get("reference_label", "Video reference"), pair.get("game_label", "Game render"))
+        for index, (side, image) in enumerate(zip(labels, images)):
             x = 12 + index * (width + 12)
             draw.text((x, 32), side, fill="#aebeca")
             sheet.paste(image, (x, 54))

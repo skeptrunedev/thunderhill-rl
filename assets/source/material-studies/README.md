@@ -1,5 +1,24 @@
 # Dry cut grass study
 
+## Flattened straw revision
+
+`dry-cut-grass-v2.png` is the current ground and stubble albedo, copied to
+`godot/assets/materials/dry_cut_grass_v2.png`. The built in imagegen tool produced
+1254 by 1254 pixels despite a requested 2048 square. It used the 00:40 video frame
+as appearance reference and v1 as an explicit negative reference. This is an
+original generated material, not a scan or extracted video texture. Its connected
+straw and soil regions remain more readable than v1 at riding height in the
+matched station 400 and 3000 studies. Two metre runtime scale remains an
+appearance estimate. The stronger bundles can expose mirrored repetition; no
+full lap temporal stability claim is made. Luminance derived relief and roughness
+remain artistic estimates. V1 is preserved for comparison.
+
+### Exact revision prompt
+
+Create one original photorealistic game terrain albedo texture, square 2048x2048 pixels. Image 1 is appearance reference only for the dry mown field at Thunderhill East; do not reproduce the scene, viewpoint, motion blur, shadows, pavement or motorcycle. Image 2 is the CURRENT UNSATISFACTORY texture: it resembles wiry curled tangled fibers and evenly distributed speckles. Replace that character with a credible summer California racetrack field surface. Top down orthographic view of an approximately two metre square patch: mostly flattened short dry straw and cut brittle straight grass blades lying in loose irregular overlapping local swaths, interspersed with interconnected compact dusty brown earth openings. Weathered muted beige straw, medium umber dust, a few paler stems, fine irregular plant fragments. Roughly sixty percent straw and forty percent soil, arranged in uneven connected patches, not isolated round tufts. Blade lengths about 2 to 10 centimetres, thin natural widths, clearly resolved against fine soil in the gaps. Broad flattened clumps about 20 to 50 centimetres across with direction varying gradually across the patch. Absolutely no curled curly fibers, moss, hay bales, pebbles, large stones, green growth, roots, weeds, artificial noise, regular stripes or focal object. Flat neutral diffuse lighting suitable for PBR albedo, no directional shadows or highlights, no baked ambient occlusion, no perspective, no horizon. Seamless tileable edge to edge; no text or frame. This is an original artist texture, not a measured scan. Favor photographic surface structure and natural connected patches over uniform fine detail.
+
+## Initial revision
+
 `dry-cut-grass-v1.png` was generated with the built in imagegen tool using the
 Ken Moto video frame at 00:40 as visual reference and the existing CC0 Poly Haven
 Withered Grass albedo as a technical reference. It is an original generated

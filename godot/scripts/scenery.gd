@@ -53,7 +53,7 @@ func _add_cut_grass(mesh: ArrayMesh, random: RandomNumberGenerator) -> void:
 	var material := StandardMaterial3D.new()
 	var tint := ThunderhillTrack.DRY_GROUND_TINT
 	material.albedo_color = Color(tint.x, tint.y, tint.z).linear_to_srgb()
-	material.albedo_texture = load("res://assets/materials/dry_cut_grass_v1.png")
+	material.albedo_texture = load("res://assets/materials/dry_cut_grass_v2.png")
 	material.roughness = 0.95
 	material.backlight_enabled = true
 	material.backlight = Color(0.3, 0.24, 0.15).linear_to_srgb()

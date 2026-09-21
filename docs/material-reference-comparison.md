@@ -361,3 +361,28 @@ strength is zero.** The default was rendered again in
 The study is retained for reproducible comparisons, not presented as a visual
 upgrade. Broad field structure, foreground texture character and matching the
 moving reference camera remain unresolved.
+
+## Flattened straw texture revision
+
+The original generated v2 albedo replaces v1 for both terrain and bent stubble
+ribbons. The exact prompt and reference roles are recorded in
+`assets/source/material-studies/README.md`. Its 1254 square source contains
+larger flattened straw bundles and connected fine earth openings rather than
+the previous nearly uniform tangled mat. Runtime scale remains two metres and
+the existing filtered luminance relief shader is retained. These are original
+appearance estimates, not scans or surveyed straw dimensions.
+
+Matched existing and candidate views at stations 400 and 3000 are in
+`artifacts/grass-v2-400/` and `artifacts/grass-v2-3000/`. The candidate has more
+readable straw patches in the foreground at both locations. It does not resolve
+the distant uniform terrain or the overall scene realism gap. Stronger bundles
+may expose mirrored patterns, so sampled stills are not proof of full lap
+temporal stability. Final production captures are in `artifacts/grass-v2-final/`.
+
+The source and runtime copies have SHA256
+`d9799490c3e2fe24a52905a80ccf2713292b354d92cd4cd4eb116d92ffd20c02`.
+Import is lossless with mipmaps and no size cap. Both scenery manifests were
+rebuilt and serialization checks preserved all 96000 grass instances. Human
+controls passed with zero failures; local Linux frame times were median
+17.049 ms and p95 17.361 ms over 275 frames. This is not native Mac performance
+certification. No contact geometry, physics parameters or agent interface changed.

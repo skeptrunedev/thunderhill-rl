@@ -12,7 +12,7 @@ const SOURCES := [
 	"data/terrain.json",
 	"data/surface.json",
 	"data/landmarks.json",
-	"assets/materials/dry_cut_grass_v1.png",
+	"assets/materials/dry_cut_grass_v2.png",
 	"tools/bake_scenery.gd"
 ]
 

@@ -116,7 +116,7 @@ func _build_terrain() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/terrain.gdshader")
 	mat.set_shader_parameter("ground_tint", DRY_GROUND_TINT)
-	mat.set_shader_parameter("grass_color", load("res://assets/materials/dry_cut_grass_v1.png"))
+	mat.set_shader_parameter("grass_color", load("res://assets/materials/dry_cut_grass_v2.png"))
 	mat.set_shader_parameter("soil_color", load("res://assets/materials/fine_shoulder_v1.png"))
 	var macro: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://assets/materials/terrain_macro.json")
