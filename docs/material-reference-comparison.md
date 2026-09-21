@@ -1014,3 +1014,42 @@ p95 20.555 ms over 266 frames, a local functional check rather than a controlled
 performance comparison. Formatting and whitespace checks passed.
 Mac export passed as `e3e8bfdaad35-462e4875e072`; this export has not been
 executed on the native Mac.
+
+## Asphalt warmth and curb blue comparison
+
+Reference frames 20, 40 and 50 consistently show warm charcoal pavement; the
+rendered road often had a blue gray cast while its white markings remained
+plausibly warm. This supports an isolated material adjustment rather than a
+scene wide white balance correction. `asphalt.gdshader` now applies a linear
+RGB factor derived from `(1.18, 1.04, 0.83)`, normalized by its luminance, to the
+authored pavement albedo. `authored_warmth` blends from identity to that factor
+and defaults to 1. This is a footage guided artistic estimate, not recovered
+spectral reflectance. The normalization avoids an intentional general gain;
+it does not guarantee identical rendered luminance for every colored texel.
+Normals, roughness, texture scale, light direction and geometry are unchanged.
+
+`preview_pavement.gd --asphalt-warmth=1 --frames=2` captures the zero warmth
+baseline against the candidate with production binder and band settings.
+`artifacts/asphalt-warm-charcoal/` contains six pairs at stations 400, 900 and
+3000, with adjacent views separated by 0.5 m. Metadata matches in every field
+except the image name and warmth setting. Root reviewed representative views
+at all three stations; independent review inspected all six pairs and accepted
+the reduced cool cast without conspicuous brown coloration. The grazing
+reflection remains. Foreground grain cannot be calibrated directly from the
+motion blurred footage, so grain scale was not changed in this pass.
+Nonfinite and out of range warmth controls are rejected; formatting passes.
+
+The reference blue curb at frame 50 is darker and less cyan than the current
+render. A second isolated comparison changes `stripe_blue` from the shader's
+sRGB values `(0.0902, 0.3765, 0.6353)` to `(0.1059, 0.2549, 0.4902)`.
+White, wear, concrete texture and geometry remain unchanged. The station 2000
+captures in `artifacts/curb-pigment-baseline/` and `curb-pigment-muted/` have
+identical camera, lighting variants and sky metadata, and both use the accepted
+asphalt warmth. Root and independent review accepted the darker blue against
+frame 50. These are different track views, not a registered pixel match.
+The curb still appears too flat and clean; pigment alone does not solve that.
+No physics, agent actions, contact or reward data changed.
+Human controls passed with zero failures. Local Linux timing was median
+17.361 ms and p95 23.181 ms over 266 frames, not a controlled performance
+comparison. Mac export passed as `a6a29e112206-e0ed16a32984`; this build has
+not been verified running natively on the Mac.

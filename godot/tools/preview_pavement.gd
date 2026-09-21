@@ -12,6 +12,7 @@ func _run() -> void:
 	var output := ""
 	var candidate := ""
 	var surface_variation := -1.0
+	var asphalt_warmth := -1.0
 	var production_baseline := false
 	var binder_mottling := -1.0
 	var edge_paint_width := -1.0
@@ -25,6 +26,18 @@ func _run() -> void:
 	var variation_only := false
 	var offset_m := 0.0
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--asphalt-warmth="):
+			var value := arg.trim_prefix("--asphalt-warmth=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				push_error("Asphalt warmth must be finite and within zero to one")
+				quit(2)
+				return
+			asphalt_warmth = float(value)
 		if arg == "--production-baseline":
 			production_baseline = true
 		if arg.begins_with("--edge-paint-width="):
@@ -99,12 +112,22 @@ func _run() -> void:
 				quit(2)
 				return
 			frames = int(value)
-	if production_baseline and surface_variation < 0.0 and binder_mottling < 0.0:
-		push_error("Production baseline requires a surface variation or binder comparison")
+	if (
+		production_baseline
+		and surface_variation < 0.0
+		and binder_mottling < 0.0
+		and asphalt_warmth < 0.0
+	):
+		push_error("Production baseline requires a surface variation, binder, or warmth comparison")
 		quit(2)
 		return
 	if (
-		(surface_variation >= 0.0 or binder_mottling >= 0.0 or edge_paint_width >= 0.0)
+		(
+			surface_variation >= 0.0
+			or binder_mottling >= 0.0
+			or edge_paint_width >= 0.0
+			or asphalt_warmth >= 0.0
+		)
 		and (
 			not candidate.is_empty()
 			or flat_relief
@@ -122,7 +145,12 @@ func _run() -> void:
 		quit(2)
 		return
 	if (
-		int(binder_mottling >= 0.0) + int(surface_variation >= 0.0) + int(edge_paint_width >= 0.0)
+		(
+			int(binder_mottling >= 0.0)
+			+ int(surface_variation >= 0.0)
+			+ int(edge_paint_width >= 0.0)
+			+ int(asphalt_warmth >= 0.0)
+		)
 		> 1
 	):
 		push_error("Choose one independent material or marking comparison")
@@ -146,6 +174,8 @@ func _run() -> void:
 		labels = ["baseline", "mottling"]
 	if edge_paint_width >= 0.0:
 		labels = ["baseline", "paint"]
+	if asphalt_warmth >= 0.0:
+		labels = ["baseline", "warmth"]
 	var candidate_texture: ImageTexture
 	if not candidate.is_empty():
 		if not candidate.is_absolute_path():
@@ -253,6 +283,19 @@ func _run() -> void:
 			material.set_shader_parameter(
 				"authored_surface", not candidate.is_empty() and strength > 0.0
 			)
+			if asphalt_warmth >= 0.0:
+				material.set_shader_parameter("pavement_tone_strength", 0.0)
+				material.set_shader_parameter("authored_surface", true)
+				for parameter in ["surface_variation_strength", "binder_mottling_strength"]:
+					material.set_shader_parameter(
+						parameter,
+						RenderingServer.shader_get_parameter_default(
+							material.shader.get_rid(), parameter
+						)
+					)
+				material.set_shader_parameter(
+					"authored_warmth", 0.0 if strength == 0.0 else asphalt_warmth
+				)
 			if surface_variation >= 0.0:
 				material.set_shader_parameter("pavement_tone_strength", 0.0)
 				material.set_shader_parameter("authored_surface", true)
@@ -307,6 +350,7 @@ func _run() -> void:
 					),
 					"requested_station_m": view.station,
 					"historical_strength": material.get_shader_parameter("pavement_tone_strength"),
+					"authored_warmth": material.get_shader_parameter("authored_warmth"),
 					"surface_variation_strength":
 					material.get_shader_parameter("surface_variation_strength"),
 					"binder_mottling_strength":

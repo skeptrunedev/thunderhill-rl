@@ -7,6 +7,8 @@ uniform sampler2D rough_map : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform bool authored_surface = false;
 uniform sampler2D authored_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float authored_color_gain = 0.30;
+// Footage guided warm charcoal response, not a measured spectral reflectance.
+uniform float authored_warmth : hint_range(0.0, 1.0) = 1.0;
 uniform float authored_tile_m = 0.8;
 uniform float authored_relief_m = 0.00035;
 // Original broad binder variation, not a surveyed rubber or racing line.
@@ -68,6 +70,9 @@ void fragment() {
         authored = textureGrad(authored_color, authored_uv, authored_dx, authored_dy).rgb;
         ALBEDO = mix(vec3(0.10), authored, 0.70) * authored_color_gain * variation;
         ALBEDO *= mix(0.84, 1.12, broad);
+        vec3 warm_tint = vec3(1.18, 1.04, 0.83);
+        warm_tint /= dot(warm_tint, vec3(0.2126, 0.7152, 0.0722));
+        ALBEDO *= mix(vec3(1.0), warm_tint, authored_warmth);
     } else {
         vec3 aggregate = texture(color_map, detail).rgb;
         // Original generic material remains available for matched comparisons.

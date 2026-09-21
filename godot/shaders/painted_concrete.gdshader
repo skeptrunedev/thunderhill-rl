@@ -14,7 +14,7 @@ uniform sampler2D concrete_normal : hint_normal, filter_linear_mipmap_anisotropi
 uniform sampler2D concrete_roughness : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float concrete_tile_m = 1.2;
 uniform float concrete_normal_depth = 0.16;
-uniform vec3 stripe_blue : source_color = vec3(0.0902, 0.3765, 0.6353);
+uniform vec3 stripe_blue : source_color = vec3(0.1059, 0.2549, 0.4902);
 uniform vec3 stripe_white : source_color = vec3(0.898, 0.898, 0.863);
 varying vec3 world_position;
 
