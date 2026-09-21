@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["numpy==2.4.3", "scipy==1.17.1", "pyproj==3.7.2", "matplotlib==3.10.8"]
 # ///
-"""Compare the experimental road ribbon with pinned historical aerial evidence.
+"""Compare the production or experimental road with pinned historical aerial evidence.
 
 This produces review artifacts, never edits track geometry or claims surveyed
 edges. Run after build_road_surface.py. The plot retains a source-only panel.
@@ -18,17 +18,74 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pyproj.transformer import TransformerGroup
-from pyproj import datadir
-from scipy.spatial import cKDTree
-
 from build_road_surface import evaluate
+from pyproj import datadir
+from pyproj.transformer import TransformerGroup
+from scipy.ndimage import gaussian_filter1d
+from scipy.spatial import cKDTree
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def smooth_plan_candidate(track, start, end, sigma_m):
+    """Local appearance candidate only; original stations and vertical data remain.
+
+    Filter in uniform station space, taper displacement with a C2 weight, and
+    report the actual movement. This does not produce contact or surveyed data.
+    """
+    if not np.isfinite(sigma_m) or sigma_m <= 0 or sigma_m > 20:
+        raise ValueError("Plan smoothing sigma must be positive and at most 20 m")
+    length = float(track["length_m"])
+    if not 0 <= start < end <= length or end - start <= 60:
+        raise ValueError("Plan study requires an interval longer than 60 m")
+    rows = track["samples"]
+    stations = np.array([r["s"] for r in rows])
+    points = np.array([r["p"] for r in rows])[:, [0, 2]]
+    count = int(np.ceil(length / 0.5))
+    step = length / count
+    uniform = np.arange(count) * step
+    dense = np.column_stack(
+        [np.interp(uniform, stations, points[:, i], period=length) for i in range(2)]
+    )
+    filtered = gaussian_filter1d(dense, sigma_m / step, axis=0, mode="wrap")
+    target = np.column_stack(
+        [np.interp(stations, uniform, filtered[:, i], period=length) for i in range(2)]
+    )
+    weight = np.clip(np.minimum(stations - start, end - stations) / 30.0, 0, 1)
+    weight = weight**3 * (weight * (weight * 6 - 15) + 10)
+    candidate = points + (target - points) * weight[:, None]
+    movement = np.linalg.norm(candidate - points, axis=1)
+    selected = (stations >= start) & (stations <= end)
+
+    def heading_change(xz):
+        delta = np.roll(xz, -1, axis=0) - xz
+        before = np.roll(delta, 1, axis=0)
+        return np.degrees(
+            np.arctan2(
+                before[:, 0] * delta[:, 1] - before[:, 1] * delta[:, 0],
+                np.sum(before * delta, axis=1),
+            )
+        )
+
+    return candidate, {
+        "sigma_m": sigma_m,
+        "transition_m": 30.0,
+        "uniform_step_m": step,
+        "maximum_center_displacement_m": float(movement.max()),
+        "maximum_baseline_heading_change_deg": float(
+            np.abs(heading_change(points)[selected]).max()
+        ),
+        "maximum_candidate_heading_change_deg": float(
+            np.abs(heading_change(candidate)[selected]).max()
+        ),
+        "stations_m": stations[selected].tolist(),
+        "candidate_xz_m": candidate[selected].tolist(),
+        "status": "Horizontal study only, not accepted geometry; contact, elevation and dependent assets must be rebuilt before use",
+    }
 
 
 def fit_height_graph(offsets, heights, direction):
@@ -124,6 +181,17 @@ def main():
     parser.add_argument("--start", type=float, default=1750.0)
     parser.add_argument("--end", type=float, default=1880.0)
     parser.add_argument(
+        "--production",
+        action="store_true",
+        help="Audit the shipped piecewise linear center and edge frame",
+    )
+    parser.add_argument(
+        "--plan-smoothing-m",
+        type=float,
+        default=0.0,
+        help="Overlay a local horizontal smoothing study; never modifies game data",
+    )
+    parser.add_argument(
         "--surface",
         type=Path,
         default=ROOT / "artifacts/road-surface/road-surface.json",
@@ -139,12 +207,21 @@ def main():
         help="Acquire openly licensed PROJ datum grids into this project's reference artifacts",
     )
     args = parser.parse_args()
+    if not np.isfinite(args.plan_smoothing_m) or args.plan_smoothing_m < 0:
+        raise ValueError("Plan smoothing must be finite and nonnegative")
+    if args.plan_smoothing_m and not args.production:
+        raise ValueError("Plan smoothing requires --production")
+    if args.output.exists() or args.output.with_suffix(".json").exists():
+        raise FileExistsError("Refusing to overwrite alignment evidence")
     track_path = ROOT / "godot/data/track.json"
     track = json.loads(track_path.read_text())
-    surface = json.loads(args.surface.read_text())
-    if surface["metadata"]["track_sha256"] != digest(track_path):
+    surface = None if args.production else json.loads(args.surface.read_text())
+    if surface is not None and surface["metadata"]["track_sha256"] != digest(
+        track_path
+    ):
         raise ValueError("Surface was generated from a different track")
-    if not 0 <= args.start < args.end <= surface["period_m"]:
+    period = track["length_m"] if args.production else surface["period_m"]
+    if not 0 <= args.start < args.end <= period:
         raise ValueError("Choose an ordered interval within the track period")
     image_path = ROOT / "artifacts/reference/ortho/east-2022.png"
     source_pin = json.loads(
@@ -214,16 +291,40 @@ def main():
     stations = np.linspace(
         args.start, args.end, int(np.ceil((args.end - args.start) / 0.25)) + 1
     )
-    observed_s = [row["s"] for row in track["samples"]] + [surface["period_m"]]
+    observed_s = [row["s"] for row in track["samples"]] + [period]
     widths = np.interp(
         stations,
         observed_s,
         [row["width"] for row in track["samples"]] + [track["samples"][0]["width"]],
     )
     ribbons = {}
+    points = np.array([row["p"] for row in track["samples"]])
+    plan_study = None
+    if args.plan_smoothing_m:
+        candidate, plan_study = smooth_plan_candidate(
+            track, args.start, args.end, args.plan_smoothing_m
+        )
+        points[:, [0, 2]] = candidate
+    tangent = np.roll(points, -1, axis=0) - np.roll(points, 1, axis=0)
+    left = np.column_stack([tangent[:, 2], np.zeros(len(points)), -tangent[:, 0]])
+    left /= np.linalg.norm(left, axis=1)[:, None]
+    sampled_width = np.array([row["width"] for row in track["samples"]])
+    bank = np.tan([row["bank"] for row in track["samples"]])
+
+    def production_points(query, side):
+        offset = side * sampled_width * 0.5
+        edge = points + left * offset[:, None]
+        edge[:, 1] += bank * offset + 0.04
+        edge = np.vstack([edge, edge[0]])
+        return np.column_stack(
+            [np.interp(query, observed_s, edge[:, axis]) for axis in range(3)]
+        )
+
     for name, sign in [("center", 0), ("left", 1), ("right", -1)]:
         ribbons[name] = projected(
-            [
+            production_points(stations, sign)
+            if args.production
+            else [
                 evaluate(surface, s, sign * width / 2)["R"]
                 for s, width in zip(stations, widths)
             ]
@@ -256,7 +357,13 @@ def main():
         ax.set_ylabel("North relative to crop centre (m)")
         ax.set_aspect("equal")
     axes[0].set_title("Historical NAIP, July 2022, no overlay")
-    axes[1].set_title("Experimental ribbon, source alignment audit")
+    axes[1].set_title(
+        "Plan smoothing study"
+        if plan_study
+        else "Production road"
+        if args.production
+        else "Experimental ribbon, source alignment audit"
+    )
     for name, color in [
         ("center", "#ffee32"),
         ("left", "#ff4848"),
@@ -265,7 +372,12 @@ def main():
         xy = ribbons[name] - midpoint
         axes[1].plot(xy[:, 0], xy[:, 1], color=color, linewidth=1.1, label=name)
     for station in np.arange(np.ceil(args.start / 10) * 10, args.end, 10):
-        xy = projected([evaluate(surface, station, 0)["R"]])[0] - midpoint
+        center = (
+            production_points([station], 0)
+            if args.production
+            else [evaluate(surface, station, 0)["R"]]
+        )
+        xy = projected(center)[0] - midpoint
         axes[1].plot(*xy, "o", color="#ffee32", markersize=2)
         axes[1].annotate(
             str(int(station)),
@@ -274,7 +386,7 @@ def main():
             textcoords="offset points",
             fontsize=8,
             color="white",
-            bbox=dict(facecolor="black", alpha=0.45, edgecolor="none", pad=1),
+            bbox={"facecolor": "black", "alpha": 0.45, "edgecolor": "none", "pad": 1},
         )
     axes[1].legend(loc="upper right")
     fig.suptitle(
@@ -285,7 +397,14 @@ def main():
     plt.close(fig)
     report = {
         "track_sha256": digest(track_path),
-        "surface_sha256": digest(args.surface),
+        "geometry": "production piecewise linear edge frame"
+        if args.production
+        else "experimental differentiable ribbon",
+        "plan_study": plan_study,
+        "surface_sha256": None if args.production else digest(args.surface),
+        "track_script_sha256": digest(ROOT / "godot/scripts/track.gd")
+        if args.production
+        else None,
         "aerial_sha256": digest(image_path),
         "station_interval_m": [args.start, args.end],
         "track_crs": "EPSG:6339, from build_track.read_route",
@@ -305,10 +424,11 @@ def main():
         "plot_sha256": digest(args.output),
         "limitations": "Visual registration aid only. Historic color boundaries, source georeferencing and datum operations have uncertainty. No edge measurements accepted automatically.",
     }
-    surface_audit = json.loads(args.surface.with_suffix(".audit.json").read_text())
-    report["lidar_checks"] = lidar_checks(
-        surface, track, surface_audit["curvature_extrema"]
-    )
+    if not args.production:
+        surface_audit = json.loads(args.surface.with_suffix(".audit.json").read_text())
+        report["lidar_checks"] = lidar_checks(
+            surface, track, surface_audit["curvature_extrema"]
+        )
     args.output.with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
 

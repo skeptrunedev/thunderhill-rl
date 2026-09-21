@@ -43,3 +43,42 @@ The circuit's [engineering report](https://www.thunderhill.com/news-from-the-hil
 Use the real DEM for terrain and initial grade, with a local meter origin so Godot never simulates at million meter UTM coordinates. Store the original CRS, origin, vertical datum and import transform. Generate a separately controllable road surface over that terrain. Preserve both course branches until video confirmation. Derive road width, camber and curb placement from stronger evidence before labeling the game geometrically validated. Smooth rendering and simplified collision meshes must not silently erase the elevation profile.
 
 For the playable section, this evidence is enough to build recognizably correct terrain rather than invented hills. Hyperrealistic tire contact, curb response, surface grip and current track limits remain unvalidated and need explicit calibration.
+
+## Turn 2 polygonal source path audit
+
+The current rider view at station 950 shows a sharp left edge corner. The
+production centerline changes heading by 6.838 degrees at station 976.173.
+Width is exactly 12 m throughout stations 850 to 1150, so a width interpolation
+change cannot explain this corner. Independent inspection connects this to
+a 10.045 degree raw OSM vertex near source station 975.204. The current
+1 m Gaussian smoothing sigma leaves long source chords with short transitions.
+Subdividing those straight segments would preserve the visible kink.
+
+`tools/audit_road_alignment.py --production` now overlays the actual shipped
+piecewise linear center and edge frame, using the same horizontal normal
+construction as `track.gd`, rather than requiring an experimental differentiable
+surface. It retains a source only aerial panel and datum provenance. The CLI
+refuses to overwrite existing image or report evidence.
+
+The audit at stations 900 to 1320 is in
+`artifacts/turn2-production-alignment.png`. Root inspected the historical
+image and overlay: the path is visibly polygonal and its edges do not precisely
+follow the historical pavement envelope. The outside exit width discrepancy
+previously identified by the curb review remains unresolved.
+
+`--plan-smoothing-m=9` creates a horizontal candidate without editing game data.
+It filters uniformly spaced station samples and tapers displacement to zero
+with a quintic weight over 30 m at both interval ends. The reviewed candidate
+in `artifacts/turn2-plan-smoothing9.png` moves the center at most 0.645 m and
+reduces the interval's maximum heading jump from 7.711 to 2.035 degrees. This
+exceeds the original source smoothing tolerance, so it is explicitly a new
+reconstruction study, not a silent adjustment to the source constraints.
+
+`data/reference/turn2-plan-study.json` preserves the candidate coordinates,
+original station labels, source hashes and integration requirements. It is
+not runtime geometry. A visually smooth curve is not proof of correct road
+boundaries. Any adoption must refit lidar heights and bank and rebuild shared
+pavement, terrain interface, contact and dependent placements together.
+Five analytical tests pass, including local smoothing on a nonuniform sampled
+closed path, exact preservation outside its interval, source immutability,
+invalid parameter rejection and the existing lidar curvature checks.
