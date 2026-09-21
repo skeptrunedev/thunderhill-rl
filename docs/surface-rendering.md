@@ -329,3 +329,42 @@ ground remains smooth and the paddock buildings and vegetation still look
 simplified. This is not photographic appearance acceptance. Evidence is local
 in `artifacts/terrain-detail-after.png`, `artifacts/terrain-detail-straight.png`
 and `artifacts/terrain-detail-human.log`.
+
+## Preserve detail before clamping aerial gains
+
+`terrain_detail_gains` previously called `terrain_gains` twice with its macro
+output clamp enabled, then divided those clipped fine and broad fields. Where
+both reached the same bound, real differences became a neutral ratio of one.
+A synthetic accepted bright field with a darker stripe reproduced this exactly.
+The same failure occurs for brighter detail inside a dark field.
+
+The builder now forms the fine to broad ratio from the unclamped normalized
+convolutions, then applies the existing 0.75 through 1.25 detail bounds. Broad
+terrain output still uses its original 0.6 through 1.4 limits. A new regression
+checks signed stripe contrast within both saturated cases; all nine terrain
+color tests pass. Restoring the old clipping behavior makes both new subcases
+fail. Source classification, registration, convolution scales, shoulder
+coverage and output dimensions are unchanged.
+
+A candidate build was generated with the new `--output-dir` option in
+`artifacts/unclamped-aerial-detail/`. Its broad PNG hash is byte identical to
+production. Root compared the output detail maps: alpha is byte identical,
+10.5971 percent of RGB pixels change in at least one channel, maximum encoded
+channel difference is 32 and mean absolute channel difference is 0.332831.
+These are data texture statistics, not screen appearance improvements.
+
+`preview_grass_material.gd --candidate-detail-map` validates a candidate image's
+hash, dimensions and registration metadata before comparing it with production.
+It records the candidate path and hash and rejects simultaneous candidate
+changes. Two poses each at stations 1065 and 400 are in
+`artifacts/aerial-ratio-turn2/` and `artifacts/aerial-ratio-straight/`.
+Root inspected the rendered pairs: the visual difference is subtle, with no
+obvious seam or new color artifact. This corrects lost source detail, but is
+not the main explanation for uniform fields. The corrected fine map and its
+metadata are adopted; the broad map remains byte identical. Historical source
+lighting, incomplete vegetation structure and distant terrain uniformity remain
+limitations. No contact geometry, friction or agent control changes were made.
+Mac export passed as `91ca01c311bf-cf464a663cb5`. After import, the cached
+texture source digest matches the adopted PNG. The rendered human check then
+passed with zero failures (Linux median 17.347 ms, p95 19.697 ms, 268 frames).
+Native Mac execution and full lap visual acceptance remain unverified.

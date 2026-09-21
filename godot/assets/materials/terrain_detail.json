@@ -106,9 +106,9 @@
       ]
     }
   },
-  "algorithm": "Accepted tan pixels only; ratio of fine to broad normalized convolution gains; same datum transform and 4 by 4 quadrature as macro. Alpha uses smoothstep of exact horizontal distance to surface road ring segments at output pixel centers.",
+  "algorithm": "Accepted tan pixels only; ratio of unclamped fine to broad normalized convolution gains, then clamp detail ratio to 0.75 through 1.25; same datum transform and 4 by 4 quadrature as macro. Alpha uses smoothstep of exact horizontal distance to surface road ring segments at output pixel centers.",
   "encoding": "RGBA8 linear data; RGB decodes as texture.rgb * 2.0; alpha is visual dry grass coverage (0 soil, 1 grass). No sRGB conversion.",
-  "output_sha256": "299f344f58dee97b118b5235409c4a4f5c65fb3c48fb20a7e6ecf18c2e999e6d",
+  "output_sha256": "7f53efd904a1f91d9d2201e54e5d98917cc3445ddb52633c1ee4b2e91e99beb0",
   "limitations": [
     "Historical July 2022 appearance predates repave",
     "Color selection is not a reviewed semantic terrain mask; tan objects and weak shadows may survive",

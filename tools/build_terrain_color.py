@@ -11,6 +11,7 @@ Rejected pixels never contribute their color to the normalized convolution.
 Regions without nearby accepted pixels converge to the accepted terrain median.
 """
 
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -62,7 +63,7 @@ def dry_terrain_mask(rgb):
     )
 
 
-def terrain_gains(rgb, pixel_m, smoothing_sigma_m=6.0):
+def terrain_gains(rgb, pixel_m, smoothing_sigma_m=6.0, *, clip_gains=True):
     if rgb.ndim != 3 or rgb.shape[2] != 3 or not np.isfinite(rgb).all():
         raise ValueError("Expected finite RGB image")
     if np.min(rgb) < 0 or np.max(rgb) > 1 or min(pixel_m) <= 0:
@@ -93,14 +94,18 @@ def terrain_gains(rgb, pixel_m, smoothing_sigma_m=6.0):
         ],
         axis=-1,
     )
-    gains = np.clip(smooth / median, *SETTINGS["gain_range"])
+    gains = smooth / median
+    if clip_gains:
+        gains = np.clip(gains, *SETTINGS["gain_range"])
     return gains, valid, median
 
 
 def terrain_detail_gains(rgb, pixel_m):
     """Retain accepted aerial detail relative to the existing broad color layer."""
-    broad, _, _ = terrain_gains(rgb, pixel_m)
-    fine, _, _ = terrain_gains(rgb, pixel_m, smoothing_sigma_m=0.6)
+    # Form the ratio before output clamping. Clamping both components first
+    # destroys variations where an entire light or dark region saturates.
+    broad, _, _ = terrain_gains(rgb, pixel_m, clip_gains=False)
+    fine, _, _ = terrain_gains(rgb, pixel_m, smoothing_sigma_m=0.6, clip_gains=False)
     return np.clip(fine / broad, 0.75, 1.25)
 
 
@@ -206,7 +211,7 @@ def resample_local_gains(
     return result / samples**2
 
 
-def build():
+def build(output_dir=ROOT / "godot/assets/materials"):
     source_dir = ROOT / "artifacts/reference/ortho"
     source = source_dir / "east-2022.png"
     if sha256(source) != SOURCE_HASH:
@@ -235,7 +240,7 @@ def build():
         gains, extent, origin, transform, lower, local_size, (width, height)
     )
     encoded = np.rint(np.clip(reduced * 0.5, 0, 1) * 255).astype(np.uint8)
-    output_dir = ROOT / "godot/assets/materials"
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     output = output_dir / "terrain_macro.png"
     Image.fromarray(encoded).save(output)
@@ -308,7 +313,7 @@ def build():
             "target_output_pixel_m": 1.0,
             "color_filter": SETTINGS,
         },
-        "algorithm": "Accepted tan pixels only; ratio of fine to broad normalized convolution gains; same datum transform and 4 by 4 quadrature as macro. Alpha uses smoothstep of exact horizontal distance to surface road ring segments at output pixel centers.",
+        "algorithm": "Accepted tan pixels only; ratio of unclamped fine to broad normalized convolution gains, then clamp detail ratio to 0.75 through 1.25; same datum transform and 4 by 4 quadrature as macro. Alpha uses smoothstep of exact horizontal distance to surface road ring segments at output pixel centers.",
         "encoding": "RGBA8 linear data; RGB decodes as texture.rgb * 2.0; alpha is visual dry grass coverage (0 soil, 1 grass). No sRGB conversion.",
         "output_sha256": sha256(detail_path),
         "limitations": metadata["limitations"] + [
@@ -333,4 +338,6 @@ def build():
 
 
 if __name__ == "__main__":
-    build()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, default=ROOT / "godot/assets/materials")
+    build(parser.parse_args().output_dir)

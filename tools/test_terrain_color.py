@@ -105,6 +105,28 @@ class TerrainColorTests(unittest.TestCase):
         self.assertGreaterEqual(detail.min(), 0.75)
         self.assertLessEqual(detail.max(), 1.25)
 
+    def test_detail_survives_bright_and_dark_macro_saturation(self):
+        # The majority neutral field anchors the median. Far inside each other
+        # field, its broad and fine absolute gains both exceed the same macro
+        # limit. A small stripe must still retain relative local contrast.
+        for field_gain, stripe_gain, direction in (
+            (1.3, 0.95, -1),
+            (0.65, 1.05, 1),
+        ):
+            with self.subTest(field_gain=field_gain):
+                image = np.full((160, 400, 3), [0.55, 0.48, 0.37])
+                image[:, 240:] *= field_gain
+                image[:, 310:315] *= stripe_gain
+                self.assertTrue(dry_terrain_mask(image).all())
+                macro, _, _ = terrain_gains(image, (1, 1))
+                limit = 1.4 if field_gain > 1 else 0.6
+                np.testing.assert_allclose(macro[80, 312], limit)
+                detail = terrain_detail_gains(image, (1, 1))
+                self.assertTrue(np.all(direction * (detail[80, 312] - 1) > 0.05))
+                np.testing.assert_allclose(detail[80, 370], 1, atol=1e-12)
+                self.assertGreaterEqual(detail.min(), 0.75)
+                self.assertLessEqual(detail.max(), 1.25)
+
     def test_shoulder_distance_and_pixel_center_mapping(self):
         # Rectangle right edge is x=0, well away from the other three edges.
         ring = [[-20, -20], [0, -20], [0, 20], [-20, 20]]

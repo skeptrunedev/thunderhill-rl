@@ -31,10 +31,13 @@ func _run() -> void:
 	var candidate_field_relief := -1.0
 	var candidate_straw_swaths := -1.0
 	var candidate_height_blend := -1.0
+	var candidate_detail_path := ""
 	var candidate_coverage_path := ""
 	var candidate_coverage: FieldCoverage
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--candidate-height-blend="):
+		if arg.begins_with("--candidate-detail-map="):
+			candidate_detail_path = arg.trim_prefix("--candidate-detail-map=")
+		elif arg.begins_with("--candidate-height-blend="):
 			var value := arg.trim_prefix("--candidate-height-blend=")
 			if (
 				not value.is_valid_float()
@@ -213,6 +216,23 @@ func _run() -> void:
 		elif arg.begins_with("--candidate="):
 			candidate = arg.trim_prefix("--candidate=")
 	if (
+		not candidate_detail_path.is_empty()
+		and (
+			not candidate_detail_path.is_absolute_path()
+			or not candidate.is_empty()
+			or not candidate_coverage_path.is_empty()
+			or candidate_field_relief >= 0.0
+			or compare_fields
+			or not stubble_shader_path.is_empty()
+			or candidate_grass_rotation >= 0.0
+			or candidate_scale_spread >= 0.0
+			or candidate_straw_swaths >= 0.0
+			or candidate_height_blend >= 0.0
+		)
+	):
+		_fail("Detail map comparison requires an absolute path and no other candidate changes")
+		return
+	if (
 		candidate_height_blend >= 0.0
 		and (
 			not candidate.is_empty()
@@ -290,6 +310,7 @@ func _run() -> void:
 		or (
 			candidate_field_relief < 0.0
 			and candidate_height_blend < 0.0
+			and candidate_detail_path.is_empty()
 			and candidate_straw_swaths < 0.0
 			and candidate_coverage_path.is_empty()
 			and not compare_fields
@@ -429,6 +450,47 @@ func _run() -> void:
 	var original_scale_spread: float = RenderingServer.shader_get_parameter_default(
 		material.shader.get_rid(), "grass_scale_spread"
 	)
+	var original_detail: Texture2D = material.get_shader_parameter("terrain_detail")
+	var candidate_detail: ImageTexture
+	if not candidate_detail_path.is_empty():
+		var candidate_metadata: Variant = JSON.parse_string(
+			FileAccess.get_file_as_string(candidate_detail_path.get_basename() + ".json")
+		)
+		var production_metadata: Dictionary = JSON.parse_string(
+			FileAccess.get_file_as_string("res://assets/materials/terrain_detail.json")
+		)
+		if (
+			not candidate_metadata is Dictionary
+			or (
+				candidate_metadata.get("output_sha256")
+				!= FileAccess.get_sha256(candidate_detail_path)
+			)
+		):
+			_fail("Detail map metadata or image hash mismatch")
+			return
+		for key in [
+			"local_origin_xz",
+			"local_size_xz",
+			"output_dimensions",
+			"track_sha256",
+			"surface_sha256",
+			"encoding"
+		]:
+			if candidate_metadata.get(key) != production_metadata.get(key):
+				_fail("Detail map registration differs: " + key)
+				return
+		var detail_image := Image.load_from_file(candidate_detail_path)
+		if (
+			detail_image == null
+			or (
+				detail_image.get_size()
+				!= Vector2i(original_detail.get_width(), original_detail.get_height())
+			)
+			or detail_image.generate_mipmaps() != OK
+		):
+			_fail("Invalid detail map dimensions or mipmaps")
+			return
+		candidate_detail = ImageTexture.create_from_image(detail_image)
 	var samples: Array = []
 	for index in frames:
 		var pose := position + forward * (0.30 * index)
@@ -436,6 +498,14 @@ func _run() -> void:
 		game.camera.global_position = pose
 		game.camera.look_at(pose + target - position)
 		for name: String in ["existing", "candidate"]:
+			material.set_shader_parameter(
+				"terrain_detail",
+				(
+					candidate_detail
+					if name == "candidate" and candidate_detail != null
+					else original_detail
+				)
+			)
 			for item in stubble_materials:
 				item.mesh.surface_set_material(
 					item.surface, item.original if name == "existing" else item.candidate
@@ -538,6 +608,13 @@ func _run() -> void:
 							),
 							"candidate_field_relief_m": candidate_field_relief,
 							"candidate_height_blend": candidate_height_blend,
+							"candidate_detail_map": candidate_detail_path,
+							"candidate_detail_map_sha256":
+							(
+								""
+								if candidate_detail_path.is_empty()
+								else FileAccess.get_sha256(candidate_detail_path)
+							),
 							"candidate_straw_swaths": candidate_straw_swaths,
 							"existing_grass_relief_m": original_grass_relief,
 							"candidate_grass_relief_m":
