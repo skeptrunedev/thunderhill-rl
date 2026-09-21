@@ -18,6 +18,7 @@ func _run() -> void:
 	var ground_study_metadata := {}
 	var sky_source := ""
 	var solar_haze := 0.0
+	var solar_haze_broad := false
 	var sky_patch_path := ""
 	var sky_patch_off := false
 	var sky_secondary_off := false
@@ -46,6 +47,7 @@ func _run() -> void:
 	var production_only := false
 	var sky_yaw := 0.0
 	var sun_azimuth := NAN
+	var sun_elevation := NAN
 	var cloud_gain := NAN
 	var authored_yaw := NAN
 	var minimum_elevation := -90.0
@@ -54,7 +56,9 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--solar-haze="):
+		if arg == "--solar-haze-broad":
+			solar_haze_broad = true
+		elif arg.begins_with("--solar-haze="):
 			var value := arg.trim_prefix("--solar-haze=")
 			if (
 				not value.is_valid_float()
@@ -65,6 +69,17 @@ func _run() -> void:
 				_fail("Solar haze must be finite and within zero to eight")
 				return
 			solar_haze = float(value)
+		elif arg.begins_with("--sun-elevation-deg="):
+			var value := arg.trim_prefix("--sun-elevation-deg=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) <= 0.0
+				or float(value) >= 90.0
+			):
+				_fail("Sun elevation must be finite and strictly between zero and 90 degrees")
+				return
+			sun_elevation = float(value)
 		elif arg.begins_with("--sun-azimuth-deg="):
 			var value := arg.trim_prefix("--sun-azimuth-deg=")
 			if (
@@ -718,7 +733,16 @@ func _run() -> void:
 		sun.look_at(
 			-Vector3(sin(azimuth) * horizontal, toward.y, -cos(azimuth) * horizontal), Vector3.UP
 		)
+	if is_finite(sun_elevation):
+		var toward := sun.global_basis.z.normalized()
+		var azimuth := atan2(toward.x, -toward.z)
+		var elevation := deg_to_rad(sun_elevation)
+		sun.look_at(
+			-Vector3(sin(azimuth) * cos(elevation), sin(elevation), -cos(azimuth) * cos(elevation)),
+			Vector3.UP
+		)
 	environment.sky.sky_material.set_shader_parameter("solar_haze_strength", solar_haze)
+	environment.sky.sky_material.set_shader_parameter("solar_haze_broad", solar_haze_broad)
 	environment.sky.sky_material.set_shader_parameter(
 		"solar_haze_direction", sun.global_basis.z.normalized()
 	)
@@ -765,6 +789,9 @@ func _run() -> void:
 						{
 							"orchard_study": orchard_metadata,
 							"solar_haze_strength": solar_haze,
+							"solar_haze_broad": solar_haze_broad,
+							"direct_sun_elevation_override_deg":
+							sun_elevation if is_finite(sun_elevation) else null,
 							"sun_projection_pixels": [projected_sun.x, projected_sun.y],
 							"sun_projection_in_front": sun_in_front,
 							"asphalt_study": asphalt_study,

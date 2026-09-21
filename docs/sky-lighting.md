@@ -361,3 +361,39 @@ The projection describes a direction, not actual raster visibility or occlusion.
 Editor import and the real Vulkan preview completed successfully. Formatter
 and whitespace checks passed. This experiment does not change physics, agent
 observations, or the default sky appearance.
+
+## Solar elevation and broad glow trials
+
+The preview accepts `--sun-elevation-deg` strictly between zero and 90 degrees.
+It preserves azimuth and records the override separately from the resulting
+light vector and camera projection. At station 850, elevation 25 degrees puts
+the projected sun at (671.86, 16.09), compared with (682.89, -472.21) at the
+existing 47.90 degrees. The reference frame 30 bright region is near the image
+top, but cloud scattering and clipping prevent identifying it as the solar disk.
+
+Lowering the sun produces a much stronger, concentrated road reflection even
+with haze disabled (`artifacts/solar-elevation25-control`). The narrow haze at
+strengths three and eight still leaves a localized bright cloud region. The
+optional `--solar-haze-broad` uses a wider angular lobe and a larger clear sky
+contribution. Broad eight loses too much cloud structure. Broad four retains
+more detail but still makes a conspicuous bright area and does not resolve the
+road hotspot. The existing sun elevation with broad four avoids that hotspot,
+but does not reproduce the reference sky distribution. None is promoted.
+
+The shader's broad option defaults false; haze strength still defaults zero.
+This is original appearance authoring, not physical atmospheric calibration.
+
+Independent review identified the upright rider shadow at video frame 50 as
+a more useful constraint than the bright cloud. Station 1450 was too far into
+the following turn to provide comparable framing. Station 1350 has a more
+appropriate straight heading and buildings ahead. In matched game captures,
+25 degrees puts the helmet shadow farther up the road; 47.90 places it behind
+the visible cockpit. The reference has a visible helmet shadow but a distinctly
+lower cockpit in the frame. Camera pitch, lens, rider posture and precise station
+remain unknown, so this does not establish either elevation.
+
+The next calibration should constrain horizon, cockpit framing and rider shadow
+together. Do not infer solar elevation from bloom alone or alter rider dimensions
+solely to force a shadow match. Comparison sheets are in
+`artifacts/solar-elevation-comparison`; source trial names and metadata preserve
+each independent change. Real Vulkan captures and formatter checks passed.

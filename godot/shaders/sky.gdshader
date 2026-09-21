@@ -7,6 +7,8 @@ uniform float panorama_energy = 1.0;
 // Original circumsolar brightness study, not measured atmospheric scattering.
 // Shared by visible sky and environment lighting to preserve their agreement.
 uniform float solar_haze_strength : hint_range(0.0, 8.0) = 0.0;
+// Wider forward scattering appearance trial, not a recovered atmospheric model.
+uniform bool solar_haze_broad = false;
 uniform vec3 solar_haze_direction = vec3(0.0, 1.0, 0.0);
 // Artistic cloud radiance reconstruction for the authored LDR panorama.
 // One is unchanged; this is not a measured HDR conversion.
@@ -116,9 +118,9 @@ void sky() {
     COLOR *= panorama_energy * mix(1.0, cloud_radiance_gain, cloud);
     if (solar_haze_strength > 0.0) {
         float toward = max(dot(direction, normalize(solar_haze_direction)), 0.0);
-        float haze = pow(toward, 64.0) + 0.25 * pow(toward, 8.0);
+        float haze = pow(toward, 64.0) + (solar_haze_broad ? 0.5 * pow(toward, 4.0) : 0.25 * pow(toward, 8.0));
         haze *= smoothstep(-0.02, 0.08, direction.y);
-        COLOR += vec3(1.0, 0.96, 0.90) * solar_haze_strength * haze * mix(0.35, 1.0, cloud);
+        COLOR += vec3(1.0, 0.96, 0.90) * solar_haze_strength * haze * mix(solar_haze_broad ? 0.75 : 0.35, 1.0, cloud);
     }
     if (AT_CUBEMAP_PASS) {
         if (use_ground_radiance) {
