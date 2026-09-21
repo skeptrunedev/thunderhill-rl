@@ -1062,6 +1062,7 @@ func _build_provenance() -> Dictionary:
 		"rider_glove",
 		"rider_arm_visual",
 		"curb_surface",
+		"curb_placement",
 		"triangle_ribbon"
 	]:
 		var path: String = "res://scripts/" + source + ".gd"
@@ -1077,6 +1078,7 @@ func _build_provenance() -> Dictionary:
 		"instrument_screen_sha256":
 		FileAccess.get_sha256("res://shaders/instrument_screen.gdshader"),
 		"pavement_sha256": FileAccess.get_sha256("res://data/pavement.json"),
+		"curb_placement_sha256": FileAccess.get_sha256("res://data/curb-placement.json"),
 		"track_script_sha256": FileAccess.get_sha256("res://scripts/track.gd"),
 		"envelope_script_sha256": FileAccess.get_sha256("res://scripts/bike_collision_envelope.gd"),
 		"sweep_script_sha256": FileAccess.get_sha256("res://scripts/bike_sweep.gd")

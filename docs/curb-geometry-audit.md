@@ -1,11 +1,12 @@
 # Curb placement and contact audit
 
-The current curvature rule is provisional and unsuitable as a reconstruction of
-observed curb locations. On the current track it produces 112 disconnected runs,
+The original curvature rule was provisional and unsuitable as a reconstruction of
+observed curb locations. On the track baseline it produced 112 disconnected runs,
 many only one or two road segments long. This fragmentation follows local
 curvature variation, not reviewed paint or construction boundaries.
 
-`uv run tools/audit_curbs.py` overlays the existing 0.9 m wide footprint on the
+`uv run tools/audit_curbs.py` now overlays the explicit placement manifest and its
+existing 0.9 m wide footprint on the
 pinned 2022 NAIP image. It reproduces the horizontal centered tangent frame from
 `track.gd`, then applies the verified EPSG:6339 to EPSG:26910 datum operation.
 The output report records source hashes, datum grid hashes, station bounds and
@@ -47,9 +48,54 @@ Placement, width and profile remain provisional. This change preserves the
 existing visible curb geometry and does not certify it against surveyed curbs.
 Motorcycle friction now selects separate configurable curb coefficients for
 exposed curbs, independently of `on_track`. Those coefficients remain uncalibrated
-dry pavement estimates, as documented in `dynamics-implementation.md`. Reviewed station intervals
-must replace the curvature rule before claiming an accurate reconstruction.
+dry pavement estimates, as documented in `dynamics-implementation.md`. Reviewed placement across the remaining circuit is still required before claiming
+an accurate reconstruction.
 
 Evidence is in `artifacts/curb-audit/report.json`, `overview.png`, the numbered
 paired crops, `contact-before.json`, and
 `artifacts/curb-track-contact-check.log`.
+
+## Turn 2 reference correction
+
+Root and independent inspection of the pinned aerial crop
+`[1100,1640,1720,2130]` and onboard frame 00:40 show a continuous white edge line
+and earth shoulder on the inside of Turn 2, without the game's scattered blue
+and white fragments. `data/reference/turn2-curb-review.json` records the source
+hashes, observations and reviewed removals. C08 through C30 are removed: 23 runs,
+36 road segments, or 72 rendered triangles. This is a correction to visible
+construction, not evidence about buried concrete.
+
+`godot/data/curb-placement.json` replaces runtime curvature driven spawning.
+Its remaining 89 runs preserve the original 261 segment indices, sides and
+profile exactly. All those retained runs are explicitly marked unreviewed and
+provisional. The loader rejects mismatched track hashes, duplicate identifiers,
+overlapping placements, invalid indices and nonfinite profile values. Rendering
+and contact continue to share the same triangle stream. Development recordings
+now include the placement data and helper hashes; both scenery bakes pin them.
+The audit CLI reads this same manifest, writes a separate output directory and
+refuses to overwrite an existing report.
+
+The outside exit curb is visible in the aerial and frame 00:50, around stations
+1268 to 1317 m. Root independently verified the pixel to track projection.
+Its historical center lies approximately 4.7 to 5.3 m right of the centerline,
+where the current road edge is 6 m right. It has not been added at an incorrect
+road edge. This width alignment conflict remains unresolved. Neither the curb
+height nor its width can be established reliably from 0.6 m pixels.
+
+The placement test verifies every segment and side against the preserved baseline
+with only the reviewed inner arc removed. Integrated contact checks pass for
+54,520 pavement interior samples, 35,156 pavement boundary samples and 2,088
+remaining curb samples. Maximum curb height discrepancy is 0.000003709 m.
+All 36 removed segment footprints return no curb geometry or curb contact.
+These are internal rendering/contact agreement checks, not survey accuracy.
+
+Both scenery bakes and the rendered rider camera attachment check pass.
+Root inspected `artifacts/turn2-curb-corrected/existing.png`; the unsupported
+fragments are absent. `artifacts/turn2-curb-comparison/` compares it with the
+previous view from the same station and camera. The track's remaining curb
+inventory and overall visual fidelity are unfinished.
+
+Human controls pass with zero failures. Local Linux timing was median 17.305 ms
+and p95 19.698 ms over 264 frames, not native Mac performance certification.
+Mac export passed as `18d1c645ab4f-524bc1616c78`. Tailscale reports the MacBook
+offline; native execution of this build remains unverified.

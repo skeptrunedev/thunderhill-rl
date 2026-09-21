@@ -15,6 +15,7 @@ var offroad_surface := preload("res://scripts/offroad_surface.gd").new()
 var field_coverage := preload("res://scripts/field_coverage.gd").new()
 var pavement_surface := preload("res://scripts/triangle_ribbon.gd").new()
 var curb_surface := preload("res://scripts/curb_surface.gd").new()
+var curb_placement := preload("res://scripts/curb_placement.gd").new()
 const CELL: float = 25.0
 const ROAD_LIFT: float = 0.04
 ## Appearance estimate from onboard footage, not a surveyed stripe dimension.
@@ -260,6 +261,15 @@ func _build_road() -> void:
 		push_error(initialization_error)
 		get_tree().quit(2)
 		return
+	initialization_error = curb_placement.configure(
+		JSON.parse_string(FileAccess.get_file_as_string("res://data/curb-placement.json")),
+		FileAccess.get_sha256("res://data/track.json"),
+		points.size()
+	)
+	if not initialization_error.is_empty():
+		push_error(initialization_error)
+		get_tree().quit(2)
+		return
 	curb_surface.clear()
 	for i in points.size():
 		var j: int = (i + 1) % points.size()
@@ -268,19 +278,20 @@ func _build_road() -> void:
 		var s: float = samples[i].s
 		var sj: float = samples[j].s if j > 0 else length_m
 		for side in [-1.0, 1.0]:
-			# Provisional curb placement follows curvature. Real profile and placement remain editable.
-			if (
-				absf(float(samples[i].curvature)) > 0.012
-				and side * float(samples[i].curvature) > 0.0
-			):
+			# Explicit reviewed/provisional placement replaces curvature driven spawning.
+			if curb_placement.has_segment(i, int(side)):
 				var error: String = curb_surface.add_quad(
-					edge_point(i, side * w, 0.05),
-					edge_point(i, side * (w + 0.9), 0.11),
-					edge_point(j, side * (wj + 0.9), 0.11),
-					edge_point(j, side * wj, 0.05),
+					edge_point(i, side * w, curb_placement.inner_height_m),
+					edge_point(
+						i, side * (w + curb_placement.width_m), curb_placement.outer_height_m
+					),
+					edge_point(
+						j, side * (wj + curb_placement.width_m), curb_placement.outer_height_m
+					),
+					edge_point(j, side * wj, curb_placement.inner_height_m),
 					Vector2(0.0, s),
-					Vector2(0.9, s),
-					Vector2(0.9, sj),
+					Vector2(curb_placement.width_m, s),
+					Vector2(curb_placement.width_m, sj),
 					Vector2(0.0, sj)
 				)
 				if not error.is_empty():

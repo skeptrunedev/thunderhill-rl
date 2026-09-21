@@ -98,6 +98,7 @@ func run():
 	)
 	_test_rendered_pavement(track)
 	_test_rendered_curbs(track)
+	_test_removed_t2_curbs(track)
 	track.queue_free()
 	quit(failures)
 
@@ -115,7 +116,7 @@ func _test_rendered_curbs(track: Node3D) -> void:
 	if indices.is_empty():
 		for index in vertices.size():
 			indices.append(index)
-	check(indices.size() == 594 * 3, "Historical fixture covers all 594 curb triangles")
+	check(indices.size() == 522 * 3, "Reviewed fixture covers all 522 remaining curb triangles")
 	var count := 0
 	var ground_above := 0
 	var curb_flags := 0
@@ -169,7 +170,7 @@ func _test_rendered_curbs(track: Node3D) -> void:
 						"Covered curb leaks triangle identity: " + label
 					)
 			count += 1
-	check(count == 2376, "Every curb triangle supplies four contact samples")
+	check(count == 2088, "Every curb triangle supplies four contact samples")
 	check(curb_flags > 0 and ground_above > 0, "Both exposed and ground covered curbs exercised")
 	print(
 		"CURB_TRACK_CONTACT samples=",
@@ -284,3 +285,23 @@ func _test_rendered_pavement(track: Node3D) -> void:
 		" failures=",
 		failures
 	)
+
+
+func _test_removed_t2_curbs(track: Node3D) -> void:
+	var count := 0
+	for index in range(324, 416):
+		if float(track.samples[index].curvature) <= 0.012:
+			continue
+		var next := index + 1
+		var a: Vector3 = track.edge_point(
+			index, float(track.samples[index].width) * 0.5 + 0.45, 0.08
+		)
+		var b: Vector3 = track.edge_point(next, float(track.samples[next].width) * 0.5 + 0.45, 0.08)
+		var point := (a + b) * 0.5
+		check(
+			track.curb_surface.sample(point).is_empty(), "Removed T2 curb still supplies geometry"
+		)
+		check(not track.sample_world(point).on_curb, "Removed T2 curb still affects contact")
+		count += 1
+	check(count == 36, "All removed curb segment footprints tested")
+	print("REMOVED_T2_CURB_CONTACT samples=", count, " failures=", failures)

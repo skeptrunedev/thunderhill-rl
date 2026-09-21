@@ -1,26 +1,28 @@
 {
-  "build_ms": 12192.656,
+  "build_ms": 12175.029,
   "geometry_sha256": "1f506d4beca99d5beb2650d1c432323af417bf1e00c031c225b1eed051d393ea",
   "godot_version": "4.7.2-stable (official)",
   "grass_instances": 96000,
-  "load_ms": 37.788,
-  "scene_sha256": "b3bc020e4db96fbbd2c75be8aa4331e1140069c31fb21e081e10d10141f43424",
+  "load_ms": 34.354,
+  "scene_sha256": "c3a6d50a2ef3771a093b41204e60c95db8a4136e40d25264d361096194fa8f41",
   "schema_version": 1,
   "sources": {
     "assets/materials/dry_cut_grass_v2.png": "d9799490c3e2fe24a52905a80ccf2713292b354d92cd4cd4eb116d92ffd20c02",
+    "data/curb-placement.json": "2da692adfa60a5658901fe83b3add16ee2a4b724291496b350e6c1292c40b388",
     "data/field-coverage.json": "2ebfc7b0361c5f420cfd3c467ed9b3f9c7b445742865c2e5512488b5683fe4c2",
     "data/landmarks.json": "d5b43fb77e3ad5c8de2464d8c25d1ca9639a37efcd9b200ee07befb942b4e085",
     "data/pavement.json": "3d8eb1ad0dbf4de04d589eec0f5db9c839242c7c80a6ff2c21f88affe84ef8f9",
     "data/surface.json": "c0fbcf8df2ff73ac5dec213f67978091c57c9019302ef12a77eab9868b967dae",
     "data/terrain.json": "c643f764f23253de59b1417ac0ab803604d47acbd0c70bb173fc455a586a0543",
     "data/track.json": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+    "scripts/curb_placement.gd": "97f1d14c3e3e428fe85dac84599fa6e5be1248d2c5af27a45d937fbb31b766e2",
     "scripts/curb_surface.gd": "b2de99aba0dd705d76d11c2541a0bf9484b65e91c04b59e2fdc5b4f2baa72cb4",
     "scripts/field_coverage.gd": "1c0891c7978f2e50e7c9e88e41a474addb0a72cc130526fa7127413f7fcc2c4e",
     "scripts/offroad_surface.gd": "744a4e65b018e1fca24b5d4bbfd6b41202bc596795d83328a6188315ea2099d9",
     "scripts/scenery.gd": "28d0bc85df93a76164959e95244d2b1a4a33bc80c4ee8a510fb4781a46f05903",
-    "scripts/track.gd": "910d77d87e18e45a6fe067d85b690c0ac9978132eb4ba4cd2f11712d40bfac8d",
+    "scripts/track.gd": "57c19eb4466975e27b94bc59bf7ba68b75b771bb49f89c0926ea863d595ae625",
     "scripts/triangle_ribbon.gd": "16d950de47fc6840aa2a819706a2695fb2746d90de991000fc4cf86f7e642eed",
     "shaders/dry_stubble.gdshader": "194d945483027844bec1124744484b1924128b1a7c527578dbaecc10ed44ab53",
-    "tools/bake_scenery.gd": "461e9c69a07f3087c98c0bdfbd153e3daf2041da1b3e5868f2dd6888beefe2d7"
+    "tools/bake_scenery.gd": "cf8b7e4694bdcdd068eba385388a76fc69fb6bd7534b0321a498cd34781ccffe"
   }
 }

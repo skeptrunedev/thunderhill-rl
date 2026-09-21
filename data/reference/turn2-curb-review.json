@@ -1,0 +1,336 @@
+{
+  "schema_version": 1,
+  "status": "Reviewed T2 inner curb removal; all retained curb placement, width and profile remain provisional",
+  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "baseline": {
+    "report_path": "artifacts/curb-audit/report.json",
+    "report_sha256": "51e5751546230ca8f1acf4eefcb15fac1ee873faf9b2cfe6f16a2d48bfef44ba",
+    "curvature_threshold": 0.012,
+    "runs": 112,
+    "segments": 297,
+    "validation": "Every baseline segment and side agrees with abs(curvature) > 0.012 on the pinned track samples."
+  },
+  "aerial_source": {
+    "path": "artifacts/reference/ortho/east-2022.png",
+    "sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
+    "metadata_path": "data/reference/ortho-measurements.json",
+    "metadata_sha256": "602e82b3a6bb201dffb1582cf9c8b507cc66b7bb28a39834729aea4cbef1810a",
+    "acquisition_date": "2022-07-15",
+    "license": "Public domain USDA NAIP, distributed by USGS",
+    "pixel_spacing_m": [
+      0.6,
+      0.600000000000154
+    ],
+    "crop_box_ltrb": [
+      1100,
+      1640,
+      1720,
+      2130
+    ],
+    "observation": "No visible blue and white curb along the T2 inner sweeping arc. The aerial shows a continuous painted strip on the outside exit."
+  },
+  "onboard_evidence": [
+    {
+      "url": "https://www.youtube.com/watch?v=yVjzZqYbKuM",
+      "path": "artifacts/reference/ken-moto/frame-0040.00.jpg",
+      "sha256": "5df7ab078ace341097d7546481e7324503d8906633206fe2fd4a59779db5b568",
+      "timestamp_seconds": 40,
+      "observation": "The visible inner T2 boundary is a continuous white edge line beside earth and straw. No blue and white curb appears in this view. This independently supports removal of the fragmented inferred inner curb, but does not establish buried construction."
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=yVjzZqYbKuM",
+      "path": "artifacts/reference/ken-moto/frame-0050.00.jpg",
+      "sha256": "1779ed6f5c5b0ad8a6402c46d57406a825ffcc978ba74b866b1c913400fd5821",
+      "timestamp_seconds": 50,
+      "observation": "A continuous blue and white strip is visible on the right outside exit."
+    }
+  ],
+  "removed_runs": [
+    {
+      "id": "C08",
+      "side": 1,
+      "segments": [
+        324,
+        325
+      ],
+      "start_m": 973.054,
+      "end_m": 979.318
+    },
+    {
+      "id": "C09",
+      "side": 1,
+      "segments": [
+        328
+      ],
+      "start_m": 985.417,
+      "end_m": 988.485
+    },
+    {
+      "id": "C10",
+      "side": 1,
+      "segments": [
+        331
+      ],
+      "start_m": 994.571,
+      "end_m": 997.644
+    },
+    {
+      "id": "C11",
+      "side": 1,
+      "segments": [
+        334
+      ],
+      "start_m": 1003.711,
+      "end_m": 1006.802
+    },
+    {
+      "id": "C12",
+      "side": 1,
+      "segments": [
+        337,
+        338
+      ],
+      "start_m": 1012.874,
+      "end_m": 1019.032
+    },
+    {
+      "id": "C13",
+      "side": 1,
+      "segments": [
+        341
+      ],
+      "start_m": 1025.104,
+      "end_m": 1028.171
+    },
+    {
+      "id": "C14",
+      "side": 1,
+      "segments": [
+        344
+      ],
+      "start_m": 1034.25,
+      "end_m": 1037.361
+    },
+    {
+      "id": "C15",
+      "side": 1,
+      "segments": [
+        347
+      ],
+      "start_m": 1043.455,
+      "end_m": 1046.522
+    },
+    {
+      "id": "C16",
+      "side": 1,
+      "segments": [
+        349,
+        350
+      ],
+      "start_m": 1049.565,
+      "end_m": 1055.707
+    },
+    {
+      "id": "C17",
+      "side": 1,
+      "segments": [
+        352
+      ],
+      "start_m": 1058.735,
+      "end_m": 1061.814
+    },
+    {
+      "id": "C18",
+      "side": 1,
+      "segments": [
+        355,
+        356
+      ],
+      "start_m": 1067.916,
+      "end_m": 1074.065
+    },
+    {
+      "id": "C19",
+      "side": 1,
+      "segments": [
+        360
+      ],
+      "start_m": 1083.213,
+      "end_m": 1086.295
+    },
+    {
+      "id": "C20",
+      "side": 1,
+      "segments": [
+        368
+      ],
+      "start_m": 1107.614,
+      "end_m": 1110.684
+    },
+    {
+      "id": "C21",
+      "side": 1,
+      "segments": [
+        370
+      ],
+      "start_m": 1113.728,
+      "end_m": 1116.802
+    },
+    {
+      "id": "C22",
+      "side": 1,
+      "segments": [
+        373
+      ],
+      "start_m": 1122.911,
+      "end_m": 1125.984
+    },
+    {
+      "id": "C23",
+      "side": 1,
+      "segments": [
+        376,
+        377
+      ],
+      "start_m": 1132.017,
+      "end_m": 1138.305
+    },
+    {
+      "id": "C24",
+      "side": 1,
+      "segments": [
+        381,
+        382
+      ],
+      "start_m": 1147.335,
+      "end_m": 1153.542
+    },
+    {
+      "id": "C25",
+      "side": 1,
+      "segments": [
+        386,
+        387
+      ],
+      "start_m": 1162.584,
+      "end_m": 1168.849
+    },
+    {
+      "id": "C26",
+      "side": 1,
+      "segments": [
+        392,
+        393
+      ],
+      "start_m": 1180.929,
+      "end_m": 1187.225
+    },
+    {
+      "id": "C27",
+      "side": 1,
+      "segments": [
+        397,
+        398
+      ],
+      "start_m": 1196.244,
+      "end_m": 1202.499
+    },
+    {
+      "id": "C28",
+      "side": 1,
+      "segments": [
+        403,
+        404
+      ],
+      "start_m": 1214.603,
+      "end_m": 1220.85
+    },
+    {
+      "id": "C29",
+      "side": 1,
+      "segments": [
+        408,
+        409,
+        410
+      ],
+      "start_m": 1229.851,
+      "end_m": 1239.202
+    },
+    {
+      "id": "C30",
+      "side": 1,
+      "segments": [
+        414,
+        415
+      ],
+      "start_m": 1248.223,
+      "end_m": 1254.532
+    }
+  ],
+  "decision": "Remove only C08 through C30. Preserve all other baseline segment indices and sides exactly. Do not add the outside exit curb until road width alignment is reviewed.",
+  "outside_exit_unresolved": {
+    "status": "Observed but not added to runtime geometry",
+    "source_pixel_coordinates": "Zero based continuous pixel centers; x right, y down",
+    "trace_pixels_travel_order": [
+      [
+        1534,
+        1758
+      ],
+      [
+        1510,
+        1750.5
+      ],
+      [
+        1480,
+        1741
+      ],
+      [
+        1456,
+        1735
+      ]
+    ],
+    "approximate_station_interval_m": [
+      1268,
+      1317
+    ],
+    "endpoint_uncertainty": "Several metres; manually interpreted source pixels, not surveyed endpoints",
+    "projection_method": "Pinned terrain_transform inverse from EPSG:26910 to EPSG:6339, followed by nearest centerline segment projection",
+    "datum": {
+      "source_crs": "EPSG:6339",
+      "target_crs": "EPSG:26910",
+      "operation": "proj=pipeline step inv proj=utm zone=10 ellps=GRS80 step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif step inv proj=gridshift grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif step proj=utm zone=10 ellps=GRS80",
+      "grid_sha256": {
+        "us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96",
+        "us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a",
+        "us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff",
+        "us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+      },
+      "manifest_sha256": "950e9e57d04f62b12f8c9284dacfd9146dddb0df6a97d0d86d4157a437e32604",
+      "vertical": "Horizontal transformation only; NAVD88 heights are unchanged"
+    },
+    "observed_center_lateral_right_m": [
+      4.697841,
+      4.905719,
+      5.299962,
+      4.694397
+    ],
+    "current_track_width_m": 12.0,
+    "current_right_edge_lateral_m": 6.0,
+    "alignment_conflict": "Historical curb centers lie roughly one metre inward of the current modeled right road edge. Attaching a new curb to that edge would not reproduce the observed footprint.",
+    "width_and_profile": "Not resolved from 0.6 m aerial imagery; no physical height inferred."
+  },
+  "retained_geometry": {
+    "runs": 89,
+    "segments": 261,
+    "width_m": 0.9,
+    "inner_height_m": 0.05,
+    "outer_height_m": 0.11,
+    "status": "Unchanged existing artistic curb dimensions, not measured or validated against the real track"
+  },
+  "limitations": [
+    "Historical aerial and current onboard imagery may reflect different pavement construction.",
+    "No claim of complete curb inventory outside T2.",
+    "Removal concerns visible unsupported curbs, not proof that no buried curb structure exists.",
+    "Third party video frames remain ignored inspection artifacts and are not redistributed as game assets."
+  ]
+}

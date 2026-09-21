@@ -1,0 +1,896 @@
+{
+  "schema_version": 1,
+  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "sample_count": 1536,
+  "width_m": 0.9,
+  "inner_height_m": 0.05,
+  "outer_height_m": 0.11,
+  "source_reference": "data/reference/turn2-curb-review.json",
+  "source_reference_sha256": "b348df035ad88d7da5b768a64d6bc9e7cf45913d163b7a5e92574dfeb7f3de81",
+  "runs": [
+    {
+      "id": "C01",
+      "side": 1,
+      "segments": [
+        214
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C02",
+      "side": 1,
+      "segments": [
+        217
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C03",
+      "side": 1,
+      "segments": [
+        219,
+        220
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C04",
+      "side": 1,
+      "segments": [
+        222,
+        223
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C05",
+      "side": 1,
+      "segments": [
+        228
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C06",
+      "side": 1,
+      "segments": [
+        231,
+        232,
+        233
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C07",
+      "side": 1,
+      "segments": [
+        235,
+        236
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C31",
+      "side": -1,
+      "segments": [
+        463,
+        464
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C32",
+      "side": -1,
+      "segments": [
+        468
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C33",
+      "side": -1,
+      "segments": [
+        471,
+        472
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C34",
+      "side": -1,
+      "segments": [
+        474,
+        475
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C35",
+      "side": -1,
+      "segments": [
+        478,
+        479
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C36",
+      "side": -1,
+      "segments": [
+        481,
+        482
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C37",
+      "side": -1,
+      "segments": [
+        484
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C38",
+      "side": -1,
+      "segments": [
+        487
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C39",
+      "side": -1,
+      "segments": [
+        490,
+        491,
+        492
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C40",
+      "side": -1,
+      "segments": [
+        496
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C41",
+      "side": -1,
+      "segments": [
+        499,
+        500
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C42",
+      "side": -1,
+      "segments": [
+        505,
+        506
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C43",
+      "side": -1,
+      "segments": [
+        508,
+        509
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C44",
+      "side": -1,
+      "segments": [
+        511,
+        512
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C45",
+      "side": -1,
+      "segments": [
+        517,
+        518
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C46",
+      "side": -1,
+      "segments": [
+        520,
+        521,
+        522,
+        523
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C47",
+      "side": 1,
+      "segments": [
+        534,
+        535
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C48",
+      "side": 1,
+      "segments": [
+        538,
+        539,
+        540,
+        541,
+        542,
+        543,
+        544,
+        545,
+        546,
+        547,
+        548,
+        549
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C49",
+      "side": 1,
+      "segments": [
+        551,
+        552,
+        553,
+        554,
+        555,
+        556,
+        557,
+        558,
+        559,
+        560,
+        561
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C50",
+      "side": -1,
+      "segments": [
+        577
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C51",
+      "side": -1,
+      "segments": [
+        588,
+        589
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C52",
+      "side": -1,
+      "segments": [
+        596,
+        597
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C53",
+      "side": 1,
+      "segments": [
+        603,
+        604,
+        605,
+        606,
+        607
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C54",
+      "side": -1,
+      "segments": [
+        611,
+        612,
+        613,
+        614,
+        615,
+        616,
+        617,
+        618,
+        619,
+        620,
+        621
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C55",
+      "side": -1,
+      "segments": [
+        623,
+        624,
+        625,
+        626
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C56",
+      "side": -1,
+      "segments": [
+        632,
+        633,
+        634,
+        635
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C57",
+      "side": -1,
+      "segments": [
+        637,
+        638
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C58",
+      "side": -1,
+      "segments": [
+        641,
+        642
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C59",
+      "side": -1,
+      "segments": [
+        645
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C60",
+      "side": -1,
+      "segments": [
+        650
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C61",
+      "side": -1,
+      "segments": [
+        653,
+        654
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C62",
+      "side": -1,
+      "segments": [
+        657
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C63",
+      "side": -1,
+      "segments": [
+        660
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C64",
+      "side": -1,
+      "segments": [
+        663
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C65",
+      "side": -1,
+      "segments": [
+        667,
+        668
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C66",
+      "side": 1,
+      "segments": [
+        699,
+        700
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C67",
+      "side": 1,
+      "segments": [
+        702,
+        703
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C68",
+      "side": 1,
+      "segments": [
+        705,
+        706
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C69",
+      "side": 1,
+      "segments": [
+        708,
+        709
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C70",
+      "side": 1,
+      "segments": [
+        712,
+        713
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C71",
+      "side": 1,
+      "segments": [
+        716,
+        717
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C72",
+      "side": 1,
+      "segments": [
+        719,
+        720
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C73",
+      "side": 1,
+      "segments": [
+        722,
+        723
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C74",
+      "side": 1,
+      "segments": [
+        725,
+        726,
+        727,
+        728
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C75",
+      "side": 1,
+      "segments": [
+        730,
+        731
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C76",
+      "side": 1,
+      "segments": [
+        733,
+        734
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C77",
+      "side": 1,
+      "segments": [
+        791,
+        792
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C78",
+      "side": 1,
+      "segments": [
+        796,
+        797
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C79",
+      "side": 1,
+      "segments": [
+        803,
+        804
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C80",
+      "side": 1,
+      "segments": [
+        809,
+        810
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C81",
+      "side": 1,
+      "segments": [
+        815,
+        816
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C82",
+      "side": 1,
+      "segments": [
+        821
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C83",
+      "side": 1,
+      "segments": [
+        882,
+        883
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C84",
+      "side": 1,
+      "segments": [
+        885,
+        886,
+        887,
+        888
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C85",
+      "side": 1,
+      "segments": [
+        890,
+        891
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C86",
+      "side": 1,
+      "segments": [
+        893,
+        894
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C87",
+      "side": 1,
+      "segments": [
+        1002,
+        1003,
+        1004,
+        1005,
+        1006,
+        1007,
+        1008,
+        1009,
+        1010,
+        1011,
+        1012,
+        1013,
+        1014,
+        1015,
+        1016
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C88",
+      "side": 1,
+      "segments": [
+        1018,
+        1019
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C89",
+      "side": -1,
+      "segments": [
+        1046
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C90",
+      "side": -1,
+      "segments": [
+        1076
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C91",
+      "side": 1,
+      "segments": [
+        1173,
+        1174,
+        1175,
+        1176,
+        1177,
+        1178,
+        1179,
+        1180,
+        1181,
+        1182,
+        1183,
+        1184,
+        1185,
+        1186,
+        1187,
+        1188,
+        1189,
+        1190
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C92",
+      "side": 1,
+      "segments": [
+        1227,
+        1228,
+        1229,
+        1230,
+        1231,
+        1232,
+        1233,
+        1234,
+        1235,
+        1236,
+        1237,
+        1238,
+        1239,
+        1240
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C93",
+      "side": -1,
+      "segments": [
+        1256,
+        1257,
+        1258,
+        1259,
+        1260
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C94",
+      "side": -1,
+      "segments": [
+        1262,
+        1263,
+        1264,
+        1265,
+        1266,
+        1267,
+        1268
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C95",
+      "side": 1,
+      "segments": [
+        1276
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C96",
+      "side": 1,
+      "segments": [
+        1279
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C97",
+      "side": 1,
+      "segments": [
+        1282
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C98",
+      "side": 1,
+      "segments": [
+        1286
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C99",
+      "side": 1,
+      "segments": [
+        1290,
+        1291
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C100",
+      "side": 1,
+      "segments": [
+        1294,
+        1295
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C101",
+      "side": 1,
+      "segments": [
+        1299,
+        1300
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C102",
+      "side": -1,
+      "segments": [
+        1451,
+        1452
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C103",
+      "side": -1,
+      "segments": [
+        1456,
+        1457,
+        1458,
+        1459,
+        1460
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C104",
+      "side": -1,
+      "segments": [
+        1462,
+        1463
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C105",
+      "side": -1,
+      "segments": [
+        1465,
+        1466
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C106",
+      "side": -1,
+      "segments": [
+        1468,
+        1469,
+        1470
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C107",
+      "side": -1,
+      "segments": [
+        1472,
+        1473
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C108",
+      "side": -1,
+      "segments": [
+        1476,
+        1477
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C109",
+      "side": -1,
+      "segments": [
+        1480,
+        1481
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C110",
+      "side": -1,
+      "segments": [
+        1485,
+        1486
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C111",
+      "side": -1,
+      "segments": [
+        1507
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    },
+    {
+      "id": "C112",
+      "side": -1,
+      "segments": [
+        1509,
+        1510,
+        1511,
+        1512,
+        1513,
+        1514,
+        1515,
+        1516,
+        1517,
+        1518
+      ],
+      "status": "Unreviewed provisional placement retained from curvature baseline"
+    }
+  ]
+}

@@ -2,11 +2,12 @@
 # requires-python = ">=3.11"
 # dependencies = ["numpy==2.4.3", "Pillow==12.1.1", "pyproj==3.7.2"]
 # ///
-"""Overlay the current provisional curb footprints on pinned historical NAIP.
+"""Overlay explicit reviewed/provisional curb placements on pinned historical NAIP.
 
 This is a manual review aid, not automatic detection or a curb survey. The
-polygons reproduce track.gd's current curvature rule and horizontal edge frame.
+polygons reproduce the placement manifest and track.gd's horizontal edge frame.
 """
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -24,6 +25,14 @@ def digest(path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=ROOT / "artifacts/curb-placement-audit")
+    args = parser.parse_args()
+    output = args.output
+    if (output / "report.json").exists():
+        raise FileExistsError(output / "report.json")
+    layout_path = ROOT / "godot/data/curb-placement.json"
+    layout = json.loads(layout_path.read_text())
     track_path = ROOT / "godot/data/track.json"
     metadata_path = ROOT / "data/reference/ortho-measurements.json"
     image_path = ROOT / "artifacts/reference/ortho/east-2022.png"
@@ -41,8 +50,11 @@ def main():
     left = np.column_stack([tangent[:, 2], -tangent[:, 0]])
     left /= np.linalg.norm(left, axis=1)[:, None]
     widths = np.array([row["width"] for row in track["samples"]])
-    curvature = np.array([row["curvature"] for row in track["samples"]])
-    active = np.where(abs(curvature) > .012, np.sign(curvature), 0).astype(int)
+    if layout["schema_version"] != 1 or layout["track_sha256"] != digest(track_path) or layout["sample_count"] != len(points):
+        raise ValueError("Curb placement source mismatch")
+    width = float(layout["width_m"])
+    if not np.isfinite(width) or width <= 0:
+        raise ValueError("Invalid curb width")
     origin = track["origin"]
 
     def pixel(local):
@@ -51,33 +63,29 @@ def main():
         return np.column_stack([(east - extent["xmin"]) / spacing[0],
                                 (extent["ymax"] - north) / spacing[1]])
 
-    # Begin at an inactive segment to merge any run crossing the route seam.
-    inactive = np.flatnonzero(active == 0)
-    if not len(inactive):
-        raise ValueError("No inactive segment available to delimit curb runs")
-    runs = []
-    for step in range(1, len(points) + 1):
-        i = (int(inactive[0]) + step) % len(points)
-        if active[i] == 0:
-            continue
-        previous = (i - 1) % len(points)
-        if active[previous] != active[i]:
-            runs.append([])
-        runs[-1].append(i)
-    output = ROOT / "artifacts/curb-audit"
+    runs = layout["runs"]
+    seen = set()
+    for run in runs:
+        if run["side"] not in [-1, 1] or not run["segments"]:
+            raise ValueError("Invalid curb run")
+        for index in run["segments"]:
+            if not isinstance(index, int) or not 0 <= index < len(points) or (index, run["side"]) in seen:
+                raise ValueError("Invalid or overlapping curb segment")
+            seen.add((index, run["side"]))
     output.mkdir(parents=True, exist_ok=True)
     overview = image.copy()
     overview_draw = ImageDraw.Draw(overview)
     records = []
-    for number, indices in enumerate(runs, 1):
-        side = int(active[indices[0]])
+    for run in runs:
+        indices = run["segments"]
+        side = run["side"]
         polygons = []
         for i in indices:
             j = (i + 1) % len(points)
             a = points[i, [0, 2]] + side * left[i] * widths[i] * .5
-            b = a + side * left[i] * .9
+            b = a + side * left[i] * width
             d = points[j, [0, 2]] + side * left[j] * widths[j] * .5
-            c = d + side * left[j] * .9
+            c = d + side * left[j] * width
             polygons.append(pixel(np.array([a, b, c, d])))
         all_pixels = np.concatenate(polygons)
         lo = np.maximum(np.floor(all_pixels.min(axis=0) - 25), 0).astype(int)
@@ -89,7 +97,7 @@ def main():
         for polygon in polygons:
             draw.polygon([tuple(p - lo) for p in polygon], outline="red", width=1)
             overview_draw.polygon([tuple(p) for p in polygon], outline="red", width=1)
-        label = f"C{number:02d}"
+        label = run["id"]
         center = all_pixels.mean(axis=0)
         overview_draw.text(tuple(center + [4, 4]), label, fill="yellow",
                            stroke_width=1, stroke_fill="black")
@@ -101,19 +109,19 @@ def main():
         sheet.paste(plain, (0, 35))
         sheet.paste(marked, (plain.width, 35))
         ImageDraw.Draw(sheet).text((8, 10),
-            f"{label}: s={start:.1f}..{end:.1f}m side={side:+d} | NAIP / provisional footprint", fill="white")
+            f"{label}: s={start:.1f}..{end:.1f}m side={side:+d} | NAIP / explicit footprint", fill="white")
         filename = f"{label}.png"
         sheet.save(output / filename)
         records.append({"id": label, "start_m": start, "end_m": end, "side": side,
                         "segments": indices, "image": filename,
-                        "status": "unreviewed provisional geometry, not observed curb"})
+                        "status": run["status"]})
     overview.save(output / "overview.png")
     report = {"track_sha256": digest(track_path),
               "track_script_sha256": digest(ROOT / "godot/scripts/track.gd"),
               "aerial_sha256": digest(image_path),
               "metadata_sha256": digest(metadata_path), "datum": datum,
-              "pixel_spacing_m": spacing.tolist(), "curvature_threshold": .012,
-              "provisional_width_m": .9, "runs": records,
+              "pixel_spacing_m": spacing.tolist(), "curb_placement_sha256": digest(layout_path),
+              "provisional_width_m": width, "runs": records,
               "limitations": "Historical 0.6m aerial; paint, curb and adjoining pavement may be ambiguous. No height inference."}
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps({"runs": len(records), "output": str(output)}))

@@ -9,6 +9,8 @@ const SOURCES := [
 	"data/field-coverage.json",
 	"scripts/offroad_surface.gd",
 	"scripts/curb_surface.gd",
+	"scripts/curb_placement.gd",
+	"data/curb-placement.json",
 	"scripts/triangle_ribbon.gd",
 	"data/track.json",
 	"data/pavement.json",

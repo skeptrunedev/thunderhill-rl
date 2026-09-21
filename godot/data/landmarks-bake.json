@@ -1,13 +1,14 @@
 {
-  "build_ms": 6275.414,
+  "build_ms": 6786.785,
   "collision": "Runtime pit wall construction unchanged; no collision in this scene",
   "geometry_sha256": "1753578de1d75b1a0d2128bf7df201a49527698d02da78477b9daa6170f61638",
   "godot_version": "4.7.2-stable (official)",
-  "load_ms": 17.403,
-  "scene_sha256": "440549919cafbfd4e89308648b3338393738a42632aad933ebc08ab0af092356",
+  "load_ms": 17.368,
+  "scene_sha256": "d348d823567529c1f1368b8d0eadcc76d96932be67c2f72afb0e73f64b70c4ac",
   "schema_version": 1,
   "sources": {
     "data/clubhouse-profile.json": "19deb349d55dcc322f533d7e09953a72cf7344b0e6d8effb5556ca8375581b65",
+    "data/curb-placement.json": "2da692adfa60a5658901fe83b3add16ee2a4b724291496b350e6c1292c40b388",
     "data/field-coverage.json": "2ebfc7b0361c5f420cfd3c467ed9b3f9c7b445742865c2e5512488b5683fe4c2",
     "data/landmarks.json": "d5b43fb77e3ad5c8de2464d8c25d1ca9639a37efcd9b200ee07befb942b4e085",
     "data/pavement.json": "3d8eb1ad0dbf4de04d589eec0f5db9c839242c7c80a6ff2c21f88affe84ef8f9",
@@ -15,13 +16,14 @@
     "data/surface.json": "c0fbcf8df2ff73ac5dec213f67978091c57c9019302ef12a77eab9868b967dae",
     "data/terrain.json": "c643f764f23253de59b1417ac0ab803604d47acbd0c70bb173fc455a586a0543",
     "data/track.json": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+    "scripts/curb_placement.gd": "97f1d14c3e3e428fe85dac84599fa6e5be1248d2c5af27a45d937fbb31b766e2",
     "scripts/curb_surface.gd": "b2de99aba0dd705d76d11c2541a0bf9484b65e91c04b59e2fdc5b4f2baa72cb4",
     "scripts/field_coverage.gd": "1c0891c7978f2e50e7c9e88e41a474addb0a72cc130526fa7127413f7fcc2c4e",
     "scripts/landmarks.gd": "c31742afe9693f476f8e51b2e5ff1e2333c58fbdc344a95faf4015c1b891c9a2",
     "scripts/offroad_surface.gd": "744a4e65b018e1fca24b5d4bbfd6b41202bc596795d83328a6188315ea2099d9",
-    "scripts/track.gd": "910d77d87e18e45a6fe067d85b690c0ac9978132eb4ba4cd2f11712d40bfac8d",
+    "scripts/track.gd": "57c19eb4466975e27b94bc59bf7ba68b75b771bb49f89c0926ea863d595ae625",
     "scripts/triangle_ribbon.gd": "16d950de47fc6840aa2a819706a2695fb2746d90de991000fc4cf86f7e642eed",
-    "tools/bake_landmarks.gd": "025f32effccda50672a3d81a0c7fb196fe7968c130ce0363c040809e3a3aa92a",
-    "tools/bake_scenery.gd": "461e9c69a07f3087c98c0bdfbd153e3daf2041da1b3e5868f2dd6888beefe2d7"
+    "tools/bake_landmarks.gd": "a2a32e45318e568c434109913dbbc42e15d29cb8b1c161b154ab6647eeb3f943",
+    "tools/bake_scenery.gd": "cf8b7e4694bdcdd068eba385388a76fc69fb6bd7534b0321a498cd34781ccffe"
   }
 }

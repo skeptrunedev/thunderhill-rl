@@ -95,3 +95,32 @@ rendered rider camera check and macOS export.
 Neutral and leaned track captures were visually inspected in
 `artifacts/reservoir-cockpit.png` and `artifacts/reservoir-on-track.png`.
 This build has not yet been verified in a foreground native Mac session.
+
+## Independent static reference pose controls
+
+The existing lighting preview now accepts finite bounded `--lean-deg`,
+`--view-roll-deg`, `--view-yaw-deg` and `--lateral-m` values. Lateral placement must
+remain inside the selected track section. Camera roll preserves eye position
+and gaze, then establishes optical roll relative to world up independently from
+motorcycle lean. These are preview controls, not gameplay camera changes.
+Metadata records the chosen pose and explicitly labels it an artistic study.
+
+Frame 00:40 has an apparent image bank of roughly 12 to 17 degrees by visual
+inspection, not a measurement of physical motorcycle lean or camera calibration.
+The existing 0.22 camera follow factor produces a much smaller roll at the
+previous 0.4 radian test lean. Static trials use a 14 degree image roll, with
+negative sign for the reference's landscape descending toward the right.
+
+`artifacts/turn2-inside-reference-pose/` uses rider camera 1 at station 950 m,
+25 degrees of left lean, 4 m left lateral position and 8 degrees of gaze yaw.
+`artifacts/turn2-deep-lean-reference-pose/` uses 45 degrees of left lean and
+3.5 m lateral position. The first better matches the road edge entering the
+bottom left; the second shifts the cockpit toward the lower right but worsens
+road framing. Both retain the existing FOV. The low onboard view makes the
+cockpit dominate and is unsuitable for this particular frame comparison.
+
+Root and independent inspection find these views useful for coarse comparison,
+not a registered 1:1 match. Road curvature in the image, distant terrain silhouette,
+lens parameters, exposure, exact position and motion blur remain different.
+Increasing lean to move the dashboard would confound bike pose with camera
+placement, so no gameplay roll response or rider anchor is changed here.
