@@ -695,3 +695,22 @@ times were median 17.361 ms and p95 21.750 ms over 269 frames, not native Mac
 performance measurements. No physics or control interface changed.
 Nonfinite wall density exited with status 2. Mac export passed as
 `39c83c9a0021-9fa84dbcfac3`; it has not been run natively on the MacBook.
+
+## Cockpit hardware edge curvature
+
+The yoke, four clamp ears and central damper bridge now use the existing
+rounded box builder in place of planar chamfers. Outer dimensions, positions,
+materials and corner radius values are retained. The production camera render
+in `artifacts/cockpit-hardware-fillets/production.png` shows continuous highlights
+around these corners, closer to manufactured hardware in the supplied 00:10
+frame. Root and independent visual review both found this a local improvement.
+The bridge remains bulky and the overall cockpit silhouette is not a measured
+reconstruction. Geometry changes cannot substitute for correcting those shapes
+or matching the reference materials.
+
+Existing rounded mesh checks passed for bounds, closed edges, normals and
+volume. Cockpit readouts, rider visibility and human controls passed. Local
+Linux frame timing was median 17.361 ms and p95 22.277 ms over 266 frames.
+These are not native Mac measurements.
+Mac export passed as `a869083b5357-ca4c44fda88b`; native execution remains
+unverified for this build.

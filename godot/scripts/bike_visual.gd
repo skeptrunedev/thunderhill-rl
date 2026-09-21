@@ -661,7 +661,7 @@ func _build_cockpit() -> void:
 	display_material.shader = preload("res://shaders/instrument_screen.gdshader")
 	display_material.set_shader_parameter("display_texture", _display_viewport.get_texture())
 	# Forged top yoke and risers, with visible fasteners and fork adjustment caps.
-	_chamfered_box(Vector3(0.245, 0.028, 0.084), Vector3(0, 0.59, 0.245), 0.005, dark_metal, _front)
+	_rounded_box(Vector3(0.245, 0.028, 0.084), Vector3(0, 0.59, 0.245), 0.005, dark_metal, _front)
 	for side in [-1.0, 1.0]:
 		_bar(
 			Vector3(side * 0.094, 0.595, 0.25),
@@ -700,7 +700,7 @@ func _build_cockpit() -> void:
 			Vector3(side * 0.045, 0.694, 0.267)
 		)
 		for z in [0.241, 0.293]:
-			_chamfered_box(
+			_rounded_box(
 				Vector3(0.028, 0.018, 0.021),
 				Vector3(side * 0.045, 0.695, z),
 				0.005,
@@ -937,9 +937,7 @@ func _build_steering_damper(mount: Material, polymer: Material) -> void:
 			Vector3(x, 0.665, 0.292)
 		)
 	# Mounting bridge and visible pivot fasteners connect the cylinder to the yoke.
-	_chamfered_box(
-		Vector3(0.036, 0.018, 0.044), Vector3(0.018, 0.643, 0.292), 0.006, mount, assembly
-	)
+	_rounded_box(Vector3(0.036, 0.018, 0.044), Vector3(0.018, 0.643, 0.292), 0.006, mount, assembly)
 	_bar(Vector3(0.018, 0.590, 0.245), Vector3(0.018, 0.643, 0.292), 0.009, mount, assembly)
 	_lathe(
 		[
