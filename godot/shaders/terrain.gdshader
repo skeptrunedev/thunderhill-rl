@@ -15,6 +15,8 @@ uniform float field_surface_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float mapped_aerial_contrast : hint_range(0.0, 1.0) = 1.0;
 // Regional version of the independently reviewed photographic field study.
 uniform bool photographic_field_enabled = false;
+// Independent preview of retained large field structure over the new detail.
+uniform float photographic_structure_strength : hint_range(0.0, 1.0) = 0.0;
 uniform sampler2D photographic_field : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform vec3 pale_straw_gain = vec3(1.40, 1.48, 1.55);
 uniform vec2 macro_origin;
@@ -337,7 +339,8 @@ void fragment() {
         mask = max(mask, photographic_weight(field_uv - vec2(0.0, radius_uv.y)));
         mask *= field_surface_strength * (1.0 - corridor * (1.0 - retained_grass));
         vec3 photographic = ground_surface(photographic_field, world_pos.xz / 4.0, 0.08, 0.25);
-        ALBEDO = mix(ALBEDO, photographic * 0.55, mask);
+        vec3 photographic_gain = mix(vec3(1.0), retained_swath_gain * field_structure, photographic_structure_strength);
+        ALBEDO = mix(ALBEDO, photographic * 0.55 * photographic_gain, mask);
         ROUGHNESS = mix(ROUGHNESS, 0.93, mask);
         float photographic_height = dot(photographic, vec3(0.2126, 0.7152, 0.0722)) * 0.004;
         height_dx = mix(height_dx, dFdx(photographic_height), mask);

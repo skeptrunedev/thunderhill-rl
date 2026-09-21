@@ -141,3 +141,21 @@ source alone does not establish a better match. Camera pose and motion blur
 prevent a precise aggregate scale comparison with the video.
 
 This developer preview changes no production material, geometry or simulation.
+
+## Retained field structure control
+
+The `structured` mode in both preview tools retains the generated regional
+material while restoring the existing curved mowing and retained swath gains.
+The shader's `photographic_structure_strength` defaults to zero, so this
+experiment does not change the playable game's appearance. It changes albedo
+only; coverage, relief, roughness and simulation remain as before.
+
+Both static entry and apex captures compiled and rendered under Vulkan Mobile:
+`artifacts/structured-field-entry` and `artifacts/structured-field-apex`.
+Metadata records the mode, strength and shader/source hashes.
+Root review of both angles and independent apex review found only a slight
+change in middle distance mottling. This does not solve the uniform straw carpet,
+so it is not promoted. The current source replaces larger field distinctions;
+restoring modest color gains alone is insufficient. Future work needs distinct
+sparse, flattened and disturbed material regions informed by multiple references.
+The current footage does not establish exact mowing locations or strand scale.
