@@ -4,6 +4,8 @@ uniform float lap_length_m;
 // Independent dry aggregate study. Disabled in production. Reflectance,
 // stone spacing and roughness are appearance estimates, not measured samples.
 uniform bool matte_aggregate_study = false;
+// Hybrid retains authored broad albedo while broadening the reflection lobe.
+uniform bool hybrid_aggregate_study = false;
 // Appearance study offset; independent of tire grip and surface identity.
 uniform float roughness_offset : hint_range(-0.3, 0.2) = 0.0;
 uniform sampler2D color_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -193,7 +195,8 @@ void fragment() {
                       * (authored_surface ? 1.0 : 0.0) * (1.0 - edge_weight);
     ROUGHNESS = mix(ROUGHNESS, mix(0.46, 0.70, wear), wear_weight);
     ROUGHNESS = clamp(ROUGHNESS + roughness_offset * (1.0 - edge_weight), 0.25, 0.9);
-    if (matte_aggregate_study) {
+    if (matte_aggregate_study || hybrid_aggregate_study) {
+        vec3 authored_albedo = ALBEDO;
         // World metre domains are continuous across the lap seam. Two stone
         // scales retain restrained near detail and converge to their mean once
         // their projected footprint is subpixel. No longitudinal wear bands.
@@ -209,5 +212,13 @@ void fragment() {
         NORMAL_MAP_DEPTH = 0.16;
         ROUGHNESS = 0.88 + (coarse_aggregate - 0.5) * 0.04;
         SPECULAR = 0.35;
+        if (hybrid_aggregate_study) {
+            ALBEDO = mix(ALBEDO, authored_albedo, 0.75);
+            // Broad binder response avoids the narrow blue wear ribbons. This
+            // is an appearance trial, not measured Thunderhill roughness.
+            ROUGHNESS = 0.68 + (binder_patches - 0.5) * 0.04;
+            NORMAL_MAP_DEPTH = 0.08;
+            SPECULAR = 0.42;
+        }
     }
 }

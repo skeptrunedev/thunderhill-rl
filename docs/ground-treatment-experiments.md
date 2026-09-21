@@ -316,3 +316,37 @@ Real renderer captures compiled both shader branches. Human controls passed
 with zero failures. Preview GDScript format and diff checks passed. These are
 local static studies, not new Mac performance results or validated motion
 quality. No physics, training behavior or production material default changed.
+
+
+## Broad roughness hybrid followup
+
+`--asphalt-study=hybrid-aggregate` retains 75 percent of the authored pavement
+albedo, including its broad spatial variation and paving joint, while replacing
+narrow wear reflections with broad binder roughness. The final estimate is
+0.68 plus centered binder variation of amplitude 0.04, specular 0.42 and generic
+scan normal strength 0.08. The remaining albedo comes from the matte aggregate
+study. These values are original appearance estimates. Production defaults are
+unchanged.
+
+A first 0.75 roughness trial remained too dull. Final matched static captures
+are `artifacts/hybrid68-straight` and `artifacts/hybrid68-apex`, with reference
+sheets in `artifacts/hybrid68-comparison`. The earlier `hybrid-aggregate-*`
+captures are the 0.75 trial; its apex metadata also predates correction of the
+paving joint report. The hybrid retains the joint through the authored color
+mixture, unlike the completely matte trial.
+
+The hybrid removes the conspicuous narrow blue ribbons, but still loses too
+much directional brightness compared with footage frame 30. At the corner,
+the reference also has a lighter outer road region. Root review and independent
+review do not support promotion. Scene illumination and the broad placement of
+surface variation remain larger fidelity gaps than aggregate resolution.
+
+The existing replay study accepts `--hybrid-aggregate` with
+`--ground-study=production`; it rejects a simultaneous directional wear override
+and records the shader hash. `artifacts/hybrid68-motion.mp4` contains 700 frames
+at fixed 30 FPS and completed all 2699 recorded transitions. Eleven sampled
+frames show a gradual broad reflection change, without an obvious abrupt switch.
+Sparse frame inspection cannot establish absence of temporal shimmer. The
+existing ObjectDB exit warning remains; fixed movie timing is not a performance
+measurement. Human controls passed with zero failures. GDScript formatting,
+real shader compilation and diff checks passed.

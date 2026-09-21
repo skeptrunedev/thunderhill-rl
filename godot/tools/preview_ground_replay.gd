@@ -11,8 +11,11 @@ func _run() -> void:
 	var mode := ""
 	var replay := ""
 	var directional_wear := NAN
+	var hybrid_aggregate := false
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--ground-study="):
+		if arg == "--hybrid-aggregate":
+			hybrid_aggregate = true
+		elif arg.begins_with("--ground-study="):
 			mode = arg.get_slice("=", 1)
 		elif arg.begins_with("--replay="):
 			replay = arg.trim_prefix("--replay=")
@@ -50,6 +53,10 @@ func _run() -> void:
 		push_error("Ground study requires a valid mode and an existing replay")
 		quit(2)
 		return
+	if hybrid_aggregate and is_finite(directional_wear):
+		push_error("Hybrid aggregate replaces directional wear; choose one study")
+		quit(2)
+		return
 	var game = load("res://main.tscn").instantiate()
 	root.add_child(game)
 	var report: Dictionary
@@ -76,5 +83,10 @@ func _run() -> void:
 		effective_wear = RenderingServer.shader_get_parameter_default(
 			pavement.shader.get_rid(), "directional_wear_strength"
 		)
+	if hybrid_aggregate:
+		pavement.set_shader_parameter("hybrid_aggregate_study", true)
+		effective_wear = 0.0
+	report["hybrid_aggregate"] = hybrid_aggregate
+	report["pavement_shader_sha256"] = FileAccess.get_sha256(pavement.shader.resource_path)
 	report["directional_wear_strength"] = effective_wear
 	print("GROUND_REPLAY_STUDY ", JSON.stringify({"mode": mode, "material": report}))

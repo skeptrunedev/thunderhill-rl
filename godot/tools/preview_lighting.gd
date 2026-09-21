@@ -121,7 +121,7 @@ func _run() -> void:
 			orchard_study = true
 		elif arg.begins_with("--asphalt-study="):
 			asphalt_study = arg.get_slice("=", 1)
-			if asphalt_study not in ["production", "scan", "matte-aggregate"]:
+			if asphalt_study not in ["production", "scan", "matte-aggregate", "hybrid-aggregate"]:
 				_fail("Unknown asphalt study mode")
 				return
 		elif arg.begins_with("--ground-study="):
@@ -626,19 +626,21 @@ func _run() -> void:
 		if asphalt_study_metadata.has("error"):
 			_fail(asphalt_study_metadata.error)
 			return
-	if asphalt_study == "matte-aggregate":
+	if asphalt_study in ["matte-aggregate", "hybrid-aggregate"]:
 		var material: ShaderMaterial = game.track.get_node("RacingSurface").material_override
-		material.set_shader_parameter("matte_aggregate_study", true)
+		material.set_shader_parameter("matte_aggregate_study", asphalt_study == "matte-aggregate")
+		material.set_shader_parameter("hybrid_aggregate_study", asphalt_study == "hybrid-aggregate")
 		var normal_texture: Texture2D = material.get_shader_parameter("normal_map")
 		asphalt_study_metadata = {
-			"mode": "matte-aggregate",
+			"mode": asphalt_study,
+			"authored_albedo_weight": 0.75 if asphalt_study == "hybrid-aggregate" else 0.0,
 			"aggregate_spacing_m": [0.006, 0.018],
 			"binder_spacing_m": 0.25,
 			"linear_albedo": [0.032, 0.031, 0.029],
-			"roughness": 0.88,
-			"specular": 0.35,
+			"roughness": 0.68 if asphalt_study == "hybrid-aggregate" else 0.88,
+			"specular": 0.42 if asphalt_study == "hybrid-aggregate" else 0.35,
 			"normal_scale_m": 0.5,
-			"normal_strength": 0.16,
+			"normal_strength": 0.08 if asphalt_study == "hybrid-aggregate" else 0.16,
 			"normal_source_path": normal_texture.resource_path,
 			"normal_source_sha256": FileAccess.get_sha256(normal_texture.resource_path),
 			"filter": "Derivative footprint fades unresolved stone cells to their mean",
@@ -806,8 +808,9 @@ func _run() -> void:
 		effective_wear = RenderingServer.shader_get_parameter_default(
 			pavement.shader.get_rid(), "directional_wear_strength"
 		)
-	if asphalt_study == "matte-aggregate":
+	if asphalt_study in ["matte-aggregate", "hybrid-aggregate"]:
 		effective_wear = 0.0
+	if asphalt_study == "matte-aggregate":
 		paving_joint_strength = 0.0
 	for row in variants:
 		if row.name == "production" and fog_density < 0.0:
