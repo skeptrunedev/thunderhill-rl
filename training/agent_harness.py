@@ -14,8 +14,9 @@ class ThunderhillEnv:
     The trainer owns worker creation, episode duration and checkpoint identity.
     """
 
-    def __init__(self, client, index, trace, step):
+    def __init__(self, client, index, trace, step, *, road_telemetry=None):
         self._client, self._index, self._trace, self._step = client, index, trace, step
+        self._road_telemetry = road_telemetry
         self._observation = None
         self._reward = 0.0
         self._calls = 0
@@ -41,7 +42,7 @@ class ThunderhillEnv:
 
     def _view(self):
         state = self._observation["state"]
-        return {
+        view = {
             "tick": self._observation["tick"],
             "speed_m_s": state["speed"],
             "gear": state["gear"],
@@ -49,6 +50,15 @@ class ThunderhillEnv:
             "observation_token": self._receipt,
             "done": self._observation["terminated"] or self._observation["truncated"],
         }
+
+        if self._road_telemetry is not None:
+            try:
+                view["road"] = self._road_telemetry.features(self._observation)
+            except Exception as error:
+                self._fault = str(error)
+                self._log("infrastructure_failure", error=self._fault)
+                raise
+        return view
 
     def _request(self, request):
         if self._fault:
@@ -76,12 +86,21 @@ class ThunderhillEnv:
         self._log(
             "reset",
             observation=self._view(),
-            observation_version="bike-telemetry-v1",
+            observation_version=(
+                "privileged-road-telemetry-v1"
+                if self._road_telemetry is not None
+                else "bike-telemetry-v1"
+            ),
             reward_version="interactive-launch-v1",
         )
+        task = (
+            "Ride the track safely using the supplied simulator road geometry. "
+            if self._road_telemetry is not None
+            else "You control a stationary motorcycle on a straight. Explore throttle values between 0 and 1. "
+        )
         return (
-            "You control a stationary motorcycle on a straight. Explore throttle values between 0 and 1. "
-            "More forward progress earns more reward. Call control_bike exactly ONCE in each response. "
+            task
+            + "More forward progress earns more reward. Call control_bike exactly ONCE in each response. "
             "Copy observation_token from the latest observation into the call. Never guess the next token. "
             "Wait for the tool result before choosing another action. Continue until done is true, then say Done. "
             "Steering assistance and automatic gears are enabled. Initial observation: "

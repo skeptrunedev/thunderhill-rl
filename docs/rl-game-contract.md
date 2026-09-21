@@ -28,6 +28,8 @@ Unavailable physical quantities must be marked unsupported, never invented. Chec
 
 ## Policy information boundary
 
+Road telemetry is the selected standard policy input. The lap policy receives speed, lean, lateral position, angle and distance to a lookahead centerline point, and upcoming centerline curvature. These are explicitly simulator supplied observations. Camera perception is optional future work, not a requirement for the current training goal.
+
 Maintain an explicit allowlist of observations for each experiment. Camera input and telemetry input are separately versioned modes. A camera policy must not accidentally receive privileged tire friction, perfect future curvature, ideal racing lines, or reward internals. Telemetry experiments may expose selected simulator quantities, but their results must be labeled accordingly. Both modes may record privileged physical state for verification without putting it in the model prompt.
 
 Use bounded observation history rather than allowing an entire lap to grow the context indefinitely. Record the exact retained history. Observation normalization, camera exposure, image resolution, and history length are part of the configuration, not hidden preprocessing.

@@ -78,13 +78,17 @@ class RoadTelemetry:
         return result
 
     def prompt(self, observation: dict) -> str:
+        return self.prompt_features(self.features(observation))
+
+    def prompt_features(self, features: dict) -> str:
+        """Format the same road features surfaced by the agent harness."""
         return (
             "Ride the track safely. Simulator road guidance: speed m/s, lean rad, "
             "angle rad to lookahead center, distance m to it, lateral m, signed "
             "curves 1/m at 0,30,60,90,120m. Reply only control_bike "
             "STEER_MILLI THROTTLE_PERCENT FRONT_PERCENT REAR_PERCENT. "
             "Steer -1000..1000; pedals 0..100.\n"
-            + json.dumps(self.features(observation), separators=(",", ":"))
+            + json.dumps(features, separators=(",", ":"))
             + "\nAction:\n"
         )
 

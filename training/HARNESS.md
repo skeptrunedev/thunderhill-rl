@@ -27,9 +27,14 @@ The token is a sequencing receipt, not an authentication credential.
 
 The initial launch diagnostic allowlist includes tick, speed, gear, lean, done
 and the observation token. Road telemetry is the standard input for lap training.
-`lap_policy.py` adds simulator supplied road position, angle and distance to the
-lookahead center, and upcoming centerline curvature. This is privileged geometry,
-not camera perception or a recommended action. Teacher controls appear only in
+Passing `road_telemetry=RoadTelemetry()` to the harness adds a `road` object to
+every observation and control result. `lap_policy.py` derives current lateral
+position, angle and distance to the lookahead center, and upcoming centerline
+curvature from the authoritative state at that observation tick. The evaluator
+formats these surfaced features for Gemma and passes the surfaced receipt back
+with each model action. The launch probe intentionally omits the provider to
+preserve its existing observation contract and reproducibility. This is privileged
+geometry, not camera perception or a recommended action. Teacher controls appear only in
 offline training examples. Godot records full state for verification.
 Receipts vary between candidates; initial physical state remains identical. This
 is not a claim that all prompt tokens or sampled trajectories are identical.
@@ -96,6 +101,6 @@ excluded 1,219 environment tokens. Peak PyTorch allocation was 6,382,137,856 byt
 about 5.94 GiB, not total GPU memory use. Full artifacts are retained under
 `artifacts/interactive-trl-03/`.
 
-Five independent harness tests cover read only observations, stale receipts,
-control bounds, transport failure invalidation and policy authority limits.
+Six independent harness tests cover read only observations, causal road features,
+stale receipts, control bounds, transport failure invalidation and policy authority limits.
 The adapter was saved; this interactive test does not claim a reload check.

@@ -5,6 +5,7 @@ import json
 import unittest
 
 from agent_harness import ThunderhillEnv
+from lap_policy import RoadTelemetry
 
 
 class Client:
@@ -49,6 +50,46 @@ class HarnessTests(unittest.TestCase):
             set(first),
             {"tick", "speed_m_s", "gear", "lean_rad", "observation_token", "done"},
         )
+
+    def test_road_mode_uses_current_state_and_retains_receipts(self):
+        road = RoadTelemetry()
+
+        class RoadClient(Client):
+            def request(self, command):
+                result = super().request(command)
+                result["state"].update(position=road.point(self.tick), heading=0)
+                result["track"] = {
+                    "progress": self.tick / road.length,
+                    "lateral_m": self.tick / 100,
+                }
+                self.latest = result
+                return result
+
+        client = RoadClient()
+        trace = io.StringIO()
+        env = ThunderhillEnv(client, 0, trace, lambda: 7, road_telemetry=road)
+        prompt = env.reset()
+        initial = json.loads(env.observe())
+        self.assertIn("simulator road geometry", prompt)
+        self.assertEqual(initial["road"], road.features(client.latest))
+        self.assertEqual(
+            road.prompt_features(initial["road"]), road.prompt(client.latest)
+        )
+        after = json.loads(env.control_bike(initial["observation_token"], 0.4))
+        self.assertEqual(after["tick"], 12)
+        self.assertEqual(after["road"]["speed"], 1.2)
+        self.assertEqual(after["road"]["lateral"], 0.12)
+        self.assertEqual(after["road"], road.features(client.latest))
+        self.assertNotEqual(initial["road"], after["road"])
+        self.assertEqual(json.loads(env.observe()), after)
+        self.assertEqual(len(client.requests), 2)
+        with self.assertRaisesRegex(ValueError, "Stale"):
+            env.control_bike(initial["observation_token"], 0.8)
+        self.assertEqual(len(client.requests), 2)
+        rows = [json.loads(line) for line in trace.getvalue().splitlines()]
+        self.assertEqual(rows[0]["observation_version"], "privileged-road-telemetry-v1")
+        self.assertEqual(rows[1]["before"], initial)
+        self.assertEqual(rows[1]["after"], after)
 
     def test_fresh_token_required_and_complete_controls_forwarded(self):
         first = json.loads(self.env.observe())

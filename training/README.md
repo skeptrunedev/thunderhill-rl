@@ -98,3 +98,38 @@ Earlier runs correctly failed the nonzero update gate when every candidate chose
 the same action. Another run found a relative user data path error after a valid
 update; the final harness resolves its artifact directory before starting Godot
 and verifies the episode records explicitly. Those runs are not counted as passes.
+
+## Road telemetry lap policy
+
+Road telemetry is the standard observation mode for the lap policy. It includes
+speed, lean, lateral position, angle and distance to a lookahead centerline point,
+and upcoming curvature. Geometry is simulator supplied and explicitly privileged.
+The model generates steering, throttle and both brake commands; no teacher
+controller supplies or substitutes actions during evaluation.
+
+`lap_policy.py` builds causally paired supervised examples from an audited driver
+recording. Each target uses the observation before the action. A contiguous
+holdout and excluded boundary rows keep adjacent augmented examples out of the
+holdout. This is still one recorded lap, not an independent generalization test.
+`train_lap_sft.py` uses TRL SFTTrainer to warm start the small Gemma adapter. It
+checks prompt token boundaries and rejects examples that would be truncated.
+This stage is imitation learning, not a policy gradient update.
+
+```sh
+python3 training/lap_policy.py \
+  --driver /absolute/driver.jsonl --episode /absolute/episode.jsonl \
+  --output artifacts/new-lap-dataset --augment 2 --max-speed 8
+uv run --project training python training/train_lap_sft.py \
+  --dataset artifacts/new-lap-dataset --output artifacts/new-lap-sft \
+  --steps 600 --batch 2
+uv run --project training python training/evaluate_lap.py \
+  --adapter artifacts/new-lap-sft/adapter --godot /absolute/path/to/godot \
+  --output artifacts/new-lap-evaluation
+```
+
+The evaluator reloads the saved adapter into a new process and obtains fresh
+telemetry after each control interval. It saves exact generated tokens, prompts,
+parsed controls, adapter identity, harness events and authoritative Godot state
+recordings. Malformed commands stop evaluation rather than triggering a fallback.
+A completed lap must pass ordered gates, track validity and recording checks.
+Training loss alone is not evidence of a successful lap.

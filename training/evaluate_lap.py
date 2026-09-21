@@ -9,6 +9,7 @@ from pathlib import Path
 
 import torch
 from agent_harness import ThunderhillEnv
+from lap_audit import audit_lap
 from lap_policy import RoadTelemetry, parse_action
 from peft import PeftModel
 from smoke_grpo import MODEL, REVISION, worker
@@ -47,13 +48,20 @@ def main():
         )
         trace = stack.enter_context((out / "harness.jsonl").open("w"))
         decisions = stack.enter_context((out / "decisions.jsonl").open("w"))
-        env = ThunderhillEnv(client, 0, trace, lambda: "lap-eval-" + adapter_hash[:12])
+        env = ThunderhillEnv(
+            client,
+            0,
+            trace,
+            lambda: "lap-eval-" + adapter_hash[:12],
+            road_telemetry=road,
+        )
         env.reset()
+        view = json.loads(env.observe())
         episode = env._observation["episode_id"]
         reason = "action_budget"
         actions = 0
         for index in range(args.max_actions):
-            prompt = road.prompt(env._observation)
+            prompt = road.prompt_features(view["road"])
             inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
             with torch.inference_mode():
                 output = model.generate(
@@ -80,7 +88,7 @@ def main():
                 decisions.write(json.dumps(row) + "\n")
                 reason = "invalid_model_action"
                 break
-            env.control_bike(env._receipt, **controls)
+            view = json.loads(env.control_bike(view["observation_token"], **controls))
             actions += 1
             obs = env._observation
             row["tick"] = obs["tick"]
@@ -112,30 +120,19 @@ def main():
                 break
         final = env._observation
         client.request({"op": "reset", "policy_id": "evaluation-finished"})
-        recordings = []
-        rows = []
-        for path in data.rglob("*.jsonl"):
-            recorded = [json.loads(line) for line in path.read_text().splitlines()]
-            if recorded and recorded[0]["episode_id"] == episode:
-                recordings.append(str(path))
-                rows.extend(row for row in recorded if row["type"] == "transition")
-        gates = [
-            event["gate"]
-            for row in rows
-            for event in row["events"]
-            if event["type"] == "gate"
-        ]
-        offtrack = sum(not row["track"]["on_track"] for row in rows)
-        ordered = [row["tick"] for row in rows] == list(range(1, len(rows) + 1))
-        success = (
-            final["track"]["completed_laps"] == 1
-            and final["track"]["lap_valid"]
-            and not final["state"]["crashed"]
-            and not final["truncated"]
-            and gates == list(range(1, 32)) + [0]
-            and offtrack == 0
-            and ordered
+        decisions.flush()
+        audit = audit_lap(
+            data.rglob("*.jsonl"),
+            episode_id=episode,
+            policy_id="interactive-step-lap-eval-" + adapter_hash[:12],
+            track_sha256=road.track_sha256,
+            final_observation=final,
+            decisions=[
+                json.loads(line)
+                for line in (out / "decisions.jsonl").read_text().splitlines()
+            ],
         )
+        success = audit["success"]
         summary = {
             "success": success,
             "reason": reason,
@@ -146,10 +143,7 @@ def main():
             "actions": actions,
             "sim_seconds": final["sim_time"],
             "wall_seconds": time.monotonic() - started,
-            "recorded_transitions": len(rows),
-            "gates": gates,
-            "offtrack_ticks": offtrack,
-            "recordings": recordings,
+            **audit,
             "final_observation": final,
         }
         (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
