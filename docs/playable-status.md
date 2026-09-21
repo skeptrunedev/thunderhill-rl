@@ -22,12 +22,16 @@ Evidence: `artifacts/agent-closeout-check.json` and
 `artifacts/qa/closeout-camera/summary.json`. These are short integration checks,
 not proof of long episode stability or parallel isolation. No model training ran.
 
-Before a learning pilot, finish versioned reward configuration, bounded episode
-and invalid action budgets, explicit terminal reasons, longer parallel isolation checks,
+Before a learning pilot, finish versioned reward configuration, invalid action
+and trainer budgets, longer parallel isolation checks,
 and the trainer's observation, action and token trace joins. The current game
 records raw progress, elapsed time and crash components; it is not yet a complete
 training harness. Harbor integration and a verified adapter update remain open.
 The full requirements remain in [the RL contract](rl-game-contract.md).
+
+An optional server owned simulation tick budget and explicit terminal reasons are
+now implemented and verified through real socket requests. See the episode
+duration section of the RL contract. The default human game is unchanged.
 
 A subsequent two process check passed with `tools/check_parallel.py`. Both workers
 started from equal physical states, advanced concurrently with different controls

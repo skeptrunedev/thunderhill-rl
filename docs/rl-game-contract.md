@@ -105,3 +105,34 @@ recorded with verified PNG hashes and unchanged simulation ticks during capture;
 queued advance and reset requests remained serialized. Evidence is in
 `artifacts/camera-failure-check.log`, `artifacts/capture-wall-check.log` and
 `artifacts/qa/capture-validation-durable/summary.json`. No training was performed.
+
+## Optional server owned episode duration
+
+Start an agent worker with `--agent-max-episode-ticks=N`, where N is a positive
+integer. The limit counts successful physics ticks since reset, including resets
+from a supplied initial state. It is fixed at process startup and cannot be
+changed through reset or action requests. Omission preserves unlimited prototype
+behavior; human mode rejects this option. Recordings include `episode_limits`
+with version `tick-budget-v1` and `max_physics_ticks` (zero means unlimited).
+
+The final permitted tick retains its normal transition and reward components,
+sets `truncated=true`, and records `truncation_reason=episode_tick_limit` and one
+truncation event. The worker stops even partway through its usual 12 tick action.
+Further actions require reset. Retrying the last action returns the cached result.
+Observation and final camera capture remain available. A timeout remains a valid
+rollout, whereas an infrastructure failure invalidates it. Crashes and completed
+laps use `terminated=true` and `termination_reason` of `crash` or `lap_completed`;
+task termination takes precedence if it occurs on the last permitted tick.
+Lap completion does not imply lap validity; consumers must inspect `lap_valid`.
+
+This is a simulation duration budget, not a wall clock watchdog. Idle connections,
+repeated invalid commands, inference deadlines and token budgets still require
+trainer supervision and further implementation. No reward coefficients or model
+updates are introduced by this feature.
+
+`tools/check_episode_limit.py --godot /path/to/godot` exercises real socket
+boundaries at 1, 12 and 13 ticks, retry behavior, post limit rejection, reset,
+recorded transition equality, immutable server configuration and invalid startup
+arguments. Current evidence is `artifacts/episode-limit-check.json`. Existing
+agent transport, authoritative replay, environment failure and rendered human
+control checks also pass after the change.

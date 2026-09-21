@@ -37,6 +37,10 @@ var action_cache: Dictionary = {}
 var action_requests: Dictionary = {}
 var policy_id := "human"
 var terminated := false
+var termination_reason := ""
+var truncation_reason := ""
+var agent_max_episode_ticks := 0
+var episode_initial_tick := 0
 var environment_failure: Dictionary = {}
 var server_port := 0
 var screenshot_path := ""
@@ -94,6 +98,13 @@ func _ready() -> void:
 				get_tree().quit(2)
 				return
 			preview_canopy_strength = float(value)
+		if arg.begins_with("--agent-max-episode-ticks="):
+			var value := arg.trim_prefix("--agent-max-episode-ticks=")
+			if not value.is_valid_int() or int(value) <= 0:
+				push_error("Agent episode tick limit must be a positive integer")
+				get_tree().quit(2)
+				return
+			agent_max_episode_ticks = int(value)
 		if arg.begins_with("--agent-port="):
 			server_port = int(arg.split("=")[1])
 			agent_mode = true
@@ -113,6 +124,10 @@ func _ready() -> void:
 			benchmark_path = arg.trim_prefix("--benchmark-recording=")
 		if arg.begins_with("--replay="):
 			replay_path = arg.trim_prefix("--replay=")
+	if agent_max_episode_ticks > 0 and not agent_mode:
+		push_error("Agent episode tick limit requires agent mode")
+		get_tree().quit(2)
+		return
 	if (
 		"--qa-controls" in OS.get_cmdline_user_args()
 		and (agent_mode or preview_mode or qa_target > 0 or not replay_path.is_empty())
@@ -398,6 +413,8 @@ func reset_episode(
 	next_gate = (int(last_progress * 32) + 1) % 32
 	lap_valid = true
 	terminated = false
+	termination_reason = ""
+	truncation_reason = ""
 	environment_failure.clear()
 	wheel_rotation = 0
 	steering_input = 0
@@ -405,6 +422,7 @@ func reset_episode(
 	action_requests.clear()
 	if not initial_state.is_empty():
 		preload("res://scripts/replay.gd").new().apply_state(sim, initial_state)
+	episode_initial_tick = sim.tick
 	_start_recording(station)
 	return observation()
 
@@ -427,6 +445,11 @@ func _start_recording(station: float) -> void:
 			"surface_sha256": FileAccess.get_sha256("res://data/surface.json"),
 			"physics_version": sim.MODEL_VERSION,
 			"physics_dt": DT,
+			"episode_limits":
+			{
+				"version": "tick-budget-v1",
+				"max_physics_ticks": agent_max_episode_ticks if agent_mode else 0
+			},
 			"obstacle_collision":
 			{
 				"envelope": preload("res://scripts/bike_collision_envelope.gd").MODEL_VERSION,
@@ -673,8 +696,8 @@ func _fail_environment(result: Dictionary, details: Dictionary = {}) -> Dictiona
 
 
 func _step(action: Dictionary) -> Dictionary:
-	if terminated:
-		return {"error": "Episode terminated; reset required"}
+	if terminated or not truncation_reason.is_empty():
+		return {"error": "Episode finished; reset required"}
 	var old_tick: int = sim.tick
 	var road: Dictionary = track.sample_world(sim.position)
 	_collision_start_pose = _collision_pose(road.normal, wheel_rotation)
@@ -709,6 +732,7 @@ func _step(action: Dictionary) -> Dictionary:
 			passed_gates = 0
 			if agent_mode:
 				terminated = true
+				termination_reason = "lap_completed"
 			else:
 				lap_time = 0
 				lap_valid = true
@@ -718,6 +742,15 @@ func _step(action: Dictionary) -> Dictionary:
 	if sim.crashed:
 		lap_valid = false
 		terminated = true
+		termination_reason = "crash"
+	if (
+		agent_mode
+		and agent_max_episode_ticks > 0
+		and sim.tick - episode_initial_tick >= agent_max_episode_ticks
+		and not terminated
+	):
+		truncation_reason = "episode_tick_limit"
+		events.append({"type": "truncation", "reason": truncation_reason})
 	wheel_rotation += sim.longitudinal_velocity * DT / 0.32
 	if not sim.collision_contact.is_empty():
 		wheel_rotation = float(sim.collision_contact.wheel_rotation)
@@ -748,7 +781,9 @@ func _step(action: Dictionary) -> Dictionary:
 		},
 		"events": events,
 		"terminated": terminated,
-		"truncated": false
+		"truncated": not truncation_reason.is_empty(),
+		"termination_reason": termination_reason,
+		"truncation_reason": truncation_reason
 	}
 	_record(transition)
 	return transition
@@ -776,7 +811,10 @@ func observation() -> Dictionary:
 				"completed_laps": completed_laps
 			},
 			"terminated": terminated,
-			"truncated": not environment_failure.is_empty(),
+			"truncated": not environment_failure.is_empty() or not truncation_reason.is_empty(),
+			"termination_reason": termination_reason,
+			"truncation_reason":
+			"environment_failure" if not environment_failure.is_empty() else truncation_reason,
 			"rollout_valid": environment_failure.is_empty(),
 			"environment_failure": environment_failure.duplicate(true)
 		}
@@ -1051,8 +1089,8 @@ func _request(request: Dictionary) -> Dictionary:
 			return {"error": "Tick mismatch"}
 		if not environment_failure.is_empty():
 			return serializable(environment_failure)
-		if terminated:
-			return {"error": "Episode terminated; reset required"}
+		if terminated or not truncation_reason.is_empty():
+			return {"error": "Episode finished; reset required"}
 		var action: Variant = request.get("controls", {})
 		if not action is Dictionary:
 			return {"error": "controls must be object"}
@@ -1071,7 +1109,7 @@ func _request(request: Dictionary) -> Dictionary:
 				action_requests[id] = request.duplicate(true)
 				return failure
 			transitions.append(serializable(transition))
-			if terminated:
+			if terminated or not truncation_reason.is_empty():
 				break
 		var response := observation()
 		response["transitions"] = transitions

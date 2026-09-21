@@ -25,7 +25,7 @@ from check_agent import ROOT, Client
 
 
 @contextmanager
-def worker(godot, directory, timeout):
+def worker(godot, directory, timeout, extra_args=()):
     directory.mkdir()
     data = directory / "data"
     log = directory / "godot.log"
@@ -43,6 +43,7 @@ def worker(godot, directory, timeout):
                 str(ROOT / "godot"),
                 "--",
                 f"--agent-port={port}",
+                *extra_args,
             ],
             stdout=output,
             stderr=subprocess.STDOUT,
