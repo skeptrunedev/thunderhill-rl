@@ -135,6 +135,10 @@ func _build_terrain() -> void:
 		"photographic_field", load("res://assets/materials/ground_study/flattened-field-v1.res")
 	)
 	mat.set_shader_parameter("photographic_field_enabled", true)
+	mat.set_shader_parameter(
+		"photographic_sparse", load("res://assets/materials/ground_study/sparse-field-v1.res")
+	)
+	mat.set_shader_parameter("photographic_sparse_enabled", true)
 	mat.set_shader_parameter("soil_color", load("res://assets/materials/fine_shoulder_v1.png"))
 	var macro: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://assets/materials/terrain_macro.json")

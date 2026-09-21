@@ -19,6 +19,7 @@ static func apply(
 	material.set_shader_parameter("photographic_field" if regional else "field_color", texture)
 	if regional:
 		material.set_shader_parameter("photographic_field_enabled", true)
+		material.set_shader_parameter("photographic_sparse_enabled", false)
 		material.set_shader_parameter("photographic_structure_strength", 1.0 if structured else 0.0)
 	var sparse_sha256 := ""
 	if composition:
@@ -27,6 +28,7 @@ static func apply(
 			return {"error": "Sparse study texture missing"}
 		material.set_shader_parameter("photographic_sparse", sparse)
 		material.set_shader_parameter("photographic_sparse_enabled", true)
+		material.set_shader_parameter("photographic_disturbance_strength", 1.0)
 		sparse_sha256 = FileAccess.get_sha256(sparse.resource_path)
 	track.get_node("MeasuredTerrain").material_override = material
 	track.terrain_material = material

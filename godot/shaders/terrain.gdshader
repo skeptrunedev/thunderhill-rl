@@ -17,6 +17,8 @@ uniform float mapped_aerial_contrast : hint_range(0.0, 1.0) = 1.0;
 uniform bool photographic_field_enabled = false;
 // Optional two-material composition, using the existing authored flattened corridor.
 uniform bool photographic_sparse_enabled = false;
+// Keep the uncertain corridor treatment isolated from the mixed base material.
+uniform float photographic_disturbance_strength : hint_range(0.0, 1.0) = 0.0;
 uniform sampler2D photographic_sparse : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 // Independent preview of retained large field structure over the new detail.
 uniform float photographic_structure_strength : hint_range(0.0, 1.0) = 0.0;
@@ -353,7 +355,7 @@ void fragment() {
             // Material proportions are artistic estimates, not classified land cover.
             // Reuse the corridor's authored interruptions instead of a uniform band.
             float disturbed = clamp((1.0 - dot(region.rgb, vec3(0.2126, 0.7152, 0.0722))) / 0.42, 0.0, 1.0);
-            float sparse_weight = mix(0.60, 0.95, corridor * retained_grass * disturbed);
+            float sparse_weight = mix(0.60, 0.95, corridor * retained_grass * disturbed * photographic_disturbance_strength);
             float sparse_height = dot(sparse, vec3(0.2126, 0.7152, 0.0722)) * 0.0015;
             photographic = mix(photographic, sparse, sparse_weight);
             photo_dx = mix(photo_dx, dFdx(sparse_height), sparse_weight);

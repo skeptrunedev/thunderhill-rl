@@ -710,6 +710,14 @@ func _run() -> void:
 							"asphalt_study_metadata": asphalt_study_metadata,
 							"ground_study": ground_study,
 							"ground_study_metadata": ground_study_metadata,
+							"photographic_sparse_enabled":
+							_material_parameter(
+								game.track.terrain_material, "photographic_sparse_enabled"
+							),
+							"photographic_disturbance_strength":
+							_material_parameter(
+								game.track.terrain_material, "photographic_disturbance_strength"
+							),
 							"sky_source": sky_source,
 							"sky_patch": sky_patch_metadata,
 							"runtime_secondary_sky_patch_enabled":

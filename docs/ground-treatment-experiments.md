@@ -192,3 +192,28 @@ absence of temporal shimmer. The initial dark frame and ObjectDB exit warning
 also occur in prior captures and remain unresolved. Fixed movie timing is not a
 live performance benchmark. Editor import and formatter checks passed. The
 production sparse material flag remains false pending stronger spatial matching.
+
+## Playable mixed ground integration
+
+The default game now uses the 60 percent sparse base mixture in the existing
+pale region. The additional corridor disturbance is disabled. The `composition`
+study explicitly enables that uncertain treatment; `regional` and `structured`
+explicitly disable sparse material to preserve their historical comparisons.
+Static capture metadata records the effective sparse and disturbance settings.
+
+Root and independent visual review prefer the mixed base to the dense carpet.
+Larger directional patterns and distant vegetation still need work; this is not
+an assertion of exact reference fidelity. The revised default is captured in
+`artifacts/mixed-ground-verified-apex/production.png`.
+Both scenery resources were rebuilt for the changed track setup. Human controls
+passed with zero failures. Local Linux frame intervals were 17.184 ms median and
+19.744 ms p95 across 267 samples. This short check does not prove Mac performance.
+
+Five real agent camera captures passed hash, PNG, immutable artifact, frozen
+state and queued capture/advance checks in `artifacts/mixed-ground-camera-qa`.
+Track, terrain, surface, pavement and field coverage data are byte identical to
+the prior commit; both scenery geometry hashes are unchanged after rebaking.
+Mac export `2e0b5539ca76-d95c96458ffe` completed. This export has not been tested
+natively on the laptop. The default replay recording is
+`artifacts/mixed-ground-production.mp4`; the static before/after comparison is
+`artifacts/mixed-ground-comparison/00.png`. The replay completed 2699 transitions.
