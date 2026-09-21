@@ -99,6 +99,18 @@ Recordings live in Godot's user data directory under `runs/RUN_ID/EPISODE_ID.jso
 
 ## Native packages
 
+Current closeout export: `4b6929eece72-8bf7fb8bfdc8`, built from clean commit
+`4b6929eece72fa6ca96a555b9c0f54086275e203`. The universal Mac archive is
+`artifacts/builds/4b6929eece72-8bf7fb8bfdc8/macos/Thunderhill-macos.zip`.
+Its SHA256 is
+`2531614dc2ae78c37f96d63166b19e2d9bb2b6891287d78b8d6b9a5be4207e29`.
+Export validates the baked inputs, universal executable, bundle identity and
+unchanged source content. Nine package tool tests pass. This version includes the
+optional agent episode budget and current paint filtering. The Mac connection
+timed out during this export session, so this archive has not been installed or
+verified natively. Earlier native verification does not certify this build.
+
+
 Install the official Godot 4.7.2 export templates. From a clean committed tree, run `python3 tools/package_game.py --godot /path/to/godot --platform macos` (or `--platform linux`). Packages and manifests are written under `artifacts/builds/`. The Mac archive contains a universal application with builtin ad hoc signing. No Apple notarization or Mac runtime verification is implied by a successful export. `--allow-dirty` is only for explicitly marked development candidates.
 
 Run `uv run tools/check_camera.py --godot /path/to/godot --display :1` on a machine with a working graphical display for actual rendered camera checks.
