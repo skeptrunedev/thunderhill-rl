@@ -159,3 +159,36 @@ so it is not promoted. The current source replaces larger field distinctions;
 restoring modest color gains alone is insufficient. Future work needs distinct
 sparse, flattened and disturbed material regions informed by multiple references.
 The current footage does not establish exact mowing locations or strand scale.
+
+## Sparse earth and straw composition
+
+The `composition` preview mode combines the existing generated dense source
+with original `sparse-field-v1` exposed earth and short cut grass. The second
+source is color artwork, not a measured PBR scan. Both use four metre estimated
+scale and the existing continuous four patch sampler. Sparse contribution is
+60 percent across the pale region, rising toward 95 percent inside the existing
+flattened corridor according to its authored point tint interruptions.
+The corridor is an appearance reconstruction, not surveyed contemporary cover.
+
+Each source supplies its own estimated roughness and relief. Gradients are
+calculated before coverage blending, so changes in material weight do not
+introduce fictitious geometric ridges. Bare access regions retain the prior
+exclusion and the independent road mesh is unchanged.
+
+The initial uniform corridor blend reduced the carpet appearance, but independent
+review flagged a broad gray brown band. The subsequent variant uses the existing
+point strength interruptions instead of treating the corridor as uniform.
+Static evidence: `artifacts/composed-field-entry`, `composed-field-apex` (initial),
+and `composed-field-interrupted-apex` (revised).
+The revised apex comparison is `artifacts/composed-field-comparison/00.png`.
+This remains an experiment. It improves sparse material identity but does not
+establish accurate placement of individual disturbed patches in the footage.
+
+The revised composition completed the same 2699 transition replay; the review
+movie is `artifacts/composed-field-motion.mp4` (700 frames at fixed 30 FPS,
+23.33 seconds including the ending hold). Twelve samples at two second intervals
+showed no obvious material boundary seam. This sparse inspection does not prove
+absence of temporal shimmer. The initial dark frame and ObjectDB exit warning
+also occur in prior captures and remain unresolved. Fixed movie timing is not a
+live performance benchmark. Editor import and formatter checks passed. The
+production sparse material flag remains false pending stronger spatial matching.

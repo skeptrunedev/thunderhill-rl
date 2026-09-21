@@ -65,6 +65,7 @@ func _run() -> void:
 					"generated",
 					"regional",
 					"structured",
+					"composition",
 					"scan",
 					"geometry"
 				]
@@ -528,9 +529,12 @@ func _run() -> void:
 	if ground_study == "legacy":
 		game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
 		ground_study_metadata = {"mode": "legacy", "photographic_field_enabled": false}
-	elif ground_study in ["generated", "regional", "structured"]:
+	elif ground_study in ["generated", "regional", "structured", "composition"]:
 		ground_study_metadata = load("res://scripts/ground_generated_study.gd").apply(
-			game.track, ground_study != "generated", ground_study == "structured"
+			game.track,
+			ground_study != "generated",
+			ground_study == "structured",
+			ground_study == "composition"
 		)
 	elif ground_study == "scan":
 		ground_study_metadata = load("res://scripts/ground_scan_study.gd").apply(game.track)

@@ -20,7 +20,7 @@ func _run() -> void:
 			quit(2)
 			return
 	if (
-		mode not in ["generated", "regional", "structured", "scan", "geometry"]
+		mode not in ["generated", "regional", "structured", "composition", "scan", "geometry"]
 		or not FileAccess.file_exists(replay)
 	):
 		push_error("Ground study requires a valid mode and an existing replay")
@@ -29,9 +29,9 @@ func _run() -> void:
 	var game = load("res://main.tscn").instantiate()
 	root.add_child(game)
 	var report: Dictionary
-	if mode in ["generated", "regional", "structured"]:
+	if mode in ["generated", "regional", "structured", "composition"]:
 		report = load("res://scripts/ground_generated_study.gd").apply(
-			game.track, mode != "generated", mode == "structured"
+			game.track, mode != "generated", mode == "structured", mode == "composition"
 		)
 	elif mode == "scan":
 		report = load("res://scripts/ground_scan_study.gd").apply(game.track)

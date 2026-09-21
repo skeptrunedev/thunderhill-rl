@@ -15,6 +15,9 @@ uniform float field_surface_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float mapped_aerial_contrast : hint_range(0.0, 1.0) = 1.0;
 // Regional version of the independently reviewed photographic field study.
 uniform bool photographic_field_enabled = false;
+// Optional two-material composition, using the existing authored flattened corridor.
+uniform bool photographic_sparse_enabled = false;
+uniform sampler2D photographic_sparse : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 // Independent preview of retained large field structure over the new detail.
 uniform float photographic_structure_strength : hint_range(0.0, 1.0) = 0.0;
 uniform sampler2D photographic_field : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
@@ -340,11 +343,27 @@ void fragment() {
         mask *= field_surface_strength * (1.0 - corridor * (1.0 - retained_grass));
         vec3 photographic = ground_surface(photographic_field, world_pos.xz / 4.0, 0.08, 0.25);
         vec3 photographic_gain = mix(vec3(1.0), retained_swath_gain * field_structure, photographic_structure_strength);
-        ALBEDO = mix(ALBEDO, photographic * 0.55 * photographic_gain, mask);
-        ROUGHNESS = mix(ROUGHNESS, 0.93, mask);
         float photographic_height = dot(photographic, vec3(0.2126, 0.7152, 0.0722)) * 0.004;
-        height_dx = mix(height_dx, dFdx(photographic_height), mask);
-        height_dy = mix(height_dy, dFdy(photographic_height), mask);
+        float photo_dx = dFdx(photographic_height);
+        float photo_dy = dFdy(photographic_height);
+        float photo_roughness = 0.93;
+        if (photographic_sparse_enabled) {
+            vec3 sparse = ground_surface(photographic_sparse, world_pos.xz / 4.0, 0.08, 0.25);
+            // Authored reference corridor is independent of driving/friction data.
+            // Material proportions are artistic estimates, not classified land cover.
+            // Reuse the corridor's authored interruptions instead of a uniform band.
+            float disturbed = clamp((1.0 - dot(region.rgb, vec3(0.2126, 0.7152, 0.0722))) / 0.42, 0.0, 1.0);
+            float sparse_weight = mix(0.60, 0.95, corridor * retained_grass * disturbed);
+            float sparse_height = dot(sparse, vec3(0.2126, 0.7152, 0.0722)) * 0.0015;
+            photographic = mix(photographic, sparse, sparse_weight);
+            photo_dx = mix(photo_dx, dFdx(sparse_height), sparse_weight);
+            photo_dy = mix(photo_dy, dFdy(sparse_height), sparse_weight);
+            photo_roughness = mix(photo_roughness, 0.96, sparse_weight);
+        }
+        ALBEDO = mix(ALBEDO, photographic * 0.55 * photographic_gain, mask);
+        ROUGHNESS = mix(ROUGHNESS, photo_roughness, mask);
+        height_dx = mix(height_dx, photo_dx, mask);
+        height_dy = mix(height_dy, photo_dy, mask);
     }
     vec3 dx = dFdx(VERTEX);
     vec3 dy = dFdy(VERTEX);

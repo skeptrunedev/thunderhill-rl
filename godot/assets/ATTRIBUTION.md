@@ -69,3 +69,7 @@ not a Thunderhill scan.
 `materials/ground_study/flattened-field-v1.png` is original generated artwork
 under the project MIT license. Source, exact prompt and limitations are in
 `assets/source/ground-studies/` at the repository root.
+
+`materials/ground_study/sparse-field-v1.png` is original generated artwork
+under the project MIT license. The generator received text only. Exact prompt,
+source hash and limitations are in `assets/source/ground-studies/`.
