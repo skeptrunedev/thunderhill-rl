@@ -1682,3 +1682,28 @@ rendered hardware and live speed, gear, RPM and lap readings. The earlier
 screen shape correction. It must not be presented as the final cockpit render.
 Human controls and the five real agent camera observation checks passed before
 the display adjustment; the functional motorcycle display test passed afterward.
+
+## Road marking aggregate response
+
+Road edge paint previously used a flat normal and revealed concrete color in
+worn spots even though its substrate is asphalt. The edge paint branch now adds
+original world coordinate aggregate noise with an estimated 8 mm pitch and
+0.25 mm relief amplitude. Visibility fades with the projected footprint. Height
+is differentiated before applying that visibility, so the fade itself does not
+create a surface ridge. Subtle color and roughness variation share the noise.
+Wear quantity and marking width remain unchanged; exposed road substrate is
+darker, while curb substrate retains its concrete color.
+
+The shared shader already outputs tangent normal maps for concrete. The new
+surface gradient is converted into that same convention, using mesh tangents
+that the track builder generates. Godot's [spatial shader reference](https://docs.godotengine.org/en/4.7/tutorials/shaders/shader_reference/spatial_shader.html)
+documents the view space normal and tangent space normal map outputs. No normal
+texture, geometry, collision or friction changes are involved.
+
+`artifacts/paint-aggregate-comparison/00.png` shows native pixel crops of the
+same onboard pose. Root and independent review found subtle granular variation
+without obvious heavy chips or seams. This is a small material improvement,
+not a recovered paint scan. The still does not establish temporal stability.
+Rendered controls passed with zero failures. Linux frame intervals were
+17.36 ms median and 25.00 ms p95 across 262 samples; these are not Mac timings.
+The Mac package exported successfully and remains separately unverified.
