@@ -10,6 +10,8 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var output := ""
+	var orchard_study := false
+	var orchard_metadata := {}
 	var asphalt_study := "production"
 	var asphalt_study_metadata := {}
 	var ground_study := "production"
@@ -50,7 +52,9 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--asphalt-study="):
+		if arg == "--orchard-study":
+			orchard_study = true
+		elif arg.begins_with("--asphalt-study="):
 			asphalt_study = arg.get_slice("=", 1)
 			if asphalt_study not in ["production", "scan"]:
 				_fail("Unknown asphalt study mode")
@@ -549,6 +553,8 @@ func _run() -> void:
 		if asphalt_study_metadata.has("error"):
 			_fail(asphalt_study_metadata.error)
 			return
+	if orchard_study:
+		orchard_metadata = load("res://scripts/orchard_study.gd").apply(game.track)
 	game.paused = true
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	game.hud.visible = false
@@ -593,6 +599,10 @@ func _run() -> void:
 		var gaze: Vector3 = -game.camera.global_basis.z
 		game.camera.look_at(game.camera.global_position + gaze, Vector3.UP)
 		game.camera.rotate_object_local(Vector3.FORWARD, deg_to_rad(view_roll_deg))
+	if orchard_study:
+		orchard_metadata["visibility_audit"] = load("res://scripts/orchard_study.gd").audit(
+			game.track, game.camera
+		)
 	var environment: Environment
 	var sun: DirectionalLight3D
 	for child in game.get_children():
@@ -706,6 +716,7 @@ func _run() -> void:
 					JSON
 					. stringify(
 						{
+							"orchard_study": orchard_metadata,
 							"asphalt_study": asphalt_study,
 							"asphalt_study_metadata": asphalt_study_metadata,
 							"ground_study": ground_study,
