@@ -18,6 +18,8 @@ const SOURCES := [
 	"data/surface.json",
 	"data/landmarks.json",
 	"assets/materials/dry_cut_grass_v2.png",
+	"assets/materials/dry_cut_grass_v2.res",
+	"assets/materials/dry_cut_grass_v2.json",
 	"tools/bake_scenery.gd"
 ]
 

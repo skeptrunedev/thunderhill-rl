@@ -54,7 +54,7 @@ func _add_cut_grass(mesh: ArrayMesh, random: RandomNumberGenerator) -> void:
 	material.shader = preload("res://shaders/dry_stubble.gdshader")
 	material.set_shader_parameter("ground_tint", ThunderhillTrack.DRY_GROUND_TINT)
 	material.set_shader_parameter(
-		"grass_color", load("res://assets/materials/dry_cut_grass_v2.png")
+		"grass_color", load("res://assets/materials/dry_cut_grass_v2.res")
 	)
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)

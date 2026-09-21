@@ -1195,3 +1195,37 @@ capture at station 1400 matches the reviewed candidate PNG exactly, and its
 metadata records the adopted strength of 1.
 Mac export passed as `ec35bbe82000-2f4c203e8c2f`; this build has not been verified
 running natively on the Mac.
+
+## Grass color mipmap correction
+
+The imported grass texture mip chain exactly matched Godot averaging encoded
+sRGB bytes. Its base pixels matched the source PNG exactly. At mip levels 4
+and 8, rebuilding in linear light increased mean decoded texture luminance
+by 8.40 and 9.01 percent respectively. These are texture measurements, not
+claims about final rendered brightness. `test_color_mipmaps.gd` now supports
+`--audit-texture` to reproduce the source, import and rebuilt chain comparison.
+
+The original v2 base pixels remain unchanged. Terrain and baked stubble now
+load `dry_cut_grass_v2.res`, built with the existing color mipmap builder.
+Its sibling JSON records source, builder and output hashes. Scenery source
+validation includes both new files. Both scenery bakes were regenerated.
+
+The filtering study is in `artifacts/grass-linear-filter-turn2`. The v5
+texture was also reconsidered with the new broad field coverage map in
+`artifacts/fine-straw-mapped-turn2`; it still produces overly uniform brown
+bands. The new generated v6 study was compared against corrected production
+v2 in `artifacts/short-straw-v6-linear-turn2`, using two adjacent camera
+positions and linear light mipmaps for the candidate. Root inspected the
+first pair. Its foreground pattern differs slightly but does not establish
+a convincing realism improvement, so v6 remains outside runtime assets.
+`preview_grass_material.gd --linear-mips` enables this comparison.
+
+The correction is modest. Field coverage, repeated straw patterns, lighting
+and the overall scene still differ visibly from the onboard reference.
+No exact video registration or photorealistic match is claimed.
+
+Color mipmap tests and human controls passed with zero failures. Local Linux
+frame timing was median 17.251 ms and p95 18.097 ms over 271 frames, a runtime
+check rather than a controlled benchmark. Formatting and diff checks passed.
+Mac export passed as `63331edbaf79-74ab066d9e53`. This export has not been
+verified running natively on the Mac.

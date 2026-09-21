@@ -11,6 +11,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var output := ""
 	var candidate := ""
+	var linear_mips := false
 	var frames := 1
 	var road_edge := false
 	var compare_fields := false
@@ -35,7 +36,9 @@ func _run() -> void:
 	var candidate_coverage_path := ""
 	var candidate_coverage: FieldCoverage
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--candidate-detail-map="):
+		if arg == "--linear-mips":
+			linear_mips = true
+		elif arg.begins_with("--candidate-detail-map="):
 			candidate_detail_path = arg.trim_prefix("--candidate-detail-map=")
 		elif arg.begins_with("--candidate-height-blend="):
 			var value := arg.trim_prefix("--candidate-height-blend=")
@@ -247,7 +250,10 @@ func _run() -> void:
 	):
 		_fail("Height blend comparison uses the production texture and no other candidate changes")
 		return
-	if (candidate_tile_m >= 0.0 or candidate_grass_relief >= 0.0) and candidate.is_empty():
+	if (
+		(candidate_tile_m >= 0.0 or candidate_grass_relief >= 0.0 or linear_mips)
+		and candidate.is_empty()
+	):
 		_fail("Candidate tile size and grass relief require a candidate texture")
 		return
 	if (
@@ -336,7 +342,15 @@ func _run() -> void:
 	var texture: ImageTexture
 	if not candidate.is_empty():
 		source = Image.load_from_file(candidate)
-		if source == null or source.is_empty() or source.generate_mipmaps() != OK:
+		if source == null or source.is_empty():
+			_fail("Cannot load candidate")
+			return
+		if linear_mips:
+			source = preload("res://scripts/color_mipmaps.gd").build(source)
+		elif source.generate_mipmaps() != OK:
+			_fail("Cannot generate candidate mipmaps")
+			return
+		if source == null or source.is_empty():
 			_fail("Cannot load candidate and generate mipmaps")
 			return
 		texture = ImageTexture.create_from_image(source)
@@ -370,7 +384,7 @@ func _run() -> void:
 				replacement.shader = shader
 				replacement.set_shader_parameter("ground_tint", ThunderhillTrack.DRY_GROUND_TINT)
 				replacement.set_shader_parameter(
-					"grass_color", load("res://assets/materials/dry_cut_grass_v2.png")
+					"grass_color", load("res://assets/materials/dry_cut_grass_v2.res")
 				)
 				stubble_materials.append(
 					{
@@ -662,6 +676,7 @@ func _run() -> void:
 							"samples": samples,
 							"view": "road_edge" if road_edge else "field",
 							"candidate": candidate,
+							"linear_mips": linear_mips,
 							"candidate_sha256":
 							"" if candidate.is_empty() else FileAccess.get_sha256(candidate),
 							"source_size":

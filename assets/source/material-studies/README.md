@@ -24,7 +24,9 @@ Create an original seamless photorealistic PBR BASE COLOR texture for freshly re
 ## Flattened straw revision
 
 `dry-cut-grass-v2.png` is the current ground and stubble albedo, copied to
-`godot/assets/materials/dry_cut_grass_v2.png`. The built in imagegen tool produced
+`godot/assets/materials/dry_cut_grass_v2.png`. Runtime uses the sibling `.res`
+with mip levels averaged in linear light, built by the existing color mipmap
+baker; base level source pixels are preserved exactly. The built in imagegen tool produced
 1254 by 1254 pixels despite a requested 2048 square. It used the 00:40 video frame
 as appearance reference and v1 as an explicit negative reference. This is an
 original generated material, not a scan or extracted video texture. Its connected
@@ -124,3 +126,14 @@ repetition but an overly uniform brown middle distance. It is retained as a
 candidate fine detail layer, not installed as the production material. A separate
 coherent straw coverage layer is needed before adoption; simply increasing
 contrast would bring back the source repetition problem.
+
+## Short cut straw v6 study
+
+`short-cut-straw-v6.png` was edited with the built in image generator using
+`dry-cut-grass-v2.png` as the target and `fine-straw-v5.png` as a fragment shape
+reference. The exact prompt is in `short-cut-straw-v6-prompt.txt`. Requested
+2048 square, returned 1254 square. SHA256:
+`d2170c4d5a02da05d43823ae74ee8cf7cc7e3a5a9196ff79e20e3ddb7f9a668c`.
+Scale, morphology and diffuse lighting are artistic estimates, not measured
+material properties. A paired Turn 2 render with linear light mipmaps did not
+show a convincing improvement in realism. Retained as a study only.
