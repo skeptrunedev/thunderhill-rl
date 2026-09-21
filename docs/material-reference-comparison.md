@@ -758,3 +758,30 @@ timing was median 17.361 ms and p95 22.440 ms over 265 frames, not a native Mac
 measurement. Physics, grip and the agent interface are unchanged.
 Mac export passed as `3e5adf905695-22da0d631573`; native execution of this build
 is unverified.
+
+## Edge marking proportion
+
+The previous paint mesh was 0.12 m wide. The footage at 00:40 shows a broader
+looking cream white strip, although camera lean and proximity prevent deriving
+its metric width. The aerial source does not resolve paint width either.
+`artifacts/edge-paint-width-study/` compares 0.12 and 0.20 m meshes with identical
+production pavement, lighting and cameras at stations 400, 900 and 3000.
+Root inspected the 900 pair and 3000 candidate; independent review inspected
+all three pairs. Both reviews prefer 0.20 m as a modest improvement: the near
+markings read as painted strips rather than thin outlines without appearing
+excessively wide. This is an artistic estimate, not a dimensional correction.
+
+The outer paint edge remains 0.06 m inside the pavement boundary, so the added
+width extends inward. The reference's dark outer margin is still more apparent
+than in these centered game views. Paint wear now uses the actual mesh width
+as a shader parameter. Curbs, contact surfaces, grip and agent boundaries are
+unchanged. The preview records paint width and the track and paint shader hashes,
+and isolates marking comparisons from other material diagnostics.
+
+Both scenery bakes passed after refreshing their track source fingerprints.
+The 202 curb surface checks and human controls passed with zero failures.
+Local Linux timing was median 17.146 ms and p95 26.314 ms over 261 frames.
+This is not a native Mac benchmark. Tailscale reports the MacBook offline,
+so native visual and performance verification remains pending.
+Mac export passed as `ba2c565290ba-cb2489b1bbc0`. Nonfinite preview width
+correctly exits with status 2.

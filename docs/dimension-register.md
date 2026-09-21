@@ -48,6 +48,13 @@ The reproduction tool samples color transitions perpendicular to approximate rou
 
 Reported decimals preserve the detector output, not decimeter accuracy. Use at least ±1.2 m around each estimate as an initial interpretive envelope, representing two source pixels across the full width. This is not a calibrated confidence interval. Registration, tangent direction, and ambiguous paint can add further error. Sampling every 0.3 m does not improve the underlying 0.6 m resolution. These widths include unresolved painted edge pixels; they do not define legal racing limits or curb width.
 
+The rendered edge stripe uses a provisional 0.20 m width with its outer edge
+0.06 m inside the pavement boundary. The 0.20 m value is an artistic estimate
+adopted after comparing 0.12 m and 0.20 m renders against onboard footage,
+especially frame 00:40. Neither value is a measured Thunderhill specification.
+The aerial resolution cannot determine stripe width. Paint geometry does not
+define collision, legal racing limits or the agent's track boundary.
+
 S01 and S02 illustrate why review matters: an automatic threshold includes adjoining pit pavement and reports roughly 30 m. Those results are excluded. The broad junction at S20 and several curb dominated sections are also excluded. We must trace both actual edges and recenter the road before generating its collision mesh. Do not apply one width symmetrically around every OSM point.
 
 Run `uv run tools/fetch_geometry.py`, followed by `uv run tools/measure_ortho.py`. Generated imagery and contact sheets stay in ignored `artifacts/reference/ortho`. The committed [measurement register](../data/reference/ortho-measurements.json) preserves the inspected results, coordinates, source metadata, hashes, acceptance decisions, and uncertainty. It is a reviewed snapshot; rerunning the detector creates new unreviewed candidates, not automatic replacements for the accepted record.

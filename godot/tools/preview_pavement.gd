@@ -13,6 +13,7 @@ func _run() -> void:
 	var candidate := ""
 	var surface_variation := -1.0
 	var binder_mottling := -1.0
+	var edge_paint_width := -1.0
 	var frames := 1
 	var flat_relief := false
 	var unlit := false
@@ -23,6 +24,18 @@ func _run() -> void:
 	var variation_only := false
 	var offset_m := 0.0
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--edge-paint-width="):
+			var value := arg.trim_prefix("--edge-paint-width=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.05
+				or float(value) > 0.5
+			):
+				push_error("Paint width must be finite and within 0.05 to 0.5 metres")
+				quit(2)
+				return
+			edge_paint_width = float(value)
 		if arg.begins_with("--binder-mottling="):
 			var value := arg.trim_prefix("--binder-mottling=")
 			if (
@@ -84,7 +97,7 @@ func _run() -> void:
 				return
 			frames = int(value)
 	if (
-		(surface_variation >= 0.0 or binder_mottling >= 0.0)
+		(surface_variation >= 0.0 or binder_mottling >= 0.0 or edge_paint_width >= 0.0)
 		and (
 			not candidate.is_empty()
 			or flat_relief
@@ -101,8 +114,11 @@ func _run() -> void:
 		)
 		quit(2)
 		return
-	if binder_mottling >= 0.0 and surface_variation >= 0.0:
-		push_error("Compare either binder mottling or surface variation independently")
+	if (
+		int(binder_mottling >= 0.0) + int(surface_variation >= 0.0) + int(edge_paint_width >= 0.0)
+		> 1
+	):
+		push_error("Choose one independent material or marking comparison")
 		quit(2)
 		return
 	if not output.is_absolute_path() or DisplayServer.get_name() == "headless":
@@ -121,6 +137,8 @@ func _run() -> void:
 		labels = ["baseline", "variation"]
 	if binder_mottling >= 0.0:
 		labels = ["baseline", "mottling"]
+	if edge_paint_width >= 0.0:
+		labels = ["baseline", "paint"]
 	var candidate_texture: ImageTexture
 	if not candidate.is_empty():
 		if not candidate.is_absolute_path():
@@ -230,6 +248,23 @@ func _run() -> void:
 				material.set_shader_parameter(
 					"binder_mottling_strength", 0.0 if strength == 0.0 else binder_mottling
 				)
+			if edge_paint_width >= 0.0:
+				material.set_shader_parameter("pavement_tone_strength", 0.0)
+				material.set_shader_parameter("authored_surface", true)
+				for parameter in ["surface_variation_strength", "binder_mottling_strength"]:
+					material.set_shader_parameter(
+						parameter,
+						RenderingServer.shader_get_parameter_default(
+							material.shader.get_rid(), parameter
+						)
+					)
+				var width := 0.12 if strength == 0.0 else edge_paint_width
+				var paint_surface: SurfaceTool = game.track.edge_paint_surface(width)
+				paint_surface.generate_normals()
+				paint_surface.generate_tangents()
+				var paint_mesh: MeshInstance3D = game.track.get_node("EdgePaint")
+				paint_mesh.mesh = paint_surface.commit()
+				paint_mesh.material_override.set_shader_parameter("edge_paint_width_m", width)
 			for frame in 4:
 				await RenderingServer.frame_post_draw
 			var capture := root.get_texture().get_image()
@@ -244,6 +279,10 @@ func _run() -> void:
 			report.append(
 				{
 					"image": name,
+					"edge_paint_width_m":
+					game.track.get_node("EdgePaint").material_override.get_shader_parameter(
+						"edge_paint_width_m"
+					),
 					"requested_station_m": view.station,
 					"historical_strength": material.get_shader_parameter("pavement_tone_strength"),
 					"surface_variation_strength":
@@ -285,6 +324,9 @@ func _run() -> void:
 						"candidate": candidate,
 						"candidate_sha256":
 						"" if candidate.is_empty() else FileAccess.get_sha256(candidate),
+						"track_script_sha256": FileAccess.get_sha256("res://scripts/track.gd"),
+						"paint_shader_sha256":
+						FileAccess.get_sha256("res://shaders/painted_concrete.gdshader"),
 						"shader_sha256": FileAccess.get_sha256("res://shaders/asphalt.gdshader"),
 						"tone_sha256":
 						FileAccess.get_sha256("res://assets/materials/pavement_tone.png"),

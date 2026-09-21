@@ -17,6 +17,8 @@ var pavement_surface := preload("res://scripts/triangle_ribbon.gd").new()
 var curb_surface := preload("res://scripts/curb_surface.gd").new()
 const CELL: float = 25.0
 const ROAD_LIFT: float = 0.04
+## Appearance estimate from onboard footage, not a surveyed stripe dimension.
+const EDGE_PAINT_WIDTH_M: float = 0.20
 const SHOULDER_WIDTH: float = 6.0
 ## Shared linear albedo multiplier for dry ground and standing vegetation.
 ## Artistic palette matching, not measured Thunderhill reflectance.
@@ -230,15 +232,35 @@ func _load_pavement() -> String:
 	return ""
 
 
+func edge_paint_surface(width_m: float) -> SurfaceTool:
+	var paint := SurfaceTool.new()
+	paint.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in points.size():
+		var j: int = (i + 1) % points.size()
+		var w: float = samples[i].width * 0.5
+		var wj: float = samples[j].width * 0.5
+		for side in [-1.0, 1.0]:
+			_quad(
+				paint,
+				edge_point(i, side * (w - 0.06 - width_m), 0.047),
+				edge_point(i, side * (w - 0.06), 0.047),
+				edge_point(j, side * (wj - 0.06), 0.047),
+				edge_point(j, side * (wj - 0.06 - width_m), 0.047),
+				Vector2.ZERO,
+				Vector2.RIGHT,
+				Vector2.ONE,
+				Vector2.DOWN
+			)
+	return paint
+
+
 func _build_road() -> void:
 	initialization_error = _load_pavement()
 	if not initialization_error.is_empty():
 		push_error(initialization_error)
 		get_tree().quit(2)
 		return
-	var paint := SurfaceTool.new()
 	curb_surface.clear()
-	paint.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in points.size():
 		var j: int = (i + 1) % points.size()
 		var w: float = samples[i].width * 0.5
@@ -246,17 +268,6 @@ func _build_road() -> void:
 		var s: float = samples[i].s
 		var sj: float = samples[j].s if j > 0 else length_m
 		for side in [-1.0, 1.0]:
-			_quad(
-				paint,
-				edge_point(i, side * (w - 0.18), 0.047),
-				edge_point(i, side * (w - 0.06), 0.047),
-				edge_point(j, side * (wj - 0.06), 0.047),
-				edge_point(j, side * (wj - 0.18), 0.047),
-				Vector2.ZERO,
-				Vector2.RIGHT,
-				Vector2.ONE,
-				Vector2.DOWN
-			)
 			# Provisional curb placement follows curvature. Real profile and placement remain editable.
 			if (
 				absf(float(samples[i].curvature)) > 0.012
@@ -322,7 +333,8 @@ func _build_road() -> void:
 	paint_mat.set_shader_parameter("paint_tint", Color("e8e3ce"))
 	paint_mat.set_shader_parameter("wear_amount", 0.12)
 	paint_mat.set_shader_parameter("edge_paint", true)
-	_mesh(paint, paint_mat, "EdgePaint")
+	paint_mat.set_shader_parameter("edge_paint_width_m", EDGE_PAINT_WIDTH_M)
+	_mesh(edge_paint_surface(EDGE_PAINT_WIDTH_M), paint_mat, "EdgePaint")
 	var curb_mat := ShaderMaterial.new()
 	curb_mat.shader = preload("res://shaders/painted_concrete.gdshader")
 	curb_mat.set_shader_parameter("wear_amount", 0.28)
