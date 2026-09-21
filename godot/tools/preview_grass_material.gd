@@ -15,8 +15,36 @@ func _run() -> void:
 	var road_edge := false
 	var detail_gain_exponent := 1.0
 	var station_m := 1830.0
+	var ground_tint := Vector3.ZERO
+	var field_soil_strength := -1.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--station="):
+		if arg.begins_with("--field-soil-strength="):
+			var value := arg.trim_prefix("--field-soil-strength=")
+			if not value.is_valid_float():
+				_fail("Field soil strength must be numeric")
+				return
+			field_soil_strength = float(value)
+			if (
+				not is_finite(field_soil_strength)
+				or field_soil_strength < 0
+				or field_soil_strength > 1
+			):
+				_fail("Field soil strength must be between zero and one")
+				return
+		elif arg.begins_with("--ground-tint="):
+			var values := arg.trim_prefix("--ground-tint=").split(",")
+			if values.size() != 3:
+				_fail("Ground tint requires three linear RGB values")
+				return
+			for i in 3:
+				if not values[i].is_valid_float():
+					_fail("Ground tint must be numeric")
+					return
+				ground_tint[i] = float(values[i])
+				if not is_finite(ground_tint[i]) or ground_tint[i] <= 0 or ground_tint[i] > 1:
+					_fail("Ground tint channels must be greater than zero and at most one")
+					return
+		elif arg.begins_with("--station="):
 			var value := arg.trim_prefix("--station=")
 			if not value.is_valid_float():
 				_fail("Station must be numeric")
@@ -102,6 +130,15 @@ func _run() -> void:
 	game.camera.fov = 74.0
 	game.camera.current = true
 	var material: ShaderMaterial = track.terrain_material
+	if ground_tint != Vector3.ZERO:
+		material.set_shader_parameter("ground_tint", ground_tint)
+	ground_tint = material.get_shader_parameter("ground_tint")
+	if field_soil_strength >= 0.0:
+		material.set_shader_parameter("field_soil_strength", field_soil_strength)
+	else:
+		field_soil_strength = RenderingServer.shader_get_parameter_default(
+			material.shader.get_rid(), "field_soil_strength"
+		)
 	material.set_shader_parameter("detail_gain_exponent", detail_gain_exponent)
 	var original: Texture2D = material.get_shader_parameter("grass_color")
 	var samples: Array = []
@@ -140,6 +177,14 @@ func _run() -> void:
 							"existing": original.resource_path,
 							"frames_per_material": frames,
 							"detail_gain_exponent": detail_gain_exponent,
+							"ground_tint_linear": [ground_tint.x, ground_tint.y, ground_tint.z],
+							"field_soil_strength": field_soil_strength,
+							"terrain_shader_sha256":
+							FileAccess.get_sha256("res://shaders/terrain.gdshader"),
+							"macro_map_sha256":
+							FileAccess.get_sha256("res://assets/materials/terrain_macro.png"),
+							"detail_map_sha256":
+							FileAccess.get_sha256("res://assets/materials/terrain_detail.png"),
 							"requested_station_m": station_m,
 							"sample_station_m": float(track.samples[nearest].s),
 							"step_m": 0.30,

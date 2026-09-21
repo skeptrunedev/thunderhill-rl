@@ -331,3 +331,33 @@ The rendered human controls check passed with zero failures. Local Linux timing
 was median 17.289 ms and p95 18.231 ms over 274 frames. Bake serialization checks
 preserved all 96000 grass instances. This does not establish native Mac runtime
 performance or a complete photographic appearance match.
+
+## Field tint and coverage studies
+
+The preview CLI now accepts `--ground-tint=R,G,B` (linear channels greater than
+zero and at most one) and `--field-soil-strength=0..1`. It records their values
+and hashes of the terrain shader and both aerial gain maps. Invalid component
+counts, nonnumeric channels, zero channels and out of range coverage were
+confirmed to exit with status 2.
+
+The neutral tint trial `(0.59, 0.57, 0.51)` is preserved in
+`artifacts/neutral-field-study/existing.png`; it was not adopted. Median encoded
+RGB from a field crop in frame 00:40 (180,250 to 400,350) was (142,114,83), while
+the station 400 game crop (180,420 to 400,520) was (191,152,110). Their normalized
+RGB ratios are similar. These unmatched patches do not establish calibrated
+albedo, but do not support blaming a global hue shift for the realism gap.
+
+An optional shader trial blends fine soil into darker broad aerial regions.
+Its mask is `1 - smoothstep(0.65, 1.0, macro_luminance)` and its strength is
+bounded by the CLI. Missing neutral aerial gain adds no soil. This is an artistic
+brightness to coverage hypothesis, not a vegetation classification, and changes
+neither contact geometry nor friction. It adds no texture samples.
+
+At strength 0.65, captures in `artifacts/field-coverage-study/` and
+`artifacts/field-coverage-3000/` showed almost no improvement. Changes were mainly
+confined to distant patches; the uniform foreground remained. **Production
+strength is zero.** The default was rendered again in
+`artifacts/field-study-default/`, and its metadata confirms zero strength.
+The study is retained for reproducible comparisons, not presented as a visual
+upgrade. Broad field structure, foreground texture character and matching the
+moving reference camera remain unresolved.

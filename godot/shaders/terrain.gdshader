@@ -11,6 +11,9 @@ uniform vec2 macro_size;
 uniform vec3 ground_tint = vec3(1.0);
 // Appearance control for historical field detail, not recovered reflectance.
 uniform float detail_gain_exponent = 1.0;
+// Optional appearance study, not land cover labels. Current aerial tone trial
+// misses the uniform foreground problem, so production keeps it disabled.
+uniform float field_soil_strength : hint_range(0.0, 1.0) = 0.0;
 // Original appearance parameters, not measured plant height or reflectance.
 uniform float grass_tile_m = 2.0;
 uniform float grass_relief_m = 0.010;
@@ -86,6 +89,11 @@ void fragment() {
     float coverage_variation = coverage_noise(world_pos.xz / 2.4) * 0.9
                              + coverage_noise(world_pos.xz / 0.35) * 0.25;
     float grass_coverage = clamp(detail.a + transition * coverage_variation, 0.0, 1.0);
+    // Darker accepted aerial regions expose some fine earth between straw.
+    // Fade to full grass at neutral gain so missing aerial data adds no patches.
+    float field_tone = dot(macro_gain, vec3(0.2126, 0.7152, 0.0722));
+    float sparse_field = 1.0 - smoothstep(0.65, 1.0, field_tone);
+    grass_coverage *= 1.0 - sparse_field * field_soil_strength;
     float soil_weight = (1.0 - grass_coverage) * macro_weight;
     ALBEDO = mix(grass, soil, soil_weight) * ground_tint * macro_gain * detail_gain;
     // A single albedo does not contain measured PBR maps. Bright straw over
