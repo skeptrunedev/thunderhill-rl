@@ -113,12 +113,15 @@ holdout and excluded boundary rows keep adjacent augmented examples out of the
 holdout. This is still one recorded lap, not an independent generalization test.
 `train_lap_sft.py` uses TRL SFTTrainer to warm start the small Gemma adapter. It
 checks prompt token boundaries and rejects examples that would be truncated.
-This stage is imitation learning, not a policy gradient update.
+This stage is imitation learning, not a policy gradient update. Recovery augmentation
+adds balanced low speed, cruising and braking examples with heading and lateral
+perturbations; the source lap alone is dominated by steady cruising. An existing
+adapter can continue supervised training with `--adapter /path/to/adapter`.
 
 ```sh
 python3 training/lap_policy.py \
   --driver /absolute/driver.jsonl --episode /absolute/episode.jsonl \
-  --output artifacts/new-lap-dataset --augment 2 --max-speed 8
+  --output artifacts/new-lap-dataset --augment 2 --max-speed 8 --recovery-grid
 uv run --project training python training/train_lap_sft.py \
   --dataset artifacts/new-lap-dataset --output artifacts/new-lap-sft \
   --steps 600 --batch 2

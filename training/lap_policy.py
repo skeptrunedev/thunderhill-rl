@@ -12,6 +12,7 @@ import copy
 import hashlib
 import json
 import math
+import random
 import re
 import sys
 from pathlib import Path
@@ -127,7 +128,12 @@ def encode_action(controls: dict) -> str:
 
 
 def build_dataset(
-    driver_path: Path, episode_path: Path, output: Path, augment=0, max_speed=8.0
+    driver_path: Path,
+    episode_path: Path,
+    output: Path,
+    augment=0,
+    max_speed=8.0,
+    recovery_grid=False,
 ):
     road = RoadTelemetry()
     with episode_path.open() as source:
@@ -145,13 +151,18 @@ def build_dataset(
         "track": {"progress": header["start_station"] / road.length, "lateral_m": 0.0},
     }
     teacher = None
-    if augment:
+    if augment or recovery_grid:
         sys.path.insert(0, str(ROOT / "tools"))
         from drive_lap import Driver
 
         teacher = Driver(max_speed)
     output.mkdir(parents=True, exist_ok=False)
     counts = {"train": 0, "eval": 0, "excluded": 0}
+    recovery_count = 0
+    recovery_rng = random.Random(71)
+    recovery_speeds = (0, 2, 4, 6, 8, 10)
+    recovery_headings = (-0.12, 0.0, 0.12)
+    recovery_laterals = (-1.0, 0.0, 1.0)
     # One contiguous central holdout, with ten decisions excluded on each edge.
     lo, hi = int(len(rows) * 0.45), int(len(rows) * 0.55)
     with (
@@ -170,7 +181,7 @@ def build_dataset(
                 counts["excluded"] += 1
                 observation = row["observation"]
                 continue
-            examples = [(observation, req["controls"], False)]
+            examples = [(observation, req["controls"], False, None)]
             if teacher and split == "train":
                 for direction in (-1, 1)[:augment]:
                     varied = copy.deepcopy(observation)
@@ -186,8 +197,60 @@ def build_dataset(
                     state["speed"] = max(0, state["speed"] + direction * 0.5)
                     varied["track"]["lateral_m"] += direction * 0.5
                     controls, _ = teacher.controls(varied)
-                    examples.append((varied, controls, True))
-            for before, controls, augmented in examples:
+                    examples.append((varied, controls, True, None))
+                if recovery_grid and index % 20 == 0:
+                    station = observation["track"]["progress"] * road.length
+                    a, b = road.point(station - 0.5), road.point(station + 0.5)
+                    dx, dz = b[0] - a[0], b[2] - a[2]
+                    norm = math.hypot(dx, dz)
+                    for speed_index, speed in enumerate(recovery_speeds):
+                        for variant in range(4):
+                            sample_index = index // 20
+                            heading = (
+                                recovery_headings[
+                                    (variant + speed_index + sample_index) % 3
+                                ]
+                                if variant < 3
+                                else 0.0
+                            )
+                            lateral = (
+                                recovery_laterals[
+                                    (variant + 2 * speed_index + 2 * sample_index) % 3
+                                ]
+                                if variant < 3
+                                else 0.0
+                            )
+                            varied = copy.deepcopy(observation)
+                            state = varied["state"]
+                            actual_speed = (
+                                round(
+                                    max(0.0, speed + recovery_rng.uniform(-0.9, 0.9)), 2
+                                )
+                                if variant < 3
+                                else float(speed)
+                            )
+                            state["speed"] = actual_speed
+                            state["heading"] += heading
+                            state["position"][0] += lateral * dz / norm
+                            state["position"][2] -= lateral * dx / norm
+                            varied["track"]["lateral_m"] += lateral
+                            controls, _ = teacher.controls(varied)
+                            examples.append(
+                                (
+                                    varied,
+                                    controls,
+                                    True,
+                                    {
+                                        "speed_bin_m_s": speed,
+                                        "speed_m_s": actual_speed,
+                                        "centered_exact": variant == 3,
+                                        "heading_offset_rad": heading,
+                                        "lateral_offset_m": lateral,
+                                    },
+                                )
+                            )
+                            recovery_count += 1
+            for before, controls, augmented, recovery in examples:
                 record = {
                     "prompt": road.prompt(before),
                     "completion": encode_action(controls),
@@ -195,6 +258,8 @@ def build_dataset(
                     "split": split,
                     "augmented": augmented,
                 }
+                if recovery is not None:
+                    record["recovery"] = recovery
                 (train if split == "train" else evaluation).write(
                     json.dumps(record) + "\n"
                 )
@@ -213,6 +278,26 @@ def build_dataset(
         "counts": counts,
         "augmentation_per_training_row": augment,
         "augmentation_teacher_max_speed": max_speed,
+        "recovery_grid": {
+            "enabled": recovery_grid,
+            "source_row_stride": 20,
+            "examples_per_sampled_row": 24,
+            "speed_bins_m_s": list(recovery_speeds),
+            "speed_jitter": {
+                "distribution": "uniform",
+                "range_m_s": [-0.9, 0.9],
+                "seed": 71,
+                "minimum_m_s": 0,
+                "decimal_places": 2,
+                "jittered_variants": 3,
+                "exact_centered_variants": 1,
+            },
+            "heading_offsets_rad": list(recovery_headings),
+            "lateral_offsets_m": list(recovery_laterals),
+            "sampling": "Three rotated offset pairs plus centered state per speed",
+            "examples": recovery_count,
+            "teacher": "offline Driver(max_speed), never used at inference",
+        },
         "holdout_source_rows": [lo, hi],
         "boundary_gap_rows": 10,
         "limitation": "Single episode contiguous holdout is not an independent closed loop evaluation.",
@@ -228,11 +313,17 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--augment", type=int, choices=(0, 1, 2), default=0)
     parser.add_argument("--max-speed", type=float, default=8.0)
+    parser.add_argument("--recovery-grid", action="store_true")
     args = parser.parse_args()
     print(
         json.dumps(
             build_dataset(
-                args.driver, args.episode, args.output, args.augment, args.max_speed
+                args.driver,
+                args.episode,
+                args.output,
+                args.augment,
+                args.max_speed,
+                recovery_grid=args.recovery_grid,
             ),
             indent=2,
         )

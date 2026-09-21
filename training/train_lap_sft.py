@@ -8,7 +8,7 @@ from pathlib import Path
 
 import torch
 from datasets import Dataset
-from peft import LoraConfig
+from peft import LoraConfig, PeftModel
 from smoke_grpo import MODEL, REVISION
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from trl import SFTConfig, SFTTrainer
@@ -20,6 +20,9 @@ def main():
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--steps", type=int, default=600)
     p.add_argument("--batch", type=int, default=2)
+    p.add_argument(
+        "--adapter", type=Path, help="Continue supervised training from this adapter"
+    )
     args = p.parse_args()
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
@@ -31,6 +34,9 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         MODEL, revision=REVISION, dtype=torch.float32, attn_implementation="sdpa"
     )
+
+    if args.adapter:
+        model = PeftModel.from_pretrained(model, args.adapter, is_trainable=True)
 
     def load(name):
         rows = [
@@ -82,7 +88,9 @@ def main():
             report_to="none",
             seed=71,
         ),
-        peft_config=LoraConfig(
+        peft_config=None
+        if args.adapter
+        else LoraConfig(
             r=16,
             lora_alpha=32,
             target_modules="all-linear",
@@ -99,6 +107,11 @@ def main():
         "model": MODEL,
         "revision": REVISION,
         "steps": trainer.state.global_step,
+        "initial_adapter_sha256": hashlib.sha256(
+            (args.adapter / "adapter_model.safetensors").read_bytes()
+        ).hexdigest()
+        if args.adapter
+        else None,
         "seconds": time.monotonic() - started,
         "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated(),
         "metrics": result.metrics,

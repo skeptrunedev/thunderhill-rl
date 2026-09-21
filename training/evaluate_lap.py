@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import signal
 import time
 from contextlib import ExitStack
 from pathlib import Path
@@ -36,6 +37,13 @@ def main():
         (args.adapter / "adapter_model.safetensors").read_bytes()
     ).hexdigest()
     road = RoadTelemetry()
+    stop_requested = False
+
+    def request_stop(signum, frame):
+        nonlocal stop_requested
+        stop_requested = True
+
+    signal.signal(signal.SIGINT, request_stop)
     started = time.monotonic()
     with ExitStack() as stack:
         client, data = stack.enter_context(
@@ -61,12 +69,16 @@ def main():
         reason = "action_budget"
         actions = 0
         for index in range(args.max_actions):
+            if stop_requested:
+                reason = "operator_stopped"
+                break
             prompt = road.prompt_features(view["road"])
             inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
             with torch.inference_mode():
                 output = model.generate(
                     **inputs,
                     max_new_tokens=32,
+                    max_length=None,
                     do_sample=False,
                     pad_token_id=tokenizer.pad_token_id,
                     eos_token_id=tokenizer.eos_token_id,

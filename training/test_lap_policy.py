@@ -99,6 +99,79 @@ class LapPolicyTests(unittest.TestCase):
                 [row["source_row"] for row in evaluation], list(range(45, 55))
             )
 
+            manifest = build_dataset(
+                folder / "driver.jsonl",
+                folder / "episode.jsonl",
+                folder / "recovery",
+                recovery_grid=True,
+            )
+            recovered = [
+                json.loads(line)
+                for line in (folder / "recovery/train.jsonl").read_text().splitlines()
+            ]
+            recovered_eval = [
+                json.loads(line)
+                for line in (folder / "recovery/eval.jsonl").read_text().splitlines()
+            ]
+            self.assertEqual(recovered_eval, evaluation)
+            self.assertEqual([row for row in recovered if "recovery" not in row], train)
+            extra = [row for row in recovered if "recovery" in row]
+            self.assertEqual(manifest["recovery_grid"]["examples"], 72)
+            self.assertEqual(len(extra), 72)
+            self.assertEqual({row["source_row"] for row in extra}, {0, 20, 80})
+            self.assertTrue(all(row["split"] == "train" for row in extra))
+            speed_counts = {speed: 0 for speed in (0, 2, 4, 6, 8, 10)}
+            for row in extra:
+                features = json.loads(row["prompt"].split("\n")[1])
+                config = row["recovery"]
+                speed_counts[config["speed_bin_m_s"]] += 1
+                self.assertGreaterEqual(features["speed"], 0)
+                self.assertLessEqual(
+                    abs(features["speed"] - config["speed_bin_m_s"]), 0.901
+                )
+                if config["centered_exact"]:
+                    self.assertEqual(features["speed"], config["speed_bin_m_s"])
+                    self.assertEqual(config["heading_offset_rad"], 0)
+                    self.assertEqual(config["lateral_offset_m"], 0)
+                self.assertEqual(features["speed"], row["recovery"]["speed_m_s"])
+                self.assertNotIn("station", features)
+                self.assertNotIn("tick", features)
+                controls = decode_action(row["completion"])
+                if features["speed"] == 0:
+                    self.assertGreater(controls["throttle"], 0)
+                    self.assertEqual(controls["front_brake"], 0)
+                if features["speed"] == 10:
+                    self.assertEqual(controls["throttle"], 0)
+                    self.assertGreater(controls["front_brake"], 0)
+            self.assertEqual(set(speed_counts.values()), {12})
+            self.assertEqual(
+                sum(row["recovery"]["centered_exact"] for row in extra), 18
+            )
+            self.assertTrue(
+                any(
+                    row["recovery"]["speed_m_s"] != row["recovery"]["speed_bin_m_s"]
+                    for row in extra
+                )
+            )
+            self.assertEqual(manifest["recovery_grid"]["speed_jitter"]["seed"], 71)
+            build_dataset(
+                folder / "driver.jsonl",
+                folder / "episode.jsonl",
+                folder / "recovery_repeat",
+                recovery_grid=True,
+            )
+            self.assertEqual(
+                (folder / "recovery/train.jsonl").read_bytes(),
+                (folder / "recovery_repeat/train.jsonl").read_bytes(),
+            )
+            self.assertEqual(
+                {row["recovery"]["heading_offset_rad"] for row in extra},
+                {-0.12, 0, 0.12},
+            )
+            self.assertEqual(
+                {row["recovery"]["lateral_offset_m"] for row in extra}, {-1, 0, 1}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
