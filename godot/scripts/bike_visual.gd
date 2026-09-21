@@ -21,11 +21,8 @@ var _rubber: StandardMaterial3D
 var rider: Node3D
 var _arms: Node3D
 var _rider_visible := true
-var _speed_label: Label3D
-var _gear_label: Label3D
-var _rpm_label: Label3D
-var _rpm_segments: Array[MeshInstance3D] = []
-var _instrument_readout := Vector3(-1, -1, -1)
+var _display: Control
+var _display_viewport: SubViewport
 
 
 func _ready() -> void:
@@ -58,18 +55,11 @@ func set_rider_visible(value: bool) -> void:
 
 
 ## Simulation speed is metres per second; dashboard displays kilometres per hour.
-func update_instruments(speed_mps: float, rpm: float, gear: int) -> void:
-	if not is_instance_valid(_speed_label):
+func update_instruments(speed_mps: float, rpm: float, gear: int, lap_seconds := 0.0) -> void:
+	if not is_instance_valid(_display):
 		return
-	var readout := Vector3(roundf(absf(speed_mps) * 3.6), roundf(rpm / 100) * 100, gear)
-	if readout == _instrument_readout:
-		return
-	_instrument_readout = readout
-	_speed_label.text = "%03d" % int(readout.x)
-	_gear_label.text = str(gear) if gear > 0 else "N"
-	_rpm_label.text = "%d RPM" % int(readout.y)
-	for i in range(_rpm_segments.size()):
-		_rpm_segments[i].visible = float(i) / _rpm_segments.size() < clampf(rpm / 14000.0, 0, 1)
+	if _display.set_readings(speed_mps, rpm, gear, lap_seconds):
+		_display_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func update_pose(lean: float, steering: float, wheel_rotation: float) -> void:
@@ -507,27 +497,13 @@ func _build_front() -> void:
 	_build_cockpit()
 
 
-func _instrument_text(
-	text: String, at: Vector3, size: int, color: Color, parent: Node3D
-) -> Label3D:
-	var label := Label3D.new()
-	label.text = text
-	label.position = at
-	label.font_size = size
-	label.pixel_size = 0.00042
-	label.modulate = color
-	label.outline_size = 0
-	label.shaded = false
-	label.double_sided = false
-	parent.add_child(label)
-	return label
-
-
 func _beveled_panel(
 	size: Vector2, depth: float, bevel: float, material: Material, parent: Node3D
 ) -> void:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# A reflective flat face must not inherit normals from its housing edges.
+	surface.set_smooth_group(-1)
 	var half_size := size * 0.5
 	var outline: Array[Vector2] = [
 		Vector2(-half_size.x + bevel, -half_size.y),
@@ -539,6 +515,8 @@ func _beveled_panel(
 		Vector2(-half_size.x, half_size.y - bevel),
 		Vector2(-half_size.x, -half_size.y + bevel)
 	]
+	# Clockwise front winding gives the glass face a normal toward the rider (+Z).
+	outline.reverse()
 	for i in range(outline.size()):
 		var a := outline[i]
 		var b := outline[(i + 1) % outline.size()]
@@ -630,12 +608,28 @@ func _build_cockpit() -> void:
 	# Proportions and silhouette are guided by the provided Ken Moto cockpit
 	# footage. This is original geometry and an original functional display,
 	# not a reproduction of Ducati graphics or proprietary instrument firmware.
-	var polymer := _material(Color("151719"), 0.05, 0.62)
-	var dark_metal := _material(Color("353b3f"), 0.85, 0.31)
+	var polymer := ShaderMaterial.new()
+	polymer.shader = preload("res://shaders/cockpit_finish.gdshader")
+	var dark_metal := ShaderMaterial.new()
+	dark_metal.shader = preload("res://shaders/cockpit_finish.gdshader")
+	dark_metal.set_shader_parameter("base_color", Color("353b3f"))
+	dark_metal.set_shader_parameter("metalness", 0.85)
+	dark_metal.set_shader_parameter("finish_roughness", 0.28)
+	dark_metal.set_shader_parameter("grain_pitch_m", 0.00035)
+	dark_metal.set_shader_parameter("relief_m", 0.000004)
 	var markings := _material(Color("c6c9bd"), 0.1, 0.5)
 	var accent := _material(Color("9f1822"), 0.05, 0.47)
-	var display_material := _material(Color("080e15"), 0.05, 0.60)
-	display_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_display_viewport = SubViewport.new()
+	_display_viewport.name = "InstrumentTexture"
+	_display_viewport.size = Vector2i(1024, 560)
+	_display_viewport.disable_3d = true
+	_display_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(_display_viewport)
+	_display = preload("res://scripts/instrument_display.gd").new()
+	_display_viewport.add_child(_display)
+	var display_material := ShaderMaterial.new()
+	display_material.shader = preload("res://shaders/instrument_screen.gdshader")
+	display_material.set_shader_parameter("display_texture", _display_viewport.get_texture())
 	# Forged top yoke and risers, with visible fasteners and fork adjustment caps.
 	_chamfered_box(Vector3(0.245, 0.028, 0.084), Vector3(0, 0.59, 0.245), 0.005, dark_metal, _front)
 	for side in [-1.0, 1.0]:
@@ -784,24 +778,6 @@ func _build_cockpit() -> void:
 	face.position.z = 0.013
 	instruments.add_child(face)
 	_beveled_panel(Vector2(0.177, 0.097), 0.001, 0.008, display_material, face)
-	_instrument_text("TRACK", Vector3(-0.061, 0.036, 0.002), 15, Color("94a8ae"), face)
-	_instrument_text("km/h", Vector3(-0.033, -0.034, 0.002), 13, Color("a7b4b9"), face)
-	_instrument_text("GEAR", Vector3(0.057, -0.034, 0.002), 12, Color("a7b4b9"), face)
-	_speed_label = _instrument_text(
-		"000", Vector3(-0.032, -0.009, 0.002), 56, Color("eaf3ee"), face
-	)
-	_gear_label = _instrument_text("N", Vector3(0.057, -0.009, 0.002), 56, Color("eaf3ee"), face)
-	_rpm_label = _instrument_text("0 RPM", Vector3(0.032, 0.036, 0.002), 14, Color("a7b4b9"), face)
-	for i in range(24):
-		var lit := _material(Color("d62a31") if i >= 19 else Color("e0e9d8"), 0, 1)
-		lit.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		var segment := _box(
-			Vector3(0.0057, 0.005 + float(i) * 0.00012, 0.0005),
-			Vector3(-0.077 + float(i) * 0.0066, 0.022, 0.002),
-			lit,
-			face
-		)
-		_rpm_segments.append(segment)
 	update_instruments(0, 1500, 1)
 
 

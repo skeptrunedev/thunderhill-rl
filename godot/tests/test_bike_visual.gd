@@ -13,11 +13,36 @@ func _run() -> void:
 	stage.add_child(bike)
 	for cap in [false, true]:
 		_check_reservoir(bike._reservoir_shell(cap), cap)
+	# The reflective face must be planar and face the rider, not inherit side normals.
+	var housing: MeshInstance3D = bike._front.get_node("LiveInstrumentCluster").get_child(0)
+	var panel_arrays := housing.mesh.surface_get_arrays(0)
+	var panel_vertices: PackedVector3Array = panel_arrays[Mesh.ARRAY_VERTEX]
+	var panel_normals: PackedVector3Array = panel_arrays[Mesh.ARRAY_NORMAL]
+	var checked := 0
+	for triangle in range(0, panel_vertices.size(), 3):
+		if (
+			panel_vertices[triangle].z > 0
+			and panel_vertices[triangle + 1].z > 0
+			and panel_vertices[triangle + 2].z > 0
+		):
+			for vertex in range(triangle, triangle + 3):
+				assert(
+					panel_normals[vertex].distance_to(Vector3.BACK) < 0.0001,
+					"Front normal: " + str(panel_normals[vertex])
+				)
+			checked += 1
+	assert(checked == 8)
 	bike.set_rider_visible(false)
-	bike.update_instruments(25.0, 7200.0, 3)
-	assert(bike._speed_label.text == "090")
-	assert(bike._gear_label.text == "3")
-	assert(bike._rpm_label.text == "7200 RPM")
+	bike.update_instruments(25.0, 7200.0, 3, 72.34)
+	assert(bike._display.speed_text == "090")
+	assert(bike._display.gear_text == "3")
+	assert(bike._display.rpm_text == "7200 RPM")
+	assert(bike._display.lap_text == "01:12.34")
+	assert(not bike._display.set_readings(25.0, 7200.0, 3, 72.34))
+	bike.update_instruments(-10.0, 1400.0, 0, 0)
+	assert(bike._display.speed_text == "036" and bike._display.gear_text == "N")
+	assert(bike._display.lap_text == "00:00.00")
+	bike.update_instruments(25.0, 7200.0, 3, 72.34)
 	assert(not bike.rider.visible)
 	var camera := Camera3D.new()
 	stage.add_child(camera)

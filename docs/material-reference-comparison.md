@@ -64,3 +64,36 @@ The existing cockpit readout and reservoir geometry check passes. Human controls
 pass with zero failures. The macOS development export also succeeds. These tests establish function, not photographic fidelity.
 No training was run. The game remains under visual development and has not met
 the requested near one to one match.
+
+## Live instrument surface and cockpit finishes
+
+The cockpit screen now uses an original 1024 by 560 live texture with a rising
+RPM scale, lap timer, speed and gear. The supplied 00:10 frame guides visual
+density and hierarchy. Values come from simulation state and the current lap
+timer. No Ducati firmware image or fabricated sensor values are displayed.
+The viewport redraws only when a displayed value changes. The screen combines
+emission with dielectric glass response in `instrument_screen.gdshader`, without
+a reflection painted into the image.
+
+The reflective material exposed front face normals being smoothed together with
+the case sides. The panel now has separate flat normals and clockwise front
+winding. The regression checks that all front triangle normals face the rider,
+allowing for the packed normal quantization observed in the actual ArrayMesh.
+Godot's pinned SurfaceTool implementation generates normals by smoothing group:
+[engine source](https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/scene/resources/surface_tool.cpp#L1105).
+
+`cockpit_finish.gdshader` adds original object space microtexture to molded
+plastic and the darker metal fittings. Separate roughness, metalness, grain scale
+and relief distinguish the finishes. Derivative filtering fades unresolved
+microtexture rather than letting it sparkle at a distance. These are estimated
+surface properties, not scans or measured Ducati materials. Development
+provenance includes both new shaders and the display script.
+
+The cockpit readout test verifies speed conversion, gear and neutral, RPM,
+lap time and unchanged value caching. The reflective panel normal check and
+rendered human control check pass. A game cockpit screenshot at station 400,
+camera 2, 1280 by 720 was inspected against the same reference frame in
+`artifacts/instrument-comparison/00.png`. The planar face has no previous
+triangular highlight artifact. This does not establish a complete cockpit match;
+reservoir transmission, fitting geometry, housing edge profiles and many fine
+features remain unfinished.

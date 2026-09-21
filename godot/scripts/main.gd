@@ -826,7 +826,7 @@ func _update_visual(dt: float) -> void:
 	bike_root.transform = _bike_root_transform(road.normal)
 	var riding_tangent: Vector3 = sim.surface_forward(road.normal)
 	bike.update_pose(-sim.lean, -sim.steering, wheel_rotation)
-	bike.update_instruments(sim.speed, sim.rpm, sim.gear)
+	bike.update_instruments(sim.speed, sim.rpm, sim.gear, lap_time)
 	camera.set_cull_mask_value(20, camera_mode == 0)
 	var forward := Vector3(sin(sim.heading), 0, -cos(sim.heading))
 	if camera_mode == 0:
@@ -1068,6 +1068,9 @@ func _build_provenance() -> Dictionary:
 		"physics_script_sha256": FileAccess.get_sha256("res://scripts/motorcycle.gd"),
 		"game_script_sha256": FileAccess.get_sha256("res://scripts/main.gd"),
 		"bike_visual_script_sha256": FileAccess.get_sha256("res://scripts/bike_visual.gd"),
+		"instrument_display_sha256": FileAccess.get_sha256("res://scripts/instrument_display.gd"),
+		"instrument_screen_sha256":
+		FileAccess.get_sha256("res://shaders/instrument_screen.gdshader"),
 		"pavement_sha256": FileAccess.get_sha256("res://data/pavement.json"),
 		"track_script_sha256": FileAccess.get_sha256("res://scripts/track.gd"),
 		"envelope_script_sha256": FileAccess.get_sha256("res://scripts/bike_collision_envelope.gd"),
