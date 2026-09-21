@@ -19,8 +19,10 @@
     "license": "Public domain",
     "attribution": "USDA NAIP; USGS The National Map"
   },
-  "annotation_path": "data/reference/turn2-straw-regions.json",
-  "annotation_sha256": "0009a50e743b4fbe7c072c28c3fd4da8f1c9438c88f1ca26550b056b5d73fb4f",
+  "overlap_policy": "source_over",
+  "annotation_path": "data/reference/turn2-straw-regions-roadside.json",
+  "annotation_sha256": "edf55e053a22b3106d828ff000dff8bcfaab7e2b41ba58d955e9dcd09865854c",
+  "builder_sha256": "05523af1daf0e500579671e3977211efe8becc15cef14688a14186b9fd3601b5",
   "horizontal_datum": {
     "source_crs": "EPSG:6339",
     "target_crs": "EPSG:26910",
@@ -54,18 +56,32 @@
   ],
   "mapping": "uv = (world_xz - local_origin_xz) / local_size_xz; PNG top is north; outside rectangle has zero alpha",
   "encoding": "RGBA8 linear numerical data without sRGB conversion. R target grass coverage; G pale straw response weight; B unused zero; A regional blend weight. Outside annotations RGBA is zero.",
-  "algorithm": "Source pixel center annotation polygons densified to one pixel then inverse transformed using pinned datum grids. Interior boundary distance at local output pixel centers controls smoothstep alpha; no exterior feather and no invented stripes.",
+  "algorithm": "Source pixel center annotation polygons densified to one pixel then inverse transformed using pinned datum grids. Optional metric region expansion is clipped by buffered road geometry and disconnected outside islands are discarded. Interior boundary distance at local output pixel centers controls smoothstep alpha; regions use straight alpha source over in listed order when explicitly enabled; no exterior feather and no invented stripes.",
   "regions": [
     {
       "id": "turn2_interior_pale_straw",
-      "local_area_m2": 28541.859774598204,
-      "road_clearance_m": 6.743860497413553,
+      "boundary_adjustment": {
+        "expansion_m": 12.0,
+        "road_clearance_m": 1.0,
+        "status": "Artistic field transition estimate, constrained by current road geometry; not a surveyed vegetation boundary"
+      },
+      "local_area_m2": 37895.56112503388,
+      "road_clearance_m": 0.999999993438262,
       "target_grass_coverage": 0.95,
       "pale_straw_response": 0.8,
-      "interior_feather_m": 3.0
+      "interior_feather_m": 1.5
+    },
+    {
+      "id": "turn2_western_interrupted_straw",
+      "boundary_adjustment": null,
+      "local_area_m2": 3239.4578884880248,
+      "road_clearance_m": 23.17007470287801,
+      "target_grass_coverage": 0.85,
+      "pale_straw_response": 0.12,
+      "interior_feather_m": 3.5
     }
   ],
-  "output_sha256": "e08578da50238c5ee6e4ad163e405c34ad20f5c48b20db369e11b22a67a032d1",
+  "output_sha256": "9c5f706f71974a2691a0ba291d723ce0cf8b8d85dae81ec6a371108b60fe96dc",
   "limitations": [
     "Historical July 2022 appearance predates repave and current footage",
     "Polygon boundaries and material weights are artistic estimates, not measured vegetation coverage or reflectance",

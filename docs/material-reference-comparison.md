@@ -1520,3 +1520,35 @@ datum transform, not inferred from a screenshot. Correct the field transition
 along that actual road boundary before increasing the whole pale region's gain.
 The scene is still visibly synthetic. Native Mac testing was unavailable because
 the intended Tailscale peer reported offline during this pass.
+
+
+## Road constrained field transition
+
+The production map now uses `data/reference/turn2-straw-regions-roadside.json`.
+The historical pale outline expands by an artistic 12 metres, clipped at one
+metre from current road geometry. Disconnected pieces beyond the road are
+removed. Its interior feather remains 1.5 metres. This is a visual placement
+rule, not a measured vegetation edge or an instruction to change physics.
+The output SHA256 is
+`9c5f706f71974a2691a0ba291d723ce0cf8b8d85dae81ec6a371108b60fe96dc`.
+The builder defaults to the adopted annotation and records its own source hash.
+
+This correction narrows the broad brown apron visible through Turn 2. Entry and
+apex comparisons use identical camera and lighting with unchanged material gains:
+`artifacts/roadside-field-comparison/00.png` and `01.png`. Both root and independent
+review found a modest improvement without a new visible hard polygon edge.
+The imported production scene was also inspected at station 1280 in
+`artifacts/turn2-roadside-production-exit`. The near shoulder still appears too
+uniform, and scattered stubble does not yet convey the reference's flattened
+field. These stills do not establish temporal stability or photographic fidelity.
+Five field annotation tests cover datum mapping, blending, road clearance and
+exclusion of disconnected regions. No track geometry, friction or action schema
+changes are involved.
+
+The framing audit also found that recent comparisons used the 1.51 metre rider
+anchor. The existing 1.14 metre onboard anchor reveals too much cockpit for frame
+40. Preview overrides now independently control camera height (0.9 to 1.8 m),
+downward pitch (0 to 40 degrees), and FOV (50 to 110 degrees), reject nonfinite
+inputs and chase camera use, and save their values in capture metadata.
+The 1.37 metre study makes more cockpit visible but is not a recovered camera
+calibration. Human camera defaults and the policy camera remain unchanged.

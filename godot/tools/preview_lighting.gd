@@ -18,6 +18,7 @@ func _run() -> void:
 	var field_map_sha256 := ""
 	var field_map_strength := -1.0
 	var camera_mode := 2
+	var camera_overrides := {}
 	var station_m := 400.0
 	var fog_density := -1.0
 	var paving_joint_strength := -1.0
@@ -80,6 +81,27 @@ func _run() -> void:
 			asphalt_detail["authored_tile_m" if is_tile else "authored_relief_m"] = float(value)
 		elif arg.begins_with("--terrain-detail="):
 			detail_source = arg.trim_prefix("--terrain-detail=")
+		elif (
+			arg.begins_with("--camera-height-m=")
+			or arg.begins_with("--camera-pitch-deg=")
+			or arg.begins_with("--camera-fov-deg=")
+		):
+			var name := arg.get_slice("=", 0).trim_prefix("--camera-")
+			var value := arg.get_slice("=", 1)
+			var bounds: Vector2 = {
+				"height-m": Vector2(0.9, 1.8),
+				"pitch-deg": Vector2(0, 40),
+				"fov-deg": Vector2(50, 110)
+			}[name]
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < bounds.x
+				or float(value) > bounds.y
+			):
+				_fail("Camera override outside finite study bounds: " + name)
+				return
+			camera_overrides[name] = float(value)
 		elif arg.begins_with("--pale-straw-gain-scale="):
 			var value := arg.get_slice("=", 1)
 			if (
@@ -239,6 +261,9 @@ func _run() -> void:
 		return
 	if is_finite(authored_yaw) and not sky_source.is_empty():
 		_fail("Authored yaw is only for the production panorama without a captured solar disk")
+		return
+	if not camera_overrides.is_empty() and camera_mode == 0:
+		_fail("Camera overrides require a rider or onboard camera")
 		return
 	if (is_finite(view_roll_deg) or view_yaw_deg != 0.0) and camera_mode == 0:
 		_fail("View roll study requires a rider or onboard camera")
@@ -440,6 +465,23 @@ func _run() -> void:
 	game.sim.position.y = game.track.sample_world(game.sim.position).height
 	game.sim.lean = deg_to_rad(lean_deg)
 	game._update_visual(1.0)
+	if camera_overrides.has("height-m"):
+		var anchor: Vector3 = (
+			game.bike.ONBOARD_CAMERA_LOCAL if camera_mode == 2 else game.bike.RIDER_EYE_LOCAL
+		)
+		anchor.y = camera_overrides["height-m"]
+		game.camera.global_position = game.bike.to_global(anchor)
+	if camera_overrides.has("pitch-deg"):
+		var tangent: Vector3 = game.sim.surface_forward(
+			game.track.sample_world(game.sim.position).normal
+		)
+		var upright := Vector3.UP.slide(tangent).normalized()
+		var pitch := deg_to_rad(float(camera_overrides["pitch-deg"]))
+		var gaze := tangent * cos(pitch) - upright * sin(pitch)
+		game.camera.look_at(game.camera.global_position + gaze * 30.0, upright)
+		game.camera.rotate_object_local(Vector3.FORWARD, game.sim.lean * 0.22)
+	if camera_overrides.has("fov-deg"):
+		game.camera.fov = camera_overrides["fov-deg"]
 	if view_yaw_deg != 0.0:
 		game.camera.rotate(Vector3.UP, deg_to_rad(view_yaw_deg))
 	if is_finite(view_roll_deg):
@@ -650,6 +692,7 @@ func _run() -> void:
 							"pose_status":
 							"Artistic static framing study, not reconstructed physical lean or lens calibration",
 							"camera": camera_mode,
+							"camera_overrides": camera_overrides,
 							"fov": game.camera.fov,
 							"camera_transform": str(game.camera.global_transform),
 							"variants": variants,

@@ -260,7 +260,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--annotations",
         type=Path,
-        default=ROOT / "data/reference/turn2-straw-regions.json",
+        default=ROOT / "data/reference/turn2-straw-regions-roadside.json",
     )
     args = parser.parse_args()
     build(args.output_dir.resolve(), args.annotations.resolve())
