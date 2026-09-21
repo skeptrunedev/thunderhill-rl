@@ -334,3 +334,30 @@ Human controls passed with zero failures; local Linux frame intervals were
 17.269 ms median and 18.315 ms p95 over 270 samples. Five agent camera observations
 passed the existing capture checks in `artifacts/solar-corrected-camera-qa`.
 Mac export `74bd8a5fb095-af94ae03c423` completed; native laptop testing is pending.
+
+## Circumsolar brightness experiment
+
+The optional `preview_lighting.gd --solar-haze=0..8` adds an authored angular
+brightness lobe to both the visible sky and its environment radiance. This is
+an appearance experiment, not measured atmospheric scattering. Its shader
+default is zero and the playable game does not enable it.
+
+Strength three made little visible difference at stations 850 and 1150.
+Strength eight whitened the upper edge of the straight capture, but failed to
+reproduce the reference frame 30 brightness extending toward the horizon.
+Root and independent review rejected promotion. Evidence is in
+`artifacts/solar-haze3-straight`, `solar-haze3-apex`, and `solar-haze8-straight`.
+The reference is `artifacts/reference/ken-moto-turn2-avc/frame-0030.00.jpg`.
+
+The preview now records the direct sun direction projected into the camera.
+At station 850, camera two, the projection is (682.89, -472.21) pixels for a
+1280 by 720 capture. It is in front of the camera but above the image. This
+explains why raising this lobe's strength mainly affects the upper edge.
+It does not recover the true solar elevation from the footage: camera pitch,
+lens, cloud placement, exposure and bloom remain uncalibrated. The next lighting
+comparison must resolve that registration rather than simply increase gain.
+
+The projection describes a direction, not actual raster visibility or occlusion.
+Editor import and the real Vulkan preview completed successfully. Formatter
+and whitespace checks passed. This experiment does not change physics, agent
+observations, or the default sky appearance.

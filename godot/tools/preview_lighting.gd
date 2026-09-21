@@ -17,6 +17,7 @@ func _run() -> void:
 	var ground_study := "production"
 	var ground_study_metadata := {}
 	var sky_source := ""
+	var solar_haze := 0.0
 	var sky_patch_path := ""
 	var sky_patch_off := false
 	var sky_secondary_off := false
@@ -53,7 +54,18 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--sun-azimuth-deg="):
+		if arg.begins_with("--solar-haze="):
+			var value := arg.trim_prefix("--solar-haze=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 8.0
+			):
+				_fail("Solar haze must be finite and within zero to eight")
+				return
+			solar_haze = float(value)
+		elif arg.begins_with("--sun-azimuth-deg="):
 			var value := arg.trim_prefix("--sun-azimuth-deg=")
 			if (
 				not value.is_valid_float()
@@ -704,6 +716,13 @@ func _run() -> void:
 		sun.look_at(
 			-Vector3(sin(azimuth) * horizontal, toward.y, -cos(azimuth) * horizontal), Vector3.UP
 		)
+	environment.sky.sky_material.set_shader_parameter("solar_haze_strength", solar_haze)
+	environment.sky.sky_material.set_shader_parameter(
+		"solar_haze_direction", sun.global_basis.z.normalized()
+	)
+	var sun_point: Vector3 = game.camera.global_position + sun.global_basis.z.normalized() * 100.0
+	var projected_sun: Vector2 = game.camera.unproject_position(sun_point)
+	var sun_in_front: bool = -game.camera.to_local(sun_point).z > 0.0
 	for row in variants:
 		if row.name == "production" and fog_density < 0.0:
 			row.fog = environment.fog_density
@@ -737,6 +756,9 @@ func _run() -> void:
 					. stringify(
 						{
 							"orchard_study": orchard_metadata,
+							"solar_haze_strength": solar_haze,
+							"sun_projection_pixels": [projected_sun.x, projected_sun.y],
+							"sun_projection_in_front": sun_in_front,
 							"asphalt_study": asphalt_study,
 							"asphalt_study_metadata": asphalt_study_metadata,
 							"ground_study": ground_study,

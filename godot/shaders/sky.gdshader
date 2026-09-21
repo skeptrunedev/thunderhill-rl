@@ -4,6 +4,10 @@ uniform sampler2D panorama : filter_linear_mipmap, repeat_enable;
 uniform bool panorama_is_srgb = false;
 // An authored LDR sky needs an explicit artistic radiance scale, not an HDR claim.
 uniform float panorama_energy = 1.0;
+// Original circumsolar brightness study, not measured atmospheric scattering.
+// Shared by visible sky and environment lighting to preserve their agreement.
+uniform float solar_haze_strength : hint_range(0.0, 8.0) = 0.0;
+uniform vec3 solar_haze_direction = vec3(0.0, 1.0, 0.0);
 // Artistic cloud radiance reconstruction for the authored LDR panorama.
 // One is unchanged; this is not a measured HDR conversion.
 uniform float cloud_radiance_gain : hint_range(1.0, 4.0) = 1.0;
@@ -110,6 +114,12 @@ void sky() {
     float cloud = smoothstep(0.30, 0.80, source_luminance)
                 * (1.0 - smoothstep(0.20, 0.65, source_chroma));
     COLOR *= panorama_energy * mix(1.0, cloud_radiance_gain, cloud);
+    if (solar_haze_strength > 0.0) {
+        float toward = max(dot(direction, normalize(solar_haze_direction)), 0.0);
+        float haze = pow(toward, 64.0) + 0.25 * pow(toward, 8.0);
+        haze *= smoothstep(-0.02, 0.08, direction.y);
+        COLOR += vec3(1.0, 0.96, 0.90) * solar_haze_strength * haze * mix(0.35, 1.0, cloud);
+    }
     if (AT_CUBEMAP_PASS) {
         if (use_ground_radiance) {
             float ground_weight = 1.0 - smoothstep(-0.12, 0.02, direction.y);
