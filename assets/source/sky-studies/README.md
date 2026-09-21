@@ -52,3 +52,21 @@ The shader blends the patch into the original panorama in fixed world space,
 for both visible sky and environment light, while retaining the existing direct
 sun direction and lower hemisphere ground radiance. This remains LDR authored
 appearance. No photographic radiometry is claimed.
+
+## Apex cirrus source
+
+`cirrus-apex-v1.png` is an original generated sky view from the built in imagegen
+tool, using frame 40 only as a cloud morphology reference. The exact prompt is
+`cirrus-apex-v1-prompt.txt`. Actual dimensions are 1536 by 1024 RGB; source SHA256
+is `d0c4fe1317059a7567d30621e7bd7ef6f57de7de717f6b30ed7955c22ca58a75`.
+It uses the project MIT license as an original asset. No footage pixels are
+bundled in the game.
+
+This second rectilinear source covers the viewing direction reached around
+Turn 2's apex, outside the first patch's central coverage. Runtime projection
+uses estimated azimuth 195 degrees, elevation 35 degrees, horizontal FOV 100
+degrees and edge feather 0.15. These are artistic layout choices. The runtime
+`cirrus_apex_v1.res` has ten mip levels filtered in linear light, with output
+SHA256 `b49f2009b8102fd66fa28845168e87bc94d8c6858a28aa24070b189b15329ed1`.
+Both patches stay fixed in world coordinates and affect sky and environmental
+radiance together. The base panorama remains outside their coverage.

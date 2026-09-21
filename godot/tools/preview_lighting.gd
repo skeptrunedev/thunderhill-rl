@@ -13,6 +13,7 @@ func _run() -> void:
 	var sky_source := ""
 	var sky_patch_path := ""
 	var sky_patch_off := false
+	var sky_secondary_off := false
 	var sky_patch_metadata := {}
 	var field_map_path := ""
 	var field_map_sha256 := ""
@@ -244,6 +245,8 @@ func _run() -> void:
 			production_only = true
 		elif arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
+		elif arg == "--sky-secondary-off":
+			sky_secondary_off = true
 		elif arg == "--sky-patch-off":
 			sky_patch_off = true
 		elif arg.begins_with("--sky-patch="):
@@ -564,6 +567,8 @@ func _run() -> void:
 		sun.look_at(-toward, Vector3.UP)
 	if sky_patch_off:
 		environment.sky.sky_material.set_shader_parameter("sky_patch_enabled", false)
+	if sky_patch_off or sky_secondary_off:
+		environment.sky.sky_material.set_shader_parameter("sky_patch_secondary_enabled", false)
 	if not sky_patch_path.is_empty():
 		sky_patch_metadata = _apply_sky_patch(environment.sky.sky_material, sky_patch_path)
 		if sky_patch_metadata.has("error"):
@@ -606,6 +611,10 @@ func _run() -> void:
 						{
 							"sky_source": sky_source,
 							"sky_patch": sky_patch_metadata,
+							"runtime_secondary_sky_patch_enabled":
+							environment.sky.sky_material.get_shader_parameter(
+								"sky_patch_secondary_enabled"
+							),
 							"runtime_sky_patch_enabled":
 							environment.sky.sky_material.get_shader_parameter("sky_patch_enabled"),
 							"production_sky_metadata_sha256":

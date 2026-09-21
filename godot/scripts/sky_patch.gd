@@ -9,8 +9,13 @@ static func configure(
 	horizontal_fov_degrees: float,
 	center_azimuth_degrees: float,
 	center_elevation_degrees: float,
-	feather_fraction: float
+	feather_fraction: float,
+	slot: int = 0
 ) -> Dictionary:
+	if slot != 0 and slot != 1:
+		push_error("Sky patch slot must be 0 or 1")
+		return {}
+	var prefix := "sky_patch" if slot == 0 else "sky_patch_secondary"
 	var azimuth := deg_to_rad(center_azimuth_degrees)
 	var elevation := deg_to_rad(center_elevation_degrees)
 	var forward := Vector3(
@@ -22,13 +27,13 @@ static func configure(
 	var up := right.cross(forward)
 	var tan_horizontal := tan(deg_to_rad(horizontal_fov_degrees) * 0.5)
 	var tan_vertical := tan_horizontal * float(texture.get_height()) / float(texture.get_width())
-	material.set_shader_parameter("sky_patch", texture)
-	material.set_shader_parameter("sky_patch_forward", forward)
-	material.set_shader_parameter("sky_patch_right", right)
-	material.set_shader_parameter("sky_patch_up", up)
-	material.set_shader_parameter("sky_patch_tan_half_fov", Vector2(tan_horizontal, tan_vertical))
-	material.set_shader_parameter("sky_patch_feather", feather_fraction)
-	material.set_shader_parameter("sky_patch_enabled", true)
+	material.set_shader_parameter(prefix, texture)
+	material.set_shader_parameter(prefix + "_forward", forward)
+	material.set_shader_parameter(prefix + "_right", right)
+	material.set_shader_parameter(prefix + "_up", up)
+	material.set_shader_parameter(prefix + "_tan_half_fov", Vector2(tan_horizontal, tan_vertical))
+	material.set_shader_parameter(prefix + "_feather", feather_fraction)
+	material.set_shader_parameter(prefix + "_enabled", true)
 	return {
 		"horizontal_fov_degrees": horizontal_fov_degrees,
 		"vertical_fov_degrees": rad_to_deg(2.0 * atan(tan_vertical)),

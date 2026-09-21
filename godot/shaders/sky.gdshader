@@ -33,6 +33,14 @@ uniform vec3 sky_patch_right = vec3(-1.0, 0.0, 0.0);
 uniform vec3 sky_patch_up = vec3(0.0, 0.70710678, -0.70710678);
 uniform vec2 sky_patch_tan_half_fov = vec2(1.0, 1.0);
 uniform float sky_patch_feather = 0.15;
+// Independent secondary source, composited after the primary in overlaps.
+uniform bool sky_patch_secondary_enabled = false;
+uniform sampler2D sky_patch_secondary : filter_linear_mipmap, repeat_disable;
+uniform vec3 sky_patch_secondary_forward = vec3(0.0, 0.70710678, 0.70710678);
+uniform vec3 sky_patch_secondary_right = vec3(-1.0, 0.0, 0.0);
+uniform vec3 sky_patch_secondary_up = vec3(0.0, 0.70710678, -0.70710678);
+uniform vec2 sky_patch_secondary_tan_half_fov = vec2(1.0, 1.0);
+uniform float sky_patch_secondary_feather = 0.15;
 
 vec3 sample_panorama(vec2 uv, vec2 dx, vec2 dy) {
     vec3 value = textureGrad(panorama, uv, dx, dy).rgb;
@@ -41,6 +49,27 @@ vec3 sample_panorama(vec2 uv, vec2 dx, vec2 dy) {
                     step(vec3(0.04045), value));
     }
     return value;
+}
+
+vec3 blend_rectilinear_patch(vec3 base, vec3 direction, sampler2D source,
+                            vec3 forward, vec3 right, vec3 up,
+                            vec2 tan_half_fov, float feather) {
+    // Called only from uniform enable branches. Derivatives precede spatial
+    // coverage branching, including at the front hemisphere boundary.
+    float depth = dot(direction, forward);
+    vec2 projected = vec2(dot(direction, right), -dot(direction, up));
+    vec2 patch_uv = 0.5 + projected / (2.0 * max(depth, 0.0001) * tan_half_fov);
+    vec2 patch_dx = dFdx(patch_uv);
+    vec2 patch_dy = dFdy(patch_uv);
+    vec2 edge = min(patch_uv, vec2(1.0) - patch_uv);
+    float coverage = smoothstep(0.0, feather, min(edge.x, edge.y));
+    if (depth > 0.0 && coverage > 0.0) {
+        vec3 patch = textureGrad(source, clamp(patch_uv, vec2(0.0), vec2(1.0)), patch_dx, patch_dy).rgb;
+        patch = mix(patch / 12.92, pow((patch + vec3(0.055)) / 1.055, vec3(2.4)),
+                    step(vec3(0.04045), patch));
+        return mix(base, patch, coverage);
+    }
+    return base;
 }
 
 void sky() {
@@ -65,22 +94,16 @@ void sky() {
     } else {
         COLOR = sample_panorama(uv, dx, dy);
     }
-    // The enable branch is uniform. Compute derivatives before the spatial
-    // coverage branch, including at the projection's front hemisphere boundary.
+    // Both patches affect the background and the environment radiance below.
     if (sky_patch_enabled) {
-        float depth = dot(direction, sky_patch_forward);
-        vec2 projected = vec2(dot(direction, sky_patch_right), -dot(direction, sky_patch_up));
-        vec2 patch_uv = 0.5 + projected / (2.0 * max(depth, 0.0001) * sky_patch_tan_half_fov);
-        vec2 patch_dx = dFdx(patch_uv);
-        vec2 patch_dy = dFdy(patch_uv);
-        vec2 edge = min(patch_uv, vec2(1.0) - patch_uv);
-        float coverage = smoothstep(0.0, sky_patch_feather, min(edge.x, edge.y));
-        if (depth > 0.0 && coverage > 0.0) {
-            vec3 patch = textureGrad(sky_patch, clamp(patch_uv, vec2(0.0), vec2(1.0)), patch_dx, patch_dy).rgb;
-            patch = mix(patch / 12.92, pow((patch + vec3(0.055)) / 1.055, vec3(2.4)),
-                        step(vec3(0.04045), patch));
-            COLOR = mix(COLOR, patch, coverage);
-        }
+        COLOR = blend_rectilinear_patch(COLOR, direction, sky_patch,
+                    sky_patch_forward, sky_patch_right, sky_patch_up,
+                    sky_patch_tan_half_fov, sky_patch_feather);
+    }
+    if (sky_patch_secondary_enabled) {
+        COLOR = blend_rectilinear_patch(COLOR, direction, sky_patch_secondary,
+                    sky_patch_secondary_forward, sky_patch_secondary_right, sky_patch_secondary_up,
+                    sky_patch_secondary_tan_half_fov, sky_patch_secondary_feather);
     }
     float source_luminance = dot(COLOR, vec3(0.2126, 0.7152, 0.0722));
     float source_chroma = (max(max(COLOR.r, COLOR.g), COLOR.b) - min(min(COLOR.r, COLOR.g), COLOR.b)) / max(source_luminance, 0.001);

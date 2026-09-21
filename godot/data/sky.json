@@ -37,5 +37,19 @@
     "center_elevation_degrees": 30.0,
     "feather_fraction": 0.15,
     "status": "Original generated rectilinear cloud appearance from frame40 morphology. Projection is an artistic estimate, not recovered weather or lens calibration."
+  },
+  "secondary_detail_patch": {
+    "source": "assets/source/sky-studies/cirrus-apex-v1.png",
+    "sha256": "d0c4fe1317059a7567d30621e7bd7ef6f57de7de717f6b30ed7955c22ca58a75",
+    "runtime_texture": "res://assets/sky/cirrus_apex_v1.res",
+    "dimensions": [
+      1536,
+      1024
+    ],
+    "horizontal_fov_degrees": 100.0,
+    "center_azimuth_degrees": 195.0,
+    "center_elevation_degrees": 35.0,
+    "feather_fraction": 0.15,
+    "status": "Original generated cloud appearance; artistic projection for apex sky coverage, not measured weather or camera calibration."
   }
 }

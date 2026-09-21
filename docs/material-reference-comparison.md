@@ -1707,3 +1707,40 @@ not a recovered paint scan. The still does not establish temporal stability.
 Rendered controls passed with zero failures. Linux frame intervals were
 17.36 ms median and 25.00 ms p95 across 262 samples; these are not Mac timings.
 The Mac package exported successfully and remains separately unverified.
+
+## Sky coverage around the apex
+
+The first detailed sky region points toward azimuth 82.5 degrees. The current
+apex camera points roughly toward azimuth 194 degrees, where most of the visible
+sky still came from the lower resolution 1774 by 887 panorama. Sharpening the
+first patch would not fix this coverage gap.
+
+A second original 1536 by 1024 rectilinear source, documented in
+`assets/source/sky-studies/README.md`, covers the apex direction. The shader now
+accepts two independent fixed world projections, each with its own texture and
+edge feather. The second composites after the first before shared sky radiance
+and background processing. Direct sunlight and its direction are unchanged.
+The setup helper preserves the original default slot and rejects invalid slots.
+Projection tests cover independent parameters and cardinal and polar bases.
+
+`artifacts/sky-secondary-comparison/00.png` uses the new secondary off diagnostic
+to isolate the additional source. Entry, middle and apex production captures
+were inspected. Root and independent review found more natural separated cloud
+structure than the soft panorama, without an obvious rectangular boundary in
+these stills. The bright cloud arrangement and morphology still differ from
+frame 40; the generated source is not a reconstruction of measured weather.
+The new `--sky-secondary-off` flag disables only the added region; existing
+`--sky-patch-off` disables both. Capture metadata records both enabled states.
+
+The rendered human controls check passed with zero failures. Linux frame
+intervals were 17.36 ms median and 20.47 ms p95 across 264 samples.
+`artifacts/turn2-detailed-sky.mp4` records the compatible Turn 2 replay with
+the current display, camera, paint and sky at 1280 by 800, 30 FPS. Its
+23.33 seconds include a short stationary tail. Contact sheet inspection at
+two second intervals found no obvious hard patch boundary during the turn;
+this sampling does not establish fine temporal stability. Fixed frame rate
+movie capture is not a live performance measurement.
+
+Mac export `8068a2089019-3266bd5ec984` completed successfully. Its manifest
+records the exact source content and artifact digest. This package has not
+been tested on the Mac, which was offline during this pass.

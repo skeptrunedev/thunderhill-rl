@@ -299,6 +299,16 @@ func _environment() -> void:
 		float(patch.center_elevation_degrees),
 		float(patch.feather_fraction)
 	)
+	var secondary_patch: Dictionary = sky_metadata.secondary_detail_patch
+	preload("res://scripts/sky_patch.gd").configure(
+		sky_mat,
+		preload("res://assets/sky/cirrus_apex_v1.res"),
+		float(secondary_patch.horizontal_fov_degrees),
+		float(secondary_patch.center_azimuth_degrees),
+		float(secondary_patch.center_elevation_degrees),
+		float(secondary_patch.feather_fraction),
+		1
+	)
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
