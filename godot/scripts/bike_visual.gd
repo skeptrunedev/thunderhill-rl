@@ -509,13 +509,19 @@ func _build_front() -> void:
 		_red,
 		_front
 	)
+	# The rear of the lamp tapers below the instrument cluster rather than
+	# presenting a tank sized oval cap toward the rider. Original estimates
+	# guided by the cockpit and manufacturer photographs, not measured CAD.
+	var headlight_finish := ShaderMaterial.new()
+	headlight_finish.shader = preload("res://shaders/cockpit_finish.gdshader")
 	var headlight := _body_panel(
 		[
 			Vector4(-0.08, 0.53, 0.08, 0.025),
 			Vector4(0.02, 0.58, 0.16, 0.07),
-			Vector4(0.13, 0.59, 0.12, 0.08)
+			Vector4(0.08, 0.56, 0.115, 0.052),
+			Vector4(0.13, 0.54, 0.075, 0.038)
 		],
-		_black,
+		headlight_finish,
 		_front
 	)
 	headlight.name = "HeadlightShell"

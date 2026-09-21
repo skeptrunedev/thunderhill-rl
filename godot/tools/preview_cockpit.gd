@@ -16,6 +16,7 @@ func _run() -> void:
 	var reservoir_overrides := {}
 	var legacy_housing := false
 	var hide_headlight := false
+	var exterior_views := false
 	var sun_shadows := true
 	var diagnostic_sun := false
 	var shadow_bias := -1.0
@@ -37,7 +38,9 @@ func _run() -> void:
 		_fail("Choose one display filtering mode")
 		return
 	for arg in arguments:
-		if arg == "--hide-headlight-shell":
+		if arg == "--exterior":
+			exterior_views = true
+		elif arg == "--hide-headlight-shell":
 			hide_headlight = true
 		elif arg == "--high-shadow-filter":
 			high_shadow_filter = true
@@ -153,6 +156,25 @@ func _run() -> void:
 		{"name": "forward", "anchor": Vector3(-0.04, 1.22, -0.37), "pitch": 0.45, "fov": 85.0},
 		{"name": "wide", "anchor": Vector3(-0.04, 1.20, -0.27), "pitch": 0.45, "fov": 90.0}
 	]
+	if exterior_views:
+		variants.append(
+			{
+				"name": "front_quarter",
+				"anchor": Vector3(1.0, 1.15, -1.8),
+				"target": Vector3(0, 0.9, -0.65),
+				"pitch": 0.0,
+				"fov": 55.0
+			}
+		)
+		variants.append(
+			{
+				"name": "side",
+				"anchor": Vector3(1.3, 1.0, -0.60),
+				"target": Vector3(0, 0.9, -0.65),
+				"pitch": 0.0,
+				"fov": 55.0
+			}
+		)
 	for row in variants:
 		if FileAccess.file_exists(output.path_join(row.name + ".png")):
 			_fail("Refusing to overwrite captures")
@@ -296,10 +318,15 @@ func _run() -> void:
 	for row in variants:
 		if row.name != "production":
 			game.camera.global_position = game.bike.to_global(row.anchor)
-			var direction := Vector3(0, -sin(row.pitch), -cos(row.pitch))
-			game.camera.look_at(
-				game.camera.position + game.bike.global_basis * direction, game.bike.global_basis.y
-			)
+			if row.has("target"):
+				game.camera.look_at(game.bike.to_global(row.target), game.bike.global_basis.y)
+				game.camera.set_cull_mask_value(20, true)
+			else:
+				var direction := Vector3(0, -sin(row.pitch), -cos(row.pitch))
+				game.camera.look_at(
+					game.camera.position + game.bike.global_basis * direction,
+					game.bike.global_basis.y
+				)
 			game.camera.fov = row.fov
 		for frame in 24:
 			await RenderingServer.frame_post_draw
@@ -325,6 +352,7 @@ func _run() -> void:
 				FileAccess.get_sha256("res://shaders/reservoir.gdshader"),
 				"anchor": [row.anchor.x, row.anchor.y, row.anchor.z],
 				"pitch_rad": row.pitch,
+				"target_bike_local": str(row.target) if row.has("target") else "",
 				"fov": row.fov,
 				"camera_transform": str(game.camera.global_transform)
 			}

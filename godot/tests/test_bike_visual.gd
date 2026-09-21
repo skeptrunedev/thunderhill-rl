@@ -31,6 +31,7 @@ func _run() -> void:
 		if not _check_reservoir(bike._reservoir_shell(cap), cap):
 			quit(1)
 			return
+	_check_closed_shell(bike.find_child("HeadlightShell", true, false).mesh)
 	# The front cap must stay planar; the rounded rim has independent smooth normals.
 	var housing: MeshInstance3D = bike._front.get_node("LiveInstrumentCluster").get_child(0)
 	var panel_arrays := housing.mesh.surface_get_arrays(0)
@@ -232,3 +233,34 @@ func _check_lathe(bike: Node3D, stage: Node3D) -> bool:
 		push_error("Lathe orientation invalid: wrong normals=%d volume=%f" % [wrong, volume])
 		return false
 	return true
+
+
+func _check_closed_shell(mesh: ArrayMesh) -> void:
+	var arrays := mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var edges := {}
+	var volume := 0.0
+	for vertex in vertices:
+		assert(vertex.is_finite())
+	for normal in normals:
+		assert(normal.is_finite() and absf(normal.length() - 1.0) < 0.0001)
+	for i in range(0, indices.size(), 3):
+		var a := vertices[indices[i]]
+		var b := vertices[indices[i + 1]]
+		var c := vertices[indices[i + 2]]
+		var cross := (b - a).cross(c - a)
+		assert(cross.length() > 0.000000001, "Degenerate headlamp triangle")
+		assert(
+			cross.dot(normals[indices[i]] + normals[indices[i + 1]] + normals[indices[i + 2]]) < 0,
+			"Headlamp winding disagrees with normals"
+		)
+		volume -= a.dot(b.cross(c)) / 6.0
+		for edge in [[a, b], [b, c], [c, a]]:
+			var key: Array = edge.duplicate()
+			key.sort()
+			edges[key] = edges.get(key, 0) + 1
+	for count in edges.values():
+		assert(count == 2, "Headlamp must remain closed")
+	assert(volume > 0, "Headlamp volume must face outward")
