@@ -15,3 +15,17 @@ edge blending. No solar disk or recovered radiometric calibration is present.
 Prompt:
 
 Use case: photorealistic-natural. Asset type: original seamless equirectangular pure sky panorama for a realistic motorcycle racing game at Thunderhill in dry California midday. Create a 3840 by 1920 image, exactly 2:1 longitude latitude spherical projection covering 360 degrees horizontally and 180 vertically. Top row is zenith, middle row is horizon, bottom row is nadir. Upper hemisphere: natural medium blue sky with large blue openings and fine white feathery cirrus filaments, elongated broken sheets of delicate high cloud, some fine mottled cirrocumulus, approximately 45 percent cloud cover. Cloud forms should look photographed, slender and translucent, never rounded puffy cumulus. These visual properties are based on inspected motorcycle onboard footage: bright wispy cloud layer upper left, deeper blue gaps overhead and to the right, hazy pale blue horizon. No warm sunset. No dramatic storm. No terrain, no mountains, no trees, no buildings, no road, no objects, no text or watermarks. No visible solar disk or lens flare; directional sunlight will be supplied by the game. Below the horizon continue a softly uniform pale atmospheric blue, with no objects or clouds. Smooth left/right seam with matching edge color and cloud continuity, no borders. Top polar region must converge smoothly without a pinched radial star. This is a game texture, not a screenshot or landscape picture. Original cloud arrangement, not a copied photographic frame.
+
+## Direct reference v2 study
+
+`cirrus-v2.png` was generated with the built in imagegen tool. Image inputs
+were `artifacts/reference/ken-moto/frame-0040.00.jpg` for sky morphology and
+`cirrus-v1.png` for panorama projection layout. The exact prompt is saved in
+`cirrus-v2-prompt.txt`. Requested 3840 by 1920, returned 1774 by 887. SHA256:
+`575c75ef2dd29b9a6647481fe9d102c99d64cf2f3c3f1357862f35ed513e07ba`.
+This is an original generated LDR study, not measured weather or HDR radiance.
+The video frame is a reference, not included as a runtime texture.
+
+Rejected after the rendered comparison: larger opaque cloud patches were
+softer than the reference's fine translucent streaks. It is not installed
+as a production asset. See `docs/sky-lighting.md` for the control experiment.

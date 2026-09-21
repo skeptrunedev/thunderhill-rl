@@ -335,7 +335,14 @@ func _run() -> void:
 		if FileAccess.get_sha256(source.local_path) != source.sha256:
 			_fail("Candidate sky differs from manifest")
 			return
-		image.generate_mipmaps()
+		if source.get("encoding", "linear") == "srgb":
+			image = preload("res://scripts/color_mipmaps.gd").build(image)
+		elif image.generate_mipmaps() != OK:
+			_fail("Cannot generate candidate sky mipmaps")
+			return
+		if image == null or image.is_empty():
+			_fail("Cannot build candidate sky color mipmaps")
+			return
 		environment.sky.sky_material.set_shader_parameter(
 			"panorama", ImageTexture.create_from_image(image)
 		)

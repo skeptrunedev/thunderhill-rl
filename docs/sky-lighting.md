@@ -218,3 +218,37 @@ is insufficient evidence of a closer reference match.
 Both Godot study runs exited successfully with nonblack captures. The fetcher
 passed Python compilation and diff checks. No production game assets, shaders,
 physics or camera protocol changed; no new native build is claimed.
+
+## Direct video reference panorama study
+
+A second original panorama now uses frame 40 directly as an image reference,
+with v1 supplied only as the projection layout reference. Its exact prompt
+and unchanged generated PNG are retained in `assets/source/sky-studies`.
+The generator again returned 1774 by 887 despite the requested 3840 by 1920.
+That supplies only about 4.93 source pixels per degree before seam overlap.
+It does not supply high resolution detail simply because the prompt asks for it.
+
+`artifacts/cirrus-v2-baseline/production.png` and
+`artifacts/cirrus-v2-rider/production.png` use the same station 950 rider pose.
+Camera transform, FOV, sunlight direction, exposure, fog, panorama radiance
+scale, seam overlap and ground radiance match exactly in their metadata.
+The texture changes both background and environment illumination. Root and
+independent visual review reject v2: it introduces broad soft opaque white
+patches rather than the reference's finer translucent filaments. Increased
+coverage is not evidence of improved photographic realism.
+
+The preview previously generated ordinary encoded mipmaps for LDR sky inputs,
+unlike the production linear light builder. It now uses the same existing
+builder for sRGB inputs and checks generation failures for both encodings.
+To validate the preview against runtime loading, the original v1 PNG was
+loaded through the candidate path with matching source metadata. The complete
+1280 by 720 capture in `artifacts/cirrus-v1-linear-control/production.png`
+is pixel identical to the production baseline. This verifies that this
+preview reproduces the production texture path for the tested pose. The v2
+cloud enlargement is therefore not a candidate versus production mapping
+difference. Source morphology and limited angular detail remain the next
+authoring constraints; exact video registration is still unproven.
+
+All three Godot rendering runs completed successfully with nonblack captures.
+Formatting and diff checks passed. No production asset or shader was changed
+in this study, and no new native build is claimed.
