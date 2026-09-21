@@ -1090,3 +1090,20 @@ protocols are unchanged.
 Human controls passed with zero failures (Linux median 17.313 ms, p95 18.863 ms,
 270 frames). Formatting and diff checks pass. Mac export passed as
 `53b4b529b5bf-3c5361a25ede`; native Mac execution remains unverified for this build.
+
+## Next field material pass
+
+A fresh comparison of frame 40 and
+`artifacts/straw-layered-rider-view/production.png` identifies the broad field
+composition as the largest remaining surface mismatch in this view. Pale straw
+regions and darker curved flattened strips in the footage become a mostly
+uniform brown field in the render. Resolved foreground fibers do not correct
+the distant material mixture. Historical aerial evidence also shows distinct
+mowing regions with a change of orientation inside Turn 2.
+
+The next candidate should be a spatially registered, nonrepeating Turn 2 straw
+coverage map. Use the aerial for placement and footage for appearance. Blend
+pale flattened straw against exposed earth while keeping fine texture scale
+and normals independent of those broad transitions. This is a proposed authored
+appearance map, not a measured contemporary coverage or friction map. Do not
+repeat the rejected global contrast, enlarged tile, or generic stripe changes.

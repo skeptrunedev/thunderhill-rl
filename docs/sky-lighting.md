@@ -188,3 +188,33 @@ terminated with signal 15 after the engine export stage, before writing its
 manifest. After confirming that process had ended, a fresh packaging invocation
 completed the archive checks and provenance manifest. Native Mac execution
 remains unverified for this build.
+
+## Photographic 38 degree cloud study
+
+The verified CC0 candidate
+[Kloofendal 38d Partly Cloudy Pure Sky](https://polyhaven.com/a/kloofendal_38d_partly_cloudy_puresky)
+by Greg Zaal and Jarod Guest is now reproducible through
+`uv run tools/fetch_sky.py --candidate kloofendal_38d_partly_cloudy_puresky`.
+This is distinct from the previously evaluated 48 degree source. The publisher
+API pins the 4096 by 2048 HDR to MD5 `f0e9e19f824767c92f36d2af7ae605b8`;
+the downloaded 20,462,635 bytes passed that check and decoded at the expected
+resolution. Existing candidates retain their pinned 2K downloads.
+
+`artifacts/sky-38d-rider/production.png` uses the existing station 950 artistic
+rider pose (camera 1, lean minus 25 degrees, optical roll minus 14 degrees,
+lateral 4 m and yaw 8 degrees). The source is rotated to match production sun
+azimuth. This changes ambient radiance and sun elevation, so it is a combined
+sky and lighting study, not an isolated background comparison.
+
+The photographic clouds resolve more sharply than the generated panorama,
+but the rendered sky has excessive continuous cloud coverage and pale blue
+openings compared with reference frame 40. The supplementary
+`artifacts/sky-38d-exposure/` study holds fog at production 0.00008. Root
+inspected the background energy 0.4 and saturation 1.6 variants as well as the
+production settings. Neither restores the required open blue areas and thin
+elongated bands. This candidate is not adopted. Sharper source detail alone
+is insufficient evidence of a closer reference match.
+
+Both Godot study runs exited successfully with nonblack captures. The fetcher
+passed Python compilation and diff checks. No production game assets, shaders,
+physics or camera protocol changed; no new native build is claimed.

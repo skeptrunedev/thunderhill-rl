@@ -22,11 +22,12 @@ MD5 = "2eba3a4d7eeb23cbfbeca364c97e7980"
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--candidate", choices=["aristea_wreck_puresky", "kloppenheim_05_puresky", "kloppenheim_03_puresky", "cloud_layers", "cayley_lookout"])
+    parser.add_argument("--candidate", choices=["aristea_wreck_puresky", "kloppenheim_05_puresky", "kloppenheim_03_puresky", "cloud_layers", "cayley_lookout", "kloofendal_38d_partly_cloudy_puresky"])
     args = parser.parse_args()
     asset = args.candidate or "kloofendal_48d_partly_cloudy_puresky"
-    pins = {"aristea_wreck_puresky": "e764c66f871ab0987f3fac422edc841d", "kloppenheim_05_puresky": "adb05080152dc9ee44ca41d6452748e4", "kloppenheim_03_puresky": "06abf490739e537e9339d619a2a3c941", "cloud_layers": "4f0d6e3d46dd31e8bff222ba3b9c9eed", "cayley_lookout": "050097d1e383a128b1330d6197972ec0"}
-    url = f"https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/{asset}_2k.hdr" if args.candidate else URL
+    pins = {"aristea_wreck_puresky": "e764c66f871ab0987f3fac422edc841d", "kloppenheim_05_puresky": "adb05080152dc9ee44ca41d6452748e4", "kloppenheim_03_puresky": "06abf490739e537e9339d619a2a3c941", "cloud_layers": "4f0d6e3d46dd31e8bff222ba3b9c9eed", "cayley_lookout": "050097d1e383a128b1330d6197972ec0", "kloofendal_38d_partly_cloudy_puresky": "f0e9e19f824767c92f36d2af7ae605b8"}
+    resolution = 4 if asset == "kloofendal_38d_partly_cloudy_puresky" else 2
+    url = f"https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/{resolution}k/{asset}_{resolution}k.hdr" if args.candidate else URL
     expected_md5 = pins[asset] if args.candidate else MD5
     path = ROOT / "artifacts/sky-studies" / f"{asset}.hdr"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -36,7 +37,7 @@ def main():
     raw = path.read_bytes()
     assert hashlib.md5(raw).hexdigest() == expected_md5, "Sky differs from pinned publisher hash"
     image = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
-    assert image is not None and image.shape == (1024, 2048, 3)
+    assert image is not None and image.shape == (resolution * 512, resolution * 1024, 3)
     luminance = image @ np.array([0.0722, 0.7152, 0.2126])
     y, x = np.unravel_index(np.argmax(luminance), luminance.shape)
     # Matches sky.gdshader's explicit atan(x,z) / acos(y) panorama mapping.
@@ -47,7 +48,7 @@ def main():
                 "download_url": url, "authors": ["Greg Zaal"] if asset in {"cloud_layers", "cayley_lookout"} else ["Greg Zaal", "Jarod Guest"],
                 "license": "CC0-1.0", "license_url": "https://polyhaven.com/license",
                 "publisher_md5": expected_md5, "sha256": hashlib.sha256(raw).hexdigest(),
-                "bytes": len(raw), "dimensions": [2048, 1024], "sun_pixel_xy": [int(x),int(y)],
+                "bytes": len(raw), "dimensions": [image.shape[1], image.shape[0]], "sun_pixel_xy": [int(x),int(y)],
                 "toward_sun": toward_sun,
                 "status": "Generic sky reference; not Thunderhill weather or calibrated radiometry"}
     metadata["local_path"] = str(path)
