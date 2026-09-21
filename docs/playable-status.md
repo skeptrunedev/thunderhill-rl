@@ -23,11 +23,21 @@ Evidence: `artifacts/agent-closeout-check.json` and
 not proof of long episode stability or parallel isolation. No model training ran.
 
 Before a learning pilot, finish versioned reward configuration, bounded episode
-and invalid action budgets, explicit terminal reasons, parallel isolation checks,
+and invalid action budgets, explicit terminal reasons, longer parallel isolation checks,
 and the trainer's observation, action and token trace joins. The current game
 records raw progress, elapsed time and crash components; it is not yet a complete
 training harness. Harbor integration and a verified adapter update remain open.
 The full requirements remain in [the RL contract](rl-game-contract.md).
+
+A subsequent two process check passed with `tools/check_parallel.py`. Both workers
+started from equal physical states, advanced concurrently with different controls
+and identical action identifiers, and produced distinct outcomes. Resetting either
+worker left the other observation unchanged. Advancing one left the other frozen;
+a foreign episode identifier was rejected. Separate user data directories held
+exactly 24 and 12 transitions with only their own policy identifiers. Evidence:
+`artifacts/parallel-closeout-check.json`. This is short telemetry isolation evidence,
+not a camera concurrency, long episode, GPU memory or throughput benchmark. A
+future rollout launcher must preserve the separate process user data directories.
 
 The optional Turn 2 edge hypothesis is preserved in development tools only.
 `build_turn2_exit_envelope.py` requires its original track hash and sampled
