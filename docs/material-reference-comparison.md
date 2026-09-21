@@ -1385,3 +1385,31 @@ Human controls pass with zero failures (Linux median 17.217 ms, p95 24.864 ms,
 265 frames). Mac export passes as `7880a095bd5b-246d85cdc600`, without native
 Mac verification. These checks validate the tooling integration and unchanged
 production material defaults, not a new visual fidelity claim.
+
+### Aggregate scale correction (2026-09-21)
+
+The controlled Turn 2 study isolates a coarse foreground aggregate pattern in
+`artifacts/pavement-aggregate-control/production.png`. Removing inferred normal
+relief alone (`pavement-aggregate-flat`) leaves the visible color speckle. Reducing
+the authored texture repeat from 0.8 m to 0.25 m produces smaller, less prominent
+grain (`pavement-aggregate-fine`). Relief changes proportionally from 0.00035 m to
+0.000109375 m, preserving the relief to tile ratio. These defaults are adopted.
+The broad binder variation, roughness, collision mesh and friction are unchanged.
+
+This is an appearance estimate, not measured aggregate size. Frame 40 has motion
+blur and different framing, so smoothness in that frame alone cannot establish
+physical stone dimensions. The result improves the static foreground appearance;
+it does not establish a calibrated match or solve the field and cockpit gaps.
+
+Reproduce the controlled pose with `preview_lighting.gd`, using
+`--production-only --camera=1 --station-m=950 --lateral-m=4 --lean-deg=-25
+--view-roll-deg=-14 --view-yaw-deg=8`. The old material can be captured with
+`--asphalt-tile-m=0.8 --asphalt-relief-m=0.00035`. The diagnostic tool validates
+finite tile values in [0.05, 2] metres and relief in [0, 0.002] metres and records
+explicit overrides. Shader hashes record the default values when not overridden.
+
+The comparison specification is `artifacts/pavement-aggregate-comparison.json`;
+`tools/compare_material_views.py` generated the reference and controlled pairs in
+`artifacts/pavement-aggregate-comparison/`, without color grading or upsampling.
+The Linux human control check passed with zero failures. Its short render sample
+is not a Mac performance benchmark.

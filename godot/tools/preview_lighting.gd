@@ -19,6 +19,7 @@ func _run() -> void:
 	var fog_density := -1.0
 	var paving_joint_strength := -1.0
 	var asphalt_roughness := NAN
+	var asphalt_detail := {}
 	var retained_swath := NAN
 	var detail_source := ""
 	var lean_deg := 0.0
@@ -34,7 +35,21 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--terrain-detail="):
+		if arg.begins_with("--asphalt-tile-m=") or arg.begins_with("--asphalt-relief-m="):
+			var value := arg.get_slice("=", 1)
+			var is_tile := arg.begins_with("--asphalt-tile-m=")
+			var lower := 0.05 if is_tile else 0.0
+			var upper := 2.0 if is_tile else 0.002
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < lower
+				or float(value) > upper
+			):
+				_fail("Asphalt detail must be finite and within its physical study bounds")
+				return
+			asphalt_detail["authored_tile_m" if is_tile else "authored_relief_m"] = float(value)
+		elif arg.begins_with("--terrain-detail="):
 			detail_source = arg.trim_prefix("--terrain-detail=")
 		elif arg.begins_with("--retained-swath-strength="):
 			var value := arg.trim_prefix("--retained-swath-strength=")
@@ -323,6 +338,10 @@ func _run() -> void:
 		game.track.get_node("RacingSurface").material_override.set_shader_parameter(
 			"roughness_offset", asphalt_roughness
 		)
+	for parameter in asphalt_detail:
+		game.track.get_node("RacingSurface").material_override.set_shader_parameter(
+			parameter, asphalt_detail[parameter]
+		)
 	game.paused = true
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	game.hud.visible = false
@@ -467,6 +486,7 @@ func _run() -> void:
 								. material_override
 								. get_shader_parameter("roughness_offset")
 							),
+							"asphalt_detail_overrides": asphalt_detail,
 							"asphalt_shader_sha256":
 							FileAccess.get_sha256("res://shaders/asphalt.gdshader"),
 							"field_map": field_map_path,

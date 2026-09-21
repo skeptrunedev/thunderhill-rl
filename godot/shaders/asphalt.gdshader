@@ -11,8 +11,10 @@ uniform sampler2D authored_color : source_color, filter_linear_mipmap_anisotropi
 uniform float authored_color_gain = 0.30;
 // Footage guided warm charcoal response, not a measured spectral reflectance.
 uniform float authored_warmth : hint_range(0.0, 1.0) = 1.0;
-uniform float authored_tile_m = 0.8;
-uniform float authored_relief_m = 0.00035;
+// Smaller aggregate appearance selected against frame 40. Not a measured stone size.
+uniform float authored_tile_m = 0.25;
+// Preserve relief/tile ratio while changing the physical repeat scale.
+uniform float authored_relief_m = 0.000109375;
 // Original broad binder variation, not a surveyed rubber or racing line.
 uniform float surface_variation_strength : hint_range(0.0, 1.0) = 0.35;
 // Original longitudinal binder mottling, not a recovered tire or friction map.
