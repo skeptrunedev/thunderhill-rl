@@ -266,3 +266,53 @@ pavement, and record the effective roughness treatment strength.
 
 Mac export `020989d98dca-f022e46a99eb` completed successfully. It contains this
 material change but has not yet been verified on the physical laptop.
+
+
+## Alternative material directions, September 21
+
+Four isolated experiments keep the current game defaults intact. They were
+rendered with the real Vulkan Mobile renderer at the same Turn 2 camera pose
+(station 1150 m, lateral 4 m, lean minus 25 degrees, view yaw 8 degrees).
+The supplied video frame 40 is an appearance reference, not a registered camera
+match. No fidelity percentage is justified by these images.
+
+* `--asphalt-study=matte-aggregate` replaces the directional asphalt treatment
+  with original filtered procedural aggregate and weak generic scan normals.
+  The estimated stone scales are 6 and 18 mm; roughness is 0.88. It removes the
+  smeared reflective bands, but also removes genuine directional variation.
+  It looks too flat to replace the current material.
+* `--photographic-height-blend=1` ranks overlapping source patches using
+  luminance as an artistic height proxy. Continuous normalized weights preserve
+  patch edges, and the treatment fades when projected texture structure becomes
+  unresolved. This changes the blending method, not the source image resolution.
+  Nearby straw remains more distinct, but the larger field structure is still
+  missing. Estimated normals change with the blended color.
+* `--photographic-contrast=1` compensates for contrast lost in patch averaging
+  using inverse weight variance around the source mip mean. This is approximate:
+  transformed samples correlate, and clamping can shift the mean. It produces
+  modest grain changes and cannot recover detail removed by texture filtering.
+* `data/reference/turn2-straw-regions-coverage-study.json` expands the original
+  pale region from 12 to 30 m before clipping against the road clearance.
+  Build it with `tools/build_field_coverage.py` and pass its output JSON to
+  `--field-map`. This reaches the straight's previously untreated shoulder, but
+  makes the field too uniformly pale and loses the darker margin in the video.
+  The annotation remains a study, not surveyed vegetation or a production map.
+
+Root and independent visual review reject wholesale promotion of the matte
+asphalt and wider coverage. The remaining task is spatial composition: preserve
+uneven dark shoulder areas, directional cut vegetation and interrupted pavement
+variation. Greater sharpness alone is not equivalent to reference fidelity.
+
+Local evidence lives in ignored `artifacts/`: `texture-directions-review`
+contains four video versus game sheets with source hashes, `height-layered-apex`
+contains the new blend, `ground-coverage-straight` and `ground-coverage-apex`
+contain the map trial, and `ground-variance-apex` contains contrast compensation.
+`matte-aggregate-reviewed-apex` is the final matte capture with corrected
+metadata. Earlier matte captures record the unchanged production defaults for
+wear/joint parameters even though this study bypasses their visual effects.
+The final capture records their effective strengths as zero.
+
+Real renderer captures compiled both shader branches. Human controls passed
+with zero failures. Preview GDScript format and diff checks passed. These are
+local static studies, not new Mac performance results or validated motion
+quality. No physics, training behavior or production material default changed.

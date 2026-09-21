@@ -1,6 +1,9 @@
 shader_type spatial;
 render_mode cull_disabled;
 uniform float lap_length_m;
+// Independent dry aggregate study. Disabled in production. Reflectance,
+// stone spacing and roughness are appearance estimates, not measured samples.
+uniform bool matte_aggregate_study = false;
 // Appearance study offset; independent of tire grip and surface identity.
 uniform float roughness_offset : hint_range(-0.3, 0.2) = 0.0;
 uniform sampler2D color_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -190,4 +193,21 @@ void fragment() {
                       * (authored_surface ? 1.0 : 0.0) * (1.0 - edge_weight);
     ROUGHNESS = mix(ROUGHNESS, mix(0.46, 0.70, wear), wear_weight);
     ROUGHNESS = clamp(ROUGHNESS + roughness_offset * (1.0 - edge_weight), 0.25, 0.9);
+    if (matte_aggregate_study) {
+        // World metre domains are continuous across the lap seam. Two stone
+        // scales retain restrained near detail and converge to their mean once
+        // their projected footprint is subpixel. No longitudinal wear bands.
+        float fine_aggregate = filtered_pavement_noise(world_position.xz / 0.006);
+        float coarse_aggregate = filtered_pavement_noise(world_position.xz / 0.018 + vec2(43.0, 17.0));
+        float binder_variation = filtered_pavement_noise(world_position.xz / 0.25 + vec2(97.0, 31.0));
+        float grain = (fine_aggregate - 0.5) * 0.60 + (coarse_aggregate - 0.5) * 0.24;
+        ALBEDO = vec3(0.032, 0.031, 0.029) * (1.0 + grain + (binder_variation - 0.5) * 0.06);
+        ALBEDO *= mix(1.0, 0.65, edge_weight);
+        // Retain only low strength, mip filtered scan relief. This scan is a
+        // generic asphalt, not Thunderhill and has no published metre scale.
+        NORMAL_MAP = texture(normal_map, UV / 0.5).rgb;
+        NORMAL_MAP_DEPTH = 0.16;
+        ROUGHNESS = 0.88 + (coarse_aggregate - 0.5) * 0.04;
+        SPECULAR = 0.35;
+    }
 }

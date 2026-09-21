@@ -1,5 +1,7 @@
 extends SceneTree
 ## Fixed camera lighting study. Does not modify production environment settings.
+## --asphalt-study=matte-aggregate selects an independent matte procedural road.
+## --photographic-height-blend=0..1 selects the terrain texture overlap study.
 const Validation = preload("res://scripts/image_validation.gd")
 const SIZE := Vector2i(1280, 720)
 
@@ -16,6 +18,8 @@ func _run() -> void:
 	var asphalt_study_metadata := {}
 	var ground_study := "production"
 	var ground_study_metadata := {}
+	var photographic_contrast := 0.0
+	var photographic_height_blend := 0.0
 	var sky_source := ""
 	var solar_haze := 0.0
 	var solar_haze_broad := false
@@ -56,7 +60,29 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--solar-haze-broad":
+		if arg.begins_with("--photographic-height-blend="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Photographic height blend must be finite and within zero to one")
+				return
+			photographic_height_blend = float(value)
+		elif arg.begins_with("--photographic-contrast="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Photographic contrast preservation must be finite and within zero to one")
+				return
+			photographic_contrast = float(value)
+		elif arg == "--solar-haze-broad":
 			solar_haze_broad = true
 		elif arg.begins_with("--solar-haze="):
 			var value := arg.trim_prefix("--solar-haze=")
@@ -95,7 +121,7 @@ func _run() -> void:
 			orchard_study = true
 		elif arg.begins_with("--asphalt-study="):
 			asphalt_study = arg.get_slice("=", 1)
-			if asphalt_study not in ["production", "scan"]:
+			if asphalt_study not in ["production", "scan", "matte-aggregate"]:
 				_fail("Unknown asphalt study mode")
 				return
 		elif arg.begins_with("--ground-study="):
@@ -571,6 +597,12 @@ func _run() -> void:
 			parameter, asphalt_detail[parameter]
 		)
 	var production_terrain_material: ShaderMaterial = game.track.terrain_material
+	production_terrain_material.set_shader_parameter(
+		"photographic_contrast_preservation", photographic_contrast
+	)
+	production_terrain_material.set_shader_parameter(
+		"photographic_height_blend", photographic_height_blend
+	)
 	if ground_study == "legacy":
 		game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
 		ground_study_metadata = {"mode": "legacy", "photographic_field_enabled": false}
@@ -594,6 +626,25 @@ func _run() -> void:
 		if asphalt_study_metadata.has("error"):
 			_fail(asphalt_study_metadata.error)
 			return
+	if asphalt_study == "matte-aggregate":
+		var material: ShaderMaterial = game.track.get_node("RacingSurface").material_override
+		material.set_shader_parameter("matte_aggregate_study", true)
+		var normal_texture: Texture2D = material.get_shader_parameter("normal_map")
+		asphalt_study_metadata = {
+			"mode": "matte-aggregate",
+			"aggregate_spacing_m": [0.006, 0.018],
+			"binder_spacing_m": 0.25,
+			"linear_albedo": [0.032, 0.031, 0.029],
+			"roughness": 0.88,
+			"specular": 0.35,
+			"normal_scale_m": 0.5,
+			"normal_strength": 0.16,
+			"normal_source_path": normal_texture.resource_path,
+			"normal_source_sha256": FileAccess.get_sha256(normal_texture.resource_path),
+			"filter": "Derivative footprint fades unresolved stone cells to their mean",
+			"limitation":
+			"Original procedural color with generic scan relief. All material values and physical scales are artistic estimates. No measured Thunderhill reflectance or friction."
+		}
 	if orchard_study:
 		orchard_metadata = load("res://scripts/orchard_study.gd").apply(game.track)
 	game.paused = true
@@ -755,6 +806,9 @@ func _run() -> void:
 		effective_wear = RenderingServer.shader_get_parameter_default(
 			pavement.shader.get_rid(), "directional_wear_strength"
 		)
+	if asphalt_study == "matte-aggregate":
+		effective_wear = 0.0
+		paving_joint_strength = 0.0
 	for row in variants:
 		if row.name == "production" and fog_density < 0.0:
 			row.fog = environment.fog_density
@@ -797,6 +851,8 @@ func _run() -> void:
 							"asphalt_study": asphalt_study,
 							"asphalt_study_metadata": asphalt_study_metadata,
 							"ground_study": ground_study,
+							"photographic_contrast_preservation": photographic_contrast,
+							"photographic_height_blend": photographic_height_blend,
 							"ground_study_metadata": ground_study_metadata,
 							"photographic_sparse_enabled":
 							_material_parameter(

@@ -17,6 +17,11 @@ uniform float mapped_aerial_contrast : hint_range(0.0, 1.0) = 1.0;
 uniform bool photographic_field_enabled = false;
 // Optional two-material composition, using the existing authored flattened corridor.
 uniform bool photographic_sparse_enabled = false;
+// Optional compensation for contrast lost when independent source patches blend.
+// Study: rank overlapping straw samples instead of averaging their structure.
+// Luminance is only an artistic height proxy, not measured geometry.
+uniform float photographic_height_blend : hint_range(0.0, 1.0) = 0.0;
+uniform float photographic_contrast_preservation : hint_range(0.0, 1.0) = 0.0;
 // Keep the uncertain corridor treatment isolated from the mixed base material.
 uniform float photographic_disturbance_strength : hint_range(0.0, 1.0) = 0.0;
 uniform sampler2D photographic_sparse : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
@@ -114,7 +119,7 @@ vec3 ground_patch(sampler2D color_source, vec2 uv, vec2 dx, vec2 dy, vec2 lattic
     return textureGrad(color_source, mirrored, (rotation * dx) * patch_scale * mirror_sign, (rotation * dy) * patch_scale * mirror_sign).rgb;
 }
 
-vec3 ground_surface(sampler2D color_source, vec2 uv, float rotation_spread, float scale_spread) {
+vec3 ground_surface(sampler2D color_source, vec2 uv, float rotation_spread, float scale_spread, float contrast_preservation, float height_blend) {
     vec2 cell = floor(uv);
     vec2 f = fract(uv);
     // Quintic interpolation has zero first and second derivatives at cell
@@ -130,7 +135,33 @@ vec3 ground_surface(sampler2D color_source, vec2 uv, float rotation_spread, floa
     vec3 b = ground_patch(color_source, uv, dx, dy, cell + vec2(1.0, 0.0), rotation_spread, scale_spread);
     vec3 c = ground_patch(color_source, uv, dx, dy, cell + vec2(0.0, 1.0), rotation_spread, scale_spread);
     vec3 d = ground_patch(color_source, uv, dx, dy, cell + vec2(1.0), rotation_spread, scale_spread);
-    return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
+    vec3 blended = mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
+    if (contrast_preservation > 0.0) {
+        vec4 weights = vec4((1.0 - w.x) * (1.0 - w.y), w.x * (1.0 - w.y),
+                            (1.0 - w.x) * w.y, w.x * w.y);
+        ivec2 dimensions = textureSize(color_source, 0);
+        float last_mip = floor(log2(float(max(dimensions.x, dimensions.y))));
+        vec3 mean_color = textureLod(color_source, vec2(0.5), last_mip).rgb;
+        // Exact for independent equal-variance samples before clamping. The
+        // transformed source patches can correlate, so this is an approximation.
+        float gain = mix(1.0, inversesqrt(dot(weights, weights)), contrast_preservation);
+        blended = clamp(mean_color + (blended - mean_color) * gain, vec3(0.0), vec3(1.0));
+    }
+    if (height_blend > 0.0) {
+        vec4 base = vec4((1.0 - w.x) * (1.0 - w.y), w.x * (1.0 - w.y),
+                         (1.0 - w.x) * w.y, w.x * w.y);
+        vec3 luminance = vec3(0.2126, 0.7152, 0.0722);
+        vec4 rank = vec4(dot(a, luminance), dot(b, luminance),
+                         dot(c, luminance), dot(d, luminance)) + base;
+        float peak = max(max(rank.x, rank.y), max(rank.z, rank.w));
+        vec4 selected = smoothstep(vec4(peak - 0.20), vec4(peak), rank) * base;
+        selected /= max(dot(selected, vec4(1.0)), 0.00001);
+        vec3 layered = a * selected.x + b * selected.y + c * selected.z + d * selected.w;
+        // Revert smoothly to the filtered blend when source structure is unresolved.
+        float visibility = 1.0 - smoothstep(0.015, 0.09, max(length(dx), length(dy)));
+        blended = mix(blended, layered, height_blend * visibility);
+    }
+    return blended;
 }
 
 vec4 cleared_field(vec2 point, out float grass_retention) {
@@ -188,8 +219,8 @@ float photographic_weight(vec2 uv) {
 
 void fragment() {
     // Original texture scale is an appearance estimate, not a surveyed measure.
-    vec3 grass = ground_surface(grass_color, world_pos.xz / grass_tile_m, grass_rotation_spread, grass_scale_spread);
-    vec3 soil = ground_surface(soil_color, world_pos.xz / soil_tile_m, 1.0, 0.0);
+    vec3 grass = ground_surface(grass_color, world_pos.xz / grass_tile_m, grass_rotation_spread, grass_scale_spread, 0.0, 0.0);
+    vec3 soil = ground_surface(soil_color, world_pos.xz / soil_tile_m, 1.0, 0.0, 0.0, 0.0);
     vec2 macro_uv = (world_pos.xz - macro_origin) / macro_size;
     vec2 edge_distance = min(macro_uv, vec2(1.0) - macro_uv) * macro_size;
     float macro_weight = smoothstep(0.0, 30.0, min(edge_distance.x, edge_distance.y));
@@ -343,14 +374,14 @@ void fragment() {
         mask = max(mask, photographic_weight(field_uv + vec2(0.0, radius_uv.y)));
         mask = max(mask, photographic_weight(field_uv - vec2(0.0, radius_uv.y)));
         mask *= field_surface_strength * (1.0 - corridor * (1.0 - retained_grass));
-        vec3 photographic = ground_surface(photographic_field, world_pos.xz / 4.0, 0.08, 0.25);
+        vec3 photographic = ground_surface(photographic_field, world_pos.xz / 4.0, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
         vec3 photographic_gain = mix(vec3(1.0), retained_swath_gain * field_structure, photographic_structure_strength);
         float photographic_height = dot(photographic, vec3(0.2126, 0.7152, 0.0722)) * 0.004;
         float photo_dx = dFdx(photographic_height);
         float photo_dy = dFdy(photographic_height);
         float photo_roughness = 0.93;
         if (photographic_sparse_enabled) {
-            vec3 sparse = ground_surface(photographic_sparse, world_pos.xz / 4.0, 0.08, 0.25);
+            vec3 sparse = ground_surface(photographic_sparse, world_pos.xz / 4.0, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
             // Authored reference corridor is independent of driving/friction data.
             // Material proportions are artistic estimates, not classified land cover.
             // Reuse the corridor's authored interruptions instead of a uniform band.
