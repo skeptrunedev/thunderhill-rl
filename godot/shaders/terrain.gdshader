@@ -27,6 +27,8 @@ uniform float straw_swath_strength : hint_range(0.0, 1.0) = 1.0;
 // Continuous mowing pass study; center fitted to the historical Turn 2 bend.
 // Spacing and contrast are authored estimates, not recovered mowing records.
 uniform float mowing_band_strength : hint_range(0.0, 1.0) = 1.0;
+// Interrupted fine straw streaks follow the same continuous mowing coordinates.
+uniform float mowing_detail_strength : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 mowing_bend_center = vec2(306.70854, 686.54039);
 // Study only: retain centered swath color inside the authored field map.
 // Zero preserves the existing regional appearance; no bare patches are restored.
@@ -139,7 +141,7 @@ vec4 cleared_field(vec2 point, out float grass_retention) {
 }
 
 float mowing_gain(vec2 point) {
-    if (mowing_band_strength <= 0.0) {
+    if (mowing_band_strength <= 0.0 && mowing_detail_strength <= 0.0) {
         return 1.0;
     }
     // Distance to a westward ray gives continuous straight passes joining
@@ -156,7 +158,20 @@ float mowing_gain(vec2 point) {
     float mowing_bands = sin(mowing_phase * TAU) * 0.12
                + sin(mowing_phase * TAU * 0.47 + 1.3) * 0.05;
     float continuity = 0.65 + coverage_noise(point / vec2(17.0, 21.0)) * 0.7;
-    return 1.0 + mowing_bands * continuity * mowing_visibility * mowing_region * mowing_band_strength;
+    // Continuous arc length joins the two straight arms of the mowing path.
+    // The Turn 2 center is excluded by mowing_region, so the polar origin
+    // cannot introduce visible streak singularities.
+    float along = mowing_offset.x;
+    if (mowing_offset.x > 0.0) {
+        along = atan(mowing_offset.x, mowing_offset.y) * mowing_distance;
+    } else if (mowing_offset.y < 0.0) {
+        along = PI * mowing_distance - mowing_offset.x;
+    }
+    vec2 streak_uv = vec2(mowing_distance, along);
+    float streaks = coverage_noise(streak_uv / vec2(0.38, 7.0)) * 0.36
+                  + coverage_noise(streak_uv / vec2(1.1, 19.0) + vec2(17.0, 3.0)) * 0.24;
+    return 1.0 + mowing_region * (mowing_bands * continuity * mowing_visibility * mowing_band_strength
+                                  + streaks * mowing_detail_strength);
 }
 
 void fragment() {
