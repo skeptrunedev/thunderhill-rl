@@ -57,3 +57,33 @@ The brochure values do not establish the following inputs:
 Keep estimated parameters explicitly labeled, configurable, and versioned. Manufacturer dimensions constrain the visual model, but do not validate handling. Stock tires and stock electronics are a baseline configuration to model deliberately, not permission to invent their behavior. A credible handling claim requires measured acceleration, braking, turn response, and suspension behavior under known rider, tire, fuel, and assist settings.
 
 The next data acquisition priority is the exact 2026 US owner manual and the actual reference bike setup. Preserve this distinction while beginning original geometry and a tunable physics prototype. No Ducati imagery, manual pages, or third party motorcycle mesh is bundled with this document.
+
+
+## Cockpit reference consistency check, 20 September 2026
+
+The official current model electronics page specifies a 6.9 inch diagonal,
+8:3 aspect ratio, 1280 by 480 TFT:
+https://www.ducati.com/us/en/bikes/streetfighter/streetfighter-v4/electronics
+This was fetched directly during the cockpit audit. The game's current visible
+face is 0.177 by 0.097 metres with a 1024 by 560 render texture; those proportions
+are not the manufacturer's current display specification. The supplied frame
+00:10 appears to show a less wide display, but perspective alone cannot establish
+its exact model generation. Do not describe the existing cockpit as an exact
+2026 reconstruction or silently combine a current specification with an older
+visual reference. User preference between video appearance and the current
+manufacturer model was requested during this audit.
+
+`godot/tools/preview_cockpit.gd` records the actual production onboard pose and
+three alternative camera estimates at fixed 1280 by 720 resolution. Production
+uses the actual camera transform from `_update_visual`; alternatives use stated
+bike local anchors, downward pitch and field of view. Geometry and lighting are
+fixed. Captures and source hashes are in
+`artifacts/cockpit-framing-verified/study.json`. The earlier
+`artifacts/lighting-production.png` is 1152 by 720, so direct pixel comparisons
+against the 1280 by 720 footage were not matched in aspect ratio.
+
+The alternatives do not establish a recovered lens calibration. They confirm
+that framing can change the apparent tank and cockpit coverage substantially.
+The reference supports a missing dark headstock and ignition assembly, but one
+obscured onboard view is insufficient evidence for a particular tank recess.
+No tank reshaping or production camera change was adopted from this study.
