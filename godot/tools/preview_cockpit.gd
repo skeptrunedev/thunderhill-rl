@@ -107,18 +107,18 @@ func _run() -> void:
 			display_filtered = true
 		elif arg == "--display-unfiltered":
 			display_filtered = false
-		elif arg.begins_with("--reservoir-haze=") or arg.begins_with("--reservoir-blur-lod="):
+		elif arg.begins_with("--reservoir-haze=") or arg.begins_with("--reservoir-blur-m="):
 			var value := arg.get_slice("=", 1)
 			var haze := arg.begins_with("--reservoir-haze=")
 			if (
 				not value.is_valid_float()
 				or not is_finite(float(value))
 				or float(value) < 0.0
-				or float(value) > (1.0 if haze else 4.0)
+				or float(value) > (1.0 if haze else 0.01)
 			):
 				_fail("Reservoir haze or blur outside finite study bounds")
 				return
-			reservoir_overrides["wall_haze" if haze else "transmission_blur_lod"] = float(value)
+			reservoir_overrides["wall_haze" if haze else "transmission_blur_m"] = float(value)
 		elif arg.begins_with("--reservoir-wall-density="):
 			var value := arg.trim_prefix("--reservoir-wall-density=")
 			if (
@@ -249,6 +249,7 @@ func _run() -> void:
 	var display_count := 0
 	var reservoir_count := 0
 	var wall_absorption := Vector3.ZERO
+	var reservoir_effective := {}
 	for node in game.bike.find_children("*", "MeshInstance3D", true, false):
 		var material = node.material_override
 		if (
@@ -268,6 +269,13 @@ func _run() -> void:
 			material.set_shader_parameter("wall_absorption", wall_absorption)
 			for parameter in reservoir_overrides:
 				material.set_shader_parameter(parameter, reservoir_overrides[parameter])
+			for parameter in ["wall_haze", "transmission_blur_m"]:
+				var effective: Variant = material.get_shader_parameter(parameter)
+				if effective == null:
+					effective = RenderingServer.shader_get_parameter_default(
+						material.shader.get_rid(), parameter
+					)
+				reservoir_effective[parameter] = effective
 			reservoir_count += 1
 	if display_count != 1:
 		_fail("Expected one live display material")
@@ -305,6 +313,7 @@ func _run() -> void:
 				"name": row.name,
 				"reservoir_wall_density": wall_density,
 				"reservoir_overrides": reservoir_overrides,
+				"reservoir_effective": reservoir_effective,
 				"reservoir_wall_absorption":
 				[wall_absorption.x, wall_absorption.y, wall_absorption.z],
 				"reservoir_shader_sha256":

@@ -1552,3 +1552,43 @@ downward pitch (0 to 40 degrees), and FOV (50 to 110 degrees), reject nonfinite
 inputs and chase camera use, and save their values in capture metadata.
 The 1.37 metre study makes more cockpit visible but is not a recovered camera
 calibration. Human camera defaults and the policy camera remain unchanged.
+
+
+## Reservoir transmission softness
+
+The current vessel multiplied a sharp screen copy by absorption. White road
+stripes and support stalks remained distinctly readable through the molded
+plastic. Comparing frame 10 with `artifacts/reservoir-haze-control` isolated this
+as a material problem rather than missing mesh segments or flipped normals.
+The new shader samples mipmapped screen color and adds a restrained light
+responsive wall contribution while retaining existing amber absorption.
+
+The initial fixed LOD 2 study softened the line, but haze 0.15 made the forward
+pose too gray. The adopted haze is 0.07. Production instead projects an artistic
+5 mm scattering footprint into screen pixels using view depth, projection scale
+and viewport height, then chooses the matching mip level. This avoids applying
+the same pixel blur at human and policy camera resolutions. The footprint and
+haze are appearance estimates, not measured plastic scattering properties.
+The transmitted term is reduced by the haze fraction, while the wall's diffuse
+response is lit by the scene. This is not emission painted onto the wall.
+
+[Godot's screen reading documentation](https://docs.godotengine.org/en/stable/tutorials/shaders/screen-reading_shaders.html)
+describes the mipmap requirement and the opaque scene copy used here. The
+material still lacks refraction and multiple internal reflections. Transparent
+objects do not appear in the copied screen. No fluid dynamics are simulated.
+
+Final fixed poses are in `artifacts/reservoir-scaled-blur-production`. Native
+pixel crops in `artifacts/reservoir-transmission-comparison` show control versus
+final production and forward poses. Turn 2 was separately inspected in
+`artifacts/reservoir-scaled-blur-turn2`. The result softens the transmitted stripe
+and retains the amber character, but is not a matched plastic scan or a complete
+solution to the cockpit's approximate geometry.
+
+`preview_cockpit.gd` accepts independent `--reservoir-haze` (0 to 1) and
+`--reservoir-blur-m` (0 to 0.01) overrides, rejecting nonfinite values. Captures
+record both overrides and effective shader defaults. The early checkpoint's
+fixed LOD flag was replaced by the distance and resolution aware control.
+Rendered human controls passed. The real 640 by 360 agent camera check passed
+five recorded observations, immutable image hashes, frozen ticks, queued reset
+and advance serialization, and rejection without a real renderer. Native Mac
+performance remains to be verified separately.

@@ -7,8 +7,8 @@ uniform vec3 fluid_absorption = vec3(6.0, 24.0, 60.0);
 // Independent vessel wall absorption; appearance estimate, not measured plastic.
 uniform vec3 wall_absorption = vec3(600.0, 800.0, 1400.0);
 // Visual estimates for cloudy molded plastic, not measured scattering data.
-uniform float wall_haze : hint_range(0.0, 1.0) = 0.0;
-uniform float transmission_blur_lod : hint_range(0.0, 4.0) = 0.0;
+uniform float wall_haze : hint_range(0.0, 1.0) = 0.07;
+uniform float transmission_blur_m : hint_range(0.0, 0.01) = 0.005;
 uniform float fluid_radius = 0.024;
 uniform float fluid_bottom = -0.020;
 uniform float fluid_top = 0.0081;
@@ -54,7 +54,13 @@ void fragment() {
     vec3 transmission = exp(-fluid_absorption * path_m - wall_absorption * wall_path);
     // The opaque scene copy supplies transmitted radiance. Transparent objects
     // are absent from that copy; this is not ray traced refraction or fluid slosh.
-    EMISSION = textureLod(scene_color, SCREEN_UV, transmission_blur_lod).rgb * transmission * (1.0 - fresnel) * (1.0 - wall_haze);
+    // Project the artistic scattering footprint into pixels. Its size follows
+    // camera distance, field of view and viewport resolution instead of using
+    // a fixed mip level that overblurs the smaller policy camera image.
+    float blur_pixels = abs(PROJECTION_MATRIX[1][1]) * VIEWPORT_SIZE.y * 0.5
+                      * transmission_blur_m / max(-VERTEX.z, 0.001);
+    float blur_lod = log2(max(1.0, blur_pixels));
+    EMISSION = textureLod(scene_color, SCREEN_UV, blur_lod).rgb * transmission * (1.0 - fresnel) * (1.0 - wall_haze);
     // Divert a restrained share of transmission into lit wall response. This
     // keeps the haze dependent on scene lighting, rather than self illuminating.
     ALBEDO = mix(vec3(0.015), vec3(0.32, 0.29, 0.24), wall_haze);
