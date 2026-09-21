@@ -633,3 +633,14 @@ full temporal stability or Mac performance. Existing ObjectDB exit warning
 remains. Human controls, field coverage checks and rendered agent camera checks
 passed; the latter include stepping, reset serialization and headless rejection.
 Formatter and diff checks passed. Native package verification follows separately.
+
+Native build `0f113c268fb5-3d17828db2cb` exported from clean committed source,
+transferred with matching SHA256 and passed strict deep signature verification.
+The Mac M3 Pro Metal renderer produced
+`artifacts/Thunderhill-corridor-native.png` at station 1150, camera 2, with
+successful screenshot readback and process exit zero. The sidecar reports a
+visible, focused, drawable window. Root inspected the visible curved band.
+This verifies native rendering, not an end to end performance benchmark.
+The ordinary playable instance was subsequently launched from that same bundle
+and its exact executable path verified. The image remains visibly synthetic;
+this local improvement does not complete visual acceptance.
