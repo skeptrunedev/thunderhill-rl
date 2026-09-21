@@ -1770,3 +1770,36 @@ The rendered human controls check passed with zero failures. Linux frame
 intervals were 17.36 ms median and 25.00 ms p95 across 262 samples, not Mac timings.
 Mac package `8806d75b05dc-9d6ee01cf6e2` exported successfully; native Mac
 verification remains outstanding.
+
+## Interrupted cut field appearance
+
+Broad mowing strength 0.25 alone barely changed the field mismatch. Disabling
+both mowing components isolated additional broad bands from historical color,
+and disabling mapped aerial contrast still left the pale field to brown
+shoulder transition. That remaining transition belongs to the material mixture
+and corridor treatment, so removing historical aerial detail globally would
+not address its cause. Production retains the aerial data at full strength.
+
+The mowing shader now uses shorter irregular multiscale streaks instead of
+continuous radial sinusoids. Coordinates still join the straight and curved
+regions continuously, with footprint filtering for unresolved detail. Pattern
+dimensions remain artistic estimates. This changes color only, not vegetation
+coverage, contact geometry or grip. The existing lighting preview now supports
+a bounded mapped aerial contrast diagnostic and records its effective value.
+
+`artifacts/field-streak-comparison/00.png` compares the identical apex view.
+Root and independent review found a small directional improvement toward
+broken straw structure, with less contour appearance. The entry view also
+retains interrupted structure. Broad smooth material transitions remain and
+the scene is not yet a close match to the footage. The reference's camera,
+exposure and motion blur differ from these static captures.
+
+Rendered human controls passed with zero failures. Linux frame intervals were
+17.32 ms median and 26.83 ms p95 across 266 samples. A compatible replay
+completed all 2699 transitions in `artifacts/turn2-field-streaks.mp4`, rendered
+at 1280 by 800 and 30 FPS for 700 frames including a short stationary tail.
+Fixed frame rate capture is not a live performance measurement. Mac package
+`89eb9111f41b-112e8379c9a4` exported successfully. The Mac remained offline
+when checked, so this package has not been tested there.
+The replay contact sheet was inspected at two second intervals without an
+obvious new field seam; this does not establish fine temporal stability.

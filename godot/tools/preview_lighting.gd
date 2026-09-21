@@ -26,6 +26,7 @@ func _run() -> void:
 	var asphalt_roughness := NAN
 	var asphalt_detail := {}
 	var retained_swath := NAN
+	var mapped_aerial_contrast := NAN
 	var mowing_band := NAN
 	var mowing_detail := NAN
 	var pale_straw_scale := NAN
@@ -135,6 +136,17 @@ func _run() -> void:
 				_fail("Pale straw gain scale must be finite and within 0.5 to two")
 				return
 			pale_straw_scale = float(value)
+		elif arg.begins_with("--mapped-aerial-contrast="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Mapped aerial contrast must be finite and within zero to one")
+				return
+			mapped_aerial_contrast = float(value)
 		elif arg.begins_with("--mowing-detail-strength="):
 			var value := arg.get_slice("=", 1)
 			if (
@@ -459,6 +471,10 @@ func _run() -> void:
 			material.shader.get_rid(), "pale_straw_gain"
 		)
 		material.set_shader_parameter("pale_straw_gain", gain * pale_straw_scale)
+	if is_finite(mapped_aerial_contrast):
+		game.track.terrain_material.set_shader_parameter(
+			"mapped_aerial_contrast", mapped_aerial_contrast
+		)
 	if is_finite(mowing_detail):
 		game.track.terrain_material.set_shader_parameter("mowing_detail_strength", mowing_detail)
 	if is_finite(mowing_band):
@@ -652,6 +668,10 @@ func _run() -> void:
 							"pale_straw_gain":
 							str(
 								_material_parameter(game.track.terrain_material, "pale_straw_gain")
+							),
+							"mapped_aerial_contrast":
+							_material_parameter(
+								game.track.terrain_material, "mapped_aerial_contrast"
 							),
 							"mowing_detail_strength":
 							_material_parameter(

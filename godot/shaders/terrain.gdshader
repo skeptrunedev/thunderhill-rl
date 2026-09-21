@@ -11,6 +11,8 @@ uniform sampler2D field_surface_map : filter_linear_mipmap, repeat_disable;
 uniform vec2 field_surface_origin;
 uniform vec2 field_surface_size = vec2(1.0);
 uniform float field_surface_strength : hint_range(0.0, 1.0) = 0.0;
+// Historical aerial contrast inside the independently authored straw region.
+uniform float mapped_aerial_contrast : hint_range(0.0, 1.0) = 1.0;
 uniform vec3 pale_straw_gain = vec3(1.40, 1.48, 1.55);
 uniform vec2 macro_origin;
 uniform vec2 macro_size;
@@ -148,32 +150,21 @@ float mowing_gain(vec2 point) {
     // concentric passes around the east bend, without polyline corners.
     vec2 mowing_offset = point - mowing_bend_center;
     float mowing_distance = length(vec2(max(mowing_offset.x, 0.0), mowing_offset.y));
-    float mowing_phase = mowing_distance / 2.6;
-    // A continuous warp varies pass spacing without nearest segment seams.
-    mowing_phase += field_noise(vec2(mowing_distance / 7.0, 11.3)) * 1.4;
-    mowing_phase += field_noise(point / vec2(19.0, 23.0)) * 0.55;
-    float mowing_visibility = 1.0 - smoothstep(0.20, 0.75, fwidth(mowing_phase));
     float mowing_region = smoothstep(140.0, 175.0, point.x) * smoothstep(14.0, 30.0, mowing_distance)
                 * (1.0 - smoothstep(94.0, 104.0, mowing_distance));
-    float mowing_bands = sin(mowing_phase * TAU) * 0.12
-               + sin(mowing_phase * TAU * 0.47 + 1.3) * 0.05;
-    float continuity = 0.65 + coverage_noise(point / vec2(17.0, 21.0)) * 0.7;
-    float streaks = 0.0;
-    if (mowing_detail_strength > 0.0) {
-        // Continuous arc length joins the two straight arms of the mowing path.
-        // The Turn 2 center is excluded by mowing_region, so the polar origin
-        // cannot introduce visible streak singularities.
-        float along = mowing_offset.x;
-        if (mowing_offset.x > 0.0) {
-            along = atan(mowing_offset.x, mowing_offset.y) * mowing_distance;
-        } else if (mowing_offset.y < 0.0) {
-            along = PI * mowing_distance - mowing_offset.x;
-        }
-        vec2 streak_uv = vec2(mowing_distance, along);
-        streaks = coverage_noise(streak_uv / vec2(0.38, 7.0)) * 0.36
-                      + coverage_noise(streak_uv / vec2(1.1, 19.0) + vec2(17.0, 3.0)) * 0.24;
+    // Arc length joins the two straight arms continuously. Local interruptions
+    // replace coherent sinusoidal rings; dimensions are appearance estimates.
+    float along = mowing_offset.x;
+    if (mowing_offset.x > 0.0) {
+        along = atan(mowing_offset.x, mowing_offset.y) * mowing_distance;
+    } else if (mowing_offset.y < 0.0) {
+        along = PI * mowing_distance - mowing_offset.x;
     }
-    return 1.0 + mowing_region * (mowing_bands * continuity * mowing_visibility * mowing_band_strength
+    vec2 streak_uv = vec2(mowing_distance, along);
+    float mowing_bands = coverage_noise(streak_uv / vec2(1.3, 5.0)) * 0.20;
+    float streaks = coverage_noise(streak_uv / vec2(0.18, 3.5)) * 0.36
+                 + coverage_noise(streak_uv / vec2(0.55, 8.0) + vec2(17.0, 3.0)) * 0.24;
+    return 1.0 + mowing_region * (mowing_bands * mowing_band_strength
                                   + streaks * mowing_detail_strength);
 }
 
@@ -266,6 +257,9 @@ void fragment() {
         float inside_map = step(0.0, field_map_uv.x) * step(field_map_uv.x, 1.0)
                          * step(0.0, field_map_uv.y) * step(field_map_uv.y, 1.0);
         float mapped_weight = mapped_field.a * field_surface_strength * inside_map;
+        float aerial_weight = mix(1.0, mapped_aerial_contrast, mapped_weight);
+        macro_gain = mix(vec3(1.0), macro_gain, aerial_weight);
+        detail_gain = mix(vec3(1.0), detail_gain, aerial_weight);
         // Retain bare shoulder coverage and existing access corridor handling.
         grass_coverage = mix(grass_coverage, detail.a * mapped_field.r, mapped_weight);
         vec3 mapped_straw_gain = mix(vec3(1.0), pale_straw_gain, mapped_field.g);
