@@ -468,3 +468,19 @@ exclusive preview or replay, and rejected for human, agent, benchmark and QA
 sessions. This permits exported build verification without an engine script
 override. The local real renderer screenshot succeeded; human controls passed,
 and agent and ordinary human study requests were rejected with exit two.
+
+
+The clean native build `ed4fe0830719-02f780832ca4` successfully exercised the
+guarded entry point on the Mac M3 Pro Metal renderer. The log explicitly records
+`PREVIEW_CANOPY_STUDY`, additive true and strength 1.5, followed by successful
+screenshot readback. A second invocation of the same executable at station 1350
+with the same camera and no experimental option supplies the baseline. Both
+processes exited zero. Captures and logs are `artifacts/canopy-entry-native*`;
+the inspected comparison is `artifacts/canopy-native-comparison/00.png`.
+
+The field brightens while the pavement and cockpit retain their appearance.
+This does not resolve the synthetic ground detail, blurred pavement highlights
+or procedural motorcycle. The added pass remains experimental, not promoted.
+The candidate capture is 1152 by 720 and reports a visible, drawable but unfocused
+window. This verifies exported native rendering, not foreground performance.
+The ordinary curved field review game remains running separately.
