@@ -129,3 +129,21 @@ around eight seconds show no obvious abrupt texture transition. This limited
 inspection is not proof of no shimmer across a full lap. The existing ObjectDB
 exit warning remains. The ordinary human game was then launched for review with
 onboard camera two, without replay or preview mode.
+
+
+## Local deposit review build
+
+Clean build `454d3f8b3375-1b260ffaab47` adds the original granular local pavement
+deposit mask. Archive SHA256 is
+`49dd40b55e966f3770b607edf59080aa0320aba2987eb91f238b478cee11cf59`;
+the local manifest and transferred archive match. Strict deep native signature
+verification passed. Installed application:
+`/Users/skeptrune/Applications/ThunderhillReview/454d3f8b3375-1b260ffaab47/Thunderhill.app`.
+
+The exported executable completed a normal station 1350 preview with no study
+flags, returned exit zero and screenshot result zero. The M3 Pro Metal image
+`artifacts/Thunderhill-deposits-native.png` was inspected and shows the granular
+deposits. The sidecar reports a current camera, visible, focused and drawable
+window at 1152 by 720. This proves native default material rendering, not a
+full lap performance benchmark. The scene still has conspicuously synthetic
+pavement reflections, grass and motorcycle detail.
