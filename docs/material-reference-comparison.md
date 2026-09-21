@@ -1862,3 +1862,6 @@ GDScript formatting and diff checks. The compatible replay completed 600
 transitions and 180 movie frames. Nine sampled frames showed no obvious broad
 transition; this is not a full aliasing or Mac performance test. The known
 ObjectDB exit warning remains. Evidence is `artifacts/paint-mean-motion*`.
+Clean Mac export `4396ea10c39c-c78958980dc3` completed successfully. This small
+filtering correction has not yet been installed or verified on the physical Mac;
+the previously verified broader pavement build remains the native review version.
