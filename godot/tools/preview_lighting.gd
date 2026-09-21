@@ -10,6 +10,8 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var output := ""
+	var asphalt_study := "production"
+	var asphalt_study_metadata := {}
 	var ground_study := "production"
 	var ground_study_metadata := {}
 	var sky_source := ""
@@ -48,7 +50,12 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--ground-study="):
+		if arg.begins_with("--asphalt-study="):
+			asphalt_study = arg.get_slice("=", 1)
+			if asphalt_study not in ["production", "scan"]:
+				_fail("Unknown asphalt study mode")
+				return
+		elif arg.begins_with("--ground-study="):
 			ground_study = arg.get_slice("=", 1)
 			if (
 				ground_study
@@ -302,6 +309,16 @@ func _run() -> void:
 				_fail("Camera must be 0, 1 or 2")
 				return
 			camera_mode = int(value)
+	if (
+		asphalt_study != "production"
+		and (
+			not asphalt_detail.is_empty()
+			or is_finite(asphalt_roughness)
+			or paving_joint_strength >= 0.0
+		)
+	):
+		_fail("Independent asphalt study cannot combine production material overrides")
+		return
 	if sky_patch_off and not sky_patch_path.is_empty():
 		_fail("Choose either a sky patch override or sky patch off")
 		return
@@ -515,6 +532,11 @@ func _run() -> void:
 	if ground_study_metadata.has("error"):
 		_fail(ground_study_metadata.error)
 		return
+	if asphalt_study == "scan":
+		asphalt_study_metadata = load("res://scripts/asphalt_scan_study.gd").apply(game.track)
+		if asphalt_study_metadata.has("error"):
+			_fail(asphalt_study_metadata.error)
+			return
 	game.paused = true
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	game.hud.visible = false
@@ -672,6 +694,8 @@ func _run() -> void:
 					JSON
 					. stringify(
 						{
+							"asphalt_study": asphalt_study,
+							"asphalt_study_metadata": asphalt_study_metadata,
 							"ground_study": ground_study,
 							"ground_study_metadata": ground_study_metadata,
 							"sky_source": sky_source,

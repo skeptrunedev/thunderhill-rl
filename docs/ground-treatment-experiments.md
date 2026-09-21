@@ -116,3 +116,28 @@ the previous material in `artifacts/regional-ground-comparison/00.png`.
 same 2699 replay transitions, replacing the earlier blanket material video as
 the current game review clip. Mac export `aab7e3af3554-46126a98593b` succeeded;
 the current laptop was offline at verification, so native review is pending.
+
+## Direct scanned asphalt experiment
+
+`preview_lighting.gd --asphalt-study=scan` isolates the existing CC0 ambientCG
+Asphalt010 color, normal and roughness maps from the authored road shader.
+It uses an estimated 0.5 metre repeat, color gain 0.45 and full normal strength.
+These are artistic settings, not measured Thunderhill material properties.
+The capture metadata records source paths, hashes, shader hash and settings.
+Production material overrides are rejected in this mode to keep the trial clear.
+
+Both entry (station 950) and apex (station 1150) rendered with Vulkan Mobile,
+using camera 2, lateral offset 4 metres, lean minus 25 degrees and yaw 8 degrees.
+Evidence is in `artifacts/asphalt-scan-direct-entry` and
+`artifacts/asphalt-scan-direct-apex`, with controls in
+`artifacts/asphalt-study-entry-control` and
+`artifacts/regional-ground-production-apex`.
+
+Do not promote this candidate. Root review at both angles and independent apex
+review found conspicuous repeated cloudy patches and a cooler, matte appearance
+that moves away from the supplied footage. The current material still has
+artificial longitudinal shading, but its overall character is closer. A scanned
+source alone does not establish a better match. Camera pose and motion blur
+prevent a precise aggregate scale comparison with the video.
+
+This developer preview changes no production material, geometry or simulation.
