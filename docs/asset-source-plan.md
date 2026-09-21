@@ -91,3 +91,26 @@ The production sky now uses the original generated cirrus panorama described in
 [the sky lighting study](sky-lighting.md). It is an LDR appearance estimate,
 not a captured Thunderhill sky or measured HDR lighting. The previous CC0 HDR
 remains available as a reference.
+
+## Motorcycle source recheck, 21 September 2026
+
+Live Sketchfab model API metadata was checked again. No compatible detailed
+Streetfighter mesh was established for unrestricted repository distribution.
+The [OUTPISTON 2024 Streetfighter](https://sketchfab.com/3d-models/2024-ducati-streetfighter-v4-s-c501252f8af64c559bf91dc306c3a550)
+is still listed as downloadable under CC Attribution NonCommercial ShareAlike.
+The [Jo On Ducati derivative](https://sketchfab.com/3d-models/none-a49753c00b95422b848ca84c7b450be3)
+displays CC Attribution but explicitly credits that OUTPISTON motorcycle.
+The derivative's label does not establish permission to redistribute the upstream
+mesh without its restrictions. Neither is adopted.
+
+The [T8components Panigale V4 top yoke scan](https://sketchfab.com/3d-models/ducati-panigale-v4-top-yoke-scan-f1114820e2c94ed2afca874d411eba80)
+is listed as downloadable CC Attribution 4.0 with 63,042 triangles. The author
+describes an imperfect POP2 scan intended to aid CAD work. It could inform a
+component study, but Panigale identity does not establish Streetfighter fit,
+model year, or measurement accuracy.
+
+The [HIM_ART motorcycle handlebar switch](https://sketchfab.com/3d-models/motorcycle-handlebar-switch-3b945f6d50574f7782abeaa115742590)
+is listed as downloadable CC Attribution. Its identity is generic; a Ducati
+match has not been established. Both component sources need visual evaluation
+before adoption. Download status here is publisher metadata, not a completed
+archive retrieval. No new third party motorcycle asset is bundled.

@@ -6,6 +6,8 @@ uniform vec3 base_color : source_color = vec3(0.082, 0.090, 0.098);
 uniform float metalness = 0.0;
 uniform float finish_roughness = 0.52;
 uniform float grain_pitch_m = 0.0007;
+// Object space grain aspect for turned finishes; one preserves molded grain.
+uniform vec3 grain_aspect = vec3(1.0);
 uniform float relief_m = 0.000015;
 varying vec3 finish_position;
 
@@ -30,7 +32,7 @@ void vertex() {
 }
 
 void fragment() {
-    vec3 grain_position = finish_position / grain_pitch_m;
+    vec3 grain_position = finish_position * grain_aspect / grain_pitch_m;
     float footprint = max(length(dFdx(grain_position)), length(dFdy(grain_position)));
     // Fade unresolved microtexture rather than allowing sparkling noise in motion.
     float resolved = 1.0 - smoothstep(0.7, 2.0, footprint);

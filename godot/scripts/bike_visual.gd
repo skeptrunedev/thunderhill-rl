@@ -930,9 +930,35 @@ func _build_steering_damper(mount: Material, polymer: Material) -> void:
 	var assembly := Node3D.new()
 	assembly.name = "SteeringDamper"
 	_front.add_child(assembly)
-	var satin := _material(Color("9ca4ab"), 0.92, 0.24)
-	var shaft := _material(Color("c6cbd0"), 0.96, 0.13)
-	_bar(Vector3(-0.045, 0.665, 0.292), Vector3(0.115, 0.665, 0.292), 0.009, satin, assembly)
+	# Original satin silver finish and shallow turning grain, estimated from
+	# the bright transverse housing in the close cockpit footage.
+	var satin := ShaderMaterial.new()
+	satin.shader = preload("res://shaders/cockpit_finish.gdshader")
+	satin.set_shader_parameter("base_color", Color("d8dadd"))
+	satin.set_shader_parameter("metalness", 1.0)
+	satin.set_shader_parameter("finish_roughness", 0.22)
+	satin.set_shader_parameter("grain_pitch_m", 0.00015)
+	satin.set_shader_parameter("grain_aspect", Vector3(1.0, 0.04, 0.04))
+	satin.set_shader_parameter("relief_m", 0.000001)
+	var shaft := _material(Color("e0e2e4"), 1.0, 0.13)
+	# Revolved shoulder transitions catch the rim highlight instead of a hard
+	# cylinder cap. The bore accommodates the existing polished piston shaft.
+	_lathe(
+		[
+			Vector2(-0.080, 0.0046),
+			Vector2(-0.080, 0.007),
+			Vector2(-0.078, 0.0088),
+			Vector2(-0.074, 0.009),
+			Vector2(0.074, 0.009),
+			Vector2(0.078, 0.0088),
+			Vector2(0.080, 0.007),
+			Vector2(0.080, 0.0046),
+			Vector2(-0.080, 0.0046)
+		],
+		satin,
+		assembly,
+		Vector3(0.035, 0.665, 0.292)
+	)
 	_bar(Vector3(-0.100, 0.665, 0.292), Vector3(-0.041, 0.665, 0.292), 0.0045, shaft, assembly)
 	for x in [-0.045, 0.115]:
 		_lathe(

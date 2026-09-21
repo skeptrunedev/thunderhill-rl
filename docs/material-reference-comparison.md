@@ -1449,3 +1449,31 @@ reference pair is explicitly not calibrated for camera or motion blur.
 `preview_lighting.gd --mowing-band-strength=0|1` reproduces either state and
 records the effective parameter. Linux human controls passed with zero failures;
 short frame timing samples are not a sustained native performance test.
+
+### Steering damper silver finish (2026-09-21)
+
+The close cockpit frame at 00:10 shows a bright silver transverse housing. The
+procedural part used a grey StandardMaterial and an unshaped cylinder. The new
+material reuses the original `cockpit_finish` shader with a brighter silver color,
+metalness one, roughness 0.22, and shallow directional grain. `grain_aspect`
+defaults to one, preserving all other existing cockpit finishes. For this part,
+local x is the lathe axis: aspect (1, 0.04, 0.04) stretches grain around the tube.
+Pitch 0.00015 m and relief 0.000001 m are artistic estimates, not measured machining
+specifications. The shader filters unresolved grain rather than showing it as
+coarse scratches.
+
+A closed revolved housing replaces the body cylinder. Its outer shoulder tapers
+from 9 mm radius toward 7 mm at each end, preserving the 160 mm length and the
+existing mounting position. A 4.6 mm bore surrounds the existing shaft. The
+existing shaft finish is also brighter. These dimensions remain original visual
+estimates and do not alter simulation geometry or motorcycle dynamics.
+
+Controlled captures are in `artifacts/damper-finish-control/` and
+`artifacts/damper-finish-candidate/`; comparison sheets and source hashes are in
+`artifacts/damper-finish-comparison/`. The same production camera and lighting show
+a modest improvement in the silver surface, not a solution to overall bike
+fidelity. The simplified geometry and missing component detail remain visible.
+`preview_cockpit.gd` now includes the finish shader hash in new study metadata.
+Headless motorcycle geometry/dashboard checks and rendered human control checks
+passed. Native Mac execution and sustained performance of this revision remain
+unverified.
