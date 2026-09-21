@@ -15,6 +15,7 @@ func _run() -> void:
 	var wall_density := 1.0
 	var reservoir_overrides := {}
 	var legacy_housing := false
+	var hide_headlight := false
 	var sun_shadows := true
 	var diagnostic_sun := false
 	var shadow_bias := -1.0
@@ -36,7 +37,9 @@ func _run() -> void:
 		_fail("Choose one display filtering mode")
 		return
 	for arg in arguments:
-		if arg == "--high-shadow-filter":
+		if arg == "--hide-headlight-shell":
+			hide_headlight = true
+		elif arg == "--high-shadow-filter":
 			high_shadow_filter = true
 		elif arg == "--medium-shadow-filter":
 			medium_shadow_filter = true
@@ -212,6 +215,8 @@ func _run() -> void:
 		sun.directional_shadow_split_1 = near_split
 	if shadow_blur >= 0.0:
 		sun.shadow_blur = shadow_blur
+	if hide_headlight:
+		game.bike.find_child("HeadlightShell", true, false).visible = false
 	if legacy_housing:
 		var housing: MeshInstance3D = game.bike.find_child("InstrumentHousing", true, false)
 		if housing == null:
@@ -339,6 +344,7 @@ func _run() -> void:
 							"station_m": 400,
 							"display_filtered": display_filtered,
 							"legacy_housing": legacy_housing,
+							"hide_headlight_shell": hide_headlight,
 							"sun_shadows": sun.shadow_enabled,
 							"tank_back_cull": tank_back_cull,
 							"tank_casts_shadow": tank_casts_shadow,

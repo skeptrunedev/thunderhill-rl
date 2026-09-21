@@ -509,7 +509,7 @@ func _build_front() -> void:
 		_red,
 		_front
 	)
-	_body_panel(
+	var headlight := _body_panel(
 		[
 			Vector4(-0.08, 0.53, 0.08, 0.025),
 			Vector4(0.02, 0.58, 0.16, 0.07),
@@ -518,6 +518,7 @@ func _build_front() -> void:
 		_black,
 		_front
 	)
+	headlight.name = "HeadlightShell"
 	var light := _material(Color("c4ebef"), 0.2, 0.15)
 	light.emission_enabled = true
 	light.emission = Color("83b9c5")
