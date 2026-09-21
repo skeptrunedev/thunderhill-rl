@@ -66,3 +66,12 @@ frame 40 is earlier in heading progression than those tests, especially station
 1150. The background includes both isolated dark roadside objects and a separate
 continuous green vegetation band; classifying the entire band as a barrier would
 be unsupported. Exact station and orchard identity remain unresolved.
+
+### Solar direction correction
+
+The conditional shadow timing inference above used an inherited light azimuth
+of 145.81 degrees. Review of straight headings and reference frames 20, 30 and
+32 supports an easterly working estimate of 110 degrees, now adopted. Earlier
+shadow onset may therefore reflect the lighting error instead of later track
+position. Do not treat the previous conditional station ordering as established.
+See `docs/sky-lighting.md` for the controlled comparison and elevation limits.

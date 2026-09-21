@@ -44,6 +44,7 @@ func _run() -> void:
 	var match_sun_azimuth := false
 	var production_only := false
 	var sky_yaw := 0.0
+	var sun_azimuth := NAN
 	var cloud_gain := NAN
 	var authored_yaw := NAN
 	var minimum_elevation := -90.0
@@ -52,7 +53,18 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--orchard-study":
+		if arg.begins_with("--sun-azimuth-deg="):
+			var value := arg.trim_prefix("--sun-azimuth-deg=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) >= 360.0
+			):
+				_fail("Sun azimuth must be finite and in [0, 360)")
+				return
+			sun_azimuth = float(value)
+		elif arg == "--orchard-study":
 			orchard_study = true
 		elif arg.begins_with("--asphalt-study="):
 			asphalt_study = arg.get_slice("=", 1)
@@ -684,6 +696,14 @@ func _run() -> void:
 	environment.sky.sky_material.set_shader_parameter(
 		"minimum_source_y", sin(deg_to_rad(minimum_elevation))
 	)
+	if is_finite(sun_azimuth):
+		# Geographic azimuth, north is local negative Z. Preserve light elevation.
+		var toward := sun.global_basis.z.normalized()
+		var horizontal := Vector2(toward.x, toward.z).length()
+		var azimuth := deg_to_rad(sun_azimuth)
+		sun.look_at(
+			-Vector3(sin(azimuth) * horizontal, toward.y, -cos(azimuth) * horizontal), Vector3.UP
+		)
 	for row in variants:
 		if row.name == "production" and fog_density < 0.0:
 			row.fog = environment.fog_density
@@ -815,6 +835,8 @@ func _run() -> void:
 							"panorama_yaw_radians": sky_yaw,
 							"minimum_source_elevation_deg": minimum_elevation,
 							"matched_sun_azimuth": match_sun_azimuth,
+							"direct_sun_azimuth_override_deg":
+							sun_azimuth if is_finite(sun_azimuth) else null,
 							"toward_sun":
 							[sun.global_basis.z.x, sun.global_basis.z.y, sun.global_basis.z.z],
 							"sky_shader_sha256":

@@ -299,3 +299,38 @@ passed all five recorded observations, including PNG hashes, immutable artifacts
 frozen ticks, queued advance/reset ordering and headless capture rejection.
 These are compatibility checks, not an RL training result or visual approval.
 Comparison sheets are in `artifacts/cirrus-patch-comparison/`.
+
+## Reference guided solar azimuth
+
+The inherited Kloofendal light direction had geographic azimuth 145.81 degrees
+and elevation 47.90 degrees. The dense reference sequence now supplies a more
+useful direction constraint: frames 30 and 32 show forward illumination and
+pavement glare while riding the mapped Turn 1 exit straight, whose heading is
+approximately 106 to 110 degrees. The southbound main straight at frame 20 has
+illumination toward the left, providing a separate consistency check.
+
+The controlled 110 degree trial centers the reflection more like the reference;
+the inherited light places it distinctly to the right. Root and independent
+review support 110 degrees as a working estimate. It is now the default in
+`godot/data/sky.json`. Elevation, intensity, sky texture, environment radiance,
+materials and camera settings remain unchanged. Elevation is explicitly
+uncalibrated; clouds, clipping, gaze and lens distortion prevent exact recovery.
+
+`preview_lighting.gd --sun-azimuth-deg` independently overrides direct sunlight
+azimuth while preserving elevation. It validates the finite [0, 360) interval
+and records the override and effective direction. This does not rotate the
+separately authored cloud panorama. Evidence is in `artifacts/solar-110-straight`,
+`solar-baseline-straight`, `solar-direction-comparison` and the default apex
+capture `solar-corrected-apex`.
+
+The preceding station inference from shadow onset is weakened: an incorrect
+solar direction can make a shadow enter the view too early. Reevaluate turn
+phase under the corrected estimate before treating station 1150 as later than
+video frame 40. This adjustment does not establish full photographic realism.
+
+Paired capture metadata confirms identical camera transform, FOV, material
+shader hashes, panorama source and energy, cloud gain and solar elevation.
+Human controls passed with zero failures; local Linux frame intervals were
+17.269 ms median and 18.315 ms p95 over 270 samples. Five agent camera observations
+passed the existing capture checks in `artifacts/solar-corrected-camera-qa`.
+Mac export `74bd8a5fb095-af94ae03c423` completed; native laptop testing is pending.

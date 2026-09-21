@@ -11,11 +11,11 @@
   "radiance_scale": 1.0,
   "seam_overlap": 0.04,
   "toward_sun": [
-    0.37673073913104493,
+    0.629990193105023,
     0.7419804117208311,
-    0.5545620062863689
+    0.22929767816984525
   ],
-  "sun_direction_provenance": "Retained from prior Kloofendal lighting setup; generated panorama has no solar disk",
+  "sun_direction_provenance": "Azimuth 110 degrees estimated from forward sunlight and pavement reflection in supplied video frames 30 and 32, using mapped Turn 1 exit straight heading 106 to 110 degrees. Elevation 47.90 degrees retained from prior setup and uncalibrated.",
   "status": "Original LDR appearance estimate, not measured Thunderhill weather or calibrated radiometry",
   "use_ground_radiance": true,
   "ground_radiance": [
