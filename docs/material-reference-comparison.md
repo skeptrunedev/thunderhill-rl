@@ -229,3 +229,29 @@ produced with the new `--road-edge` inspection option. The strip is visible
 between paint and shoulder. The comparison still shows an overly coarse rocky
 shoulder and simplified distant field structure, so this is not a complete
 pavement and grass appearance match.
+
+
+## Original fine shoulder material
+
+The generic rocky soil is replaced by an original 1254 pixel square fine dust
+and straw albedo, guided by frame 00:40. `terrain.gdshader` now shares rotated,
+smoothly blended world space patches between grass and soil. Both use explicit
+filtered gradients and clamped mirrored source coordinates. Soil roughness and
+1.5 mm relief are artistic luminance estimates, not measured PBR data. The
+unrelated generic soil normal and roughness maps are no longer sampled.
+
+`artifacts/original-shoulder/existing_00.png` uses the same camera as the earlier
+`artifacts/pavement-edge-close/existing.png`. The coarse stones are gone and the
+shoulder reads as fine earth. The reference sheet is
+`artifacts/original-shoulder/reference-comparison/00.png`. This compares material
+character, not identical framing: the reference is leaned and motion blurred.
+Broad field structure, shoulder wear and the smooth road boundary still fall
+short of the video. Three sampled camera positions do not establish temporal
+stability during a full lap.
+
+Shader review found no correctness defect. The generalized soil sampler adds
+one net texture lookup (10 versus 9) and four patch transforms per fragment.
+Rendered human controls passed with zero failures, median 17.116 ms and p95
+17.361 ms across 274 Linux frames. This is a local smoke measurement, not a Mac
+performance claim. Gameplay geometry, collision and agent observations are
+unchanged.

@@ -30,3 +30,8 @@ The short bent ribbon blades added by `scenery.gd` are original procedural
 geometry, using the generated cut grass albedo. Each clump combines 96 ribbons
 with two small CC0 Poly Haven stems. Blade dimensions and placement are visual
 estimates, not surveyed vegetation.
+
+`materials/fine_shoulder_v1.png` is an original generated fine soil and straw
+material guided by the onboard reference. The source, exact prompt and estimated
+shader response are documented in `assets/source/material-studies/README.md`.
+It is not a measured scan, and no video frame is redistributed in the asset.
