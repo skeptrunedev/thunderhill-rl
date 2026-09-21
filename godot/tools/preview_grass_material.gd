@@ -27,12 +27,24 @@ func _run() -> void:
 	var candidate_grass_relief := -1.0
 	var stubble_shader_path := ""
 	var candidate_grass_rotation := -1.0
+	var candidate_scale_spread := -1.0
 	var candidate_field_relief := -1.0
 	var candidate_straw_swaths := -1.0
 	var candidate_coverage_path := ""
 	var candidate_coverage: FieldCoverage
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--candidate-grass-relief="):
+		if arg.begins_with("--candidate-scale-spread="):
+			var value := arg.trim_prefix("--candidate-scale-spread=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Candidate scale spread must be finite and between zero and one")
+				return
+			candidate_scale_spread = float(value)
+		elif arg.begins_with("--candidate-grass-relief="):
 			var value := arg.trim_prefix("--candidate-grass-relief=")
 			if (
 				not value.is_valid_float()
@@ -200,6 +212,7 @@ func _run() -> void:
 			or compare_fields
 			or not stubble_shader_path.is_empty()
 			or candidate_grass_rotation >= 0.0
+			or candidate_scale_spread >= 0.0
 		)
 	):
 		_fail("Straw swath comparison requires the production texture and no other candidate")
@@ -213,6 +226,7 @@ func _run() -> void:
 			or compare_fields
 			or not stubble_shader_path.is_empty()
 			or candidate_grass_rotation >= 0.0
+			or candidate_scale_spread >= 0.0
 		):
 			_fail("Field coverage comparison requires an absolute JSON path and no other candidate")
 			return
@@ -230,6 +244,7 @@ func _run() -> void:
 			or compare_fields
 			or not stubble_shader_path.is_empty()
 			or candidate_grass_rotation >= 0.0
+			or candidate_scale_spread >= 0.0
 		)
 	):
 		_fail("Field relief comparison uses the production texture and no other candidate changes")
@@ -251,6 +266,7 @@ func _run() -> void:
 			and candidate_straw_swaths < 0.0
 			and candidate_coverage_path.is_empty()
 			and not compare_fields
+			and candidate_scale_spread < 0.0
 			and not candidate.is_absolute_path()
 		)
 		or DisplayServer.get_name() == "headless"
@@ -383,6 +399,9 @@ func _run() -> void:
 	var original_grass_relief: float = RenderingServer.shader_get_parameter_default(
 		material.shader.get_rid(), "grass_relief_m"
 	)
+	var original_scale_spread: float = RenderingServer.shader_get_parameter_default(
+		material.shader.get_rid(), "grass_scale_spread"
+	)
 	var samples: Array = []
 	for index in frames:
 		var pose := position + forward * (0.30 * index)
@@ -429,6 +448,14 @@ func _run() -> void:
 					else original_grass_relief
 				)
 			)
+			material.set_shader_parameter(
+				"grass_scale_spread",
+				(
+					candidate_scale_spread
+					if name == "candidate" and candidate_scale_spread >= 0.0
+					else original_scale_spread
+				)
+			)
 			if candidate_straw_swaths >= 0.0:
 				material.set_shader_parameter(
 					"straw_swath_strength", candidate_straw_swaths if name == "candidate" else 0.0
@@ -471,6 +498,13 @@ func _run() -> void:
 							"Same baked stubble in both views; field comparison isolates terrain material",
 							"frames_per_material": frames,
 							"existing_grass_rotation": original_rotation,
+							"existing_scale_spread": original_scale_spread,
+							"candidate_scale_spread":
+							(
+								candidate_scale_spread
+								if candidate_scale_spread >= 0.0
+								else original_scale_spread
+							),
 							"candidate_field_relief_m": candidate_field_relief,
 							"candidate_straw_swaths": candidate_straw_swaths,
 							"existing_grass_relief_m": original_grass_relief,
