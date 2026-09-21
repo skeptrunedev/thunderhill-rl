@@ -83,7 +83,7 @@ def main():
             eval_steps=100,
             save_strategy="steps",
             save_steps=100,
-            save_total_limit=3,
+            save_total_limit=None,
             logging_steps=10,
             report_to="none",
             seed=71,
