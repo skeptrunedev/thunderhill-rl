@@ -400,6 +400,8 @@ func _run() -> void:
 							FileAccess.get_sha256("res://tools/preview_cockpit.gd"),
 							"cockpit_finish_shader_sha256":
 							FileAccess.get_sha256("res://shaders/cockpit_finish.gdshader"),
+							"headlight_builder_sha256":
+							FileAccess.get_sha256("res://scripts/headlight_visual.gd"),
 							"bike_script_sha256":
 							FileAccess.get_sha256("res://scripts/bike_visual.gd"),
 							"variants": report,

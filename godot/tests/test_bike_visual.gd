@@ -31,7 +31,9 @@ func _run() -> void:
 		if not _check_reservoir(bike._reservoir_shell(cap), cap):
 			quit(1)
 			return
-	_check_closed_shell(bike.find_child("HeadlightShell", true, false).mesh)
+	for part in bike.find_child("HeadlightAssembly", true, false).get_children():
+		if part is MeshInstance3D and part.mesh is ArrayMesh:
+			_check_closed_shell(part.mesh)
 	# The front cap must stay planar; the rounded rim has independent smooth normals.
 	var housing: MeshInstance3D = bike._front.get_node("LiveInstrumentCluster").get_child(0)
 	var panel_arrays := housing.mesh.surface_get_arrays(0)

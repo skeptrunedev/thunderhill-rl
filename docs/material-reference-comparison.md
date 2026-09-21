@@ -1592,3 +1592,34 @@ Rendered human controls passed. The real 640 by 360 agent camera check passed
 five recorded observations, immutable image hashes, frozen ticks, queued reset
 and advance serialization, and rejection without a real renderer. Native Mac
 performance remains to be verified separately.
+
+## Angular headlamp reconstruction
+
+The prominent oval below the instrument was the rear cap of the old headlamp
+body. Hiding that mesh in an isolated capture confirmed its identity. Applying
+more detailed polymer to this shape could not reproduce the reference outline.
+The original replacement in `headlight_visual.gd` uses a closed angular enclosure,
+a red surround, paired lens panels, projectors and running lights. It uses the
+existing custom molded polymer shader. Panel depths overlap their supporting
+surfaces to avoid detached layers. The assembly is lowered by an estimated
+55 mm relative to its initial placement to better follow the lamp upper edge
+relative to the fork bridge in manufacturer photographs.
+
+All dimensions and hidden rear details are artistic estimates. Manufacturer
+MY25 photographs inform this silhouette; this does not resolve the model year
+and instrument differences in the supplied onboard video. No commercial game
+geometry or manufacturer texture was imported.
+
+Six rendered views are saved in `artifacts/headlight-angular-lowered` with
+builder hashes. `artifacts/headlight-final-comparison` includes the preceding
+cockpit render and a separately framed manufacturer comparison. Root and an
+independent reviewer preferred the lower placement. The casing remains thick
+and faceted, the display support is approximate, and the overall motorcycle
+still looks synthetic. Static views do not prove clearance across suspension
+travel. This is an intermediate geometry improvement, not visual acceptance.
+
+Mesh tests passed finite normals, winding, positive volume and closed topology
+for each custom lamp panel. Rendered human controls passed with zero failures.
+Linux Mobile rendering measured 17.30 ms median and 24.67 ms p95 across 265
+samples; these are not MacBook performance results. Physical dynamics and
+agent action or observation schemas are unchanged.
