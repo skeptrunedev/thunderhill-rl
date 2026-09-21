@@ -20,6 +20,9 @@ uniform bool photographic_sparse_enabled = false;
 // Optional compensation for contrast lost when independent source patches blend.
 // Study: rank overlapping straw samples instead of averaging their structure.
 // Luminance is only an artistic height proxy, not measured geometry.
+// Opt in material composition along original curved mowing coordinates.
+uniform bool photographic_curved_uv = true;
+uniform float photographic_directional_composition : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_height_blend : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_contrast_preservation : hint_range(0.0, 1.0) = 0.0;
 // Keep the uncertain corridor treatment isolated from the mixed base material.
@@ -181,6 +184,18 @@ vec4 cleared_field(vec2 point, out float grass_retention) {
         }
     }
     return vec4(tint, weight);
+}
+
+vec2 mowing_coordinates(vec2 point) {
+    vec2 offset = point - mowing_bend_center;
+    float across = length(vec2(max(offset.x, 0.0), offset.y));
+    float along = offset.x;
+    if (offset.x > 0.0) {
+        along = atan(offset.x, offset.y) * across;
+    } else if (offset.y < 0.0) {
+        along = PI * across - offset.x;
+    }
+    return vec2(across, along);
 }
 
 float mowing_gain(vec2 point) {
@@ -374,19 +389,30 @@ void fragment() {
         mask = max(mask, photographic_weight(field_uv + vec2(0.0, radius_uv.y)));
         mask = max(mask, photographic_weight(field_uv - vec2(0.0, radius_uv.y)));
         mask *= field_surface_strength * (1.0 - corridor * (1.0 - retained_grass));
-        vec3 photographic = ground_surface(photographic_field, world_pos.xz / 4.0, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
+        // Source straw runs mainly along image x. Align x with mowing travel;
+        // stretch along travel and compress across for flattened swaths.
+        vec2 photo_uv = photographic_curved_uv ? mowing_coordinates(world_pos.xz).yx / vec2(6.0, 2.0) : world_pos.xz / 4.0;
+        vec3 photographic = ground_surface(photographic_field, photo_uv, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
         vec3 photographic_gain = mix(vec3(1.0), retained_swath_gain * field_structure, photographic_structure_strength);
         float photographic_height = dot(photographic, vec3(0.2126, 0.7152, 0.0722)) * 0.004;
         float photo_dx = dFdx(photographic_height);
         float photo_dy = dFdy(photographic_height);
         float photo_roughness = 0.93;
         if (photographic_sparse_enabled) {
-            vec3 sparse = ground_surface(photographic_sparse, world_pos.xz / 4.0, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
+            vec3 sparse = ground_surface(photographic_sparse, photo_uv, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
             // Authored reference corridor is independent of driving/friction data.
             // Material proportions are artistic estimates, not classified land cover.
             // Reuse the corridor's authored interruptions instead of a uniform band.
             float disturbed = clamp((1.0 - dot(region.rgb, vec3(0.2126, 0.7152, 0.0722))) / 0.42, 0.0, 1.0);
             float sparse_weight = mix(0.60, 0.95, corridor * retained_grass * disturbed * photographic_disturbance_strength);
+            // Replace uniform material proportions with interrupted curved
+            // passes. Scales and placement are estimates, not mowing records.
+            vec2 lay_uv = mowing_coordinates(world_pos.xz);
+            float lay = coverage_noise(lay_uv / vec2(1.7, 16.0)) * 0.75
+                      + coverage_noise(lay_uv / vec2(0.45, 6.0) + vec2(17.0, 31.0)) * 0.25;
+            float lay_weight = smoothstep(-0.18, 0.18, lay);
+            float composed_sparse = mix(0.22, 0.98, lay_weight);
+            sparse_weight = mix(sparse_weight, composed_sparse, photographic_directional_composition);
             float sparse_height = dot(sparse, vec3(0.2126, 0.7152, 0.0722)) * 0.0015;
             photographic = mix(photographic, sparse, sparse_weight);
             photo_dx = mix(photo_dx, dFdx(sparse_height), sparse_weight);

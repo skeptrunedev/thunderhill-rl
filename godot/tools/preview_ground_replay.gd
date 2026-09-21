@@ -12,8 +12,26 @@ func _run() -> void:
 	var replay := ""
 	var directional_wear := NAN
 	var hybrid_aggregate := false
+	var curved_uv := true
+	var directional_composition := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--hybrid-aggregate":
+		if arg == "--photographic-planar-uv":
+			curved_uv = false
+		elif arg == "--photographic-curved-uv":
+			curved_uv = true
+		elif arg.begins_with("--photographic-directional-composition="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				push_error("Directional composition must be finite and within zero to one")
+				quit(2)
+				return
+			directional_composition = float(value)
+		elif arg == "--hybrid-aggregate":
 			hybrid_aggregate = true
 		elif arg.begins_with("--ground-study="):
 			mode = arg.get_slice("=", 1)
@@ -75,6 +93,15 @@ func _run() -> void:
 		push_error(report.error)
 		quit(2)
 		return
+	game.track.terrain_material.set_shader_parameter("photographic_curved_uv", curved_uv)
+	game.track.terrain_material.set_shader_parameter(
+		"photographic_directional_composition", directional_composition
+	)
+	report["photographic_curved_uv"] = curved_uv
+	report["photographic_directional_composition"] = directional_composition
+	report["terrain_shader_sha256"] = FileAccess.get_sha256(
+		game.track.terrain_material.shader.resource_path
+	)
 	var pavement: ShaderMaterial = game.track.get_node("RacingSurface").material_override
 	if is_finite(directional_wear):
 		pavement.set_shader_parameter("directional_wear_strength", directional_wear)

@@ -350,3 +350,35 @@ Sparse frame inspection cannot establish absence of temporal shimmer. The
 existing ObjectDB exit warning remains; fixed movie timing is not a performance
 measurement. Human controls passed with zero failures. GDScript formatting,
 real shader compilation and diff checks passed.
+
+
+## Curved straw mapping
+
+The accepted field improvement maps the dense and sparse photographic textures
+along the existing curved mowing coordinates, with image x following travel.
+The appearance scales are six metres along travel and two metres across it,
+replacing the isotropic four metre world tile. This is original visual authoring
+from footage, not a recovered mowing survey. The production photographic mask,
+road shoulder and bare access exclusions remain in force. Texture sources,
+physical terrain and friction data are unchanged.
+
+Both root and independent image review prefer `artifacts/curved-only-apex` to
+`ground-variance-control`: the field now has coherent flow into the bend instead
+of an isotropic tangled carpet. `curved-only-exit` and `curved-default-straight`
+check adjacent views. Nearby straw is visibly stretched, and some reference
+streaking is camera motion, so this is an improvement rather than a fidelity
+claim. `photographic_curved_uv` now defaults true. Static and replay previews
+accept `--photographic-planar-uv` for the earlier mapping.
+
+A separate `--photographic-directional-composition=0..1` experiment varies the
+sparse fraction from 0.22 to 0.98 over interrupted curved passes. Unresolved
+noise converges to the existing 0.60 proportion. It has little independent
+visual benefit and remains zero by default. Its preliminary combined replay is
+`curved-composition-motion.avi`; the default game replay is recorded separately
+as `curved-default-motion.avi`. Derivatives of each source height remain blended
+after differentiation, avoiding invented ridges at material boundaries.
+
+Human controls passed with zero failures and five agent camera observations
+passed the existing capture and serialization checks in
+`artifacts/curved-default-camera-qa`. These local checks do not establish native
+Mac performance. Shader compilation, preview formatting and diff checks passed.

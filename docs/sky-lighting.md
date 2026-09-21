@@ -397,3 +397,30 @@ together. Do not infer solar elevation from bloom alone or alter rider dimension
 solely to force a shadow match. Comparison sheets are in
 `artifacts/solar-elevation-comparison`; source trial names and metadata preserve
 each independent change. Real Vulkan captures and formatter checks passed.
+
+
+## Direct sunlight energy isolated against the rider shadow
+
+With the raised camera, the station 1350 production helmet shadow lies near
+pixel (657,578), close to reference frame 50 near (655,578). The earlier
+lower-camera shadow comparison is no longer a reason to lower solar elevation.
+Camera registration remains approximate.
+
+The preview now accepts `--sun-energy` finite, greater than zero and at most
+eight, and records effective energy plus the explicit override. Production
+remains one. A controlled exit trial held camera, material, sky and direction
+fixed while testing 1.5 and 2.5. Median decoded sRGB luminance in inclusive road
+bounds (650,530) to (660,540) rose from 0.04598 at one, to 0.06667 at 1.5 and
+0.10687 at 2.5. Reference frame 50 is 0.09882. Shadow bounds (650,573) to
+(660,583) stayed 0.00954; reference is 0.01194. These are image comparisons,
+not recovered radiometric exposure or measured material reflectance.
+
+Although 2.5 improves exit pavement brightness, the straight becomes too pale,
+with excessive glare and yellow fields. No global lighting change is accepted.
+Evidence: `artifacts/sun-energy15-exit`, `sun-energy25-exit` and
+`sun-energy25-straight`. This identifies a coupled material and lighting
+response problem; increasing ambient or haze is not supported by this result.
+The next isolated test can compare the hybrid pavement at energy 2.5 in both
+views, keeping a matching control. Zero, negative, excessive, nonfinite and
+malformed energy inputs were rejected. Real Vulkan captures and format checks
+passed.

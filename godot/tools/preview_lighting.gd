@@ -20,6 +20,8 @@ func _run() -> void:
 	var ground_study_metadata := {}
 	var photographic_contrast := 0.0
 	var photographic_height_blend := 0.0
+	var photographic_directional_composition := 0.0
+	var photographic_curved_uv := true
 	var sky_source := ""
 	var solar_haze := 0.0
 	var solar_haze_broad := false
@@ -52,6 +54,7 @@ func _run() -> void:
 	var sky_yaw := 0.0
 	var sun_azimuth := NAN
 	var sun_elevation := NAN
+	var sun_energy := NAN
 	var cloud_gain := NAN
 	var authored_yaw := NAN
 	var minimum_elevation := -90.0
@@ -60,7 +63,22 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--photographic-height-blend="):
+		if arg == "--photographic-planar-uv":
+			photographic_curved_uv = false
+		elif arg == "--photographic-curved-uv":
+			photographic_curved_uv = true
+		elif arg.begins_with("--photographic-directional-composition="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Photographic directional composition must be finite and within zero to one")
+				return
+			photographic_directional_composition = float(value)
+		elif arg.begins_with("--photographic-height-blend="):
 			var value := arg.get_slice("=", 1)
 			if (
 				not value.is_valid_float()
@@ -95,6 +113,17 @@ func _run() -> void:
 				_fail("Solar haze must be finite and within zero to eight")
 				return
 			solar_haze = float(value)
+		elif arg.begins_with("--sun-energy="):
+			var value := arg.trim_prefix("--sun-energy=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) <= 0.0
+				or float(value) > 8.0
+			):
+				_fail("Sun energy must be finite, greater than zero and at most eight")
+				return
+			sun_energy = float(value)
 		elif arg.begins_with("--sun-elevation-deg="):
 			var value := arg.trim_prefix("--sun-elevation-deg=")
 			if (
@@ -598,6 +627,12 @@ func _run() -> void:
 		)
 	var production_terrain_material: ShaderMaterial = game.track.terrain_material
 	production_terrain_material.set_shader_parameter(
+		"photographic_curved_uv", photographic_curved_uv
+	)
+	production_terrain_material.set_shader_parameter(
+		"photographic_directional_composition", photographic_directional_composition
+	)
+	production_terrain_material.set_shader_parameter(
 		"photographic_contrast_preservation", photographic_contrast
 	)
 	production_terrain_material.set_shader_parameter(
@@ -778,6 +813,8 @@ func _run() -> void:
 	environment.sky.sky_material.set_shader_parameter(
 		"minimum_source_y", sin(deg_to_rad(minimum_elevation))
 	)
+	if is_finite(sun_energy):
+		sun.light_energy = sun_energy
 	if is_finite(sun_azimuth):
 		# Geographic azimuth, north is local negative Z. Preserve light elevation.
 		var toward := sun.global_basis.z.normalized()
@@ -846,6 +883,9 @@ func _run() -> void:
 						{
 							"orchard_study": orchard_metadata,
 							"solar_haze_strength": solar_haze,
+							"direct_sun_energy": sun.light_energy,
+							"direct_sun_energy_override":
+							sun_energy if is_finite(sun_energy) else null,
 							"solar_haze_broad": solar_haze_broad,
 							"direct_sun_elevation_override_deg":
 							sun_elevation if is_finite(sun_elevation) else null,
@@ -856,6 +896,8 @@ func _run() -> void:
 							"ground_study": ground_study,
 							"photographic_contrast_preservation": photographic_contrast,
 							"photographic_height_blend": photographic_height_blend,
+							"photographic_directional_composition":
+							photographic_directional_composition,
 							"ground_study_metadata": ground_study_metadata,
 							"photographic_sparse_enabled":
 							_material_parameter(
