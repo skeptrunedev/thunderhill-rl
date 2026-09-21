@@ -50,7 +50,10 @@ func _run() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--ground-study="):
 			ground_study = arg.get_slice("=", 1)
-			if ground_study not in ["production", "generated", "scan", "geometry"]:
+			if (
+				ground_study
+				not in ["production", "legacy", "generated", "regional", "scan", "geometry"]
+			):
 				_fail("Unknown ground study mode")
 				return
 		elif arg.begins_with("--authored-sky-yaw-deg="):
@@ -497,11 +500,17 @@ func _run() -> void:
 			parameter, asphalt_detail[parameter]
 		)
 	var production_terrain_material: ShaderMaterial = game.track.terrain_material
-	if ground_study == "generated":
-		ground_study_metadata = load("res://scripts/ground_generated_study.gd").apply(game.track)
+	if ground_study == "legacy":
+		game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
+		ground_study_metadata = {"mode": "legacy", "photographic_field_enabled": false}
+	elif ground_study in ["generated", "regional"]:
+		ground_study_metadata = load("res://scripts/ground_generated_study.gd").apply(
+			game.track, ground_study == "regional"
+		)
 	elif ground_study == "scan":
 		ground_study_metadata = load("res://scripts/ground_scan_study.gd").apply(game.track)
 	elif ground_study == "geometry":
+		game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
 		ground_study_metadata = load("res://scripts/straw_geometry_study.gd").setup(game)
 	if ground_study_metadata.has("error"):
 		_fail(ground_study_metadata.error)

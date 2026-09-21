@@ -1,7 +1,8 @@
 # Ground treatment experiments
 
 Three independent treatments were rendered at the same Turn 2 apex pose and
-lighting. These are developer experiments, not default game replacements.
+lighting. Their original standalone variants remain developer experiments.
+The regional generated variant described below is now the default game treatment.
 The motorcycle asset work is deferred while the owner obtains its download.
 
 | Treatment | Implementation | Visible result |
@@ -73,4 +74,45 @@ All three treatments compiled and rendered with Vulkan Mobile. Full project
 editor import completed without script errors. The geometry helper was checked
 for finite upward normals, terrain placement and road clearance. It contains
 1,008,000 total triangles, culled in spatial patches beyond 65 metres; that count
-is not a performance guarantee. The default game material remains unchanged.
+is not a performance guarantee. The original comparisons predate regional integration below.
+
+## Regional integration
+
+The generated material now replaces only the pale Turn 2 field annotation.
+The darker western annotation, distant ground and explicit bare access corridors
+keep their existing materials. A bounded five sample maximum extends the pale
+mask toward the shoulder, using offsets of three metres in the two map axes.
+This is a directional artistic expansion, not a uniform measured dilation.
+Region strength and texture bounds are respected.
+
+Albedo, roughness and independently differentiated relief gradients blend under
+the same mask. Differentiating heights before blending avoids adding artificial
+ridges at region boundaries. The extra source is loaded as a baked texture
+resource, so the production path does not depend on loose developer image files.
+
+Root and independent review prefer the regional apex over blanket replacement:
+it retains the new foreground while preserving outer terrain differences. The
+source still lacks some larger disturbed straw patterns from the footage.
+
+`--ground-study=regional` explicitly selects this path; `production` uses the
+current default and `legacy` disables it for static comparisons. The geometry
+study explicitly uses the earlier underlying material to preserve its original
+isolation. Both existing scenery resources were rebaked after the track setup
+changed. Track, terrain, collision and friction data are unchanged.
+
+The rendered human controls check passed with zero failures. Linux frame
+intervals were 17.36 ms median and 17.92 ms p95 across 265 samples. These are
+local short test results, not native Mac performance measurements.
+
+Five real agent camera captures at 640 by 360 passed PNG and hash validation,
+immutable artifacts, frozen tick and deterministic idle pose, changed pixels
+after advance, queued advance/reset serialization, no privileged telemetry,
+and headless rejection. Evidence: `artifacts/regional-ground-camera-qa`.
+
+The actual default material is captured in
+`artifacts/regional-ground-production-apex/production.png` and compared with
+the previous material in `artifacts/regional-ground-comparison/00.png`.
+`artifacts/regional-ground-production.mp4` records the final default over the
+same 2699 replay transitions, replacing the earlier blanket material video as
+the current game review clip. Mac export `aab7e3af3554-46126a98593b` succeeded;
+the current laptop was offline at verification, so native review is pending.

@@ -19,18 +19,24 @@ func _run() -> void:
 			push_error("Ground replay study cannot run agent or control test sessions")
 			quit(2)
 			return
-	if mode not in ["generated", "scan", "geometry"] or not FileAccess.file_exists(replay):
+	if (
+		mode not in ["generated", "regional", "scan", "geometry"]
+		or not FileAccess.file_exists(replay)
+	):
 		push_error("Ground study requires a valid mode and an existing replay")
 		quit(2)
 		return
 	var game = load("res://main.tscn").instantiate()
 	root.add_child(game)
 	var report: Dictionary
-	if mode == "generated":
-		report = load("res://scripts/ground_generated_study.gd").apply(game.track)
+	if mode in ["generated", "regional"]:
+		report = load("res://scripts/ground_generated_study.gd").apply(
+			game.track, mode == "regional"
+		)
 	elif mode == "scan":
 		report = load("res://scripts/ground_scan_study.gd").apply(game.track)
 	else:
+		game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
 		report = load("res://scripts/straw_geometry_study.gd").setup(game)
 	if report.has("error"):
 		push_error(report.error)

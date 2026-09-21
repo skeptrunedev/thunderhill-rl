@@ -131,6 +131,10 @@ func _build_terrain() -> void:
 	field_coverage.apply_material(mat)
 	mat.set_shader_parameter("ground_tint", DRY_GROUND_TINT)
 	mat.set_shader_parameter("grass_color", load("res://assets/materials/dense_straw_v7.res"))
+	mat.set_shader_parameter(
+		"photographic_field", load("res://assets/materials/ground_study/flattened-field-v1.res")
+	)
+	mat.set_shader_parameter("photographic_field_enabled", true)
 	mat.set_shader_parameter("soil_color", load("res://assets/materials/fine_shoulder_v1.png"))
 	var macro: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://assets/materials/terrain_macro.json")

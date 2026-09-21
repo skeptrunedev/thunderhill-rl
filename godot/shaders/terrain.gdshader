@@ -13,6 +13,9 @@ uniform vec2 field_surface_size = vec2(1.0);
 uniform float field_surface_strength : hint_range(0.0, 1.0) = 0.0;
 // Historical aerial contrast inside the independently authored straw region.
 uniform float mapped_aerial_contrast : hint_range(0.0, 1.0) = 1.0;
+// Regional version of the independently reviewed photographic field study.
+uniform bool photographic_field_enabled = false;
+uniform sampler2D photographic_field : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform vec3 pale_straw_gain = vec3(1.40, 1.48, 1.55);
 uniform vec2 macro_origin;
 uniform vec2 macro_size;
@@ -168,6 +171,14 @@ float mowing_gain(vec2 point) {
                                   + streaks * mowing_detail_strength);
 }
 
+// Only the pale field annotation receives the replacement. The darker western
+// annotation retains its existing treatment. Bounds prevent clamped edge bleed.
+float photographic_weight(vec2 uv) {
+    vec4 field = texture(field_surface_map, uv);
+    float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+    return field.a * smoothstep(0.2, 0.6, field.g) * inside;
+}
+
 void fragment() {
     // Original texture scale is an appearance estimate, not a surveyed measure.
     vec3 grass = ground_surface(grass_color, world_pos.xz / grass_tile_m, grass_rotation_spread, grass_scale_spread);
@@ -313,6 +324,24 @@ void fragment() {
         float relief_weight = (1.0 - soil_weight) * relief_visibility;
         height_dx += dFdx(field_height) * relief_weight;
         height_dy += dFdy(field_height) * relief_weight;
+    }
+    if (photographic_field_enabled) {
+        // Expand the authored field footprint three metres toward the shoulder.
+        // Terrain only: the independent asphalt surface is never replaced.
+        vec2 field_uv = (world_pos.xz - field_surface_origin) / field_surface_size;
+        vec2 radius_uv = vec2(3.0) / field_surface_size;
+        float mask = photographic_weight(field_uv);
+        mask = max(mask, photographic_weight(field_uv + vec2(radius_uv.x, 0.0)));
+        mask = max(mask, photographic_weight(field_uv - vec2(radius_uv.x, 0.0)));
+        mask = max(mask, photographic_weight(field_uv + vec2(0.0, radius_uv.y)));
+        mask = max(mask, photographic_weight(field_uv - vec2(0.0, radius_uv.y)));
+        mask *= field_surface_strength * (1.0 - corridor * (1.0 - retained_grass));
+        vec3 photographic = ground_surface(photographic_field, world_pos.xz / 4.0, 0.08, 0.25);
+        ALBEDO = mix(ALBEDO, photographic * 0.55, mask);
+        ROUGHNESS = mix(ROUGHNESS, 0.93, mask);
+        float photographic_height = dot(photographic, vec3(0.2126, 0.7152, 0.0722)) * 0.004;
+        height_dx = mix(height_dx, dFdx(photographic_height), mask);
+        height_dy = mix(height_dy, dFdy(photographic_height), mask);
     }
     vec3 dx = dFdx(VERTEX);
     vec3 dy = dFdy(VERTEX);
