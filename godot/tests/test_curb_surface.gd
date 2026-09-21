@@ -46,6 +46,25 @@ func _initialize() -> void:
 			var rendered: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 			var uv: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 			check(rendered.size() == 6, "Exactly two rendered triangles")
+			var secondary := PackedVector2Array()
+			for vertex: Vector3 in surface.vertices:
+				secondary.append(Vector2(vertex.x, vertex.z))
+			var decorated: SurfaceTool = surface.surface_tool(secondary)
+			decorated.generate_normals()
+			var decorated_arrays := decorated.commit().surface_get_arrays(0)
+			check(
+				decorated_arrays[Mesh.ARRAY_VERTEX] == rendered,
+				"Material coordinates preserve contact geometry"
+			)
+			check(decorated_arrays[Mesh.ARRAY_TEX_UV] == uv, "Primary coordinates preserved")
+			for i in rendered.size():
+				check(
+					(
+						decorated_arrays[Mesh.ARRAY_TEX_UV2][i]
+						== Vector2(rendered[i].x, rendered[i].z)
+					),
+					"Secondary coordinates stay attached through winding changes"
+				)
 			var original_uv := [Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]
 			for i in rendered.size():
 				check(

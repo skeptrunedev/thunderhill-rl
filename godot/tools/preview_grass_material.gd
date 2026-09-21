@@ -12,8 +12,11 @@ func _run() -> void:
 	var output := ""
 	var candidate := ""
 	var frames := 1
+	var road_edge := false
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--output-dir="):
+		if arg == "--road-edge":
+			road_edge = true
+		elif arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
 		elif arg.begins_with("--frames="):
 			frames = int(arg.trim_prefix("--frames="))
@@ -67,9 +70,9 @@ func _run() -> void:
 	var road: Dictionary = track.sample_world(center)
 	var forward := Vector3(road.tangent.x, 0, road.tangent.z).normalized()
 	var left: Vector3 = road.left
-	var position: Vector3 = center + left * (float(road.width) * 0.5 + 4.0)
+	var position: Vector3 = center + left * (float(road.width) * 0.5 + (-0.6 if road_edge else 4.0))
 	position.y = track.terrain_surface_height(position) + 1.5
-	var target := position + forward * 8.0 + left * 3.0 - Vector3.UP * 1.0
+	var target := position + forward * 8.0 + left * (1.5 if road_edge else 3.0) - Vector3.UP * 1.0
 	game.camera.global_position = position
 	game.camera.look_at(target)
 	game.camera.fov = 74.0
@@ -113,6 +116,7 @@ func _run() -> void:
 							"frames_per_material": frames,
 							"step_m": 0.30,
 							"samples": samples,
+							"view": "road_edge" if road_edge else "field",
 							"candidate": candidate,
 							"candidate_sha256": FileAccess.get_sha256(candidate),
 							"source_size": [source.get_width(), source.get_height()],

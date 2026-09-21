@@ -133,11 +133,14 @@ func sample(p: Vector3) -> Dictionary:
 	return result
 
 
-func surface_tool() -> SurfaceTool:
+func surface_tool(secondary_uvs := PackedVector2Array()) -> SurfaceTool:
+	assert(secondary_uvs.is_empty() or secondary_uvs.size() == vertices.size())
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for t in triangles:
 		for index in t:
 			st.set_uv(uvs[index])
+			if not secondary_uvs.is_empty():
+				st.set_uv2(secondary_uvs[index])
 			st.add_vertex(vertices[index])
 	return st

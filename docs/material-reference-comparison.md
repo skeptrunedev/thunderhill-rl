@@ -206,3 +206,26 @@ Ducati hardware reconstruction.
 station 400 using onboard camera 2. The comparison with the supplied footage
 still shows substantial differences in tank shape, surrounding components and
 lighting. Cockpit readout and human control checks pass.
+
+## Pavement edge material
+
+The asphalt shader now darkens a narrow irregular band at the pavement edge,
+guided by the strip outside the white line in frame 00:40. It uses 0.08 to
+0.15 metre estimated material widths, not surveyed seam dimensions. Noise
+coordinates wrap around a circle so this new band is continuous at the lap
+seam. Existing longitudinal pavement noise is unchanged.
+
+The pavement mesh already stores station and lateral distance in its primary
+UVs. An optional secondary UV carries full road width interpolated from those
+stations. The shader therefore follows both sides through widening sections.
+No road vertices, contact triangles, paint positions or grip values changed.
+The triangle helper regression verifies secondary attributes stay attached
+through winding changes while rendered geometry and primary UVs remain equal.
+The contact regression passes 202 checks; rendered human controls pass with
+zero failures. Both affected scenery manifests were rebuilt and verified.
+
+The real renderer close view is `artifacts/pavement-edge-close/existing.png`,
+produced with the new `--road-edge` inspection option. The strip is visible
+between paint and shoulder. The comparison still shows an overly coarse rocky
+shoulder and simplified distant field structure, so this is not a complete
+pavement and grass appearance match.

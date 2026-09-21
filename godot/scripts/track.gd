@@ -274,11 +274,25 @@ func _build_road() -> void:
 					return
 	var asphalt := ShaderMaterial.new()
 	asphalt.shader = load("res://shaders/asphalt.gdshader")
+	asphalt.set_shader_parameter("lap_length_m", length_m)
 	for pair in [["color_map", "Color"], ["normal_map", "NormalGL"], ["rough_map", "Roughness"]]:
 		asphalt.set_shader_parameter(
 			pair[0], load("res://assets/materials/Asphalt010_1K-JPG_%s.jpg" % pair[1])
 		)
-	_mesh(pavement_surface.surface_tool(), asphalt, "RacingSurface")
+	# The primary UV spans 0..width across the pavement and station along it.
+	# Carry interpolated width separately, so the material follows both edges
+	# through widening sections without changing the contact mesh.
+	var stations := PackedFloat64Array()
+	for sample: Dictionary in samples:
+		stations.append(float(sample.s))
+	var edge_coordinates := PackedVector2Array()
+	for uv: Vector2 in pavement_surface.uvs:
+		var i := clampi(stations.bsearch(uv.y, false) - 1, 0, samples.size() - 1)
+		var j := (i + 1) % samples.size()
+		var end_s := stations[j] if j > 0 else length_m
+		var fraction := clampf((uv.y - stations[i]) / (end_s - stations[i]), 0.0, 1.0)
+		edge_coordinates.append(Vector2(lerpf(samples[i].width, samples[j].width, fraction), 0.0))
+	_mesh(pavement_surface.surface_tool(edge_coordinates), asphalt, "RacingSurface")
 	var paint_mat := ShaderMaterial.new()
 	paint_mat.shader = preload("res://shaders/painted_concrete.gdshader")
 	paint_mat.set_shader_parameter("paint_tint", Color("e8e3ce"))
