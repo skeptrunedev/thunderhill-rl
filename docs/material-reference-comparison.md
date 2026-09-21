@@ -1413,3 +1413,39 @@ The comparison specification is `artifacts/pavement-aggregate-comparison.json`;
 `artifacts/pavement-aggregate-comparison/`, without color grading or upsampling.
 The Linux human control check passed with zero failures. Its short render sample
 is not a Mac performance benchmark.
+
+### Continuous Turn 2 mowing shader (2026-09-21)
+
+The short noise patches guided by flattened straw corridors did not reproduce
+long curved mowing passes. A new `mowing_gain` uses distance to a westward ray:
+straight passes join curved passes continuously around the east bend. The
+center `(306.70854, 686.54039)` comes from a least squares circle fit to current
+track centerline samples with `980 < s < 1280`. Solve
+`[2*x, 2*z, 1] * [cx, cz, c] = x*x + z*z`; the fitted radius is 96.4531 m and
+maximum radial residual is 0.8506 m. This is a placement guide, not mowing survey
+data. Source track SHA256 is
+`a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04`.
+
+Nominal 2.6 m spacing, phase warping, continuity, contrast and fade boundaries are
+artistic estimates. The effect fades westward between x=140 and 175 m, inward
+between radial distance 14 and 30 m, and outward between 83 and 94 m. It changes
+only straw color before grass/soil blending. It does not restore grass over the
+bare shoulder or change friction, collision, terrain elevation, or stubble.
+Screen derivatives fade unresolved bands. A zero strength skips the calculation.
+
+The first trial (`mowing-bend-candidate`) was too regular and was largely hidden
+by the field map footprint. The expanded, warped trial (`mowing-bend-varied`)
+removes that dependency and varies pass spacing and continuity. It gives a modest
+improvement in coherent field structure; default strength one is adopted. It
+still falls short of frame 40, especially in foreground detail and lighting.
+The existing 0.5 to 3.5 m soil/grass shoulder blend suppresses the straw effect
+near pavement; that is not evidence that every unchanged foreground pixel is
+inside the shoulder.
+
+Comparison sheets and image hashes are in `artifacts/mowing-bend-comparison/`.
+The apex pair uses identical upright camera 1 at station 1135, strength zero
+versus one. The entry pair uses the documented leaned station 950 pose. The
+reference pair is explicitly not calibrated for camera or motion blur.
+`preview_lighting.gd --mowing-band-strength=0|1` reproduces either state and
+records the effective parameter. Linux human controls passed with zero failures;
+short frame timing samples are not a sustained native performance test.

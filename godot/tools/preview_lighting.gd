@@ -21,6 +21,7 @@ func _run() -> void:
 	var asphalt_roughness := NAN
 	var asphalt_detail := {}
 	var retained_swath := NAN
+	var mowing_band := NAN
 	var detail_source := ""
 	var lean_deg := 0.0
 	var lateral_m := 0.0
@@ -51,6 +52,17 @@ func _run() -> void:
 			asphalt_detail["authored_tile_m" if is_tile else "authored_relief_m"] = float(value)
 		elif arg.begins_with("--terrain-detail="):
 			detail_source = arg.trim_prefix("--terrain-detail=")
+		elif arg.begins_with("--mowing-band-strength="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Mowing band strength must be finite and within zero to one")
+				return
+			mowing_band = float(value)
 		elif arg.begins_with("--retained-swath-strength="):
 			var value := arg.trim_prefix("--retained-swath-strength=")
 			if (
@@ -332,6 +344,8 @@ func _run() -> void:
 		paving_joint_strength = RenderingServer.shader_get_parameter_default(
 			pavement_material.shader.get_rid(), "paving_joint_strength"
 		)
+	if is_finite(mowing_band):
+		game.track.terrain_material.set_shader_parameter("mowing_band_strength", mowing_band)
 	if is_finite(retained_swath):
 		game.track.terrain_material.set_shader_parameter("retained_swath_strength", retained_swath)
 	if is_finite(asphalt_roughness):
@@ -472,6 +486,10 @@ func _run() -> void:
 								FileAccess.get_sha256(detail_source)
 								if not detail_source.is_empty()
 								else ""
+							),
+							"mowing_band_strength":
+							game.track.terrain_material.get_shader_parameter(
+								"mowing_band_strength"
 							),
 							"retained_swath_strength":
 							game.track.terrain_material.get_shader_parameter(
