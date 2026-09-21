@@ -11,6 +11,9 @@ func _run() -> void:
 	root.add_child(stage)
 	var bike = load("res://scripts/bike_visual.gd").new()
 	stage.add_child(bike)
+	if not _check_lathe(bike, stage):
+		quit(1)
+		return
 	if not _check_tank(bike.get_node("FuelTank").mesh):
 		quit(1)
 		return
@@ -188,4 +191,44 @@ func _check_tank(mesh: ArrayMesh, hollow_expected := true) -> bool:
 		assert(front_center < front_shoulder - 0.03, "Tank nose lost its hollow")
 	else:
 		assert(front_center > front_shoulder, "Control loft should remain convex")
+	return true
+
+
+func _check_lathe(bike: Node3D, stage: Node3D) -> bool:
+	# An analytic annulus checks outward orientation independently of the builder.
+	var holder := Node3D.new()
+	stage.add_child(holder)
+	var profile: Array[Vector2] = [
+		Vector2(-0.1, 0.5),
+		Vector2(-0.1, 1.0),
+		Vector2(0.1, 1.0),
+		Vector2(0.1, 0.5),
+		Vector2(-0.1, 0.5)
+	]
+	bike._lathe(profile, StandardMaterial3D.new(), holder)
+	var arrays: Array = holder.get_child(0).mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var volume := 0.0
+	var wrong := 0
+	for i in range(0, vertices.size(), 3):
+		var a := vertices[i]
+		var b := vertices[i + 1]
+		var c := vertices[i + 2]
+		volume += a.dot(c.cross(b)) / 6.0
+		var midpoint := (a + b + c) / 3.0
+		var radial := Vector3(0, midpoint.y, midpoint.z).normalized()
+		var expected: Vector3
+		if absf(a.x - b.x) < 0.000001 and absf(a.x - c.x) < 0.000001:
+			expected = Vector3(signf(midpoint.x), 0, 0)
+		else:
+			expected = radial if Vector2(midpoint.y, midpoint.z).length() > 0.75 else -radial
+		for j in range(i, i + 3):
+			if not normals[j].is_finite() or normals[j].dot(expected) <= 0.0:
+				wrong += 1
+	var expected_volume := PI * (1.0 - 0.25) * 0.2
+	holder.free()
+	if wrong > 0 or absf(volume - expected_volume) > expected_volume * 0.002:
+		push_error("Lathe orientation invalid: wrong normals=%d volume=%f" % [wrong, volume])
+		return false
 	return true

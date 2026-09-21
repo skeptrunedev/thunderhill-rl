@@ -1229,3 +1229,38 @@ frame timing was median 17.251 ms and p95 18.097 ms over 271 frames, a runtime
 check rather than a controlled benchmark. Formatting and diff checks passed.
 Mac export passed as `63331edbaf79-74ab066d9e53`. This export has not been
 verified running natively on the Mac.
+
+## Cockpit surface orientation and shadow diagnostic
+
+The red tank material has no bitmap texture. Matched captures in
+`artifacts/cockpit-shadow-baseline` and `artifacts/cockpit-shadow-disabled`
+establish that its regular dark pattern comes from shadow rendering.
+Increasing constant bias from 0.1 to 0.2 leaves stipple; 0.4 removes the
+pattern but also loses close shadows in the controlled light comparison.
+Neither change was adopted. Doubling normal bias, changing the near split,
+disabling blur, and using 32 bit shadow depth did not produce an acceptable
+replacement. Blur zero exposes triangular self shadow artifacts. The
+precise renderer interaction remains unresolved, so this is not reported
+as a fixed material issue.
+
+`preview_cockpit.gd` now records the light direction and shadow settings and
+accepts bounded shadow diagnostic overrides. `--diagnostic-sun` uses an
+explicit bike relative light direction to compare shadow retention. This
+light is a diagnostic, not reconstructed reference illumination.
+
+An independent mesh audit identified a separate defect in `_lathe()`:
+its triangle order generated inward facing normals on tires, rings and
+grip details. The tank and ignition primitives do not have this defect.
+The lathe triangle order is corrected. A closed analytic annulus regression
+checks the direction of inner, outer and end surfaces and its signed volume.
+The old implementation fails; the corrected implementation passes. Smoothed
+corner normals are checked for outward direction, not exact face alignment.
+
+`artifacts/cockpit-lathe-corrected` records the four matched camera views.
+The visible difference is small and the tank shadow artifact remains.
+Human controls pass with zero failures. Local Linux timing was median
+17.361 ms and p95 25.0 ms over 262 frames, not a controlled performance
+comparison. Geometry and dashboard validation pass. This change does not
+establish a photographic match to the Ducati footage.
+Mac export passed as `10783bb35ddc-d9dc16c3ab73`. It has not been verified
+running natively on the Mac.

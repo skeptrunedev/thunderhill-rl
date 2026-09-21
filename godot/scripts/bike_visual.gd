@@ -149,8 +149,10 @@ func _lathe(
 			var b := Vector3(q.x, sin(angle_a) * q.y, cos(angle_a) * q.y)
 			var c := Vector3(q.x, sin(angle_b) * q.y, cos(angle_b) * q.y)
 			var d := Vector3(p.x, sin(angle_b) * p.y, cos(angle_b) * p.y)
-			_triangle(surface, a, b, c)
-			_triangle(surface, a, c, d)
+			# Profiles run from the negative axle end over the outer radius.
+			# Godot uses clockwise faces when viewed from outside.
+			_triangle(surface, a, c, b)
+			_triangle(surface, a, d, c)
 	surface.generate_normals()
 	_mesh(surface.commit(), material, parent, at)
 

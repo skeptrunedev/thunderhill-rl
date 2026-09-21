@@ -18,15 +18,42 @@ func _run() -> void:
 	var diagnostic_sun := false
 	var shadow_bias := -1.0
 	var normal_bias := -1.0
+	var near_split := -1.0
+	var shadow_blur := -1.0
+	var depth32 := false
 	var arguments := OS.get_cmdline_user_args()
 	if "--display-filtered" in arguments and "--display-unfiltered" in arguments:
 		_fail("Choose one display filtering mode")
 		return
 	for arg in arguments:
-		if arg == "--diagnostic-sun":
+		if arg == "--shadow-depth32":
+			depth32 = true
+		elif arg == "--diagnostic-sun":
 			diagnostic_sun = true
 		elif arg == "--sun-shadows-off":
 			sun_shadows = false
+		elif arg.begins_with("--shadow-blur="):
+			var value := arg.trim_prefix("--shadow-blur=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 4.0
+			):
+				_fail("Shadow blur must be between zero and four")
+				return
+			shadow_blur = float(value)
+		elif arg.begins_with("--near-shadow-split="):
+			var value := arg.trim_prefix("--near-shadow-split=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.005
+				or float(value) > 0.2
+			):
+				_fail("Near shadow split must be between 0.005 and 0.2")
+				return
+			near_split = float(value)
 		elif arg.begins_with("--shadow-normal-bias="):
 			var value := arg.trim_prefix("--shadow-normal-bias=")
 			if (
@@ -93,6 +120,15 @@ func _run() -> void:
 	if FileAccess.file_exists(output.path_join("study.json")):
 		_fail("Refusing to overwrite metadata")
 		return
+	if depth32:
+		RenderingServer.directional_shadow_atlas_set_size(
+			int(
+				ProjectSettings.get_setting_with_override(
+					"rendering/lights_and_shadows/directional_shadow/size"
+				)
+			),
+			false
+		)
 	root.size = SIZE
 	root.content_scale_size = SIZE
 	var game = load("res://main.tscn").instantiate()
@@ -115,13 +151,17 @@ func _run() -> void:
 		_fail("Directional sunlight missing")
 		return
 	if diagnostic_sun:
-		var toward := game.bike.global_basis * Vector3(0.3, 0.8, -0.5).normalized()
+		var toward: Vector3 = game.bike.global_basis * Vector3(0.3, 0.8, -0.5).normalized()
 		sun.look_at(-toward, Vector3.UP)
 	sun.shadow_enabled = sun_shadows
 	if shadow_bias >= 0.0:
 		sun.shadow_bias = shadow_bias
 	if normal_bias >= 0.0:
 		sun.shadow_normal_bias = normal_bias
+	if near_split >= 0.0:
+		sun.directional_shadow_split_1 = near_split
+	if shadow_blur >= 0.0:
+		sun.shadow_blur = shadow_blur
 	if legacy_housing:
 		var housing: MeshInstance3D = game.bike.find_child("InstrumentHousing", true, false)
 		if housing == null:
@@ -218,6 +258,9 @@ func _run() -> void:
 							"diagnostic_sun": diagnostic_sun,
 							"toward_sun": str(sun.global_basis.z),
 							"shadow_bias": sun.shadow_bias,
+							"shadow_depth32_override": depth32,
+							"shadow_blur": sun.shadow_blur,
+							"near_shadow_split": sun.directional_shadow_split_1,
 							"shadow_normal_bias": sun.shadow_normal_bias,
 							"housing_builder_sha256":
 							FileAccess.get_sha256("res://scripts/rounded_panel.gd"),
