@@ -897,3 +897,40 @@ The aligned straight check at station 400 is in
 Human controls passed with zero failures. Local Linux timing was median
 17.361 ms and p95 21.326 ms over 267 frames, not native Mac certification.
 Mac export passed as `34d12c446b1f-6dea2d7e8791`; native execution is unverified.
+
+## Scale variation and separate fine straw component
+
+The scale diagnostic adds `grass_scale_spread`, disabled by default. Each shared
+lattice vertex owns a deterministic source scale ranging from 0.55 to 1.65 at
+full strength. The scale applies around the patch anchor, and the same multiplier
+is passed into both texture gradients for mip selection. Neighboring cells share
+these transforms. The preview exposes `--candidate-scale-spread`, validates finite
+values from zero to one, and records both baseline and candidate values.
+
+`artifacts/straw-scale-control/` and `artifacts/straw-scale-jitter/` isolate the
+change. Compare candidate images across the two directories: both use v4 at two
+metres, zero rotation, station 900 and identical camera settings. Each contains
+three positions spaced 0.30 m apart. Scale variation disrupts individual marks
+but the field still resembles ridged sand or woodgrain. Root and independent
+review rejected adoption. Two or three still images do not establish temporal
+stability, although no gross popping was apparent in the inspected frames.
+
+`assets/source/material-studies/fine-straw-v5.png` removes broad soil holes from
+the authored fine layer. `artifacts/fine-straw-v5-turn2/` and
+`artifacts/fine-straw-v5-straight/` compare v5 against production v2 at one metre
+with otherwise identical shader settings and geometry. Root inspected both
+locations; independent review also inspected Turn 2. Shorter straighter fragments
+reduce obvious patterns, but the middle distance becomes too uniformly brown.
+V5 remains a candidate component. Production retains v2. The next material work
+must author coherent broad straw coverage separately, not restore the broad
+holes to every small texture tile. Foreground streaks in the video include
+motion blur and cannot be treated as a static texture measurement.
+
+The real Vulkan Mobile renderer compiled and captured all four studies without
+reported shader errors. The human control test passed with zero failures; local
+Linux timing was median 17.261 ms and p95 18.790 ms over 267 frames. Invalid scale
+inputs `nan`, `inf`, negative values and values above one were rejected with exit
+code 2. These are local functional checks, not native Mac performance evidence.
+Mac export passed as `d706061342e3-4e93ab2a4107`; this export has not been
+executed on the native Mac. The scene still falls substantially short of the
+requested photographic realism.

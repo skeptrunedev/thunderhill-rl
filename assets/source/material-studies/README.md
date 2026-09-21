@@ -108,3 +108,19 @@ patch rotation changed the curves into overly regular straight rows. The source
 is retained as a rejected study, not installed as a runtime material. This
 isolates orientation and placement as an important next diagnostic; it does not
 prove a mipmap bug. There are no measured matching PBR maps.
+
+## Fine straw component study
+
+`fine-straw-v5.png` is an original generated albedo component. Its exact prompt
+is in `fine-straw-v5-prompt.txt`. The built in image generator received text only.
+It requested a 2048 square image and returned 1254 square. SHA256:
+`dbc8fc2939a5582710c97c9a1fdddb1a1d6a92c913e150b9a8109e9229895df7`.
+The requested one metre coverage and stem dimensions are artistic estimates.
+There are no measured matching height, normal or roughness maps.
+
+The source has straighter shorter fragments and much less broad brightness
+variation than v4. Paired Godot renders at stations 400 and 1065 found reduced
+repetition but an overly uniform brown middle distance. It is retained as a
+candidate fine detail layer, not installed as the production material. A separate
+coherent straw coverage layer is needed before adoption; simply increasing
+contrast would bring back the source repetition problem.
