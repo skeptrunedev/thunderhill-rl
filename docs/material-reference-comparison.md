@@ -548,3 +548,43 @@ and position are labeled explicitly. The sheet makes the remaining excessive
 uniformity, simplified architecture and lighting mismatch clear; this pass is
 not a 1:1 result. Video frames and comparison sheets remain local artifacts.
 Mac export passed as `3cd028be5f4b-70c27e42dfa9`; it has not been run on the Mac.
+
+## Broad pavement material variation
+
+The supplied video frames at 00:20 and 00:40 show organized longitudinal tone
+and grazing reflections, while the current game emphasizes evenly distributed
+fine aggregate. The controlled `artifacts/pavement-sheen-study/` varied only
+roughness by up to 0.16. That produced bright blue and white strips resembling
+wet pavement and was rejected.
+
+`artifacts/pavement-band-study/` instead tested a smooth broad diffuse band with
+maximum albedo reduction 0.32. Its effect was slight. The stronger 0.50 study in
+`artifacts/pavement-band-strong/` was inspected at stations 400, 900 and 3000,
+with three camera positions at each station. Root and independent visual review
+found a modest improvement in the dark interior region, clearest at 900 and
+3000, without the wet strips. The stronger diffuse band is adopted. Correlated
+roughness changes remain small: at most 0.025 downward and 0.018 upward.
+
+The band uses normalized road width and a periodic station domain. Width,
+lateral center, drift and amplitude are artistic estimates, not surveyed rubber
+deposits, an optimal racing line, or measured binder reflectance. One similarly
+placed continuous band is still simpler than real pavement wear; increasing
+its contrast cannot solve that structural limitation. Aggregate texture and
+relief remain unchanged. Collision, friction and the agent protocol are unchanged.
+
+`preview_pavement.gd --surface-variation=1` renders matched baseline and candidate
+views using the actual baked production texture. It rejects incompatible image
+or lighting diagnostics, validates strength, and records camera transforms,
+shader hash and runtime texture hash. Other study modes explicitly disable this
+new variation to preserve their earlier comparison meaning. Nonfinite strength
+was checked and exits with status 2. These sampled stills are not proof of full
+lap motion stability or a calibrated reference match.
+
+The actual production rider capture is `artifacts/pavement-band-production.png`.
+It was inspected after changing the default strength to one. Human controls
+passed with zero failures; the local Linux run measured median 17.361 ms and
+p95 18.545 ms over 267 frames. No native Mac or full lap acceptance is implied.
+Mac export passed as `ac6e4cfc9fe5-cf123d9972de`. The final controlled pair in
+`artifacts/pavement-band-final/` records the production texture checksum and
+correct zero/one variation strengths at all three stations; these metadata
+values were verified against the actual file. Native Mac testing remains pending.

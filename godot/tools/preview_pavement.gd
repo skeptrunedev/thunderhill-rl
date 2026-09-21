@@ -11,6 +11,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var output := ""
 	var candidate := ""
+	var surface_variation := -1.0
 	var frames := 1
 	var flat_relief := false
 	var unlit := false
@@ -21,6 +22,18 @@ func _run() -> void:
 	var variation_only := false
 	var offset_m := 0.0
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--surface-variation="):
+			var value := arg.trim_prefix("--surface-variation=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				push_error("Surface variation must be finite and within zero to one")
+				quit(2)
+				return
+			surface_variation = float(value)
 		if arg == "--flat-relief":
 			flat_relief = true
 		if arg == "--unlit":
@@ -57,6 +70,24 @@ func _run() -> void:
 				quit(2)
 				return
 			frames = int(value)
+	if (
+		surface_variation >= 0.0
+		and (
+			not candidate.is_empty()
+			or flat_relief
+			or unlit
+			or fixed_mip
+			or linear_mips
+			or world_uv
+			or raw_albedo
+			or variation_only
+		)
+	):
+		push_error(
+			"Surface variation comparison requires the unchanged production texture and lighting"
+		)
+		quit(2)
+		return
 	if not output.is_absolute_path() or DisplayServer.get_name() == "headless":
 		push_error("Use real renderer and absolute output directory")
 		quit(2)
@@ -69,6 +100,8 @@ func _run() -> void:
 		quit(2)
 		return
 	var labels := ["procedural", "historical"] if candidate.is_empty() else ["existing", "authored"]
+	if surface_variation >= 0.0:
+		labels = ["baseline", "variation"]
 	var candidate_texture: ImageTexture
 	if not candidate.is_empty():
 		if not candidate.is_absolute_path():
@@ -151,6 +184,8 @@ func _run() -> void:
 		material.set_shader_parameter("authored_color", candidate_texture)
 	if flat_relief:
 		material.set_shader_parameter("authored_relief_m", 0.0)
+	material.set_shader_parameter("surface_variation_strength", 0.0)
+	var authored_texture: Texture2D = material.get_shader_parameter("authored_color")
 	var report: Array = []
 	for view in views:
 		game.reset_episode(float(view.station))
@@ -162,6 +197,12 @@ func _run() -> void:
 			material.set_shader_parameter(
 				"authored_surface", not candidate.is_empty() and strength > 0.0
 			)
+			if surface_variation >= 0.0:
+				material.set_shader_parameter("pavement_tone_strength", 0.0)
+				material.set_shader_parameter("authored_surface", true)
+				material.set_shader_parameter(
+					"surface_variation_strength", 0.0 if strength == 0.0 else surface_variation
+				)
 			for frame in 4:
 				await RenderingServer.frame_post_draw
 			var capture := root.get_texture().get_image()
@@ -177,8 +218,12 @@ func _run() -> void:
 				{
 					"image": name,
 					"requested_station_m": view.station,
-					"historical_strength": strength if candidate.is_empty() else 0.0,
-					"authored_surface": not candidate.is_empty() and strength > 0.0,
+					"historical_strength":
+					strength if candidate.is_empty() and surface_variation < 0.0 else 0.0,
+					"surface_variation_strength":
+					0.0 if strength == 0.0 else maxf(surface_variation, 0.0),
+					"authored_surface":
+					surface_variation >= 0.0 or (not candidate.is_empty() and strength > 0.0),
 					"camera_transform": str(game.camera.global_transform)
 				}
 			)
@@ -195,6 +240,13 @@ func _run() -> void:
 					{
 						"captures": report,
 						"frames_per_station": frames,
+						"runtime_authored_texture": authored_texture.resource_path,
+						"runtime_authored_texture_sha256":
+						(
+							""
+							if authored_texture.resource_path.is_empty()
+							else FileAccess.get_sha256(authored_texture.resource_path)
+						),
 						"flat_relief": flat_relief,
 						"unlit": unlit,
 						"fixed_mip": fixed_mip,

@@ -9,6 +9,8 @@ uniform sampler2D authored_color : source_color, filter_linear_mipmap_anisotropi
 uniform float authored_color_gain = 0.30;
 uniform float authored_tile_m = 0.8;
 uniform float authored_relief_m = 0.00035;
+// Original broad binder variation, not a surveyed rubber or racing line.
+uniform float surface_variation_strength : hint_range(0.0, 1.0) = 1.0;
 // Historical aerial tone, not a measured material or friction field.
 uniform sampler2D pavement_tone : filter_linear_mipmap_anisotropic, repeat_enable;
 // The historical trial did not improve reference fidelity enough for production.
@@ -65,6 +67,16 @@ void fragment() {
         ALBEDO = aggregate * vec3(0.53, 0.50, 0.46) * variation;
     }
     float across = clamp(UV.x / max(UV2.x, 0.001), 0.0, 1.0);
+    // Slowly varying broad material band; appearance estimates only. The
+    // periodic station domain preserves continuity at the lap boundary.
+    float band_phase = UV.y / lap_length_m * TAU;
+    vec2 band_domain = vec2(cos(band_phase), sin(band_phase)) * (lap_length_m / (TAU * 80.0));
+    float band_drift = pavement_noise(band_domain) - 0.5;
+    float band_center = 0.62 + band_drift * 0.12;
+    float band_width = 0.22 + band_drift * 0.06;
+    float broad_band = 1.0 - smoothstep(band_width * 0.35, band_width, abs(across - band_center));
+    float band_weight = broad_band * surface_variation_strength * (authored_surface ? 1.0 : 0.0);
+    ALBEDO *= 1.0 - band_weight * 0.50;
     float tone_interior = smoothstep(0.10, 0.22, min(across, 1.0 - across));
     float observed_tone = texture(pavement_tone, vec2(across, UV.y / lap_length_m)).r * 2.0;
     ALBEDO *= mix(1.0, observed_tone, pavement_tone_strength * tone_interior);
@@ -96,6 +108,8 @@ void fragment() {
         NORMAL_MAP = normalize(vec3(-slope, 1.0)) * 0.5 + 0.5;
         NORMAL_MAP_DEPTH = 1.0;
         ROUGHNESS = mix(clamp(0.62 + (h - 0.10) * 0.20 + (broad - 0.5) * 0.06, 0.58, 0.68), 0.72, edge_weight);
+        float binder_sheen = smoothstep(0.25, 0.80, streak);
+        ROUGHNESS += (0.018 * band_weight - 0.025 * binder_sheen * surface_variation_strength) * (1.0 - edge_weight);
     } else {
         ROUGHNESS = clamp(0.62 + (texture(rough_map, detail).r - 0.5) * 0.10
                           + (streak - 0.5) * 0.035 + (broad - 0.5) * 0.06, 0.52, 0.72);
