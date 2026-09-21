@@ -450,3 +450,21 @@ replacement trial. Static captures are `canopy-add15-straight` and
 `canopy-add15-exit`. The recorded replay completed 2699 transitions and 700
 frames in `canopy-add15-motion.avi`. Its fixed movie timing is not a native Mac
 performance measurement. Production does not install the extra pass.
+
+
+A diagnostic shadow pair uses station 1150, lateral five, view yaw 25, solar
+azimuth 70 and elevation 12. The changed sun deliberately exposes the rider
+shadow on terrain; it is not reference matching. `canopy-shadow-low0` and
+`canopy-shadow-low15` have identical shadow interior [120,680,220,700] and road
+[850,430,1000,460], while sunlit terrain [100,570,250,600] brightens. Root
+reproduced the pixel checks. `canopy-shadow-samples.json` records the evidence.
+
+The initial Mac export test using `--script` launched the ordinary scene rather
+than the study and produced no study capture. It is not a native canopy test.
+Godot's matching engine source clears script overrides when path overrides are
+disabled. The project now exposes `--preview-canopy-backscatter=0..4` through its
+own entry point, always using the additive version. It is accepted only in an
+exclusive preview or replay, and rejected for human, agent, benchmark and QA
+sessions. This permits exported build verification without an engine script
+override. The local real renderer screenshot succeeded; human controls passed,
+and agent and ordinary human study requests were rejected with exit two.

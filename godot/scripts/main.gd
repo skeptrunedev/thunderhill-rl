@@ -80,7 +80,20 @@ func _ready() -> void:
 				return
 	_startup_mark("scene_ready_begin")
 	run_id = "%d_%d" % [Time.get_unix_time_from_system(), OS.get_process_id()]
+	var preview_canopy_strength := NAN
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--preview-canopy-backscatter="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 4.0
+			):
+				push_error("Preview canopy strength must be finite and within zero to four")
+				get_tree().quit(2)
+				return
+			preview_canopy_strength = float(value)
 		if arg.begins_with("--agent-port="):
 			server_port = int(arg.split("=")[1])
 			agent_mode = true
@@ -120,6 +133,19 @@ func _ready() -> void:
 		push_error("Benchmark requires an exclusive diagnostic session")
 		get_tree().quit(2)
 		return
+	if (
+		is_finite(preview_canopy_strength)
+		and (
+			(not preview_mode and replay_path.is_empty())
+			or agent_mode
+			or qa_target > 0
+			or not benchmark_path.is_empty()
+			or "--qa-controls" in OS.get_cmdline_user_args()
+		)
+	):
+		push_error("Canopy study requires an exclusive preview or replay session")
+		get_tree().quit(2)
+		return
 	track = TrackScript.new()
 	track.startup_observer = _startup_mark
 	add_child(track)
@@ -127,6 +153,15 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	_startup_mark("track_complete")
+	if is_finite(preview_canopy_strength):
+		var study := preload("res://scripts/canopy_light_study.gd").apply(
+			track, preview_canopy_strength, true
+		)
+		if study.has("error"):
+			push_error(study.error)
+			get_tree().quit(2)
+			return
+		print("PREVIEW_CANOPY_STUDY ", JSON.stringify(study))
 	var horizon = preload("res://scripts/horizon.gd").new()
 	add_child(horizon)
 	horizon.build(track)
