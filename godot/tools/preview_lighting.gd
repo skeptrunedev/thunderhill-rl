@@ -66,6 +66,27 @@ func _run() -> void:
 				_fail("Cloud radiance gain must be finite and between one and four")
 				return
 			cloud_gain = float(value)
+		elif (
+			arg.begins_with("--asphalt-broad-tone=")
+			or arg.begins_with("--asphalt-binder-mottling=")
+			or arg.begins_with("--asphalt-surface-variation=")
+		):
+			var name := arg.get_slice("=", 0).trim_prefix("--asphalt-")
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Asphalt tone strength must be finite and within zero to one")
+				return
+			var parameter: String = {
+				"broad-tone": "broad_tone_strength",
+				"binder-mottling": "binder_mottling_strength",
+				"surface-variation": "surface_variation_strength"
+			}[name]
+			asphalt_detail[parameter] = float(value)
 		elif arg.begins_with("--asphalt-tile-m=") or arg.begins_with("--asphalt-relief-m="):
 			var value := arg.get_slice("=", 1)
 			var is_tile := arg.begins_with("--asphalt-tile-m=")

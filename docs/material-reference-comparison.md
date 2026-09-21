@@ -1744,3 +1744,29 @@ movie capture is not a live performance measurement.
 Mac export `8068a2089019-3266bd5ec984` completed successfully. Its manifest
 records the exact source content and artifact digest. This package has not
 been tested on the Mac, which was offline during this pass.
+
+## Restrained broad pavement tone
+
+The authored asphalt applied the same broad noise twice, at 2.7 metre cross
+track and 28 metre longitudinal scale. Their combined gain ranged from
+0.7728 to 1.1648 independently of the existing surface variation control.
+This reinforced soft longitudinal ribbons across the road. A separate
+`broad_tone_strength` now attenuates that combined product around its 0.9604
+midpoint response. The midpoint is an artistic reference, not a measured mean.
+Production uses 0.25 for this strength and for binder mottling, previously 0.85.
+Aggregate scale, normal relief, edge treatment, lighting and grip are unchanged.
+
+`artifacts/pavement-tone-comparison/00.png` compares the same apex pose before
+and after. The second sheet compares the candidate with frame 40. Root and
+independent review preferred the combined reduction over reducing broad tone
+alone: soft ribbons are less conspicuous, while foreground aggregate remains
+visible. Entry and middle bend captures also retain surface variation. Camera,
+exposure and motion blur differ from the footage, so these comparisons do not
+establish calibrated material reflectance or an exact visual match.
+
+The existing lighting preview accepts independent bounded broad tone, binder
+mottling and surface variation overrides and records them in capture metadata.
+The rendered human controls check passed with zero failures. Linux frame
+intervals were 17.36 ms median and 25.00 ms p95 across 262 samples, not Mac timings.
+Mac package `8806d75b05dc-9d6ee01cf6e2` exported successfully; native Mac
+verification remains outstanding.

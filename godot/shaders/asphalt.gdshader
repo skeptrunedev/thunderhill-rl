@@ -9,6 +9,9 @@ uniform sampler2D rough_map : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform bool authored_surface = false;
 uniform sampler2D authored_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float authored_color_gain = 0.30;
+// Independent strength for correlated broad albedo modulation.
+// Neutral midpoint preserves the original midpoint response, not measured mean.
+uniform float broad_tone_strength : hint_range(0.0, 1.0) = 0.25;
 // Footage guided warm charcoal response, not a measured spectral reflectance.
 uniform float authored_warmth : hint_range(0.0, 1.0) = 1.0;
 // Smaller aggregate appearance selected against frame 40. Not a measured stone size.
@@ -18,7 +21,7 @@ uniform float authored_relief_m = 0.000109375;
 // Original broad binder variation, not a surveyed rubber or racing line.
 uniform float surface_variation_strength : hint_range(0.0, 1.0) = 0.35;
 // Original longitudinal binder mottling, not a recovered tire or friction map.
-uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.85;
+uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.25;
 // Frame 50 appearance study: local paving pass boundary, not surveyed or friction data.
 uniform float paving_joint_strength : hint_range(0.0, 1.0) = 1.0;
 uniform vec2 paving_joint_station_m = vec2(1263.588613, 1508.580953);
@@ -77,8 +80,10 @@ void fragment() {
     vec3 authored = vec3(0.0);
     if (authored_surface) {
         authored = textureGrad(authored_color, authored_uv, authored_dx, authored_dy).rgb;
-        ALBEDO = mix(vec3(0.10), authored, 0.70) * authored_color_gain * variation;
-        ALBEDO *= mix(0.84, 1.12, broad);
+        float broad_tone = mix(0.92, 1.04, broad) * mix(0.84, 1.12, broad);
+        float fine_tone = mix(0.97, 1.03, streak) * mix(0.98, 1.02, fine_streak);
+        ALBEDO = mix(vec3(0.10), authored, 0.70) * authored_color_gain * fine_tone;
+        ALBEDO *= mix(0.9604, broad_tone, broad_tone_strength);
         vec3 warm_tint = vec3(1.18, 1.04, 0.83);
         warm_tint /= dot(warm_tint, vec3(0.2126, 0.7152, 0.0722));
         ALBEDO *= mix(vec3(1.0), warm_tint, authored_warmth);
