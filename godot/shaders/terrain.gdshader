@@ -16,6 +16,8 @@ uniform float detail_gain_exponent = 1.0;
 uniform float field_soil_strength : hint_range(0.0, 1.0) = 0.0;
 // Original interrupted straw swaths, not measured mowing or vegetation data.
 uniform float field_patch_strength : hint_range(0.0, 1.0) = 0.5;
+// Original pale straw swath study, independently controlled from exposed soil.
+uniform float straw_swath_strength : hint_range(0.0, 1.0) = 0.0;
 // Original appearance parameters, not measured plant height or reflectance.
 uniform float grass_tile_m = 1.0;
 // One retains full random rotation; zero preserves the source straw direction.
@@ -141,7 +143,23 @@ void fragment() {
     float swaths = coverage_noise(field_uv / vec2(2.2, 18.0)) * 0.65
                  + coverage_noise(field_uv / vec2(11.0, 13.0)) * 0.35;
     float sparse_straw = smoothstep(-0.20, 0.30, swaths);
-    grass_coverage *= 1.0 - sparse_straw * field_patch_strength;
+    float straw_abundance = 0.0;
+    if (straw_swath_strength > 0.0) {
+        // Coherent metre scale straw abundance survives the fine source mipmaps.
+        // This is estimated appearance, not a surveyed mowing or plant density map.
+        float straw_rows = coverage_noise(field_uv / vec2(0.9, 11.0) + vec2(31.0, 7.0)) * 0.75
+                         + coverage_noise(field_uv / vec2(7.0, 17.0) + vec2(11.0, 43.0)) * 0.25;
+        float pale_straw = smoothstep(-0.12, 0.27, straw_rows);
+        // Original bounded infield study from the Turn 2 plan, not a mowing survey.
+        // Keep this treatment off distant hills and other unreviewed fields.
+        float infield_radius = length((world_pos.xz - vec2(200.0, 690.0)) / vec2(210.0, 100.0));
+        float infield_weight = 1.0 - smoothstep(0.8, 1.0, infield_radius);
+        straw_abundance = straw_swath_strength * pale_straw * infield_weight;
+        // Local straw is paler and less saturated than the exposed earth. Retain
+        // the fine source detail; do not paint a flat highlight over the ground.
+        grass *= mix(vec3(1.0), vec3(1.10, 1.13, 1.18), straw_abundance);
+    }
+    grass_coverage *= 1.0 - sparse_straw * field_patch_strength * (1.0 - 0.5 * straw_abundance);
     float retained_grass;
     vec4 region = cleared_field(world_pos.xz, retained_grass);
     float corridor = region.a;

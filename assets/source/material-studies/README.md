@@ -92,3 +92,19 @@ SHA256: `1f8d534f83398401c9270a904193eabec73582f061b502a0d54447f05fb53eab`.
 ### Exact v3 generation prompt
 
 Use case: photorealistic-natural. Asset type: original ground albedo for a realistic motorcycle racing game. Generate a square 2048x2048 top down orthographic texture of a one metre square of short mown, completely dry California annual grass. Small dense basal clumps of straight blunt cut straw stems, thin flattened tan blades and fragmented grass litter cover about seventy percent of the ground, with connected irregular patches of fine compact gray brown earth between them. Subdued natural pale beige and dusty brown colors. Millimetre thin stems mostly two to five centimetres long, some longer flattened blades, closely interlocked fine irregular texture. Crucially this is short cut grassy stubble, not tangled roots, curly hair, bundles of twigs, straw ropes or hay windrows. Photographic botanical detail, no regular stripes or repeating clumps, no large stones, leaves, green plants or flowers. Uniform neutral diffuse lighting suitable for an albedo texture, no directional cast shadows or specular highlights, no depth of field, no perspective or landscape, no text, no border. Edge to edge original seamless material study, not a reconstruction or measured scan.
+
+## Broad straw swath study
+
+`dry-straw-swaths-v4.png` is an original built in imagegen material study.
+The exact prompt is in `dry-straw-swaths-v4-prompt.txt`. No image inputs were
+supplied. It requested a 2048 square view of an eight metre patch; actual output
+is 1254 square. Neither the stated scale nor plant morphology is measured.
+SHA256: `9b3fbe80620dc8cc0eb44bc961a835927843bd16deeff4fe9fa336c9ec756ee4`.
+
+The image has stronger connected straw and earth regions than v2. Godot tests
+at four metre and two metre scales found oversized stems and repeated curved
+patterns. Removing derived relief did not remove the pattern. Removing random
+patch rotation changed the curves into overly regular straight rows. The source
+is retained as a rejected study, not installed as a runtime material. This
+isolates orientation and placement as an important next diagnostic; it does not
+prove a mipmap bug. There are no measured matching PBR maps.

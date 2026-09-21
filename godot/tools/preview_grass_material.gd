@@ -23,13 +23,49 @@ func _run() -> void:
 	var field_patch_strength := -1.0
 	var soil_value := -1.0
 	var grass_tile_m := -1.0
+	var candidate_tile_m := -1.0
+	var candidate_grass_relief := -1.0
 	var stubble_shader_path := ""
 	var candidate_grass_rotation := -1.0
 	var candidate_field_relief := -1.0
+	var candidate_straw_swaths := -1.0
 	var candidate_coverage_path := ""
 	var candidate_coverage: FieldCoverage
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--candidate-field-coverage="):
+		if arg.begins_with("--candidate-grass-relief="):
+			var value := arg.trim_prefix("--candidate-grass-relief=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 0.05
+			):
+				_fail("Candidate grass relief must be between zero and 0.05 metres")
+				return
+			candidate_grass_relief = float(value)
+		elif arg.begins_with("--candidate-tile-m="):
+			var value := arg.trim_prefix("--candidate-tile-m=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.25
+				or float(value) > 8.0
+			):
+				_fail("Candidate tile must be between 0.25 and eight metres")
+				return
+			candidate_tile_m = float(value)
+		elif arg.begins_with("--candidate-straw-swaths="):
+			var value := arg.trim_prefix("--candidate-straw-swaths=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Straw swath strength must be finite and between zero and one")
+				return
+			candidate_straw_swaths = float(value)
+		elif arg.begins_with("--candidate-field-coverage="):
 			candidate_coverage_path = arg.trim_prefix("--candidate-field-coverage=")
 		elif arg.begins_with("--candidate-field-relief="):
 			var value := arg.trim_prefix("--candidate-field-relief=")
@@ -152,6 +188,22 @@ func _run() -> void:
 			frames = int(arg.trim_prefix("--frames="))
 		elif arg.begins_with("--candidate="):
 			candidate = arg.trim_prefix("--candidate=")
+	if (candidate_tile_m >= 0.0 or candidate_grass_relief >= 0.0) and candidate.is_empty():
+		_fail("Candidate tile size and grass relief require a candidate texture")
+		return
+	if (
+		candidate_straw_swaths >= 0.0
+		and (
+			not candidate.is_empty()
+			or not candidate_coverage_path.is_empty()
+			or candidate_field_relief >= 0.0
+			or compare_fields
+			or not stubble_shader_path.is_empty()
+			or candidate_grass_rotation >= 0.0
+		)
+	):
+		_fail("Straw swath comparison requires the production texture and no other candidate")
+		return
 	if not candidate_coverage_path.is_empty():
 		if (
 			not candidate_coverage_path.is_absolute_path()
@@ -196,6 +248,7 @@ func _run() -> void:
 		not output.is_absolute_path()
 		or (
 			candidate_field_relief < 0.0
+			and candidate_straw_swaths < 0.0
 			and candidate_coverage_path.is_empty()
 			and not compare_fields
 			and not candidate.is_absolute_path()
@@ -327,6 +380,9 @@ func _run() -> void:
 	var original_rotation: float = RenderingServer.shader_get_parameter_default(
 		material.shader.get_rid(), "grass_rotation_spread"
 	)
+	var original_grass_relief: float = RenderingServer.shader_get_parameter_default(
+		material.shader.get_rid(), "grass_relief_m"
+	)
 	var samples: Array = []
 	for index in frames:
 		var pose := position + forward * (0.30 * index)
@@ -357,6 +413,26 @@ func _run() -> void:
 					candidate_coverage.apply_material(material)
 				else:
 					track.field_coverage.apply_material(material)
+			material.set_shader_parameter(
+				"grass_tile_m",
+				(
+					candidate_tile_m
+					if name == "candidate" and candidate_tile_m >= 0.0
+					else grass_tile_m
+				)
+			)
+			material.set_shader_parameter(
+				"grass_relief_m",
+				(
+					candidate_grass_relief
+					if name == "candidate" and candidate_grass_relief >= 0.0
+					else original_grass_relief
+				)
+			)
+			if candidate_straw_swaths >= 0.0:
+				material.set_shader_parameter(
+					"straw_swath_strength", candidate_straw_swaths if name == "candidate" else 0.0
+				)
 			if candidate_field_relief >= 0.0:
 				material.set_shader_parameter(
 					"field_relief_m", candidate_field_relief if name == "candidate" else 0.0
@@ -396,6 +472,16 @@ func _run() -> void:
 							"frames_per_material": frames,
 							"existing_grass_rotation": original_rotation,
 							"candidate_field_relief_m": candidate_field_relief,
+							"candidate_straw_swaths": candidate_straw_swaths,
+							"existing_grass_relief_m": original_grass_relief,
+							"candidate_grass_relief_m":
+							(
+								candidate_grass_relief
+								if candidate_grass_relief >= 0.0
+								else original_grass_relief
+							),
+							"candidate_tile_m":
+							candidate_tile_m if candidate_tile_m >= 0.0 else grass_tile_m,
 							"candidate_field_coverage": candidate_coverage_path,
 							"candidate_field_coverage_sha256":
 							(

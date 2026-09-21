@@ -851,3 +851,49 @@ failures. Linux timing was median 17.314 ms and p95 25.0 ms over 264 frames;
 this was a local functional run, not an isolated native Mac benchmark.
 Tailscale reports the MacBook offline, so native verification remains pending.
 Mac export passed as `39c6c2f4157a-8f429689d9e2`; native execution is unverified.
+
+## Broad pale straw studies and placement diagnosis
+
+The next grass study tested broad color and coverage separately from fine
+source detail. `artifacts/pale-straw-swaths/` added directional brightness noise;
+root and independent review rejected it because it resembled lighting blotches
+and striped the distant hill. `artifacts/pale-straw-coverage/` combined a paler
+color with retained grass coverage but was superseded by the bounded test.
+
+`artifacts/pale-straw-bounded/` limits the treatment to an artistic Turn 2 ellipse
+(center X/Z 200/690 m, radii 210/100 m, smooth fade from radius 0.8 to 1.0).
+It uses a modest linear RGB multiplier (1.10, 1.13, 1.18) and restores at most
+half the grass coverage removed by the existing sparse patch layer. The existing
+bare shoulder remains bare. This fixed the distant hill artifact, but the visual
+improvement was too weak to justify adoption. `straw_swath_strength` remains zero;
+the disabled branch skips its noise work. These parameters are not measured
+vegetation, reflectance or mowing data.
+
+An original imagegen source, `assets/source/material-studies/dry-straw-swaths-v4.png`,
+then tested broader connected straw and earth patterns. Its exact prompt and
+provenance are recorded beside it. `artifacts/straw-v4-four-metres/` made patches
+readable at riding distance, but had oversized foreground stems. The two metre
+trial in `artifacts/straw-v4-two-metres/` reduced stem size but showed a repeated
+woodgrain pattern across three camera positions spaced 0.30 m apart. Neither
+source variant was adopted.
+
+`artifacts/straw-v4-no-relief/` retains this pattern with grass relief set to zero.
+`artifacts/straw-v4-aligned/` instead removes random rotation while retaining
+normal relief and the two metre scale. The curved pattern becomes parallel rows.
+Both root and independent review therefore identify orientation of this strongly
+directional source as a major contributor, not the derived normal layer. This
+does not establish a mipmap defect. The aligned result remains too regularly
+striped compared with the interrupted unequal swaths in frames 00:30 and 00:40.
+The next correction must address source repetition and placement rather than
+increasing relief or brightness. Production retains v2 at its existing scale.
+
+The preview now accepts candidate specific tile size and grass relief, keeping
+baseline settings unchanged and recording both in metadata. The swath diagnostic
+uses the production texture and refuses simultaneous candidate changes. All
+new numeric controls validate finite bounded inputs.
+
+The aligned straight check at station 400 is in
+`artifacts/straw-v4-aligned-straight/`; root inspected this additional view.
+Human controls passed with zero failures. Local Linux timing was median
+17.361 ms and p95 21.326 ms over 267 frames, not native Mac certification.
+Mac export passed as `34d12c446b1f-6dea2d7e8791`; native execution is unverified.
