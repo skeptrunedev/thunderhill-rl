@@ -14,7 +14,7 @@ from lap_audit import audit_lap
 from lap_policy import RoadTelemetry, parse_action
 from peft import PeftModel
 from smoke_grpo import MODEL, REVISION, worker
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, CompileConfig
 
 
 def main():
@@ -24,10 +24,26 @@ def main():
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--max-actions", type=int, default=9000)
     p.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
+    p.add_argument(
+        "--compile", action="store_true", help="Compile CUDA decode with a static cache"
+    )
     args = p.parse_args()
+    if args.compile and args.device != "cuda":
+        p.error("Compiled inference requires CUDA")
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
     tokenizer = AutoTokenizer.from_pretrained(args.adapter)
+    if args.compile:
+        tokenizer.padding_side = "left"
+    generation_options = {}
+    if args.compile:
+        generation_options = {
+            "cache_implementation": "static",
+            "max_cache_len": 288,
+            "compile_config": CompileConfig(
+                fullgraph=True, dynamic=True, mode="reduce-overhead"
+            ),
+        }
     model = PeftModel.from_pretrained(
         AutoModelForCausalLM.from_pretrained(
             MODEL, revision=REVISION, dtype=torch.float32, attn_implementation="sdpa"
@@ -87,7 +103,15 @@ def main():
                 reason = "operator_stopped"
                 break
             prompt = road.prompt_features(view["road"])
-            inputs = tokenizer(prompt, return_tensors="pt").to(args.device)
+            inputs = tokenizer(
+                prompt,
+                return_tensors="pt",
+                **(
+                    {"padding": "max_length", "max_length": 256} if args.compile else {}
+                ),
+            ).to(args.device)
+            if args.compile and inputs["input_ids"].shape[1] != 256:
+                raise ValueError("Policy prompt exceeds the fixed compiled input size")
             with torch.inference_mode():
                 output = model.generate(
                     **inputs,
@@ -96,6 +120,7 @@ def main():
                     do_sample=False,
                     pad_token_id=tokenizer.pad_token_id,
                     eos_token_id=tokenizer.eos_token_id,
+                    **generation_options,
                 )
             tokens = output[0, inputs["input_ids"].shape[1] :].tolist()
             text = tokenizer.decode(tokens, skip_special_tokens=True)
@@ -164,6 +189,7 @@ def main():
             "reason": reason,
             "model": MODEL,
             "device": args.device,
+            "compiled_inference": args.compile,
             "adapter_merged_for_inference": True,
             "merge_max_logit_error": merge_error,
             "adapter_sha256": adapter_hash,
