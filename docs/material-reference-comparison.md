@@ -807,3 +807,47 @@ command was rendered successfully in `artifacts/field-relief-final-check/` and
 visually inspected. Human controls passed with zero failures; local Linux frame
 timing was median 17.361 ms and p95 20.1 ms over 265 frames. This diagnostic does
 not establish native Mac performance or a visual match to the footage.
+
+## Turn 2 flattened straw pattern
+
+The 00:40 footage shows darker curved streaks in tan vegetation inside Turn 2.
+The historical aerial crop `[1000,1720,1750,2160]` shows curved mowing patterns,
+but does not independently establish this same dark strip. The new pattern is
+an original visual reconstruction from the footage. It is not an aerial trace,
+surveyed feature or recovered material composition.
+
+`data/reference/turn2-field-band-study.json` records image hashes, construction,
+coordinates and all artistic parameters. Eleven segments follow actual track
+samples near stations 990 through 1265, offset four metres from the left pavement
+edge. Width varies from zero at the ends to at most 1.6 m, with 0.8 m feather.
+The shader retains ground straw and modulates its linear color along the curve.
+Pale gaps interrupt dark stretches. Both the tint and dimensions are estimates.
+The original pale historical access corridor retains its previous material.
+
+The field coverage helper now supports per point widths, linear color, ground
+grass retention and per point tint strength. Terrain shading and baked upright
+grass exclusion share the same tapered footprint. Tint variation does not alter
+that footprint: the pale gaps remain flattened ground. No collision, contact
+height, tire grip, reward or observation contract is changed.
+
+`artifacts/turn2-band-first/` showed a broad continuous dark path and was rejected.
+`artifacts/turn2-band-tapered/` improved width but still resembled a dirt path.
+`artifacts/turn2-band-final/` adds intermittent color and rebuilt stubble. Root
+and independent inspection accepted the final pattern as a modest improvement.
+Three paired captures spaced 0.30 m apart isolate the material; both sides use
+the same rebuilt vegetation. They are not a complete vegetation before/after
+comparison or a continuous motion test.
+
+`artifacts/turn2-band-comparison/` includes a footage comparison with unaltered
+colors. Camera position, lean, sun, exposure and motion blur are not registered.
+The field still lacks the reference's wider pale directional straw patterns,
+and the complete scene remains substantially below the realism target.
+
+Both scenery bakes passed. Field coverage tests passed, including defaults,
+taper interpolation, material parameters and malformed data rejection. The
+rendered baked scene check inspected 96,000 grass instances and found zero
+intrusions under the shared exclusion rule. Human controls passed with zero
+failures. Linux timing was median 17.314 ms and p95 25.0 ms over 264 frames;
+this was a local functional run, not an isolated native Mac benchmark.
+Tailscale reports the MacBook offline, so native verification remains pending.
+Mac export passed as `39c6c2f4157a-8f429689d9e2`; native execution is unverified.

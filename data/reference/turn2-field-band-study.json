@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "status": "Original visual reconstruction, not a surveyed or aerial traced strip",
+  "feature": "Flattened darker straw band inside Turn 2",
+  "references": [
+    {
+      "path": "artifacts/reference/ken-moto/frame-0040.00.jpg",
+      "sha256": "5df7ab078ace341097d7546481e7324503d8906633206fe2fd4a59779db5b568",
+      "role": "Evidence for curved dark flattened streaks inside the corner"
+    },
+    {
+      "path": "artifacts/reference/ken-moto/frame-0050.00.jpg",
+      "sha256": "1779ed6f5c5b0ad8a6402c46d57406a825ffcc978ba74b866b1c913400fd5821",
+      "role": "Does not justify continuing the feature far beyond the corner"
+    },
+    {
+      "path": "artifacts/reference/ortho/east-2022.png",
+      "sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
+      "role": "Historical curved mowing patterns, not confirmation of this exact narrow strip"
+    }
+  ],
+  "video_url": "https://www.youtube.com/watch?v=yVjzZqYbKuM",
+  "historical_crop_ltrb": [
+    1000,
+    1720,
+    1750,
+    2160
+  ],
+  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "construction": {
+    "requested_stations_m": [
+      990,
+      1015,
+      1040,
+      1065,
+      1090,
+      1115,
+      1140,
+      1165,
+      1190,
+      1215,
+      1240,
+      1265
+    ],
+    "method": "Nearest track sample p.xz + left.xz * (width / 2 + 4), piecewise linear centerline",
+    "offset_inside_left_pavement_edge_m": 4.0,
+    "parameter_status": "All offsets, point widths, feather and color are artistic estimates",
+    "tint_color_space": "Linear multiplier, not measured reflectance",
+    "grass_retention": "Preserve existing ground straw coverage, remove upright stubble from core during scenery bake",
+    "tint_variation": "Original strength values at each centerline point, interpolated by segment distance to interrupt dark stretches. Bright gaps remain flattened."
+  },
+  "corridor": {
+    "points_local_xz": [
+      [
+        308.254143,
+        773.353656
+      ],
+      [
+        329.890171,
+        770.248745
+      ],
+      [
+        350.11526,
+        761.941005
+      ],
+      [
+        367.461196,
+        748.749979
+      ],
+      [
+        380.798523,
+        731.413766
+      ],
+      [
+        389.890317,
+        711.264283
+      ],
+      [
+        393.616633,
+        687.419695
+      ],
+      [
+        391.239343,
+        665.247508
+      ],
+      [
+        383.228622,
+        645.303597
+      ],
+      [
+        370.196254,
+        627.212762
+      ],
+      [
+        353.747947,
+        613.65452
+      ],
+      [
+        333.416935,
+        604.375102
+      ]
+    ],
+    "width_m": 1.6,
+    "feather_m": 0.8,
+    "tint_linear": [
+      0.58,
+      0.58,
+      0.58
+    ],
+    "grass_retention": 1.0,
+    "point_widths_m": [
+      0,
+      0.8,
+      1.4,
+      1,
+      1.6,
+      1.2,
+      1.5,
+      0.8,
+      1.2,
+      1.4,
+      0.7,
+      0
+    ],
+    "point_tint_strengths": [
+      0,
+      0.6,
+      0.05,
+      0.8,
+      0,
+      0.65,
+      0.1,
+      0.75,
+      0.05,
+      0.6,
+      0.15,
+      0
+    ]
+  },
+  "limitations": [
+    "One broad visual feature does not recreate every streak in the footage",
+    "Different camera, sun, exposure and motion blur prevent pixel registration or measured color matching",
+    "Surface composition is uncertain; flattened vegetation is an artistic interpretation",
+    "The 2022 aerial predates repaving and does not prove current ground cover",
+    "No contact heights, tire grip, collision, rewards or observations are changed"
+  ]
+}

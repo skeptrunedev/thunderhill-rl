@@ -32,6 +32,55 @@ func _initialize() -> void:
 		"Shader endpoints mismatch"
 	)
 	check(sizes[0] == Vector2(2, 1), "Shader width and feather mismatch")
+	check(
+		coverage.tints[0] == Vector3.ONE and coverage.grass_retentions[0] == 0.0,
+		"Legacy cleared material changed"
+	)
+	row.tint_linear = [0.55, 0.5, 0.45]
+	row.grass_retention = 1.0
+	check(coverage.configure(data).is_empty(), "Flattened straw material rejected")
+	coverage.apply_material(material)
+	var tints: PackedVector3Array = material.get_shader_parameter("field_tints")
+	var retentions: PackedFloat32Array = material.get_shader_parameter("field_grass_retentions")
+	check(
+		tints[1].is_equal_approx(Vector3(0.55, 0.5, 0.45)) and retentions[1] == 1.0,
+		"Flattened material not passed to shader"
+	)
+	row.tint_linear = [NAN, 1.0, 1.0]
+	check(
+		not coverage.configure(data).is_empty() and coverage.tints.is_empty(),
+		"Nonfinite tint retained stale material"
+	)
+	row.tint_linear = [1.0, 1.0, 1.0]
+	row.grass_retention = 1.1
+	check(not coverage.configure(data).is_empty(), "Invalid retention accepted")
+	row.grass_retention = 0.0
+	row.point_widths_m = [0.0, 4.0, 0.0]
+	check(coverage.configure(data).is_empty(), "Tapered corridor rejected")
+	check(
+		is_equal_approx(coverage.signed_distance(Vector2(5, 0), 0), -1.0), "Taper not interpolated"
+	)
+	check(
+		is_equal_approx(coverage.signed_distance(Vector2(-2, 0), 0), 2.0),
+		"Taper endpoint has full width cap"
+	)
+	coverage.apply_material(material)
+	var radii: PackedFloat32Array = material.get_shader_parameter("field_end_radii")
+	check(radii[0] == 2.0 and radii[1] == 0.0, "Taper endpoints not passed to shader")
+	row.point_widths_m = [0.0, INF, 0.0]
+	check(not coverage.configure(data).is_empty(), "Nonfinite taper accepted")
+	row.erase("point_widths_m")
+	row.point_tint_strengths = [0.0, 1.0, 0.25]
+	check(coverage.configure(data).is_empty(), "Variable tint rejected")
+	coverage.apply_material(material)
+	var strengths: PackedVector2Array = material.get_shader_parameter("field_tint_strengths")
+	check(
+		strengths[0] == Vector2(0, 1) and strengths[1] == Vector2(1, 0.25),
+		"Tint breaks not passed to shader"
+	)
+	row.point_tint_strengths = [0.0]
+	check(not coverage.configure(data).is_empty(), "Mismatched tint points accepted")
+	row.erase("point_tint_strengths")
 	row.width_m = NAN
 	check(
 		not coverage.configure(data).is_empty() and coverage.segments.is_empty(),

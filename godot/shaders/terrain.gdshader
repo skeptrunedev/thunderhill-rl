@@ -32,6 +32,12 @@ uniform float soil_value : hint_range(0.1, 1.0) = 0.7;
 uniform int field_segment_count = 0;
 uniform vec4 field_segments[16];
 uniform vec2 field_sizes[16];
+uniform float field_end_radii[16];
+// Linear artistic color multipliers, independently authored per region.
+uniform vec3 field_tints[16];
+uniform vec2 field_tint_strengths[16];
+// Flattened straw can retain its surface texture while removing upright blades.
+uniform float field_grass_retentions[16];
 varying vec3 world_pos;
 
 void vertex() {
@@ -91,16 +97,23 @@ vec3 ground_surface(sampler2D color_source, vec2 uv, float rotation_spread) {
     return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
 }
 
-float cleared_field(vec2 point) {
+vec4 cleared_field(vec2 point, out float grass_retention) {
+    grass_retention = 0.0;
     float weight = 0.0;
+    vec3 tint = vec3(1.0);
     for (int i = 0; i < field_segment_count; i++) {
         vec2 start = field_segments[i].xy;
         vec2 delta = field_segments[i].zw - start;
         float t = clamp(dot(point - start, delta) / dot(delta, delta), 0.0, 1.0);
-        float distance_to_edge = length(point - start - delta * t) - field_sizes[i].x;
-        weight = max(weight, 1.0 - smoothstep(0.0, field_sizes[i].y, distance_to_edge));
+        float distance_to_edge = length(point - start - delta * t) - mix(field_sizes[i].x, field_end_radii[i], t);
+        float candidate = 1.0 - smoothstep(0.0, field_sizes[i].y, distance_to_edge);
+        if (candidate > weight) {
+            weight = candidate;
+            tint = mix(vec3(1.0), field_tints[i], mix(field_tint_strengths[i].x, field_tint_strengths[i].y, t));
+            grass_retention = field_grass_retentions[i];
+        }
     }
-    return weight;
+    return vec4(tint, weight);
 }
 
 void fragment() {
@@ -129,10 +142,12 @@ void fragment() {
                  + coverage_noise(field_uv / vec2(11.0, 13.0)) * 0.35;
     float sparse_straw = smoothstep(-0.20, 0.30, swaths);
     grass_coverage *= 1.0 - sparse_straw * field_patch_strength;
-    float corridor = cleared_field(world_pos.xz);
-    grass_coverage *= 1.0 - corridor;
+    float retained_grass;
+    vec4 region = cleared_field(world_pos.xz, retained_grass);
+    float corridor = region.a;
+    grass_coverage *= 1.0 - corridor * (1.0 - retained_grass);
     float soil_weight = (1.0 - grass_coverage) * macro_weight;
-    ALBEDO = mix(grass, soil * mix(soil_value, 1.0, corridor), soil_weight) * ground_tint * macro_gain * detail_gain;
+    ALBEDO = mix(grass, soil * mix(soil_value, 1.0, corridor * (1.0 - retained_grass)), soil_weight) * ground_tint * macro_gain * detail_gain * mix(vec3(1.0), region.rgb, corridor);
     // A single albedo does not contain measured PBR maps. Bright straw over
     // darker soil supplies an explicitly artistic relief/roughness estimate.
     // Derivatives of the filtered sample naturally remove unresolved relief.

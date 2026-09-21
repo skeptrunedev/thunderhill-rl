@@ -1,5 +1,5 @@
 extends SceneTree
-## Compare a candidate albedo under identical geometry, lighting and camera.
+## Compare material candidates under identical geometry, lighting and camera.
 const Validation = preload("res://scripts/image_validation.gd")
 const SIZE := Vector2i(1280, 800)
 
@@ -26,8 +26,12 @@ func _run() -> void:
 	var stubble_shader_path := ""
 	var candidate_grass_rotation := -1.0
 	var candidate_field_relief := -1.0
+	var candidate_coverage_path := ""
+	var candidate_coverage: FieldCoverage
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--candidate-field-relief="):
+		if arg.begins_with("--candidate-field-coverage="):
+			candidate_coverage_path = arg.trim_prefix("--candidate-field-coverage=")
+		elif arg.begins_with("--candidate-field-relief="):
 			var value := arg.trim_prefix("--candidate-field-relief=")
 			if (
 				not value.is_valid_float()
@@ -148,6 +152,25 @@ func _run() -> void:
 			frames = int(arg.trim_prefix("--frames="))
 		elif arg.begins_with("--candidate="):
 			candidate = arg.trim_prefix("--candidate=")
+	if not candidate_coverage_path.is_empty():
+		if (
+			not candidate_coverage_path.is_absolute_path()
+			or not FileAccess.file_exists(candidate_coverage_path)
+			or not candidate.is_empty()
+			or candidate_field_relief >= 0.0
+			or compare_fields
+			or not stubble_shader_path.is_empty()
+			or candidate_grass_rotation >= 0.0
+		):
+			_fail("Field coverage comparison requires an absolute JSON path and no other candidate")
+			return
+		candidate_coverage = FieldCoverage.new()
+		var coverage_error := candidate_coverage.configure(
+			JSON.parse_string(FileAccess.get_file_as_string(candidate_coverage_path))
+		)
+		if not coverage_error.is_empty():
+			_fail(coverage_error)
+			return
 	if (
 		candidate_field_relief >= 0.0
 		and (
@@ -171,7 +194,12 @@ func _run() -> void:
 		return
 	if (
 		not output.is_absolute_path()
-		or (candidate_field_relief < 0.0 and not candidate.is_absolute_path())
+		or (
+			candidate_field_relief < 0.0
+			and candidate_coverage_path.is_empty()
+			and not compare_fields
+			and not candidate.is_absolute_path()
+		)
 		or DisplayServer.get_name() == "headless"
 	):
 		_fail("Use a real renderer and absolute paths; texture studies require --candidate")
@@ -324,6 +352,11 @@ func _run() -> void:
 			material.set_shader_parameter(
 				"field_segment_count", 0 if compare_fields and name == "existing" else field_count
 			)
+			if candidate_coverage != null:
+				if name == "candidate":
+					candidate_coverage.apply_material(material)
+				else:
+					track.field_coverage.apply_material(material)
 			if candidate_field_relief >= 0.0:
 				material.set_shader_parameter(
 					"field_relief_m", candidate_field_relief if name == "candidate" else 0.0
@@ -363,6 +396,13 @@ func _run() -> void:
 							"frames_per_material": frames,
 							"existing_grass_rotation": original_rotation,
 							"candidate_field_relief_m": candidate_field_relief,
+							"candidate_field_coverage": candidate_coverage_path,
+							"candidate_field_coverage_sha256":
+							(
+								""
+								if candidate_coverage_path.is_empty()
+								else FileAccess.get_sha256(candidate_coverage_path)
+							),
 							"candidate_grass_rotation":
 							(
 								candidate_grass_rotation
