@@ -424,3 +424,47 @@ The next isolated test can compare the hybrid pavement at energy 2.5 in both
 views, keeping a matching control. Zero, negative, excessive, nonfinite and
 malformed energy inputs were rejected. Real Vulkan captures and format checks
 passed.
+
+
+## Hybrid pavement with stronger and neutral sunlight
+
+The next controlled captures tested hybrid pavement at energy 2.5 at stations
+850 and 1350, with an energy one exit control. The forward road patch's decoded
+luminance falls from 0.4137 with production pavement at energy 2.5 to 0.2426 with
+the hybrid, but reference frame 30 is 0.1301. The exit hybrid reaches 0.1026,
+close to reference frame 50 at 0.0988. Thus removing narrow wear highlights
+reduces the forward excess without resolving the directional mismatch.
+
+The preview now accepts `--sun-color=RRGGBB`, validated as exactly six hex
+characters, and records effective and override color. White light at the same
+energy makes the road less warm but remains too bright: forward patch 0.2717,
+exit 0.1152. Constant numeric energy is not equal photometric luminance after
+changing RGB color. Neither color nor energy change is promoted. Native game
+lighting remains unchanged.
+
+The reproducible patch report `artifacts/hybrid-sun-patch-measurements.json`
+records exclusive-upper crop bounds, source hashes, median RGB and median
+luminance after sRGB decoding. Road bounds are [650,530,661,541], field bounds
+[195,295,206,306]. These are approximate image counterparts, not registered
+world samples. The shadow bounds are only meaningful in exit views. Full views
+are in `artifacts/hybrid-sun-comparison`. All real Vulkan captures completed;
+malformed sun color was rejected with exit two. Formatting and diff checks pass.
+
+A 25 frame reference sequence at one second intervals from 28 through 52 seconds
+is retained in `artifacts/reference/turn2-exposure-sequence`. The field becomes
+brighter as the rider turns away from the sun, while the pavement loses its
+strong forward glare. Different world patches, camera exposure and angular
+material response are confounded; this sequence alone does not prove automatic
+exposure. No global exposure curve is inferred or implemented.
+
+A physically motivated next hypothesis is vegetation backscatter rather than
+a further global light gain. NASA's measured surface BRDF overview describes
+an antisolar hotspot over savanna:
+https://www.nasa.gov/earth-science-at-ames/car-cloud-absorption-radiometer-home/car-brdf/
+A tallgrass canopy model compared against field measurements also reports
+visible-band backscatter:
+https://ntrs.nasa.gov/citations/19930067621
+These support investigating angular vegetation response in general; they do
+not provide calibrated parameters for cut dry Thunderhill grass. A future
+trial must isolate direct vegetation response and preserve shadows, rather
+than multiply the entire scene or claim the observed change is proven BRDF.

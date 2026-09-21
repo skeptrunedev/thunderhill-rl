@@ -55,6 +55,7 @@ func _run() -> void:
 	var sun_azimuth := NAN
 	var sun_elevation := NAN
 	var sun_energy := NAN
+	var sun_color := ""
 	var cloud_gain := NAN
 	var authored_yaw := NAN
 	var minimum_elevation := -90.0
@@ -113,6 +114,15 @@ func _run() -> void:
 				_fail("Solar haze must be finite and within zero to eight")
 				return
 			solar_haze = float(value)
+		elif arg.begins_with("--sun-color="):
+			var value := arg.trim_prefix("--sun-color=").to_lower()
+			var valid := value.length() == 6
+			for character in value:
+				valid = valid and character in "0123456789abcdef"
+			if not valid:
+				_fail("Sun color must contain exactly six hexadecimal RGB digits")
+				return
+			sun_color = value
 		elif arg.begins_with("--sun-energy="):
 			var value := arg.trim_prefix("--sun-energy=")
 			if (
@@ -855,7 +865,7 @@ func _run() -> void:
 		environment.tonemap_mode = row.mapper
 		environment.tonemap_exposure = row.exposure
 		environment.fog_density = row.fog
-		sun.light_color = Color(row.sun)
+		sun.light_color = Color(row.sun if sun_color.is_empty() else sun_color)
 		environment.sky.sky_material.set_shader_parameter("background_energy", row.sky)
 		environment.sky.sky_material.set_shader_parameter(
 			"background_saturation", row.get("saturation", 1.0)
@@ -884,6 +894,8 @@ func _run() -> void:
 							"orchard_study": orchard_metadata,
 							"solar_haze_strength": solar_haze,
 							"direct_sun_energy": sun.light_energy,
+							"direct_sun_color": sun.light_color.to_html(false),
+							"direct_sun_color_override": sun_color,
 							"direct_sun_energy_override":
 							sun_energy if is_finite(sun_energy) else null,
 							"solar_haze_broad": solar_haze_broad,
