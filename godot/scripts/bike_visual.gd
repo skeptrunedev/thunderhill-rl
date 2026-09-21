@@ -595,7 +595,15 @@ func _reservoir_shell(cap: bool) -> ArrayMesh:
 			Vector3(-0.004, 0.028, 0),
 			Vector3(-0.003, 0.030, 0.0012),
 			Vector3(0.0085, 0.030, 0.0012),
-			Vector3(0.010, 0.0285, 0)
+			Vector3(0.010, 0.0285, 0),
+			# A recessed crown and molded concentric lip break the flat disc.
+			# Original visual estimates, contained within the existing cap bounds.
+			Vector3(0.010, 0.0270, 0),
+			Vector3(0.0092, 0.0263, 0),
+			Vector3(0.0092, 0.0248, 0),
+			Vector3(0.0096, 0.0244, 0),
+			Vector3(0.0096, 0.0238, 0),
+			Vector3(0.0090, 0.0232, 0)
 		]
 	else:
 		profile = [
@@ -620,6 +628,9 @@ func _reservoir_shell(cap: bool) -> ArrayMesh:
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	surface.set_smooth_group(0)
 	for i in range(rings.size() - 1):
+		# Keep planar crown annuli planar. Smooth around each ring, not across
+		# profile creases into the broad top surface.
+		surface.set_smooth_group(i if cap else 0)
 		for j in segments:
 			var next := (j + 1) % segments
 			_triangle(surface, rings[i][j], rings[i][next], rings[i + 1][next])
@@ -648,6 +659,9 @@ func _build_cockpit() -> void:
 	dark_metal.set_shader_parameter("finish_roughness", 0.28)
 	dark_metal.set_shader_parameter("grain_pitch_m", 0.00035)
 	dark_metal.set_shader_parameter("relief_m", 0.000004)
+	# Cap finish is a visual estimate from the dark molded reference part.
+	var cap_finish: ShaderMaterial = polymer.duplicate()
+	cap_finish.set_shader_parameter("finish_roughness", 0.72)
 	var accent := _material(Color("9f1822"), 0.05, 0.47)
 	_display_viewport = SubViewport.new()
 	_display_viewport.name = "InstrumentTexture"
@@ -805,7 +819,7 @@ func _build_cockpit() -> void:
 		)
 		_mesh(
 			_reservoir_shell(true),
-			polymer,
+			cap_finish,
 			_front,
 			Vector3(side * 0.219, reservoir_base + 0.049, 0.205)
 		)

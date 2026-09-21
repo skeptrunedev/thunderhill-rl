@@ -108,6 +108,12 @@ func _check_reservoir(mesh: ArrayMesh, cap: bool) -> bool:
 		var b := vertices[indices[i + 1]]
 		var c := vertices[indices[i + 2]]
 		var cross := (b - a).cross(c - a)
+		# Flat molded rings must not inherit sloped normals from adjacent bevels.
+		if cap and absf(a.y - b.y) < 0.0000001 and absf(a.y - c.y) < 0.0000001:
+			for j in [i, i + 1, i + 2]:
+				assert(
+					absf(normals[indices[j]].y) > 0.999, "Planar cap face inherited bevel normals"
+				)
 		assert(cross.length() > 0.00000001)
 		assert(
 			cross.dot(normals[indices[i]] + normals[indices[i + 1]] + normals[indices[i + 2]]) < 0

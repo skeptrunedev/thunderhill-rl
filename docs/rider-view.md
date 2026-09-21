@@ -156,3 +156,37 @@ Formatting and whitespace checks passed. Tailscale reports the intended MacBook
 offline, last seen 2026-09-21 09:00 UTC. The complete cockpit still needs further
 shape and surface detail before it resembles the footage closely.
 Mac export passed as `f8a72cc2c25f-1478320bf958`; native execution is unverified.
+
+## Molded reservoir cap crown
+
+The original cap had a flat featureless top disc. The supplied frame at 00:40
+shows a dark molded top with rim detail and embossed markings. The model now
+has a shallow recessed crown and concentric perimeter lip within the existing
+cap bounds. Profile dimensions are original visual estimates, not manufacturer
+measurements. The existing grip recesses and reservoir dimensions are retained.
+
+`artifacts/reservoir-crown-detail/` exposed an incorrect bowl like highlight:
+smooth normals from the rim propagated across broad planar annuli. A central
+bump also looked unlike the source. Each cap profile band now has its own
+smoothing group, preserving circumferential smoothness while keeping planar
+rings planar. The central bump was removed. `artifacts/reservoir-crown-final/`
+records that geometry correction. The cap uses a separate instance of the
+existing polymer finish with roughness 0.72 instead of 0.52 to reduce broad glare.
+Color, metalness and microtexture remain unchanged; roughness is an appearance
+estimate, not measured material data.
+
+Root and independent review accepted `artifacts/reservoir-crown-matte/` as a
+modest improvement over `artifacts/display-filter-candidate/`. Raised views now
+read as flat molded caps with shallow perimeter lips, without the speaker effect
+or the earlier bright pale disc. The onboard view changes less because the caps
+are nearly edge on. Embossed lettering and smaller surface irregularities remain
+missing, so the asset is not finished or a photographic match.
+
+The motorcycle test checks finite normals, closed edges, winding, positive
+volume and existing cap bounds. It now additionally checks that horizontal cap
+triangles have vertical normals, preventing bevel smoothing from inventing
+curvature. Those checks, instrument readings and rider visibility passed.
+Human controls passed with zero failures. Local Linux timing was median 17.244 ms
+and p95 23.022 ms over 265 frames, not a native Mac benchmark. Formatting and
+whitespace checks passed.
+Mac export passed as `0dd8be9062df-6ab845257227`; native execution is unverified.
