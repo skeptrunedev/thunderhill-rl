@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "status": "Root visually reviewed source crop; provisional historical material interpretation",
+  "feature": "Pale historical access corridor west of the eastern edge of the western infield",
+  "source": {
+    "path": "artifacts/reference/ortho/east-2022.png",
+    "sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
+    "dimensions_pixels": [
+      1880,
+      2419
+    ],
+    "acquisition_date": "2022-07-15",
+    "license": "Public domain USDA NAIP, distributed by USGS",
+    "export_response_extent": {
+      "xmin": 556880,
+      "ymin": 4376247.8,
+      "xmax": 558008,
+      "ymax": 4377699.2,
+      "spatialReference": {
+        "wkid": 26910,
+        "latestWkid": 26910
+      }
+    }
+  },
+  "inspection_crop": {
+    "source_box_ltrb": [
+      300,
+      620,
+      820,
+      1020
+    ],
+    "description": "Full resolution 520 by 400 crop inspected. Pale connected strip extends from near right road boundary diagonally left and down into cleared field. Crop is reproducible by cropping source to these bounds; no annotated image pixels are redistributed."
+  },
+  "source_pixel_coordinates": "Zero based continuous pixel centers, x right and y down",
+  "source_pixels": [
+    [
+      729.0,
+      773.0
+    ],
+    [
+      715.0,
+      775.0
+    ],
+    [
+      650.0,
+      789.0
+    ],
+    [
+      585.0,
+      802.0
+    ],
+    [
+      520.0,
+      816.0
+    ],
+    [
+      488.0,
+      827.0
+    ]
+  ],
+  "estimated_width_pixels": 10.0,
+  "estimated_width_m": 6.0,
+  "width_interpretive_uncertainty_m": 1.8,
+  "local_crs": "EPSG:6339, local x east and z south relative to track origin",
+  "track_origin": {
+    "easting": 557466.3229144721,
+    "northing": 4377233.643425343,
+    "elevation_m": 90.0
+  },
+  "datum": {
+    "source_crs": "EPSG:6339",
+    "target_crs": "EPSG:26910",
+    "operation": "proj=pipeline step inv proj=utm zone=10 ellps=GRS80 step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif step inv proj=gridshift grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif step proj=utm zone=10 ellps=GRS80",
+    "grid_sha256": {
+      "us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96",
+      "us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a",
+      "us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff",
+      "us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+    },
+    "manifest_sha256": "950e9e57d04f62b12f8c9284dacfd9146dddb0df6a97d0d86d4157a437e32604",
+    "vertical": "Horizontal transformation only; NAVD88 heights are unchanged"
+  },
+  "transform_direction": "INVERSE of tools.terrain_datum.terrain_transform(): EPSG26910 source imagery to EPSG6339 game",
+  "nearby_station_m": 4264.549,
+  "nearby_station_center_distance_m": 14.134676434036452,
+  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "limitations": [
+    "Manual visual centerline and width estimates, not surveyed geometry or current land cover",
+    "Pale continuous corridor appearance is clear; compacted dirt versus gravel versus sparse vegetation is unverified",
+    "Historical 2022 appearance predates repave",
+    "Only clear straight section traced; western merge and eastern road junction intentionally not reconstructed",
+    "Width uncertainty is interpretive and does not include absolute aerial georegistration error",
+    "Visual material study only, no proposed collision or friction changes",
+    "No source color threshold was used to infer this trace"
+  ],
+  "corridor": {
+    "points_local_xz": [
+      [
+        -148.877976,
+        -1.903117
+      ],
+      [
+        -157.277964,
+        -0.703123
+      ],
+      [
+        -196.277915,
+        7.696853
+      ],
+      [
+        -235.277866,
+        15.496828
+      ],
+      [
+        -274.277818,
+        23.896804
+      ],
+      [
+        -293.477796,
+        30.496795
+      ]
+    ],
+    "width_m": 6.0,
+    "feather_m": 1.2,
+    "feather_status": "Artistic visual soft boundary estimate, not measured corridor edge"
+  }
+}

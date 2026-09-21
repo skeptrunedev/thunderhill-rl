@@ -13,6 +13,9 @@ func _run() -> void:
 	var candidate := ""
 	var frames := 1
 	var road_edge := false
+	var compare_fields := false
+	var side := "left"
+	var eye_height := 1.5
 	var detail_gain_exponent := 1.0
 	var station_m := 1830.0
 	var ground_tint := Vector3.ZERO
@@ -23,7 +26,25 @@ func _run() -> void:
 	var stubble_shader_path := ""
 	var candidate_grass_rotation := -1.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--candidate-grass-rotation="):
+		if arg.begins_with("--eye-height="):
+			var value := arg.trim_prefix("--eye-height=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 1.0
+				or float(value) > 50.0
+			):
+				_fail("Eye height must be between one and fifty metres")
+				return
+			eye_height = float(value)
+		elif arg == "--compare-field-coverage":
+			compare_fields = true
+		elif arg.begins_with("--side="):
+			side = arg.trim_prefix("--side=")
+			if side not in ["left", "right"]:
+				_fail("Side must be left or right")
+				return
+		elif arg.begins_with("--candidate-grass-rotation="):
 			var value := arg.trim_prefix("--candidate-grass-rotation=")
 			if (
 				not value.is_valid_float()
@@ -205,10 +226,15 @@ func _run() -> void:
 	var center: Vector3 = track.points[nearest]
 	var road: Dictionary = track.sample_world(center)
 	var forward := Vector3(road.tangent.x, 0, road.tangent.z).normalized()
-	var left: Vector3 = road.left
+	var left: Vector3 = road.left * (1.0 if side == "left" else -1.0)
 	var position: Vector3 = center + left * (float(road.width) * 0.5 + (-0.6 if road_edge else 4.0))
-	position.y = track.terrain_surface_height(position) + 1.5
-	var target := position + forward * 8.0 + left * (1.5 if road_edge else 3.0) - Vector3.UP * 1.0
+	position.y = track.terrain_surface_height(position) + eye_height
+	var target := (
+		position
+		+ forward * 8.0
+		+ left * (1.5 if road_edge else 3.0)
+		- Vector3.UP * (eye_height - 0.5)
+	)
 	game.camera.global_position = position
 	game.camera.look_at(target)
 	game.camera.fov = 74.0
@@ -242,6 +268,7 @@ func _run() -> void:
 			material.shader.get_rid(), "field_soil_strength"
 		)
 	material.set_shader_parameter("detail_gain_exponent", detail_gain_exponent)
+	var field_count: int = material.get_shader_parameter("field_segment_count")
 	var original: Texture2D = material.get_shader_parameter("grass_color")
 	var original_rotation: float = RenderingServer.shader_get_parameter_default(
 		material.shader.get_rid(), "grass_rotation_spread"
@@ -249,7 +276,7 @@ func _run() -> void:
 	var samples: Array = []
 	for index in frames:
 		var pose := position + forward * (0.30 * index)
-		pose.y = track.terrain_surface_height(pose) + 1.5
+		pose.y = track.terrain_surface_height(pose) + eye_height
 		game.camera.global_position = pose
 		game.camera.look_at(pose + target - position)
 		for name: String in ["existing", "candidate"]:
@@ -267,6 +294,9 @@ func _run() -> void:
 					if name == "candidate" and candidate_grass_rotation >= 0.0
 					else original_rotation
 				)
+			)
+			material.set_shader_parameter(
+				"field_segment_count", 0 if compare_fields and name == "existing" else field_count
 			)
 			for frame in 10:
 				await RenderingServer.frame_post_draw
@@ -292,6 +322,14 @@ func _run() -> void:
 					. stringify(
 						{
 							"existing": original.resource_path,
+							"side": side,
+							"eye_height_m": eye_height,
+							"field_coverage_comparison": compare_fields,
+							"field_segment_count": field_count,
+							"field_coverage_sha256":
+							FileAccess.get_sha256("res://data/field-coverage.json"),
+							"vegetation_comparison":
+							"Same baked stubble in both views; field comparison isolates terrain material",
 							"frames_per_material": frames,
 							"existing_grass_rotation": original_rotation,
 							"candidate_grass_rotation":

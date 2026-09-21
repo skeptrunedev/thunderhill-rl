@@ -12,6 +12,7 @@ var grid: Dictionary = {}
 var candidate_cache: Dictionary = {}
 var terrain_material: ShaderMaterial
 var offroad_surface := preload("res://scripts/offroad_surface.gd").new()
+var field_coverage := preload("res://scripts/field_coverage.gd").new()
 var pavement_surface := preload("res://scripts/triangle_ribbon.gd").new()
 var curb_surface := preload("res://scripts/curb_surface.gd").new()
 const CELL: float = 25.0
@@ -115,6 +116,16 @@ func _build_terrain() -> void:
 	_startup_mark("terrain_triangle_stream_complete")
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/terrain.gdshader")
+	var field_data: Variant = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/field-coverage.json")
+	)
+	initialization_error = field_coverage.configure(field_data)
+	if not initialization_error.is_empty():
+		return
+	if field_data.get("track_sha256") != FileAccess.get_sha256("res://data/track.json"):
+		initialization_error = "Field coverage track source mismatch"
+		return
+	field_coverage.apply_material(mat)
 	mat.set_shader_parameter("ground_tint", DRY_GROUND_TINT)
 	mat.set_shader_parameter("grass_color", load("res://assets/materials/dry_cut_grass_v2.png"))
 	mat.set_shader_parameter("soil_color", load("res://assets/materials/fine_shoulder_v1.png"))

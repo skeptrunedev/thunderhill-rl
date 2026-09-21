@@ -612,3 +612,47 @@ terrain detail alpha represents distance to the racing surface, not field cover.
 Pale access corridors in the aerial can therefore receive full grass and stubble.
 Explicit historical material regions are the next investigation; RGB contrast
 or additional random texture variants cannot supply those missing regions.
+
+## Explicit historical field corridor
+
+The 2022 aerial shows a pale connected strip west of the circuit near station
+4264.549 m. `data/reference/field-corridor-study.json` records six manually
+traced pixel centers, the original image checksum and extent, crop bounds,
+datum operation, local coordinates and uncertainty. The source crop was
+visually reviewed. All local coordinates were independently recomputed from
+pixel centers through the inverse datum transform and agreed within 0.00001 m.
+This verifies the conversion, not survey accuracy. The estimated width is six
+metres with 1.8 metres of interpretive uncertainty; source georegistration error
+is additional. Compacted soil, gravel and sparse vegetation cannot be reliably
+distinguished in this image. The junction and western merge are not reconstructed.
+
+`godot/data/field-coverage.json` carries the reviewed trace with its source
+reference checksum. `field_coverage.gd` validates the data, supplies the shader
+segments and excludes grass clumps from the same corridor core. The terrain
+shader uses smooth capsule distances with a 1.2 metre artistic feather. It
+replaces grass with the existing fine soil material. The corridor soil uses a
+value multiplier of one, while ordinary shoulder soil retains 0.7. No collision,
+contact height, friction, road boundary or training interface changes.
+
+`artifacts/field-corridor-study/` isolates the ground material at rider height.
+Both captures share the newly baked stubble exclusion, so they do not establish
+its visual contribution. The candidate exposes earth instead of straw, though
+this close view reads as a broad clearing more than a connected access route.
+A wider overview is used to inspect the corridor boundaries and alignment.
+The preview supports explicit side and eye height, recording those camera
+settings; these diagnostic viewpoints are not claimed to match the onboard video.
+
+Validation checked capsule widths and endpoint caps, malformed data, shared
+shader parameters and every baked grass instance. All 96000 instances were
+inspected with zero corridor intrusions. Both scenery bakes passed. Human
+controls passed with zero failures; local Linux timing was median 17.241 ms and
+p95 17.646 ms over 271 frames. The 202 curb and surface checks passed. Native
+Mac testing remains pending because the MacBook is offline. The scene remains
+visibly simpler than the footage; this is one mapped material region, not a
+complete land cover reconstruction.
+The 20 metre eye height pair in `artifacts/field-corridor-overview/` reveals
+both boundaries and the rounded traced endpoint near the circuit. The connected
+strip is distinguishable at this wider scale. Its uniform soil treatment and
+soft edge are still simpler than the aerial, and its deliberately untraced
+junction remains visible. The overview is a diagnostic view, not a riding camera.
+Mac export passed as `a620ac1f0d56-223165bf3cd1`; native execution is unverified.

@@ -91,6 +91,8 @@ func _add_cut_grass(mesh: ArrayMesh, random: RandomNumberGenerator) -> void:
 
 
 func _excluded_grass(position: Vector3) -> bool:
+	if _track.field_coverage.excludes_stubble(Vector2(position.x, position.z), 0.9):
+		return true
 	for polygon in _grass_exclusions:
 		if Geometry2D.is_point_in_polygon(Vector2(position.x, position.z), polygon):
 			return true

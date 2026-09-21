@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "source_reference": "data/reference/field-corridor-study.json",
+  "source_reference_sha256": "5db0ee73074f46c9213f62541d6cbaa5d5e7c535277794b1638d99de3cdbe454",
+  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "limitations": [
+    "Manual visual centerline and width estimates, not surveyed geometry or current land cover",
+    "Pale continuous corridor appearance is clear; compacted dirt versus gravel versus sparse vegetation is unverified",
+    "Historical 2022 appearance predates repave",
+    "Only clear straight section traced; western merge and eastern road junction intentionally not reconstructed",
+    "Width uncertainty is interpretive and does not include absolute aerial georegistration error",
+    "Visual material study only, no proposed collision or friction changes",
+    "No source color threshold was used to infer this trace"
+  ],
+  "corridors": [
+    {
+      "points_local_xz": [
+        [
+          -148.877976,
+          -1.903117
+        ],
+        [
+          -157.277964,
+          -0.703123
+        ],
+        [
+          -196.277915,
+          7.696853
+        ],
+        [
+          -235.277866,
+          15.496828
+        ],
+        [
+          -274.277818,
+          23.896804
+        ],
+        [
+          -293.477796,
+          30.496795
+        ]
+      ],
+      "width_m": 6.0,
+      "feather_m": 1.2,
+      "feather_status": "Artistic visual soft boundary estimate, not measured corridor edge"
+    }
+  ]
+}

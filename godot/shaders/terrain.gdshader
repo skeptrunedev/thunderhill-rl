@@ -25,6 +25,10 @@ uniform float grass_relief_m = 0.010;
 uniform float soil_tile_m = 1.0;
 uniform float soil_relief_m = 0.0015;
 uniform float soil_value : hint_range(0.1, 1.0) = 0.7;
+// Shared traced corridor capsules, also used to exclude standing stubble.
+uniform int field_segment_count = 0;
+uniform vec4 field_segments[16];
+uniform vec2 field_sizes[16];
 varying vec3 world_pos;
 
 void vertex() {
@@ -80,6 +84,18 @@ vec3 ground_surface(sampler2D color_source, vec2 uv, float rotation_spread) {
     return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
 }
 
+float cleared_field(vec2 point) {
+    float weight = 0.0;
+    for (int i = 0; i < field_segment_count; i++) {
+        vec2 start = field_segments[i].xy;
+        vec2 delta = field_segments[i].zw - start;
+        float t = clamp(dot(point - start, delta) / dot(delta, delta), 0.0, 1.0);
+        float distance_to_edge = length(point - start - delta * t) - field_sizes[i].x;
+        weight = max(weight, 1.0 - smoothstep(0.0, field_sizes[i].y, distance_to_edge));
+    }
+    return weight;
+}
+
 void fragment() {
     // Original texture scale is an appearance estimate, not a surveyed measure.
     vec3 grass = ground_surface(grass_color, world_pos.xz / grass_tile_m, grass_rotation_spread);
@@ -106,8 +122,10 @@ void fragment() {
                  + coverage_noise(field_uv / vec2(11.0, 13.0)) * 0.35;
     float sparse_straw = smoothstep(-0.20, 0.30, swaths);
     grass_coverage *= 1.0 - sparse_straw * field_patch_strength;
+    float corridor = cleared_field(world_pos.xz);
+    grass_coverage *= 1.0 - corridor;
     float soil_weight = (1.0 - grass_coverage) * macro_weight;
-    ALBEDO = mix(grass, soil * soil_value, soil_weight) * ground_tint * macro_gain * detail_gain;
+    ALBEDO = mix(grass, soil * mix(soil_value, 1.0, corridor), soil_weight) * ground_tint * macro_gain * detail_gain;
     // A single albedo does not contain measured PBR maps. Bright straw over
     // darker soil supplies an explicitly artistic relief/roughness estimate.
     // Derivatives of the filtered sample naturally remove unresolved relief.

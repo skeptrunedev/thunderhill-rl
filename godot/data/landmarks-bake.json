@@ -1,13 +1,14 @@
 {
-  "build_ms": 6120.733,
+  "build_ms": 6251.421,
   "collision": "Runtime pit wall construction unchanged; no collision in this scene",
   "geometry_sha256": "1753578de1d75b1a0d2128bf7df201a49527698d02da78477b9daa6170f61638",
   "godot_version": "4.7.2-stable (official)",
-  "load_ms": 17.246,
-  "scene_sha256": "c838d8dc2c5a9964ee8351039d500a84fd02323379fe186d4cea0768bbe0a997",
+  "load_ms": 18.04,
+  "scene_sha256": "99352d89ded30488f2fd65a2fe26d38281d66f0880e9682d98937f1714753c22",
   "schema_version": 1,
   "sources": {
     "data/clubhouse-profile.json": "19deb349d55dcc322f533d7e09953a72cf7344b0e6d8effb5556ca8375581b65",
+    "data/field-coverage.json": "978d2559408035b5c127421a370fd7aedeb58f297448423e747883fb5bbdf955",
     "data/landmarks.json": "d5b43fb77e3ad5c8de2464d8c25d1ca9639a37efcd9b200ee07befb942b4e085",
     "data/pavement.json": "3d8eb1ad0dbf4de04d589eec0f5db9c839242c7c80a6ff2c21f88affe84ef8f9",
     "data/pit-wall.json": "2773db8f31e1f08f6110bc787d6d0a702887347d65532748032165de285dbc20",
@@ -15,11 +16,12 @@
     "data/terrain.json": "c643f764f23253de59b1417ac0ab803604d47acbd0c70bb173fc455a586a0543",
     "data/track.json": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
     "scripts/curb_surface.gd": "b2de99aba0dd705d76d11c2541a0bf9484b65e91c04b59e2fdc5b4f2baa72cb4",
+    "scripts/field_coverage.gd": "e680ee33f99ec95d1365c8706f331cc9171089c9f5230a7a9c2abb8ea671f799",
     "scripts/landmarks.gd": "c31742afe9693f476f8e51b2e5ff1e2333c58fbdc344a95faf4015c1b891c9a2",
     "scripts/offroad_surface.gd": "744a4e65b018e1fca24b5d4bbfd6b41202bc596795d83328a6188315ea2099d9",
-    "scripts/track.gd": "90284f93d1c9c6588378a65ed939e74eb5a11d88d984c71fc18e8d90bb339951",
+    "scripts/track.gd": "7a7a67322bc673081a62cbf27a6336d80dbd18452e5303a8f6312b7ba6637678",
     "scripts/triangle_ribbon.gd": "16d950de47fc6840aa2a819706a2695fb2746d90de991000fc4cf86f7e642eed",
-    "tools/bake_landmarks.gd": "edf31c70d2ca4a42ab4126cc698fb96001f06d8ea65f319e24248818cd7c29c0",
-    "tools/bake_scenery.gd": "47b70662dcc39fa672a4681806ffb7be79942fb73622d2c33a6913b3efb39080"
+    "tools/bake_landmarks.gd": "025f32effccda50672a3d81a0c7fb196fe7968c130ce0363c040809e3a3aa92a",
+    "tools/bake_scenery.gd": "461e9c69a07f3087c98c0bdfbd153e3daf2041da1b3e5868f2dd6888beefe2d7"
   }
 }

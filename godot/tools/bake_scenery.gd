@@ -5,6 +5,8 @@ const SOURCES := [
 	"scripts/scenery.gd",
 	"shaders/dry_stubble.gdshader",
 	"scripts/track.gd",
+	"scripts/field_coverage.gd",
+	"data/field-coverage.json",
 	"scripts/offroad_surface.gd",
 	"scripts/curb_surface.gd",
 	"scripts/triangle_ribbon.gd",

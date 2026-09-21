@@ -5,6 +5,8 @@ const Verifier = preload("res://tools/bake_scenery.gd")
 const SOURCES := [
 	"scripts/landmarks.gd",
 	"scripts/track.gd",
+	"scripts/field_coverage.gd",
+	"data/field-coverage.json",
 	"scripts/offroad_surface.gd",
 	"scripts/curb_surface.gd",
 	"scripts/triangle_ribbon.gd",
