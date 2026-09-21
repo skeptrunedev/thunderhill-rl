@@ -160,3 +160,22 @@ TORCH_LOGS=perf_hints uv run --project training python training/benchmark_lap_in
 `--device cpu` supports independent checks while GPU training is running. It is
 not the recommended throughput path. All optimizer checkpoints are retained by
 new training runs so their generated driving episodes can be compared later.
+
+
+## Initial moving segment RL result
+
+`train_lap_grpo.py` performs actual TRL GRPO updates from Godot outcomes, starting
+from a supervised adapter. A frozen model generated prefix puts all candidates
+into the same moving state. Four sampled first controls are followed by greedy
+controls from the current model. Only the sampled first command receives a
+policy gradient; neither the prefix nor continuation tokens enter the loss.
+Progress after the prefix supplies reward, with separately recorded syntax and
+invalid lap penalties. This is a limited Monte Carlo first decision experiment,
+not full trajectory optimization.
+
+The [measured run](results/rtx2080ti-gemma-road-grpo.json) passed three updates and
+12 sampled rollouts, independent recording and loss mask audits, finite adapter
+changes and checkpoint reload. Its tiny reward change on an easy straight is not
+meaningful evidence of better driving. The supervised lap baseline reached about
+40 percent before leaving the track in a tight corner. No complete learned lap
+has been demonstrated yet.

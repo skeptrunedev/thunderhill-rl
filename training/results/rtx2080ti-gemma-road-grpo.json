@@ -1,0 +1,154 @@
+{
+  "ok": true,
+  "model": "unsloth/gemma-3-270m-it",
+  "revision": "23cf460f6bb16954176b3ddcc8d4f250501458a9",
+  "optimizer_steps": 3,
+  "sampled_rollouts": 12,
+  "max_adapter_delta": 1.7208978533744812e-05,
+  "reloaded_logits_match": true,
+  "greedy_reward_before": 16.130360020909404,
+  "greedy_reward_after": 16.130402642157943,
+  "greedy_reward_delta": 4.262124853937621e-05,
+  "greedy_return_improved": true,
+  "greedy_controls_changed": true,
+  "current_adapter_sha256": "9bf6058a2c0a4a5a52c386c8f551930c466a18110b863c37b1101a70448d16fa",
+  "initial_adapter_sha256": "5cb9944b1877d06dcb8c7aec45e027645435cb7d5db45beec5b6fc65d1c3a678",
+  "reward_version": "road-first-action-monte-carlo-v1",
+  "train_metrics": {
+    "train_runtime": 145.141,
+    "train_samples_per_second": 0.083,
+    "train_steps_per_second": 0.021,
+    "total_flos": 0.0,
+    "train_loss": 0.0025359938542048135,
+    "epoch": 0.25
+  },
+  "groups": [
+    [
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.128895154042873,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.128895154042873
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130360020909404,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130360020909404
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130360020909404,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130360020909404
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130360020909404,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130360020909404
+      }
+    ],
+    [
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130402642157943,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130402642157943
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130402642157943,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130402642157943
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130402642157943,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130402642157943
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130402642157943,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130402642157943
+      }
+    ],
+    [
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130360020909404,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130360020909404
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130402642157943,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130402642157943
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130402642157943,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130402642157943
+      },
+      {
+        "version": "road-first-action-monte-carlo-v1",
+        "legal_progress_m": 16.130360020909404,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "scored_ticks": 252,
+        "excluded_prefix_ticks": 480,
+        "total": 16.130360020909404
+      }
+    ]
+  ],
+  "all_recording_audits_passed": true,
+  "prefix_and_continuation_tokens_trained": 0,
+  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+  "peak_cuda_allocated_bytes": 1428281856,
+  "versions": {
+    "torch": "2.14.0",
+    "transformers": "5.17.0",
+    "trl": "1.13.0",
+    "peft": "0.21.0"
+  },
+  "wall_seconds": 217.46324245119467,
+  "limitation": "One fixed moving segment, first action gradient only. An adapter update is not evidence of improved full lap driving.",
+  "interpretation": "Real reward-driven adapter updates, but no meaningful driving improvement: reward change is below0.001m on one easy straight segment. Full lap still fails near40percent in the tight corner."
+}
