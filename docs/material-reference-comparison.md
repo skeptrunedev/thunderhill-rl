@@ -255,3 +255,24 @@ Rendered human controls passed with zero failures, median 17.116 ms and p95
 17.361 ms across 274 Linux frames. This is a local smoke measurement, not a Mac
 performance claim. Gameplay geometry, collision and agent observations are
 unchanged.
+
+
+## Pavement binder and paint edge response
+
+The seam now varies binder strength along its length and adds fine aggregate
+variation in world space. The broad coordinates remain periodic at the lap join.
+Fine contrast fades toward its centered mean when its screen footprint is too
+large, rather than changing the mean through a thresholded noise signal.
+
+Edge paint has an independent opt in material flag for estimated 0.2 to 2.8 mm
+boundary chips. World space pixel footprint and transverse marking footprint
+both suppress unresolved detail. Discard occurs after all shader derivatives and
+texture sampling. Curbs and other painted objects retain the default disabled
+flag. Geometry, paint mesh position and width, and collision are unchanged.
+
+The fixed camera capture is `artifacts/edge-grain/existing_00.png`. This is a
+subtle close surface refinement. It does not solve the much larger distant
+terrain and scene realism gap. Three captures are not a full motion stability
+assessment. Contact regression passed 202 checks, and rendered human controls
+passed with zero failures. Local frame timing was median 17.299 ms and p95
+21.040 ms across 271 frames. No Mac runtime performance inference is made.

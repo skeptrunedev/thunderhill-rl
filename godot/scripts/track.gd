@@ -291,6 +291,7 @@ func _build_road() -> void:
 	paint_mat.shader = preload("res://shaders/painted_concrete.gdshader")
 	paint_mat.set_shader_parameter("paint_tint", Color("e8e3ce"))
 	paint_mat.set_shader_parameter("wear_amount", 0.12)
+	paint_mat.set_shader_parameter("edge_paint", true)
 	_mesh(paint, paint_mat, "EdgePaint")
 	var curb_mat := ShaderMaterial.new()
 	curb_mat.shader = preload("res://shaders/painted_concrete.gdshader")

@@ -5,6 +5,12 @@ uniform sampler2D color_map : source_color, filter_linear_mipmap_anisotropic, re
 uniform sampler2D normal_map : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rough_map : filter_linear_mipmap_anisotropic, repeat_enable;
 
+varying vec3 world_position;
+
+void vertex() {
+    world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
+
 float pavement_hash(vec2 cell) {
     return fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -42,7 +48,14 @@ void fragment() {
     float edge_width = mix(0.08, 0.15, pavement_noise(edge_domain));
     float edge_aa = max(fwidth(edge_distance), 0.008);
     float edge_weight = 1.0 - smoothstep(edge_width - edge_aa, edge_width + edge_aa, edge_distance);
-    ALBEDO *= mix(1.0, 0.20, edge_weight);
+    // Break the uniform black ribbon into binder and exposed aggregate. Use
+    // world coordinates for fine grain so the lap join cannot introduce a seam.
+    float edge_grain = pavement_noise(world_position.xz * 48.0);
+    float grain_visibility = 1.0 - smoothstep(0.006, 0.035, length(fwidth(world_position.xz)));
+    edge_grain = mix(0.5, edge_grain, grain_visibility);
+    float binder = mix(0.16, 0.38, pavement_noise(edge_domain * 2.9 + vec2(31.0)));
+    float aggregate_binder = binder + (edge_grain - 0.5) * 0.24;
+    ALBEDO *= mix(1.0, aggregate_binder, edge_weight);
     // Keep source aggregate relief subtle. Broad cloudy source roughness was
     // making the grazing reflection read like coarse concrete in the comparison.
     ROUGHNESS = clamp(0.62 + (texture(rough_map, detail).r - 0.5) * 0.10

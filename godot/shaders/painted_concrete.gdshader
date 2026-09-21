@@ -5,6 +5,7 @@ render_mode cull_disabled;
 uniform vec3 paint_tint : source_color = vec3(1.0);
 uniform float wear_amount : hint_range(0.0, 1.0) = 0.2;
 uniform bool curb_stripes = false;
+uniform bool edge_paint = false;
 uniform bool use_mesh_uv = false;
 uniform bool concrete_detail = false;
 uniform sampler2D concrete_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -34,6 +35,16 @@ void vertex() {
 
 void fragment() {
     vec2 p = use_mesh_uv ? UV : world_position.xz;
+    bool discard_paint = false;
+    if (edge_paint) {
+        // The marking mesh is 12 cm wide. Only remove fragments inside it;
+        // do not expand paint onto the shoulder or alter contact geometry.
+        float paint_edge_m = min(UV.x, 1.0 - UV.x) * 0.12;
+        float pixel_m = max(max(fwidth(UV.x) * 0.12, length(fwidth(world_position.xz))), 0.00001);
+        float resolved = 1.0 - smoothstep(0.0008, 0.003, pixel_m);
+        float edge_chip_m = mix(0.0002, 0.0028, surface_noise(world_position.xz * 95.0));
+        discard_paint = paint_edge_m < edge_chip_m * resolved;
+    }
     float stains = surface_noise(p * 3.0);
     float chips = surface_noise(p * 85.0);
     float detail_weight = 1.0 - smoothstep(0.006, 0.025, length(fwidth(p)));
@@ -64,5 +75,9 @@ void fragment() {
         ROUGHNESS = mix(0.78, 0.96, max(exposed, stains));
         NORMAL_MAP = vec3(0.5, 0.5, 1.0);
         NORMAL_MAP_DEPTH = 0.0;
+    }
+    // Evaluate all derivatives and implicit texture gradients before discarding.
+    if (discard_paint) {
+        discard;
     }
 }
