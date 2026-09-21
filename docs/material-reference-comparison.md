@@ -979,3 +979,38 @@ not an isolated performance comparison or native Mac benchmark. Formatting and
 whitespace checks passed. Tailscale reports the intended MacBook offline, with
 last seen time 2026-09-21 08:50 UTC; native execution remains pending.
 Mac export passed as `2e4aac19fd9b-8e72d567d16c`; native execution is unverified.
+
+## Restrain the broad pavement band with current mottling
+
+The broad band was previously judged against a simpler pavement material. With
+the later binder mottling enabled, the combined result has overly strong broad
+ribbons. `artifacts/asphalt-restrained-band/` compares the actual production
+combination (surface variation 1.0, binder 0.85) against surface variation 0.35
+with binder unchanged. Root and independent inspection accepted the reduced
+band as a modest improvement at stations 400, 900 and 3000, clearest at the two
+corner views. Production now uses 0.35. Source texture, aggregate relief, tone
+map strength and binder mottling are unchanged. This is an appearance adjustment,
+not measured asphalt reflectance or a surveyed racing line.
+
+The preview adds `--production-baseline` for a single surface variation or binder
+comparison. It preserves both current shader defaults for the baseline and
+changes only the chosen value in the candidate. Current track construction sets
+no overrides for these two defaults. Legacy studies retain their previous
+isolated comparison behavior. The report records the mode and each effective
+parameter. All twelve captures were checked: authored surface was enabled,
+historical tone was zero, binder stayed 0.85, and only surface variation differed.
+Missing candidate control, nonfinite strength and combined independent controls
+were rejected with exit code 2.
+
+The reference frames at 00:20 and 00:40 also show narrower irregular marks that
+remain absent. Those need location and shape evidence; stronger generic bands
+cannot substitute for them. Foreground motion blur limits aggregate comparison.
+The new production rider capture is
+`artifacts/restrained-asphalt-rider-view/production.png`, using the prior artistic
+station 950 camera pose. It remains far from a registered photographic match.
+
+Human controls passed with zero failures. Linux timing was median 17.361 ms and
+p95 20.555 ms over 266 frames, a local functional check rather than a controlled
+performance comparison. Formatting and whitespace checks passed.
+Mac export passed as `e3e8bfdaad35-462e4875e072`; this export has not been
+executed on the native Mac.

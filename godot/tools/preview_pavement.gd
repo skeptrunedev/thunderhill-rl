@@ -12,6 +12,7 @@ func _run() -> void:
 	var output := ""
 	var candidate := ""
 	var surface_variation := -1.0
+	var production_baseline := false
 	var binder_mottling := -1.0
 	var edge_paint_width := -1.0
 	var frames := 1
@@ -24,6 +25,8 @@ func _run() -> void:
 	var variation_only := false
 	var offset_m := 0.0
 	for arg in OS.get_cmdline_user_args():
+		if arg == "--production-baseline":
+			production_baseline = true
 		if arg.begins_with("--edge-paint-width="):
 			var value := arg.trim_prefix("--edge-paint-width=")
 			if (
@@ -96,6 +99,10 @@ func _run() -> void:
 				quit(2)
 				return
 			frames = int(value)
+	if production_baseline and surface_variation < 0.0 and binder_mottling < 0.0:
+		push_error("Production baseline requires a surface variation or binder comparison")
+		quit(2)
+		return
 	if (
 		(surface_variation >= 0.0 or binder_mottling >= 0.0 or edge_paint_width >= 0.0)
 		and (
@@ -223,12 +230,23 @@ func _run() -> void:
 		material.set_shader_parameter("authored_relief_m", 0.0)
 	material.set_shader_parameter("surface_variation_strength", 0.0)
 	material.set_shader_parameter("binder_mottling_strength", 0.0)
+	var baseline_surface: float = 0.0
+	var baseline_binder: float = 0.0
+	if production_baseline:
+		baseline_surface = RenderingServer.shader_get_parameter_default(
+			material.shader.get_rid(), "surface_variation_strength"
+		)
+		baseline_binder = RenderingServer.shader_get_parameter_default(
+			material.shader.get_rid(), "binder_mottling_strength"
+		)
 	var authored_texture: Texture2D = material.get_shader_parameter("authored_color")
 	var report: Array = []
 	for view in views:
 		game.reset_episode(float(view.station))
 		game._update_visual(1.0)
 		for strength in [0.0, 0.65]:
+			material.set_shader_parameter("surface_variation_strength", baseline_surface)
+			material.set_shader_parameter("binder_mottling_strength", baseline_binder)
 			material.set_shader_parameter(
 				"pavement_tone_strength", strength if candidate.is_empty() else 0.0
 			)
@@ -239,14 +257,18 @@ func _run() -> void:
 				material.set_shader_parameter("pavement_tone_strength", 0.0)
 				material.set_shader_parameter("authored_surface", true)
 				material.set_shader_parameter(
-					"surface_variation_strength", 0.0 if strength == 0.0 else surface_variation
+					"surface_variation_strength",
+					baseline_surface if strength == 0.0 else surface_variation
 				)
 			if binder_mottling >= 0.0:
 				material.set_shader_parameter("pavement_tone_strength", 0.0)
 				material.set_shader_parameter("authored_surface", true)
-				material.set_shader_parameter("surface_variation_strength", 1.0)
 				material.set_shader_parameter(
-					"binder_mottling_strength", 0.0 if strength == 0.0 else binder_mottling
+					"surface_variation_strength", baseline_surface if production_baseline else 1.0
+				)
+				material.set_shader_parameter(
+					"binder_mottling_strength",
+					baseline_binder if strength == 0.0 else binder_mottling
 				)
 			if edge_paint_width >= 0.0:
 				material.set_shader_parameter("pavement_tone_strength", 0.0)
@@ -306,6 +328,7 @@ func _run() -> void:
 					{
 						"captures": report,
 						"frames_per_station": frames,
+						"production_baseline": production_baseline,
 						"runtime_authored_texture": authored_texture.resource_path,
 						"runtime_authored_texture_sha256":
 						(

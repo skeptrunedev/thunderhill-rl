@@ -10,7 +10,7 @@ uniform float authored_color_gain = 0.30;
 uniform float authored_tile_m = 0.8;
 uniform float authored_relief_m = 0.00035;
 // Original broad binder variation, not a surveyed rubber or racing line.
-uniform float surface_variation_strength : hint_range(0.0, 1.0) = 1.0;
+uniform float surface_variation_strength : hint_range(0.0, 1.0) = 0.35;
 // Original longitudinal binder mottling, not a recovered tire or friction map.
 uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.85;
 // Historical aerial tone, not a measured material or friction field.
