@@ -276,3 +276,29 @@ terrain and scene realism gap. Three captures are not a full motion stability
 assessment. Contact regression passed 202 checks, and rendered human controls
 passed with zero failures. Local frame timing was median 17.299 ms and p95
 21.040 ms across 271 frames. No Mac runtime performance inference is made.
+
+
+## Field structure diagnostic
+
+The existing historical detail map contains field tracks, but its sampler used
+isotropic mip filtering. Both terrain gain maps now opt into the project's
+existing anisotropic filtering. Comparison of the same 1830 metre camera in
+`artifacts/edge-grain/existing_00.png` and
+`artifacts/terrain-anisotropy/existing_00.png` shows only a small distant change.
+This corrects the sampler choice but does not explain or fix the uniform field.
+
+A new `detail_gain_exponent` appearance control defaults to 1.0, preserving
+source gain values. The inspection CLI accepts `--detail-gain-exponent` between
+0.5 and 3 and `--station` within the lap, records both requested and sampled
+station, and rejects invalid numeric inputs. This makes material studies
+reproducible at different track positions without editing production settings.
+The exponent 2 study in `artifacts/terrain-detail-contrast/existing.png`
+exaggerated broad streaks rather than adding convincing grass structure, so
+it was not adopted as the default. Source images and terrain data are unchanged.
+
+Additional default contrast captures at stations 400 and 3000 are in
+`artifacts/terrain-station-400/existing.png` and
+`artifacts/terrain-station-3000/existing.png`. Both reveal a repeated smooth
+shoulder and sparse dark stems against the ground. This points to vegetation
+coverage and material blending as the next investigation, rather than a global
+contrast increase. These are inspection views, not matched video poses.

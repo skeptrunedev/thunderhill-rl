@@ -3,12 +3,14 @@ render_mode cull_disabled;
 uniform sampler2D grass_color : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform sampler2D soil_color : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 // Data texture stores linear relative color gains divided by two, not sRGB albedo.
-uniform sampler2D terrain_macro : filter_linear_mipmap, repeat_disable;
+uniform sampler2D terrain_macro : filter_linear_mipmap_anisotropic, repeat_disable;
 // Independent data channels: RGB is fine color gain / 2, alpha is grass coverage.
-uniform sampler2D terrain_detail : filter_linear_mipmap, repeat_disable;
+uniform sampler2D terrain_detail : filter_linear_mipmap_anisotropic, repeat_disable;
 uniform vec2 macro_origin;
 uniform vec2 macro_size;
 uniform vec3 ground_tint = vec3(1.0);
+// Appearance control for historical field detail, not recovered reflectance.
+uniform float detail_gain_exponent = 1.0;
 // Original appearance parameters, not measured plant height or reflectance.
 uniform float grass_tile_m = 2.0;
 uniform float grass_relief_m = 0.010;
@@ -67,7 +69,7 @@ void fragment() {
     float macro_weight = smoothstep(0.0, 30.0, min(edge_distance.x, edge_distance.y));
     vec3 macro_gain = mix(vec3(1.0), texture(terrain_macro, macro_uv).rgb * 2.0, macro_weight);
     vec4 detail = texture(terrain_detail, macro_uv);
-    vec3 detail_gain = mix(vec3(1.0), detail.rgb * 2.0, macro_weight);
+    vec3 detail_gain = mix(vec3(1.0), pow(max(detail.rgb * 2.0, vec3(0.001)), vec3(detail_gain_exponent)), macro_weight);
     float soil_weight = (1.0 - detail.a) * macro_weight;
     ALBEDO = mix(grass, soil, soil_weight) * ground_tint * macro_gain * detail_gain;
     // A single albedo does not contain measured PBR maps. Bright straw over

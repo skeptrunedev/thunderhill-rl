@@ -13,8 +13,22 @@ func _run() -> void:
 	var candidate := ""
 	var frames := 1
 	var road_edge := false
+	var detail_gain_exponent := 1.0
+	var station_m := 1830.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--road-edge":
+		if arg.begins_with("--station="):
+			var value := arg.trim_prefix("--station=")
+			if not value.is_valid_float():
+				_fail("Station must be numeric")
+				return
+			station_m = float(value)
+		elif arg.begins_with("--detail-gain-exponent="):
+			var value := arg.trim_prefix("--detail-gain-exponent=")
+			if not value.is_valid_float():
+				_fail("Detail gain exponent must be numeric")
+				return
+			detail_gain_exponent = float(value)
+		elif arg == "--road-edge":
 			road_edge = true
 		elif arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
@@ -22,6 +36,13 @@ func _run() -> void:
 			frames = int(arg.trim_prefix("--frames="))
 		elif arg.begins_with("--candidate="):
 			candidate = arg.trim_prefix("--candidate=")
+	if (
+		not is_finite(detail_gain_exponent)
+		or detail_gain_exponent < 0.5
+		or detail_gain_exponent > 3.0
+	):
+		_fail("Detail gain exponent must be between 0.5 and 3")
+		return
 	if frames < 1 or frames > 120:
 		_fail("Frame count must be between 1 and 120")
 		return
@@ -59,11 +80,14 @@ func _run() -> void:
 	game.bike.visible = false
 	game.hud.visible = false
 	var track = game.track
+	if not is_finite(station_m) or station_m < 0.0 or station_m >= track.length_m:
+		_fail("Station must be within the lap")
+		return
 	var nearest := 0
 	for i in track.samples.size():
 		if (
-			absf(float(track.samples[i].s) - 1830.0)
-			< absf(float(track.samples[nearest].s) - 1830.0)
+			absf(float(track.samples[i].s) - station_m)
+			< absf(float(track.samples[nearest].s) - station_m)
 		):
 			nearest = i
 	var center: Vector3 = track.points[nearest]
@@ -78,6 +102,7 @@ func _run() -> void:
 	game.camera.fov = 74.0
 	game.camera.current = true
 	var material: ShaderMaterial = track.terrain_material
+	material.set_shader_parameter("detail_gain_exponent", detail_gain_exponent)
 	var original: Texture2D = material.get_shader_parameter("grass_color")
 	var samples: Array = []
 	for index in frames:
@@ -114,6 +139,9 @@ func _run() -> void:
 						{
 							"existing": original.resource_path,
 							"frames_per_material": frames,
+							"detail_gain_exponent": detail_gain_exponent,
+							"requested_station_m": station_m,
+							"sample_station_m": float(track.samples[nearest].s),
 							"step_m": 0.30,
 							"samples": samples,
 							"view": "road_edge" if road_edge else "field",
