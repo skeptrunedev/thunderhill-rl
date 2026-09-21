@@ -25,8 +25,20 @@ func _run() -> void:
 	var grass_tile_m := -1.0
 	var stubble_shader_path := ""
 	var candidate_grass_rotation := -1.0
+	var candidate_field_relief := -1.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--eye-height="):
+		if arg.begins_with("--candidate-field-relief="):
+			var value := arg.trim_prefix("--candidate-field-relief=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 0.1
+			):
+				_fail("Field relief must be finite and within zero to 0.1 metres")
+				return
+			candidate_field_relief = float(value)
+		elif arg.begins_with("--eye-height="):
 			var value := arg.trim_prefix("--eye-height=")
 			if (
 				not value.is_valid_float()
@@ -137,6 +149,17 @@ func _run() -> void:
 		elif arg.begins_with("--candidate="):
 			candidate = arg.trim_prefix("--candidate=")
 	if (
+		candidate_field_relief >= 0.0
+		and (
+			not candidate.is_empty()
+			or compare_fields
+			or not stubble_shader_path.is_empty()
+			or candidate_grass_rotation >= 0.0
+		)
+	):
+		_fail("Field relief comparison uses the production texture and no other candidate changes")
+		return
+	if (
 		not is_finite(detail_gain_exponent)
 		or detail_gain_exponent < 0.5
 		or detail_gain_exponent > 3.0
@@ -148,10 +171,10 @@ func _run() -> void:
 		return
 	if (
 		not output.is_absolute_path()
-		or not candidate.is_absolute_path()
+		or (candidate_field_relief < 0.0 and not candidate.is_absolute_path())
 		or DisplayServer.get_name() == "headless"
 	):
-		_fail("Use a real renderer, --output-dir and --candidate with absolute paths")
+		_fail("Use a real renderer and absolute paths; texture studies require --candidate")
 		return
 	if DirAccess.make_dir_recursive_absolute(output) != OK:
 		_fail("Cannot create output directory")
@@ -164,11 +187,14 @@ func _run() -> void:
 		if FileAccess.file_exists(output.path_join(filename)):
 			_fail("Refusing to overwrite " + filename)
 			return
-	var source := Image.load_from_file(candidate)
-	if source == null or source.is_empty() or source.generate_mipmaps() != OK:
-		_fail("Cannot load candidate and generate mipmaps")
-		return
-	var texture := ImageTexture.create_from_image(source)
+	var source: Image
+	var texture: ImageTexture
+	if not candidate.is_empty():
+		source = Image.load_from_file(candidate)
+		if source == null or source.is_empty() or source.generate_mipmaps() != OK:
+			_fail("Cannot load candidate and generate mipmaps")
+			return
+		texture = ImageTexture.create_from_image(source)
 	root.size = SIZE
 	root.content_scale_size = SIZE
 	var game = load("res://main.tscn").instantiate()
@@ -285,7 +311,7 @@ func _run() -> void:
 					item.surface, item.original if name == "existing" else item.candidate
 				)
 			material.set_shader_parameter(
-				"grass_color", original if name == "existing" else texture
+				"grass_color", original if name == "existing" or texture == null else texture
 			)
 			material.set_shader_parameter(
 				"grass_rotation_spread",
@@ -298,6 +324,10 @@ func _run() -> void:
 			material.set_shader_parameter(
 				"field_segment_count", 0 if compare_fields and name == "existing" else field_count
 			)
+			if candidate_field_relief >= 0.0:
+				material.set_shader_parameter(
+					"field_relief_m", candidate_field_relief if name == "candidate" else 0.0
+				)
 			for frame in 10:
 				await RenderingServer.frame_post_draw
 			var capture := root.get_texture().get_image()
@@ -332,6 +362,7 @@ func _run() -> void:
 							"Same baked stubble in both views; field comparison isolates terrain material",
 							"frames_per_material": frames,
 							"existing_grass_rotation": original_rotation,
+							"candidate_field_relief_m": candidate_field_relief,
 							"candidate_grass_rotation":
 							(
 								candidate_grass_rotation
@@ -362,8 +393,14 @@ func _run() -> void:
 							"samples": samples,
 							"view": "road_edge" if road_edge else "field",
 							"candidate": candidate,
-							"candidate_sha256": FileAccess.get_sha256(candidate),
-							"source_size": [source.get_width(), source.get_height()],
+							"candidate_sha256":
+							"" if candidate.is_empty() else FileAccess.get_sha256(candidate),
+							"source_size":
+							(
+								[original.get_width(), original.get_height()]
+								if source == null
+								else [source.get_width(), source.get_height()]
+							),
 							"tile_m": grass_tile_m,
 							"camera_position": [position.x, position.y, position.z],
 							"camera_target": [target.x, target.y, target.z],

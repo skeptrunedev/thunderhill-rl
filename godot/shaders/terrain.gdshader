@@ -21,6 +21,9 @@ uniform float grass_tile_m = 1.0;
 // One retains full random rotation; zero preserves the source straw direction.
 uniform float grass_rotation_spread : hint_range(0.0, 1.0) = 1.0;
 uniform float grass_relief_m = 0.010;
+// Estimated field microtopography for shading only, not surveyed contact heights.
+// Rendered trials did not improve fidelity enough for production.
+uniform float field_relief_m : hint_range(0.0, 0.1) = 0.0;
 // Original fine soil material, with estimated scale and shallow relief.
 uniform float soil_tile_m = 1.0;
 uniform float soil_relief_m = 0.0015;
@@ -45,14 +48,18 @@ vec3 patch_hash(vec2 lattice) {
 
 // Original coverage variation, not a surveyed vegetation mask. Fade noise when
 // its world space footprint becomes unresolved; preserve the map endpoints.
-float coverage_noise(vec2 p) {
+float field_noise(vec2 p) {
     vec2 cell = floor(p);
     vec2 f = fract(p);
     vec2 w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
     float value = mix(mix(patch_hash(cell).x, patch_hash(cell + vec2(1.0, 0.0)).x, w.x),
                       mix(patch_hash(cell + vec2(0.0, 1.0)).x, patch_hash(cell + vec2(1.0)).x, w.x), w.y);
+    return value - 0.5;
+}
+
+float coverage_noise(vec2 p) {
     float visibility = 1.0 - smoothstep(0.25, 1.0, length(fwidth(p)));
-    return (value - 0.5) * visibility;
+    return field_noise(p) * visibility;
 }
 
 vec3 ground_patch(sampler2D color_source, vec2 uv, vec2 dx, vec2 dy, vec2 lattice, float rotation_spread) {
@@ -139,6 +146,17 @@ void fragment() {
     // footprint dependent visibility or invent a ridge at each blend edge.
     float height_dx = mix(dFdx(straw) * grass_relief_m, dFdx(soil_luminance) * soil_relief_m, soil_weight);
     float height_dy = mix(dFdy(straw) * grass_relief_m, dFdy(soil_luminance) * soil_relief_m, soil_weight);
+    // Differentiate continuous height first. Apply footprint and coverage
+    // weights afterward so material transitions do not become raised ridges.
+    if (field_relief_m > 0.0) {
+        vec2 relief_uv = field_uv / vec2(0.42, 3.8);
+        float field_height = (field_noise(relief_uv) * 0.70
+                            + field_noise(field_uv / vec2(1.7, 8.5) + vec2(13.0, 37.0)) * 0.30) * field_relief_m;
+        float relief_visibility = 1.0 - smoothstep(0.25, 1.0, length(fwidth(relief_uv)));
+        float relief_weight = (1.0 - soil_weight) * relief_visibility;
+        height_dx += dFdx(field_height) * relief_weight;
+        height_dy += dFdy(field_height) * relief_weight;
+    }
     vec3 dx = dFdx(VERTEX);
     vec3 dy = dFdy(VERTEX);
     vec3 rx = cross(dy, NORMAL);

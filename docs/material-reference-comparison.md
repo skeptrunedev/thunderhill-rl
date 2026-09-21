@@ -785,3 +785,25 @@ This is not a native Mac benchmark. Tailscale reports the MacBook offline,
 so native visual and performance verification remains pending.
 Mac export passed as `ba2c565290ba-cb2489b1bbc0`. Nonfinite preview width
 correctly exits with status 2.
+
+## Field relief experiment
+
+A custom field normal layer was compared at 0.06 m amplitude near station 900
+and 0.10 m at station 400. These are artistic shading amplitudes, not measured
+terrain displacement. The shader differentiates continuous height before applying
+coverage and pixel footprint weights to avoid artificial material boundary ridges.
+
+The captures in `artifacts/field-relief-study/` and
+`artifacts/field-relief-close/` show almost no useful improvement at riding height.
+The production default therefore remains zero. Raising relief does not address
+the field's uniform land cover. Reference frame 00:40 instead shows pale straw
+areas separated by darker flattened strips, including a band following the curve.
+Those spatial patterns should guide the next material study. Motion blur and
+camera exposure prevent treating the frame as a calibrated albedo or height map.
+
+The preview now supports an isolated `--candidate-field-relief` comparison using
+the production texture without loading an unrelated candidate image. The cleaned
+command was rendered successfully in `artifacts/field-relief-final-check/` and
+visually inspected. Human controls passed with zero failures; local Linux frame
+timing was median 17.361 ms and p95 20.1 ms over 265 frames. This diagnostic does
+not establish native Mac performance or a visual match to the footage.
