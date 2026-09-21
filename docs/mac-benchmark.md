@@ -101,6 +101,6 @@ and material resource are identical.
 The clean app was opened in ordinary human mode with onboard camera two. One
 game process remained running. Its episode record confirms the clean commit and
 initialized track state (`artifacts/mac-993f48b-review-episode.jsonl`). The log
-file remained buffered while a process sample showed the active rendering loop;
+file remained empty while a process sample showed the active rendering loop;
 the process was not restarted. The corrected candidate's native image is also
 paired with the supplied footage in `artifacts/native-reference-comparison`.
