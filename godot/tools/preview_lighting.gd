@@ -221,6 +221,7 @@ func _run() -> void:
 			or arg.begins_with("--asphalt-binder-mottling=")
 			or arg.begins_with("--asphalt-surface-variation=")
 			or arg.begins_with("--asphalt-directional-wear=")
+			or arg.begins_with("--asphalt-exit-scuff=")
 		):
 			var name := arg.get_slice("=", 0).trim_prefix("--asphalt-")
 			var value := arg.get_slice("=", 1)
@@ -236,7 +237,8 @@ func _run() -> void:
 				"broad-tone": "broad_tone_strength",
 				"binder-mottling": "binder_mottling_strength",
 				"surface-variation": "surface_variation_strength",
-				"directional-wear": "directional_wear_strength"
+				"directional-wear": "directional_wear_strength",
+				"exit-scuff": "exit_scuff_strength"
 			}[name]
 			asphalt_detail[parameter] = float(value)
 		elif arg.begins_with("--asphalt-tile-m=") or arg.begins_with("--asphalt-relief-m="):

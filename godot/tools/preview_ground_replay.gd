@@ -13,6 +13,7 @@ func _run() -> void:
 	var canopy_additive := false
 	var replay := ""
 	var directional_wear := NAN
+	var exit_scuff := NAN
 	var hybrid_aggregate := false
 	var curved_uv := true
 	var directional_composition := 0.0
@@ -53,7 +54,10 @@ func _run() -> void:
 			mode = arg.get_slice("=", 1)
 		elif arg.begins_with("--replay="):
 			replay = arg.trim_prefix("--replay=")
-		elif arg.begins_with("--asphalt-directional-wear="):
+		elif (
+			arg.begins_with("--asphalt-directional-wear=")
+			or arg.begins_with("--asphalt-exit-scuff=")
+		):
 			var value := arg.get_slice("=", 1)
 			if (
 				not value.is_valid_float()
@@ -61,10 +65,13 @@ func _run() -> void:
 				or float(value) < 0.0
 				or float(value) > 1.0
 			):
-				push_error("Directional wear must be finite and within zero to one")
+				push_error("Pavement study strength must be finite and within zero to one")
 				quit(2)
 				return
-			directional_wear = float(value)
+			if arg.begins_with("--asphalt-exit-scuff="):
+				exit_scuff = float(value)
+			else:
+				directional_wear = float(value)
 		elif arg.begins_with("--agent-port=") or arg == "--qa-controls":
 			push_error("Ground replay study cannot run agent or control test sessions")
 			quit(2)
@@ -87,8 +94,8 @@ func _run() -> void:
 		push_error("Ground study requires a valid mode and an existing replay")
 		quit(2)
 		return
-	if hybrid_aggregate and is_finite(directional_wear):
-		push_error("Hybrid aggregate replaces directional wear; choose one study")
+	if hybrid_aggregate and (is_finite(directional_wear) or is_finite(exit_scuff)):
+		push_error("Hybrid aggregate replaces pavement overrides; choose one study")
 		quit(2)
 		return
 	if canopy_additive and not is_finite(canopy_strength):
@@ -138,6 +145,8 @@ func _run() -> void:
 	var pavement: ShaderMaterial = game.track.get_node("RacingSurface").material_override
 	if is_finite(directional_wear):
 		pavement.set_shader_parameter("directional_wear_strength", directional_wear)
+	if is_finite(exit_scuff):
+		pavement.set_shader_parameter("exit_scuff_strength", exit_scuff)
 	var effective_wear = pavement.get_shader_parameter("directional_wear_strength")
 	if effective_wear == null:
 		effective_wear = RenderingServer.shader_get_parameter_default(
@@ -149,4 +158,5 @@ func _run() -> void:
 	report["hybrid_aggregate"] = hybrid_aggregate
 	report["pavement_shader_sha256"] = FileAccess.get_sha256(pavement.shader.resource_path)
 	report["directional_wear_strength"] = effective_wear
+	report["exit_scuff_strength_override"] = exit_scuff if is_finite(exit_scuff) else null
 	print("GROUND_REPLAY_STUDY ", JSON.stringify({"mode": mode, "material": report}))

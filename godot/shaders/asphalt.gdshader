@@ -30,6 +30,9 @@ uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.25;
 // Directional sheen study. Original directional material variation,
 // not measured friction, rubber placement, or a recovered roughness scan.
 uniform float directional_wear_strength : hint_range(0.0, 1.0) = 0.8;
+// Local pale scrub marks guided by onboard frame 50. Placement, width and
+// composition are artistic estimates, not surveyed marks or a friction map.
+uniform float exit_scuff_strength : hint_range(0.0, 1.0) = 0.0;
 // Frame 50 appearance study: local paving pass boundary, not surveyed or friction data.
 uniform float paving_joint_strength : hint_range(0.0, 1.0) = 1.0;
 uniform vec2 paving_joint_station_m = vec2(1263.588613, 1508.580953);
@@ -69,6 +72,26 @@ float filtered_pavement_noise(vec2 p) {
     // Fade unresolved procedural cells instead of letting them crawl at distance.
     float footprint = max(length(dFdx(p)), length(dFdy(p)));
     return mix(pavement_noise(p), 0.5, smoothstep(0.25, 0.8, footprint));
+}
+
+float exit_scuff(vec2 metres, float station, float slope, float curve, float width, vec2 extent) {
+    float along = filtered_pavement_noise(vec2(metres.x / 0.65, station * 0.1));
+    float broad = filtered_pavement_noise(vec2(metres.x / 1.7, station * 0.31));
+    float center = station + slope * metres.x + curve * metres.x * metres.x
+                 + (along - 0.5) * 0.16;
+    float distance_to_line = metres.y - center;
+    // A soft deposit profile, approximately convolved with the pixel footprint.
+    // The integral stays constant as unresolved marks broaden and lose contrast.
+    float footprint = max(fwidth(distance_to_line), 0.002);
+    float sigma = width * mix(0.18, 0.5, along);
+    float filtered_sigma = sqrt(sigma * sigma + footprint * footprint / 12.0);
+    float distance_scaled = distance_to_line / filtered_sigma;
+    float coverage = sigma / filtered_sigma * exp(-0.5 * distance_scaled * distance_scaled);
+    float end_weight = smoothstep(extent.x, extent.x + 1.2, metres.x)
+                     * (1.0 - smoothstep(extent.y - 1.2, extent.y, metres.x));
+    float deposit = filtered_pavement_noise(metres / vec2(0.14, 0.045));
+    return coverage * end_weight * smoothstep(0.3, 0.7, broad)
+         * mix(0.1, 1.0, along) * mix(0.25, 1.0, deposit);
 }
 
 void fragment() {
@@ -195,6 +218,15 @@ void fragment() {
                       * (authored_surface ? 1.0 : 0.0) * (1.0 - edge_weight);
     ROUGHNESS = mix(ROUGHNESS, mix(0.46, 0.70, wear), wear_weight);
     ROUGHNESS = clamp(ROUGHNESS + roughness_offset * (1.0 - edge_weight), 0.25, 0.9);
+    if (exit_scuff_strength > 0.0) {
+        vec2 scuff_metres = vec2(UV.x - UV2.x * 0.5, UV.y);
+        float scuff = exit_scuff(scuff_metres, 1355.5, -0.35, 0.018, 0.38, vec2(-7.0, 6.0));
+        scuff = max(scuff, exit_scuff(scuff_metres, 1356.3, -0.42, 0.014, 0.48, vec2(-3.5, 2.0)));
+        scuff = max(scuff, 0.25 * exit_scuff(scuff_metres, 1360.0, 0.38, -0.022, 0.28, vec2(-1.0, 4.0)));
+        scuff *= exit_scuff_strength * (1.0 - edge_weight);
+        ALBEDO = mix(ALBEDO, vec3(0.22, 0.21, 0.19), scuff * 0.65);
+        ROUGHNESS = mix(ROUGHNESS, 0.8, scuff);
+    }
     if (matte_aggregate_study || hybrid_aggregate_study) {
         vec3 authored_albedo = ALBEDO;
         // World metre domains are continuous across the lap seam. Two stone
