@@ -22,6 +22,9 @@ uniform float authored_relief_m = 0.000109375;
 uniform float surface_variation_strength : hint_range(0.0, 1.0) = 0.35;
 // Original longitudinal binder mottling, not a recovered tire or friction map.
 uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.25;
+// Directional sheen study. Original directional material variation,
+// not measured friction, rubber placement, or a recovered roughness scan.
+uniform float directional_wear_strength : hint_range(0.0, 1.0) = 0.8;
 // Frame 50 appearance study: local paving pass boundary, not surveyed or friction data.
 uniform float paving_joint_strength : hint_range(0.0, 1.0) = 1.0;
 uniform vec2 paving_joint_station_m = vec2(1263.588613, 1508.580953);
@@ -171,5 +174,20 @@ void fragment() {
         NORMAL_MAP = texture(normal_map, detail).rgb;
         NORMAL_MAP_DEPTH = 0.07;
     }
+    // Elongated periodic domains keep wear continuous at the lap join. The
+    // two scales break up parallel lanes; filtered noise limits distant crawl.
+    vec2 wear_domain = station_direction * (lap_length_m / (TAU * 18.0) + UV.x / 0.32);
+    vec2 wear_fine_domain = station_direction * (lap_length_m / (TAU * 9.0) + UV.x / 0.075);
+    float wear_large = filtered_pavement_noise(wear_domain + vec2(123.0, 67.0));
+    float wear_fine = filtered_pavement_noise(wear_fine_domain + vec2(211.0, 31.0));
+    float wear = smoothstep(0.20, 0.80, mix(wear_large, wear_fine, 0.30));
+    // Smooth regions occupy interrupted patches, not continuous polished lanes.
+    // Most pavement keeps its original matte response, including the edges.
+    vec2 wear_patch_domain = station_direction * (lap_length_m / (TAU * 4.0) + UV.x / 1.2);
+    float wear_patch = smoothstep(0.55, 0.80,
+        filtered_pavement_noise(wear_patch_domain + vec2(43.0, 137.0)));
+    float wear_weight = directional_wear_strength * wear_patch
+                      * (authored_surface ? 1.0 : 0.0) * (1.0 - edge_weight);
+    ROUGHNESS = mix(ROUGHNESS, mix(0.46, 0.70, wear), wear_weight);
     ROUGHNESS = clamp(ROUGHNESS + roughness_offset * (1.0 - edge_weight), 0.25, 0.9);
 }

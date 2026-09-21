@@ -125,6 +125,7 @@ func _run() -> void:
 			arg.begins_with("--asphalt-broad-tone=")
 			or arg.begins_with("--asphalt-binder-mottling=")
 			or arg.begins_with("--asphalt-surface-variation=")
+			or arg.begins_with("--asphalt-directional-wear=")
 		):
 			var name := arg.get_slice("=", 0).trim_prefix("--asphalt-")
 			var value := arg.get_slice("=", 1)
@@ -139,7 +140,8 @@ func _run() -> void:
 			var parameter: String = {
 				"broad-tone": "broad_tone_strength",
 				"binder-mottling": "binder_mottling_strength",
-				"surface-variation": "surface_variation_strength"
+				"surface-variation": "surface_variation_strength",
+				"directional-wear": "directional_wear_strength"
 			}[name]
 			asphalt_detail[parameter] = float(value)
 		elif arg.begins_with("--asphalt-tile-m=") or arg.begins_with("--asphalt-relief-m="):
@@ -723,6 +725,12 @@ func _run() -> void:
 	var sun_point: Vector3 = game.camera.global_position + sun.global_basis.z.normalized() * 100.0
 	var projected_sun: Vector2 = game.camera.unproject_position(sun_point)
 	var sun_in_front: bool = -game.camera.to_local(sun_point).z > 0.0
+	var pavement: ShaderMaterial = game.track.get_node("RacingSurface").material_override
+	var effective_wear = pavement.get_shader_parameter("directional_wear_strength")
+	if effective_wear == null and asphalt_study == "production":
+		effective_wear = RenderingServer.shader_get_parameter_default(
+			pavement.shader.get_rid(), "directional_wear_strength"
+		)
 	for row in variants:
 		if row.name == "production" and fog_density < 0.0:
 			row.fog = environment.fog_density
@@ -820,6 +828,7 @@ func _run() -> void:
 								. get_shader_parameter("roughness_offset")
 							),
 							"asphalt_detail_overrides": asphalt_detail,
+							"directional_wear_strength": effective_wear,
 							"asphalt_shader_sha256":
 							FileAccess.get_sha256("res://shaders/asphalt.gdshader"),
 							"field_map": field_map_path,

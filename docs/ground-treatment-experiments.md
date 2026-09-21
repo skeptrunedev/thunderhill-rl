@@ -217,3 +217,52 @@ Mac export `2e0b5539ca76-d95c96458ffe` completed. This export has not been teste
 natively on the laptop. The default replay recording is
 `artifacts/mixed-ground-production.mp4`; the static before/after comparison is
 `artifacts/mixed-ground-comparison/00.png`. The replay completed 2699 transitions.
+
+## Interrupted pavement reflections
+
+The reference frame 30 has broken longitudinal reflective structure. The prior
+material mainly varied albedo, while its roughness remained narrowly bounded.
+The first trial combined stronger color variation and a 0.39 to 0.72 roughness
+range. It looked wet and was rejected. A second trial held albedo fixed with a
+0.46 to 0.70 roughness target, blended at strength 0.6. It still made continuous
+blue reflective ribbons in the turn and was also rejected.
+
+The accepted candidate interrupts those regions with a filtered noise mask at
+approximately four longitudinal metres and 1.2 transverse metres. Substantial
+matte pavement remains between the reflective patches. The underlying two
+directional scales are 18 by 0.32 metres and nine by 0.075 metres. Annular noise
+domains close at the lap boundary; unresolved cells fade with pixel footprint.
+These dimensions and roughness values are artistic estimates, not measured
+friction, tire wear or track surface data. Albedo and normals are unchanged.
+
+Root and independent review prefer this distribution at strength 0.8. It is now
+the asphalt shader default. Some patch ends remain too rounded and the camera,
+sky and solar elevation are still uncalibrated. This is a modest improvement,
+not a claim of photographic equivalence.
+
+Evidence is in `artifacts/patchy-sheen-straight`, `patchy-sheen-apex`, and
+`patchy-sheen-comparison`. The default game capture in `patchy-sheen-default`
+is byte identical to the explicit strength 0.8 straight study. The diagnostic
+metadata resolves shader defaults through Godot's
+[RenderingServer API](https://docs.godotengine.org/en/stable/classes/class_renderingserver.html#class-renderingserver-method-shader-get-parameter-default)
+when the material has no explicit override.
+
+The recorded candidate completed all 2699 replay transitions. Review movie:
+`artifacts/patchy-sheen-motion.mp4`, 700 frames at fixed 30 FPS. Twelve samples
+across the clip and consecutive samples from 8.0 to 8.4 seconds show no obvious
+abrupt patch changes. This inspection does not prove absence of shimmer over a
+full lap. The previously observed initial dark frame and ObjectDB exit warning
+remain. Fixed movie timing is not a live performance measurement.
+
+Human controls passed with zero failures, and all five rendered agent camera
+observations passed the capture and serialization checks. Control frame timings
+may overlap another render and are not a performance comparison. Native Mac
+verification remains pending.
+
+Both static and replay preview tools accept `--asphalt-directional-wear=0..1`.
+Zero provides the previous material response. Replay studies accept
+`--ground-study=production` to preserve the current terrain while testing the
+pavement, and record the effective roughness treatment strength.
+
+Mac export `020989d98dca-f022e46a99eb` completed successfully. It contains this
+material change but has not yet been verified on the physical laptop.
