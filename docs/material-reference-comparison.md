@@ -934,3 +934,48 @@ code 2. These are local functional checks, not native Mac performance evidence.
 Mac export passed as `d706061342e3-4e93ab2a4107`; this export has not been
 executed on the native Mac. The scene still falls substantially short of the
 requested photographic realism.
+
+## Curved field coverage adopted at Turn 2
+
+The next material iteration separates fine straw from broader mowing appearance.
+The existing retained straw corridor guides coordinates along the corner and
+inward from its curved boundary. Bare access corridors do not seed the pattern.
+The current dataset contains one retained straw chain. This is an original visual
+construction, not a trace of individual mowing passes or a general field survey.
+The historical aerial crop shows curved passes near the corner edge, with a
+different pattern farther into the field.
+
+The first v5 layered trial, `artifacts/fine-straw-guided-field/`, was rejected:
+continuous high contrast bands resembled sand dunes. The muted v5 trial in
+`artifacts/fine-straw-guided-muted/` still made the underlying field too smooth.
+The final version keeps production v2 and separates broad color gain from the
+fine luminance used to estimate normals and roughness. Color boundaries are not
+interpreted as height changes. Two noise scales, 1.1 by 14 m and 0.4 by 6 m,
+plus a smooth lateral warp interrupt the pattern. These scales are artistic.
+Linear straw gains range from 0.96 to (1.25, 1.23, 1.18); coverage retention
+ranges from 0.70 to one. The treatment fades across the first two metres inward,
+from 24 to 40 m away from the guide, and across eight metres at each chain end.
+No pavement, terrain height, contact, friction or reward data changed.
+
+`artifacts/guided-field-v2-final/` compares the treatment off and on at station
+1065 using the same v2 material. Root and independent review accepted a modest
+improvement in flattened straw appearance. The far field remains somewhat
+regular. Root additionally inspected the paired station 1190 view in
+`artifacts/guided-field-v2-exit/`. Both studies include three positions spaced
+0.30 m apart; these do not prove full lap temporal stability. The default
+`straw_swath_strength` is now one, replacing the earlier disabled ellipse study.
+The material preview can combine a candidate source with this broad layer and
+records the source hash and treatment strength.
+
+`artifacts/guided-field-rider-view/production.png` shows the adopted material
+from the prior artistic station 950 pose (camera 1, lean minus 25 degrees,
+view roll minus 14, lateral four metres, yaw eight degrees). It is not registered
+to the source footage. The complete image still has substantial deficiencies
+in distant scenery, motorcycle detail and photographic realism.
+
+Human controls passed with zero failures with the adopted shader. Linux timing
+was median 17.361 ms and p95 25.0 ms over 263 frames. This is a functional check,
+not an isolated performance comparison or native Mac benchmark. Formatting and
+whitespace checks passed. Tailscale reports the intended MacBook offline, with
+last seen time 2026-09-21 08:50 UTC; native execution remains pending.
+Mac export passed as `2e4aac19fd9b-8e72d567d16c`; native execution is unverified.

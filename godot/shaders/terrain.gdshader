@@ -16,8 +16,8 @@ uniform float detail_gain_exponent = 1.0;
 uniform float field_soil_strength : hint_range(0.0, 1.0) = 0.0;
 // Original interrupted straw swaths, not measured mowing or vegetation data.
 uniform float field_patch_strength : hint_range(0.0, 1.0) = 0.5;
-// Original pale straw swath study, independently controlled from exposed soil.
-uniform float straw_swath_strength : hint_range(0.0, 1.0) = 0.0;
+// Original curved mowing appearance, guided by the retained straw corridor.
+uniform float straw_swath_strength : hint_range(0.0, 1.0) = 1.0;
 // Original appearance parameters, not measured plant height or reflectance.
 uniform float grass_tile_m = 1.0;
 // One retains full random rotation; zero preserves the source straw direction.
@@ -149,20 +149,45 @@ void fragment() {
                  + coverage_noise(field_uv / vec2(11.0, 13.0)) * 0.35;
     float sparse_straw = smoothstep(-0.20, 0.30, swaths);
     float straw_abundance = 0.0;
+    vec3 straw_color_gain = vec3(1.0);
     if (straw_swath_strength > 0.0) {
-        // Coherent metre scale straw abundance survives the fine source mipmaps.
-        // This is estimated appearance, not a surveyed mowing or plant density map.
-        float straw_rows = coverage_noise(field_uv / vec2(0.9, 11.0) + vec2(31.0, 7.0)) * 0.75
-                         + coverage_noise(field_uv / vec2(7.0, 17.0) + vec2(11.0, 43.0)) * 0.25;
-        float pale_straw = smoothstep(-0.12, 0.27, straw_rows);
-        // Original bounded infield study from the Turn 2 plan, not a mowing survey.
-        // Keep this treatment off distant hills and other unreviewed fields.
-        float infield_radius = length((world_pos.xz - vec2(200.0, 690.0)) / vec2(210.0, 100.0));
-        float infield_weight = 1.0 - smoothstep(0.8, 1.0, infield_radius);
-        straw_abundance = straw_swath_strength * pale_straw * infield_weight;
-        // Local straw is paler and less saturated than the exposed earth. Retain
-        // the fine source detail; do not paint a flat highlight over the ground.
-        grass *= mix(vec3(1.0), vec3(1.10, 1.13, 1.18), straw_abundance);
+        // The existing flattened straw corridors guide broad field appearance.
+        // Bare access corridors (zero retained grass) do not seed mowing passes.
+        float nearest_distance = 1000000.0;
+        float nearest_along = 0.0;
+        float nearest_side = 0.0;
+        float cumulative_length = 0.0;
+        float total_length = 0.0;
+        for (int i = 0; i < field_segment_count; i++) {
+            if (field_grass_retentions[i] > 0.0) {
+                vec2 start = field_segments[i].xy;
+                vec2 delta = field_segments[i].zw - start;
+                float segment_length = length(delta);
+                float t = clamp(dot(world_pos.xz - start, delta) / dot(delta, delta), 0.0, 1.0);
+                vec2 offset = world_pos.xz - start - delta * t;
+                float distance_to_guide = length(offset);
+                if (distance_to_guide < nearest_distance) {
+                    nearest_distance = distance_to_guide;
+                    nearest_along = cumulative_length + t * segment_length;
+                    nearest_side = dot(offset, vec2(delta.y, -delta.x) / segment_length);
+                }
+                cumulative_length += segment_length;
+                total_length += segment_length;
+            }
+        }
+        // Original bounded appearance study, not measured mowing dimensions.
+        float field_weight = smoothstep(0.0, 2.0, nearest_side)
+                           * (1.0 - smoothstep(24.0, 40.0, nearest_distance))
+                           * smoothstep(0.0, 8.0, nearest_along)
+                           * smoothstep(0.0, 8.0, total_length - nearest_along);
+        vec2 mowing_uv = vec2(nearest_distance, nearest_along);
+        mowing_uv.x += field_noise(vec2(nearest_along / 9.0, nearest_distance / 7.0)) * 0.8;
+        float rows = coverage_noise(mowing_uv / vec2(1.1, 14.0)) * 0.65
+                   + coverage_noise(mowing_uv / vec2(0.4, 6.0) + vec2(13.0, 7.0)) * 0.35;
+        float pale_straw = smoothstep(-0.22, 0.24, rows);
+        straw_abundance = straw_swath_strength * field_weight;
+        straw_color_gain = mix(vec3(1.0), mix(vec3(0.96), vec3(1.25, 1.23, 1.18), pale_straw), straw_abundance);
+        grass_coverage *= mix(1.0, mix(0.70, 1.0, pale_straw), straw_abundance);
     }
     grass_coverage *= 1.0 - sparse_straw * field_patch_strength * (1.0 - 0.5 * straw_abundance);
     float retained_grass;
@@ -170,7 +195,7 @@ void fragment() {
     float corridor = region.a;
     grass_coverage *= 1.0 - corridor * (1.0 - retained_grass);
     float soil_weight = (1.0 - grass_coverage) * macro_weight;
-    ALBEDO = mix(grass, soil * mix(soil_value, 1.0, corridor * (1.0 - retained_grass)), soil_weight) * ground_tint * macro_gain * detail_gain * mix(vec3(1.0), region.rgb, corridor);
+    ALBEDO = mix(grass * straw_color_gain, soil * mix(soil_value, 1.0, corridor * (1.0 - retained_grass)), soil_weight) * ground_tint * macro_gain * detail_gain * mix(vec3(1.0), region.rgb, corridor);
     // A single albedo does not contain measured PBR maps. Bright straw over
     // darker soil supplies an explicitly artistic relief/roughness estimate.
     // Derivatives of the filtered sample naturally remove unresolved relief.

@@ -206,8 +206,7 @@ func _run() -> void:
 	if (
 		candidate_straw_swaths >= 0.0
 		and (
-			not candidate.is_empty()
-			or not candidate_coverage_path.is_empty()
+			not candidate_coverage_path.is_empty()
 			or candidate_field_relief >= 0.0
 			or compare_fields
 			or not stubble_shader_path.is_empty()
@@ -215,7 +214,7 @@ func _run() -> void:
 			or candidate_scale_spread >= 0.0
 		)
 	):
-		_fail("Straw swath comparison requires the production texture and no other candidate")
+		_fail("Straw swath comparison accepts a texture but no other candidate controls")
 		return
 	if not candidate_coverage_path.is_empty():
 		if (
