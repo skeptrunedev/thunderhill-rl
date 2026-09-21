@@ -22,6 +22,11 @@ uniform bool photographic_sparse_enabled = false;
 // Luminance is only an artistic height proxy, not measured geometry.
 // Opt in material composition along original curved mowing coordinates.
 uniform bool photographic_curved_uv = true;
+// Dense source runs horizontally; sparse source wisps run vertically.
+// Isolate their orientation before changing composition or physical scale.
+uniform bool photographic_sparse_aligned = false;
+// Opt in triangular patch blend, fixed source scale and preserved linear variance.
+uniform bool photographic_stochastic = false;
 uniform float photographic_directional_composition : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_height_blend : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_contrast_preservation : hint_range(0.0, 1.0) = 0.0;
@@ -167,6 +172,42 @@ vec3 ground_surface(sampler2D color_source, vec2 uv, float rotation_spread, floa
         blended = mix(blended, layered, height_blend * visibility);
     }
     return blended;
+}
+
+// Three shared vertex samples per triangle replace four overlapping square
+// patches. Translation changes phase without changing photographed world scale.
+// Cubic weights fade the third sample smoothly at an edge; shared vertex seeds
+// keep color continuous. Explicit gradients ignore the discontinuous cell IDs.
+vec3 photographic_triangle(sampler2D color_source, vec2 uv) {
+    mat2 skew = mat2(vec2(1.0, -0.57735026919), vec2(0.0, 1.15470053838));
+    mat2 unskew = mat2(vec2(1.0, 0.5), vec2(0.0, 0.86602540378));
+    vec2 grid = skew * uv;
+    vec2 cell = floor(grid);
+    vec2 f = fract(grid);
+    vec2 va = cell;
+    vec2 vb = cell + vec2(1.0, 0.0);
+    vec2 vc = cell + vec2(0.0, 1.0);
+    vec3 weights = vec3(1.0 - f.x - f.y, f.x, f.y);
+    if (f.x + f.y > 1.0) {
+        va = cell + vec2(1.0);
+        weights = vec3(f.x + f.y - 1.0, 1.0 - f.y, 1.0 - f.x);
+    }
+    weights = weights * weights * (vec3(3.0) - 2.0 * weights);
+    weights /= dot(weights, vec3(1.0));
+    vec2 dx = dFdx(uv);
+    vec2 dy = dFdy(uv);
+    vec3 a = ground_patch(color_source, uv, dx, dy, unskew * va, 0.0, 0.0);
+    vec3 b = ground_patch(color_source, uv, dx, dy, unskew * vb, 0.0, 0.0);
+    vec3 c = ground_patch(color_source, uv, dx, dy, unskew * vc, 0.0, 0.0);
+    vec3 blended = a * weights.x + b * weights.y + c * weights.z;
+    ivec2 dimensions = textureSize(color_source, 0);
+    float last_mip = floor(log2(float(max(dimensions.x, dimensions.y))));
+    vec3 mean_color = textureLod(color_source, vec2(0.5), last_mip).rgb;
+    // Approximate variance correction in linear light. Correlated image samples
+    // limit its accuracy; this is an appearance experiment, not measured albedo.
+    float resolved = 1.0 - smoothstep(0.015, 0.09, max(length(dx), length(dy)));
+    float gain = mix(1.0, inversesqrt(dot(weights, weights)), resolved);
+    return clamp(mean_color + (blended - mean_color) * gain, vec3(0.0), vec3(1.0));
 }
 
 vec4 cleared_field(vec2 point, out float grass_retention) {
@@ -395,14 +436,15 @@ void fragment() {
         // Source straw runs mainly along image x. Align x with mowing travel;
         // stretch along travel and compress across for flattened swaths.
         vec2 photo_uv = photographic_curved_uv ? mowing_coordinates(world_pos.xz).yx / vec2(6.0, 2.0) : world_pos.xz / 4.0;
-        vec3 photographic = ground_surface(photographic_field, photo_uv, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
+        vec3 photographic = photographic_stochastic ? photographic_triangle(photographic_field, photo_uv) : ground_surface(photographic_field, photo_uv, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
         vec3 photographic_gain = mix(vec3(1.0), retained_swath_gain * field_structure, photographic_structure_strength);
         float photographic_height = dot(photographic, vec3(0.2126, 0.7152, 0.0722)) * 0.004;
         float photo_dx = dFdx(photographic_height);
         float photo_dy = dFdy(photographic_height);
         float photo_roughness = 0.93;
         if (photographic_sparse_enabled) {
-            vec3 sparse = ground_surface(photographic_sparse, photo_uv, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
+            vec2 sparse_uv = photographic_sparse_aligned ? vec2(photo_uv.y, -photo_uv.x) : photo_uv;
+            vec3 sparse = photographic_stochastic ? photographic_triangle(photographic_sparse, sparse_uv) : ground_surface(photographic_sparse, sparse_uv, 0.08, 0.25, photographic_contrast_preservation, photographic_height_blend);
             // Authored reference corridor is independent of driving/friction data.
             // Material proportions are artistic estimates, not classified land cover.
             // Reuse the corridor's authored interruptions instead of a uniform band.

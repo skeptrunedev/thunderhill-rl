@@ -8,6 +8,7 @@ uniform sampler2D scan_normal : hint_normal, filter_linear_mipmap_anisotropic, r
 uniform sampler2D scan_roughness : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float tile_m = 2.51;
 uniform float normal_strength = 1.0;
+uniform float albedo_gain = 1.0;
 varying vec3 world_position;
 
 void vertex() {
@@ -16,7 +17,7 @@ void vertex() {
 
 void fragment() {
 	vec2 scan_uv = world_position.xz / tile_m;
-	ALBEDO = texture(scan_color, scan_uv).rgb;
+	ALBEDO = texture(scan_color, scan_uv).rgb * albedo_gain;
 	ROUGHNESS = texture(scan_roughness, scan_uv).r;
 	METALLIC = 0.0;
 	SPECULAR = 0.3;

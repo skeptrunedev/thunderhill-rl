@@ -18,6 +18,8 @@ func _run() -> void:
 	var analytic_scuff := false
 	var hybrid_aggregate := false
 	var curved_uv := true
+	var sparse_aligned := false
+	var stochastic := false
 	var directional_composition := 0.0
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--asphalt-analytic-scuff":
@@ -38,6 +40,10 @@ func _run() -> void:
 				quit(2)
 				return
 			canopy_strength = float(value)
+		elif arg == "--photographic-stochastic":
+			stochastic = true
+		elif arg == "--photographic-sparse-aligned":
+			sparse_aligned = true
 		elif arg == "--photographic-planar-uv":
 			curved_uv = false
 		elif arg == "--photographic-curved-uv":
@@ -92,7 +98,9 @@ func _run() -> void:
 				"structured",
 				"composition",
 				"scan",
-				"geometry"
+				"scan-dry",
+				"geometry",
+				"layered-geometry"
 			]
 		)
 		or not FileAccess.file_exists(replay)
@@ -125,20 +133,27 @@ func _run() -> void:
 		report = load("res://scripts/ground_generated_study.gd").apply(
 			game.track, mode != "generated", mode == "structured", mode == "composition"
 		)
+	elif mode == "scan-dry":
+		report = load("res://scripts/ground_scan_study.gd").apply(game.track, 2.0, 1.0, "withered")
 	elif mode == "scan":
 		report = load("res://scripts/ground_scan_study.gd").apply(game.track)
 	else:
-		game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
+		if mode == "geometry":
+			game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
 		report = load("res://scripts/straw_geometry_study.gd").setup(game)
 	if report.has("error"):
 		push_error(report.error)
 		quit(2)
 		return
 	game.track.terrain_material.set_shader_parameter("photographic_curved_uv", curved_uv)
+	game.track.terrain_material.set_shader_parameter("photographic_sparse_aligned", sparse_aligned)
 	game.track.terrain_material.set_shader_parameter(
 		"photographic_directional_composition", directional_composition
 	)
 	report["photographic_curved_uv"] = curved_uv
+	game.track.terrain_material.set_shader_parameter("photographic_stochastic", stochastic)
+	report["photographic_stochastic"] = stochastic
+	report["photographic_sparse_aligned"] = sparse_aligned
 	report["photographic_directional_composition"] = directional_composition
 	report["terrain_shader_sha256"] = FileAccess.get_sha256(
 		game.track.terrain_material.shader.resource_path

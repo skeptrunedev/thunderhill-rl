@@ -24,6 +24,8 @@ func _run() -> void:
 	var photographic_height_blend := 0.0
 	var photographic_directional_composition := 0.0
 	var photographic_curved_uv := true
+	var photographic_sparse_aligned := false
+	var photographic_stochastic := false
 	var sky_source := ""
 	var solar_haze := 0.0
 	var solar_haze_broad := false
@@ -85,6 +87,10 @@ func _run() -> void:
 				_fail("Canopy strength must be finite and within zero to four")
 				return
 			canopy_strength = float(value)
+		elif arg == "--photographic-stochastic":
+			photographic_stochastic = true
+		elif arg == "--photographic-sparse-aligned":
+			photographic_sparse_aligned = true
 		elif arg == "--photographic-planar-uv":
 			photographic_curved_uv = false
 		elif arg == "--photographic-curved-uv":
@@ -196,7 +202,9 @@ func _run() -> void:
 					"structured",
 					"composition",
 					"scan",
-					"geometry"
+					"scan-dry",
+					"geometry",
+					"layered-geometry"
 				]
 			):
 				_fail("Unknown ground study mode")
@@ -680,7 +688,13 @@ func _run() -> void:
 		)
 	var production_terrain_material: ShaderMaterial = game.track.terrain_material
 	production_terrain_material.set_shader_parameter(
+		"photographic_stochastic", photographic_stochastic
+	)
+	production_terrain_material.set_shader_parameter(
 		"photographic_curved_uv", photographic_curved_uv
+	)
+	production_terrain_material.set_shader_parameter(
+		"photographic_sparse_aligned", photographic_sparse_aligned
 	)
 	production_terrain_material.set_shader_parameter(
 		"photographic_directional_composition", photographic_directional_composition
@@ -701,10 +715,15 @@ func _run() -> void:
 			ground_study == "structured",
 			ground_study == "composition"
 		)
+	elif ground_study == "scan-dry":
+		ground_study_metadata = load("res://scripts/ground_scan_study.gd").apply(
+			game.track, 2.0, 1.0, "withered"
+		)
 	elif ground_study == "scan":
 		ground_study_metadata = load("res://scripts/ground_scan_study.gd").apply(game.track)
-	elif ground_study == "geometry":
-		game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
+	elif ground_study in ["geometry", "layered-geometry"]:
+		if ground_study == "geometry":
+			game.track.terrain_material.set_shader_parameter("photographic_field_enabled", false)
 		ground_study_metadata = load("res://scripts/straw_geometry_study.gd").setup(game)
 	if is_finite(canopy_strength):
 		if ground_study != "production":
@@ -961,6 +980,8 @@ func _run() -> void:
 							_material_parameter(pavement, "exit_scuff_strength"),
 							"ground_study": ground_study,
 							"photographic_contrast_preservation": photographic_contrast,
+							"photographic_sparse_aligned": photographic_sparse_aligned,
+							"photographic_stochastic": photographic_stochastic,
 							"photographic_height_blend": photographic_height_blend,
 							"photographic_directional_composition":
 							photographic_directional_composition,

@@ -528,3 +528,44 @@ are mutually exclusive and cannot combine with an independent asphalt material.
 Human controls passed with zero failures and all rendered camera checks passed.
 Both dependent scenery bakes were refreshed; their geometry fingerprints match
 the preceding production state. Native export verification follows separately.
+
+## Additional independent material trials
+
+Three further comparisons use the identical station 1150, lateral 4 metre,
+lean negative 25 degree and view yaw 8 degree pose, with production lighting.
+The current control is `artifacts/stochastic-default-check/production.png`.
+
+| Trial | Mechanism | Result |
+| --- | --- | --- |
+| `scan-dry` | Existing pinned Poly Haven Withered Grass diffuse, normal and roughness maps in an independent terrain shader | More visible foreground surface variation, but lacks flattened mowing direction and erases regional differences. Initial gain one was too pale; gain 0.55 is closer in tone but still synthetic. |
+| `--photographic-stochastic` | Three shared triangular samples with deterministic phase changes, explicit mip gradients and approximate linear variance compensation | Small foreground change, without a substantial improvement in the uniformly brown middle distance. |
+| `layered-geometry` | Existing deterministic physical straw clumps over current photographic ground, rather than the older procedural ground | Adds bright speckles and local depth but does not fix the broader material mismatch. |
+
+None is adopted as a production default. A separate sparse source orientation
+trial (`--photographic-sparse-aligned`) also remains experimental: rotating that
+source alone does not solve the field composition. Both photographic options
+default false. No physics, collision, road geometry or training behavior changed.
+
+The dry scan manifest is `materials/scan_study/withered-source.json`, copied
+from previously acquired, verified CC0 provenance. Its two metre tile and 0.55
+albedo gain are appearance estimates, not measured Thunderhill parameters.
+The scan helper remains a developer workspace study using loose source images;
+it is not an exported Mac feature. It retains independent normal and roughness
+maps rather than deriving both from diffuse brightness.
+
+Evidence: `artifacts/radical-texture-round2/00.png` through `03.png` compare
+each candidate to the control and the dry scan to onboard frame 40. The video
+pose, exposure and motion blur differ, so that pair is not pixel registered.
+`radical-dry-scan-apex` records initial gain one; `radical-dry-scan-gain-apex`
+records the final experimental gain. All candidates compiled and rendered with
+Vulkan Mobile. GDScript formatting, diff checks and rendered human controls
+passed. The aerial profile utility separately passed all eight analytical tests.
+
+Both dry scan and stochastic replay trials completed 600 recorded transitions
+and 180 movie frames. Their source clip preserves original ticks and provenance
+from seconds 69 to 74 of the existing compatible QA lap. Nine sampled frames
+per movie provide a coarse continuity inspection, not a complete shimmer test
+or Mac performance measurement. The existing ObjectDB exit warning remains.
+Recordings and contact sheets are `artifacts/radical-dry-scan-motion*` and
+`artifacts/radical-stochastic-motion*`. The geometry trial has static inspection
+only. More surface detail alone has not produced photographic equivalence.
