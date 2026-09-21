@@ -126,6 +126,12 @@ func _triangle(surface: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void
 	surface.add_vertex(c)
 
 
+func _rounded_box(
+	size: Vector3, at: Vector3, radius: float, material: Material, parent: Node3D
+) -> MeshInstance3D:
+	return _mesh(preload("res://scripts/rounded_box.gd").build(size, radius), material, parent, at)
+
+
 ## Revolve an axial (x, radius) profile about the wheel axle.
 func _lathe(
 	profile: Array[Vector2], material: Material, parent: Node3D, at := Vector3.ZERO
@@ -641,7 +647,6 @@ func _build_cockpit() -> void:
 	dark_metal.set_shader_parameter("finish_roughness", 0.28)
 	dark_metal.set_shader_parameter("grain_pitch_m", 0.00035)
 	dark_metal.set_shader_parameter("relief_m", 0.000004)
-	var markings := _material(Color("c6c9bd"), 0.1, 0.5)
 	var accent := _material(Color("9f1822"), 0.05, 0.47)
 	_display_viewport = SubViewport.new()
 	_display_viewport.name = "InstrumentTexture"
@@ -738,17 +743,28 @@ func _build_cockpit() -> void:
 			_front
 		)
 		var switchgear := Node3D.new()
+		switchgear.name = "LeftSwitchgear" if side < 0 else "RightSwitchgear"
 		switchgear.position = Vector3(side * 0.278, 0.717, 0.25)
 		switchgear.rotation.x = -0.3
 		_front.add_child(switchgear)
-		_beveled_panel(Vector2(0.047, 0.055), 0.047, 0.01, polymer, switchgear)
-		_box(
-			Vector3(0.023, 0.010, 0.006),
-			Vector3(0, 0.009, 0.027),
-			accent if side > 0 else markings,
-			switchgear
+		_rounded_box(Vector3(0.047, 0.055, 0.047), Vector3.ZERO, 0.008, polymer, switchgear)
+		# The supplied frame shows a pale left face, not symmetric black boxes.
+		# Face shape and switch dimensions are original visual estimates.
+		if side < 0:
+			var cover := Node3D.new()
+			cover.position.z = 0.0225
+			switchgear.add_child(cover)
+			_beveled_panel(Vector2(0.040, 0.047), 0.003, 0.007, _metal, cover)
+			_rounded_box(
+				Vector3(0.011, 0.022, 0.009), Vector3(0, 0.004, 0.026), 0.003, polymer, switchgear
+			)
+		else:
+			_rounded_box(
+				Vector3(0.024, 0.014, 0.009), Vector3(0, 0.009, 0.026), 0.003, accent, switchgear
+			)
+		_rounded_box(
+			Vector3(0.014, 0.008, 0.006), Vector3(0, -0.015, 0.026), 0.002, dark_metal, switchgear
 		)
-		_box(Vector3(0.014, 0.008, 0.006), Vector3(0, -0.009, 0.027), dark_metal, switchgear)
 		# Amber reservoir tint and transmitted background follow the footage.
 		# Screen transmission and analytic absorption omit refraction and slosh.
 		var fluid := ShaderMaterial.new()

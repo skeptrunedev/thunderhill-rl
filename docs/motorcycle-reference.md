@@ -141,3 +141,26 @@ run is `artifacts/tank-test-final.log`.
 in the actual renderer. It is visibly closer to an exposed central neck than
 the previous continuous red surface, but reveals simplified blocky hardware.
 This remains an original reconstruction, not a verified matching cockpit.
+
+## Switch housing surfaces
+
+The two grip switch housings now use closed rounded boxes rather than flat
+corner cuts. Their existing 47 by 55 by 47 mm envelope is retained, with an
+estimated 8 mm edge radius. The left side has a separate pale metal face and
+vertical dark control, guided by the visible left housing in frame 00:10.
+The right keeps a red control. These are original visual estimates, not verified
+switchgear parts or manufacturer measurements. Decorative controls do not
+change human input bindings or agent actions.
+
+`rounded_box.gd` constructs surface samples around a box core and projects the
+outer bands onto a constant radius fillet. Analytic normals meet continuously
+across face boundaries. Its regression checks exact outer bounds, nondegenerate
+triangles, outward winding, finite unit normals, raw coordinate watertight edges
+and volume bounds across several aspect ratios, including a small button.
+
+Actual cockpit renders are in `artifacts/switchgear-rounded/`; the wider view
+shows both control faces and the continuous highlights on the housings. This is
+a limited component improvement. Overall cockpit shape and materials remain
+visibly approximate. The mesh regression, cockpit readout check and rendered
+human controls check pass. Local Linux frame timing was median 17.224 ms and
+p95 17.907 ms across 274 frames, not a native Mac performance measurement.
