@@ -18,6 +18,8 @@ uniform float field_soil_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float field_patch_strength : hint_range(0.0, 1.0) = 0.5;
 // Original appearance parameters, not measured plant height or reflectance.
 uniform float grass_tile_m = 1.0;
+// One retains full random rotation; zero preserves the source straw direction.
+uniform float grass_rotation_spread : hint_range(0.0, 1.0) = 1.0;
 uniform float grass_relief_m = 0.010;
 // Original fine soil material, with estimated scale and shallow relief.
 uniform float soil_tile_m = 1.0;
@@ -49,9 +51,9 @@ float coverage_noise(vec2 p) {
     return (value - 0.5) * visibility;
 }
 
-vec3 ground_patch(sampler2D color_source, vec2 uv, vec2 dx, vec2 dy, vec2 lattice) {
+vec3 ground_patch(sampler2D color_source, vec2 uv, vec2 dx, vec2 dy, vec2 lattice, float rotation_spread) {
     vec3 seed = patch_hash(lattice);
-    float angle = seed.z * 6.28318530718;
+    float angle = seed.z * 6.28318530718 * rotation_spread;
     mat2 rotation = mat2(vec2(cos(angle), sin(angle)), vec2(-sin(angle), cos(angle)));
     vec2 transformed = rotation * uv + seed.xy * 2.0;
     vec2 mirrored = vec2(1.0) - abs(vec2(1.0) - mod(transformed, vec2(2.0)));
@@ -59,7 +61,7 @@ vec3 ground_patch(sampler2D color_source, vec2 uv, vec2 dx, vec2 dy, vec2 lattic
     return textureGrad(color_source, mirrored, (rotation * dx) * mirror_sign, (rotation * dy) * mirror_sign).rgb;
 }
 
-vec3 ground_surface(sampler2D color_source, vec2 uv) {
+vec3 ground_surface(sampler2D color_source, vec2 uv, float rotation_spread) {
     vec2 cell = floor(uv);
     vec2 f = fract(uv);
     // Quintic interpolation has zero first and second derivatives at cell
@@ -71,17 +73,17 @@ vec3 ground_surface(sampler2D color_source, vec2 uv) {
     w = hi / (lo + hi);
     vec2 dx = dFdx(uv);
     vec2 dy = dFdy(uv);
-    vec3 a = ground_patch(color_source, uv, dx, dy, cell);
-    vec3 b = ground_patch(color_source, uv, dx, dy, cell + vec2(1.0, 0.0));
-    vec3 c = ground_patch(color_source, uv, dx, dy, cell + vec2(0.0, 1.0));
-    vec3 d = ground_patch(color_source, uv, dx, dy, cell + vec2(1.0));
+    vec3 a = ground_patch(color_source, uv, dx, dy, cell, rotation_spread);
+    vec3 b = ground_patch(color_source, uv, dx, dy, cell + vec2(1.0, 0.0), rotation_spread);
+    vec3 c = ground_patch(color_source, uv, dx, dy, cell + vec2(0.0, 1.0), rotation_spread);
+    vec3 d = ground_patch(color_source, uv, dx, dy, cell + vec2(1.0), rotation_spread);
     return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
 }
 
 void fragment() {
     // Original texture scale is an appearance estimate, not a surveyed measure.
-    vec3 grass = ground_surface(grass_color, world_pos.xz / grass_tile_m);
-    vec3 soil = ground_surface(soil_color, world_pos.xz / soil_tile_m);
+    vec3 grass = ground_surface(grass_color, world_pos.xz / grass_tile_m, grass_rotation_spread);
+    vec3 soil = ground_surface(soil_color, world_pos.xz / soil_tile_m, 1.0);
     vec2 macro_uv = (world_pos.xz - macro_origin) / macro_size;
     vec2 edge_distance = min(macro_uv, vec2(1.0) - macro_uv) * macro_size;
     float macro_weight = smoothstep(0.0, 30.0, min(edge_distance.x, edge_distance.y));

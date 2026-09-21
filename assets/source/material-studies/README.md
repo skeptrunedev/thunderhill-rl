@@ -80,3 +80,15 @@ The old unrelated soil normal and roughness maps are no longer sampled.
 ### Exact shoulder generation prompt
 
 Create an original photorealistic game terrain ALBEDO texture. The attached Thunderhill motorcycle onboard frame is visual reference ONLY for the short dry ochre grass and fine compact earth beside the pavement. Do not reproduce the frame. Output one square 2048 by 2048 seamless tileable top down orthographic diffuse texture representing about one square metre of a dry racetrack shoulder: predominantly finely compacted muted tan brown dust and very small sand grains, mixed with sparse tiny fragments of sun bleached cut straw lying flat and occasional very short stubble. No large stones, no gravel chunks, no cracks, no deep ruts, no leafy plants, no tall stalks, no road, no paint, no horizon. Fine irregular photographic microstructure, restrained natural color variation without prominent swirls or directional bands, no obvious focal features. Flat neutral diffuse illumination, no baked directional shadows, no highlights or ambient occlusion shadows. Edge to edge material texture, no text or border. This is an original artist material guided by the reference, not a measured scan.
+
+## Short stem grass study
+
+`dry-cut-grass-v3.png` is an original built in imagegen candidate. It was
+requested as 2048 square; the returned image is 1254 square. No source image
+was supplied to the generator. Its compact clumps and shorter straighter
+stems are an artistic interpretation, not surveyed plant morphology or a scan.
+SHA256: `1f8d534f83398401c9270a904193eabec73582f061b502a0d54447f05fb53eab`.
+
+### Exact v3 generation prompt
+
+Use case: photorealistic-natural. Asset type: original ground albedo for a realistic motorcycle racing game. Generate a square 2048x2048 top down orthographic texture of a one metre square of short mown, completely dry California annual grass. Small dense basal clumps of straight blunt cut straw stems, thin flattened tan blades and fragmented grass litter cover about seventy percent of the ground, with connected irregular patches of fine compact gray brown earth between them. Subdued natural pale beige and dusty brown colors. Millimetre thin stems mostly two to five centimetres long, some longer flattened blades, closely interlocked fine irregular texture. Crucially this is short cut grassy stubble, not tangled roots, curly hair, bundles of twigs, straw ropes or hay windrows. Photographic botanical detail, no regular stripes or repeating clumps, no large stones, leaves, green plants or flowers. Uniform neutral diffuse lighting suitable for an albedo texture, no directional cast shadows or specular highlights, no depth of field, no perspective or landscape, no text, no border. Edge to edge original seamless material study, not a reconstruction or measured scan.

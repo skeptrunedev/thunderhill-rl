@@ -21,8 +21,20 @@ func _run() -> void:
 	var soil_value := -1.0
 	var grass_tile_m := -1.0
 	var stubble_shader_path := ""
+	var candidate_grass_rotation := -1.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--stubble-shader="):
+		if arg.begins_with("--candidate-grass-rotation="):
+			var value := arg.trim_prefix("--candidate-grass-rotation=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Grass rotation spread must be between zero and one")
+				return
+			candidate_grass_rotation = float(value)
+		elif arg.begins_with("--stubble-shader="):
 			stubble_shader_path = arg.trim_prefix("--stubble-shader=")
 		elif arg.begins_with("--grass-tile-m="):
 			var value := arg.trim_prefix("--grass-tile-m=")
@@ -231,6 +243,9 @@ func _run() -> void:
 		)
 	material.set_shader_parameter("detail_gain_exponent", detail_gain_exponent)
 	var original: Texture2D = material.get_shader_parameter("grass_color")
+	var original_rotation: float = RenderingServer.shader_get_parameter_default(
+		material.shader.get_rid(), "grass_rotation_spread"
+	)
 	var samples: Array = []
 	for index in frames:
 		var pose := position + forward * (0.30 * index)
@@ -244,6 +259,14 @@ func _run() -> void:
 				)
 			material.set_shader_parameter(
 				"grass_color", original if name == "existing" else texture
+			)
+			material.set_shader_parameter(
+				"grass_rotation_spread",
+				(
+					candidate_grass_rotation
+					if name == "candidate" and candidate_grass_rotation >= 0.0
+					else original_rotation
+				)
 			)
 			for frame in 10:
 				await RenderingServer.frame_post_draw
@@ -270,6 +293,13 @@ func _run() -> void:
 						{
 							"existing": original.resource_path,
 							"frames_per_material": frames,
+							"existing_grass_rotation": original_rotation,
+							"candidate_grass_rotation":
+							(
+								candidate_grass_rotation
+								if candidate_grass_rotation >= 0.0
+								else original_rotation
+							),
 							"detail_gain_exponent": detail_gain_exponent,
 							"ground_tint_linear": [ground_tint.x, ground_tint.y, ground_tint.z],
 							"field_soil_strength": field_soil_strength,

@@ -588,3 +588,27 @@ Mac export passed as `ac6e4cfc9fe5-cf123d9972de`. The final controlled pair in
 `artifacts/pavement-band-final/` records the production texture checksum and
 correct zero/one variation strengths at all three stations; these metadata
 values were verified against the actual file. Native Mac testing remains pending.
+
+## Grass direction diagnostic
+
+`artifacts/grass-direction-study/` holds a matched station 400 pair using the
+same source image with full random patch rotation versus no rotation. The
+unrotated candidate looks flatter and does not restore the field structure
+seen in the footage. Production retains full rotation. The new
+`grass_rotation_spread` control changes only grass sampling; soil retains its
+previous transforms. `--candidate-grass-rotation=0..1` applies only to the
+candidate capture and records both values. This isolates texture direction
+from another source image, broad aerial contrast, or a global color change.
+
+The built in imagegen v3 source tests shorter straight stems and basal clumps.
+`artifacts/grass-v3-study/` compares it with v2 at the same station 400 view.
+It removes some sweeping wiry strands, but the field remains equally uniform
+and looks flatter overall. It is retained as a source study, not installed as
+the game material. The prompt and source checksum are recorded beside it.
+Human controls passed after the direction diagnostic change with zero failures.
+
+Inspection of the aerial and builder identifies a separate structural omission:
+terrain detail alpha represents distance to the racing surface, not field cover.
+Pale access corridors in the aerial can therefore receive full grass and stubble.
+Explicit historical material regions are the next investigation; RGB contrast
+or additional random texture variants cannot supply those missing regions.
