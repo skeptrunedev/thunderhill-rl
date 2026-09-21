@@ -644,3 +644,39 @@ This verifies native rendering, not an end to end performance benchmark.
 The ordinary playable instance was subsequently launched from that same bundle
 and its exact executable path verified. The image remains visibly synthetic;
 this local improvement does not complete visual acceptance.
+
+## Broader pavement response
+
+The conspicuous short blue streaks came from narrow roughness variation under
+an interrupted smooth patch mask. The revised default broadens those domains
+without replacing the authored albedo, aggregate relief, paving joint or local
+deposits. Main roughness noise scales are estimated at 12 metres along and
+2.8 metres across; secondary scales are 4 and 1.1 metres, with a 12 by 5.2
+metre mask domain. The existing target range and directional strength remain.
+These are material appearance estimates, not measured wear or friction data.
+
+Broadening alone made the straight too uniform. A restrained 55 metre along,
+0.85 metre across roughness variation restores some long response. Its amplitude
+scales with directional wear strength, so zero disables both components. At the
+default strength it contributes at most 0.05 in either direction. Periodic
+station domains preserve the lap join and footprint filtering remains active.
+It applies only to the authored surface and fades away at the pavement edges.
+
+Root and independent review prefer the final version as an incremental default:
+apex and exit lose the obvious short blue streaks while the straight retains
+the forward sheen lost by the earlier matte replacement. The straight remains
+too uniform relative to frame 30, and paving pass contrast still needs work.
+This is removal of a visible artifact, not reference fidelity certification.
+Both preview tools expose `--asphalt-narrow-wear` for the preceding response
+and `--asphalt-broad-wear` for the default. Explicit overrides cannot combine
+with independent asphalt replacements; the invalid static combination exits two.
+
+Evidence: `artifacts/road-long-wear-comparison` contains matched views of the
+straight, apex and exit. Older controls have unrelated terrain differences.
+`road-broad-wear-*` captures precede the added long variation. The final replay
+`road-long-wear-motion.avi` completed 3539 transitions and 930 movie frames,
+covering the approach through the deposits beyond the exit. Twelve sampled
+frames show broad gradual light changes without an obvious hard switch. This
+does not establish complete shimmer absence or live Mac performance. Existing
+ObjectDB exit warning remains. Human controls, rendered agent camera checks,
+formatting and diff checks passed. Native export verification follows separately.

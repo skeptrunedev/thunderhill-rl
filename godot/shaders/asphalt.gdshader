@@ -30,6 +30,8 @@ uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.25;
 // Directional sheen study. Original directional material variation,
 // not measured friction, rubber placement, or a recovered roughness scan.
 uniform float directional_wear_strength : hint_range(0.0, 1.0) = 0.8;
+// Isolate reflection footprint scale without replacing albedo or roughness range.
+uniform bool broad_wear_enabled = true;
 // Local pale scrub marks guided by onboard frame 50. Placement, width and
 // composition are artistic estimates, not surveyed marks or a friction map.
 uniform float exit_scuff_strength : hint_range(0.0, 1.0) = 1.0;
@@ -206,19 +208,29 @@ void fragment() {
     }
     // Elongated periodic domains keep wear continuous at the lap join. The
     // two scales break up parallel lanes; filtered noise limits distant crawl.
-    vec2 wear_domain = station_direction * (lap_length_m / (TAU * 18.0) + UV.x / 0.32);
-    vec2 wear_fine_domain = station_direction * (lap_length_m / (TAU * 9.0) + UV.x / 0.075);
+    vec2 wear_scales = broad_wear_enabled ? vec2(12.0, 2.8) : vec2(18.0, 0.32);
+    vec2 fine_scales = broad_wear_enabled ? vec2(4.0, 1.1) : vec2(9.0, 0.075);
+    vec2 wear_domain = station_direction * (lap_length_m / (TAU * wear_scales.x) + UV.x / wear_scales.y);
+    vec2 wear_fine_domain = station_direction * (lap_length_m / (TAU * fine_scales.x) + UV.x / fine_scales.y);
     float wear_large = filtered_pavement_noise(wear_domain + vec2(123.0, 67.0));
     float wear_fine = filtered_pavement_noise(wear_fine_domain + vec2(211.0, 31.0));
     float wear = smoothstep(0.20, 0.80, mix(wear_large, wear_fine, 0.30));
     // Smooth regions occupy interrupted patches, not continuous polished lanes.
     // Most pavement keeps its original matte response, including the edges.
-    vec2 wear_patch_domain = station_direction * (lap_length_m / (TAU * 4.0) + UV.x / 1.2);
+    vec2 patch_scales = broad_wear_enabled ? vec2(12.0, 5.2) : vec2(4.0, 1.2);
+    vec2 wear_patch_domain = station_direction * (lap_length_m / (TAU * patch_scales.x) + UV.x / patch_scales.y);
     float wear_patch = smoothstep(0.55, 0.80,
         filtered_pavement_noise(wear_patch_domain + vec2(43.0, 137.0)));
     float wear_weight = directional_wear_strength * wear_patch
                       * (authored_surface ? 1.0 : 0.0) * (1.0 - edge_weight);
     ROUGHNESS = mix(ROUGHNESS, mix(0.46, 0.70, wear), wear_weight);
+    if (broad_wear_enabled && authored_surface) {
+        // Restrained long paving response retains forward directional detail
+        // without reintroducing the previous short polished beads.
+        vec2 long_domain = station_direction * (lap_length_m / (TAU * 55.0) + UV.x / 0.85);
+        float long_response = filtered_pavement_noise(long_domain + vec2(83.0, 191.0));
+        ROUGHNESS += (long_response - 0.5) * 0.125 * directional_wear_strength * (1.0 - edge_weight);
+    }
     ROUGHNESS = clamp(ROUGHNESS + roughness_offset * (1.0 - edge_weight), 0.25, 0.9);
     if (exit_scuff_strength > 0.0) {
         vec2 scuff_metres = vec2(UV.x - UV2.x * 0.5, UV.y);
