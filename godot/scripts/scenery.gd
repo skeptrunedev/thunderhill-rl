@@ -1,6 +1,6 @@
 class_name TrackScenery
 extends Node3D
-## CC0 Poly Haven decorative vegetation, not surveyed individual plants.
+## Original decorative cut grass, not surveyed individual plants.
 ## Braking boards are provisional visual landmarks, with no collision geometry.
 ## Mapped trees and buildings are provided separately by TrackLandmarks.
 
@@ -34,53 +34,14 @@ func _ground_height(p: Vector3, _road: Dictionary) -> float:
 
 
 func _grass_meshes() -> Array[ArrayMesh]:
-	var data: Dictionary = JSON.parse_string(
-		FileAccess.get_file_as_string("res://assets/grass/grass.json")
-	)
-	var material := StandardMaterial3D.new()
-	var tint := ThunderhillTrack.DRY_GROUND_TINT
-	# StandardMaterial albedo is tagged source_color; encode the linear multiplier.
-	material.albedo_color = Color(tint.x, tint.y, tint.z).linear_to_srgb()
-	material.albedo_texture = load("res://assets/grass/dry_grass_rgba.png")
-	material.vertex_color_use_as_albedo = true
-	material.vertex_color_is_srgb = true
-	material.roughness = 1.0
-	material.metallic_specular = 0.05
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-	material.alpha_scissor_threshold = 0.35
-	# MSAA alone only covers mesh edges, not the thin atlas cutouts inside them.
-	material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
-	material.alpha_antialiasing_edge = 0.30
-	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var meshes: Array[ArrayMesh] = []
-	# The source assets are individual stems, not complete roadside tussocks.
-	# Assemble several sizes in each clump, keeping the source UVs and normals.
-	# A separate seed keeps decorative mesh edits independent of world placement.
+	# Cut stubble uses bent ribbons throughout. Tall atlas stems were reading as
+	# isolated dark sticks against the short mown vegetation in the reference.
+	# Keep the mesh seed separate from placement so world distribution is stable.
 	var clump_random := RandomNumberGenerator.new()
 	clump_random.seed = 91317
 	for variant in range(3):
-		var surface := SurfaceTool.new()
-		surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-		for source_index: int in [1, 2]:
-			var row: Dictionary = data.meshes[source_index]
-			var scale := clump_random.randf_range(0.50, 0.75)
-			var basis := Basis(Vector3.UP, clump_random.randf() * TAU)
-			var angle := clump_random.randf() * TAU
-			var radius := sqrt(clump_random.randf()) * 0.16
-			var offset := Vector3(cos(angle), 0, sin(angle)) * radius
-			# Source glTF uses counterclockwise front faces; Godot uses clockwise.
-			for face in range(0, row.indices.size(), 3):
-				for corner in [0, 2, 1]:
-					var index := int(row.indices[face + corner])
-					var p: Array = row.positions[index]
-					var n: Array = row.normals[index]
-					var uv: Array = row.uv[index]
-					surface.set_normal(basis * Vector3(n[0], n[1], n[2]))
-					surface.set_uv(Vector2(uv[0], uv[1]))
-					surface.add_vertex(basis * Vector3(p[0], p[1], p[2]) * scale + offset)
-		surface.set_material(material)
-		var mesh := surface.commit()
+		var mesh := ArrayMesh.new()
 		_add_cut_grass(mesh, clump_random)
 		meshes.append(mesh)
 	return meshes
@@ -103,7 +64,7 @@ func _add_cut_grass(mesh: ArrayMesh, random: RandomNumberGenerator) -> void:
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for blade in 96:
+	for blade in 132:
 		var angle := random.randf() * TAU
 		var radius := sqrt(random.randf()) * 0.45
 		var base := Vector3(cos(angle), 0, sin(angle)) * radius
@@ -163,7 +124,8 @@ func _build_grass() -> void:
 		var road: Dictionary = _track.sample_world(position)
 		if absf(road.distance) < road.width * 0.5 + 1.4:
 			continue
-		position.y = road.height - 0.015
+		# Short stubble must remain above ground even at the smallest scale.
+		position.y = road.height - 0.003
 		var cell := Vector2i(floori(position.x / PATCH_SIZE), floori(position.z / PATCH_SIZE))
 		if not patches.has(cell):
 			patches[cell] = []

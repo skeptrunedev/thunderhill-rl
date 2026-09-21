@@ -12,8 +12,6 @@ const SOURCES := [
 	"data/terrain.json",
 	"data/surface.json",
 	"data/landmarks.json",
-	"assets/grass/grass.json",
-	"assets/grass/dry_grass_rgba.png",
 	"assets/materials/dry_cut_grass_v1.png",
 	"tools/bake_scenery.gd"
 ]

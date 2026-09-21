@@ -302,3 +302,32 @@ Additional default contrast captures at stations 400 and 3000 are in
 shoulder and sparse dark stems against the ground. This points to vegetation
 coverage and material blending as the next investigation, rather than a global
 contrast increase. These are inspection views, not matched video poses.
+
+
+## Short stubble and broken shoulder blend
+
+The grass clump now contains 132 original bent ribbons, replacing 96 ribbons
+and two taller atlas stems. That is 528 triangles rather than 525, with one
+material surface instead of two. Placement still uses the separate world RNG;
+all 96000 positions remain authored by the existing placement procedure. Roots
+are embedded 3 mm rather than 15 mm. The old depth could fully bury the shortest
+scaled blades (minimum vertical tip height 9.1 mm on level ground).
+
+Terrain material coverage varies within the existing grass and soil transition
+using smooth world space noise at estimated 2.4 metre and 0.35 metre scales.
+The original fully grass and fully soil endpoints are preserved. Noise contrast
+fades with pixel footprint. Material height derivatives are calculated before
+blending their gradients, so the footprint dependent coverage is not itself
+differentiated into a ridge. This is original decorative variation, not a
+surveyed vegetation map. Surface friction and track contact are unchanged.
+
+The intermediate capture is `artifacts/stubble-transition/existing.png`; the
+final station 400 view with corrected burial is
+`artifacts/stubble-final/existing.png`. The isolated long stems are reduced,
+but this is still a modest refinement of the overall scene. Sparse stubble and
+large scale terrain structure remain visibly unlike the onboard footage.
+
+The rendered human controls check passed with zero failures. Local Linux timing
+was median 17.289 ms and p95 18.231 ms over 274 frames. Bake serialization checks
+preserved all 96000 grass instances. This does not establish native Mac runtime
+performance or a complete photographic appearance match.

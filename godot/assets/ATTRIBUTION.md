@@ -35,3 +35,9 @@ estimates, not surveyed vegetation.
 material guided by the onboard reference. The source, exact prompt and estimated
 shader response are documented in `assets/source/material-studies/README.md`.
 It is not a measured scan, and no video frame is redistributed in the asset.
+
+The current roadside clump uses 132 original short bent ribbons and the original
+generated grass albedo. The earlier two Poly Haven atlas stems are no longer
+instantiated. Their source assets and provenance remain archived in the repo.
+The terrain shader's world space variation within the grass and soil blend is
+original procedural appearance detail, not surveyed vegetation coverage.

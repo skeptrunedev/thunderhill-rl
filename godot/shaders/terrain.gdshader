@@ -31,6 +31,18 @@ vec3 patch_hash(vec2 lattice) {
     return fract((p.xxy + p.yzz) * p.zyx);
 }
 
+// Original coverage variation, not a surveyed vegetation mask. Fade noise when
+// its world space footprint becomes unresolved; preserve the map endpoints.
+float coverage_noise(vec2 p) {
+    vec2 cell = floor(p);
+    vec2 f = fract(p);
+    vec2 w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    float value = mix(mix(patch_hash(cell).x, patch_hash(cell + vec2(1.0, 0.0)).x, w.x),
+                      mix(patch_hash(cell + vec2(0.0, 1.0)).x, patch_hash(cell + vec2(1.0)).x, w.x), w.y);
+    float visibility = 1.0 - smoothstep(0.25, 1.0, length(fwidth(p)));
+    return (value - 0.5) * visibility;
+}
+
 vec3 ground_patch(sampler2D color_source, vec2 uv, vec2 dx, vec2 dy, vec2 lattice) {
     vec3 seed = patch_hash(lattice);
     float angle = seed.z * 6.28318530718;
@@ -70,7 +82,11 @@ void fragment() {
     vec3 macro_gain = mix(vec3(1.0), texture(terrain_macro, macro_uv).rgb * 2.0, macro_weight);
     vec4 detail = texture(terrain_detail, macro_uv);
     vec3 detail_gain = mix(vec3(1.0), pow(max(detail.rgb * 2.0, vec3(0.001)), vec3(detail_gain_exponent)), macro_weight);
-    float soil_weight = (1.0 - detail.a) * macro_weight;
+    float transition = 4.0 * detail.a * (1.0 - detail.a);
+    float coverage_variation = coverage_noise(world_pos.xz / 2.4) * 0.9
+                             + coverage_noise(world_pos.xz / 0.35) * 0.25;
+    float grass_coverage = clamp(detail.a + transition * coverage_variation, 0.0, 1.0);
+    float soil_weight = (1.0 - grass_coverage) * macro_weight;
     ALBEDO = mix(grass, soil, soil_weight) * ground_tint * macro_gain * detail_gain;
     // A single albedo does not contain measured PBR maps. Bright straw over
     // darker soil supplies an explicitly artistic relief/roughness estimate.
@@ -80,12 +96,16 @@ void fragment() {
     float soil_luminance = dot(soil, vec3(0.2126, 0.7152, 0.0722));
     float soil_r = mix(0.96, 0.88, smoothstep(0.10, 0.50, soil_luminance));
     ROUGHNESS = mix(grass_r, soil_r, soil_weight);
-    float height = mix(straw * grass_relief_m, soil_luminance * soil_relief_m, soil_weight);
+    // Blend material gradients after differentiating their heights. Coverage
+    // changes material, not terrain elevation; do not differentiate its
+    // footprint dependent visibility or invent a ridge at each blend edge.
+    float height_dx = mix(dFdx(straw) * grass_relief_m, dFdx(soil_luminance) * soil_relief_m, soil_weight);
+    float height_dy = mix(dFdy(straw) * grass_relief_m, dFdy(soil_luminance) * soil_relief_m, soil_weight);
     vec3 dx = dFdx(VERTEX);
     vec3 dy = dFdy(VERTEX);
     vec3 rx = cross(dy, NORMAL);
     vec3 ry = cross(NORMAL, dx);
     float determinant = dot(dx, rx);
-    vec3 gradient = dFdx(height) * rx + dFdy(height) * ry;
+    vec3 gradient = height_dx * rx + height_dy * ry;
     NORMAL = normalize(NORMAL - sign(determinant) * gradient / max(abs(determinant), 0.000000000001));
 }
