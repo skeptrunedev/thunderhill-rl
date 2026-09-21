@@ -186,3 +186,23 @@ The real Vulkan Mobile cockpit render is
 `artifacts/reservoir-absorption-final.png`, compared with video frame 00:10.
 Transmission is visibly amber instead of an opaque brown surface. This improves
 one material but does not resolve approximate cockpit proportions and details.
+
+## Cockpit mounting hardware
+
+Handlebar mounts now use slender risers and rounded collars with bolt ears and
+visible sockets. Collar centres follow the existing handlebar centreline. A
+transverse steering damper adds a satin cylinder, polished shaft, end collars,
+mounting bridge and pivot fittings. Its final position clears the risers and
+keeps the cylinder visible between handlebar and tank in the onboard view.
+Dimensions and mounting shapes are estimates guided by frame 00:10.
+
+The entire damper is currently decorative geometry attached to the steering
+assembly. It does not telescope between independently moving mounts and does
+not alter steering physics. Clamp split seams and exact manufacturer profiles
+remain unmodeled. This is an improvement in visual structure, not validated
+Ducati hardware reconstruction.
+
+`artifacts/cockpit-hardware-proportions.png` was rendered with Vulkan Mobile at
+station 400 using onboard camera 2. The comparison with the supplied footage
+still shows substantial differences in tank shape, surrounding components and
+lighting. Cockpit readout and human control checks pass.

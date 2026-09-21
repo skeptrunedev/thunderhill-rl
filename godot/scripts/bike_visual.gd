@@ -647,34 +647,49 @@ func _build_cockpit() -> void:
 			_metal,
 			_front
 		)
-		_chamfered_box(
-			Vector3(0.036, 0.072, 0.043),
-			Vector3(side * 0.045, 0.647, 0.27),
-			0.004,
+		# Slender forged riser and a rounded clamp around the bar.
+		_bar(
+			Vector3(side * 0.045, 0.608, 0.247),
+			Vector3(side * 0.045, 0.680, 0.267),
+			0.012,
 			dark_metal,
 			_front
 		)
-		_chamfered_box(
-			Vector3(0.036, 0.026, 0.05),
-			Vector3(side * 0.045, 0.70, 0.27),
-			0.004,
+		_lathe(
+			[
+				Vector2(-0.015, 0.014),
+				Vector2(-0.015, 0.019),
+				Vector2(-0.012, 0.022),
+				Vector2(0.012, 0.022),
+				Vector2(0.015, 0.019),
+				Vector2(0.015, 0.014),
+				Vector2(-0.015, 0.014)
+			],
 			dark_metal,
-			_front
+			_front,
+			Vector3(side * 0.045, 0.694, 0.267)
 		)
-		for z in [0.253, 0.286]:
+		for z in [0.241, 0.293]:
+			_chamfered_box(
+				Vector3(0.028, 0.018, 0.021),
+				Vector3(side * 0.045, 0.695, z),
+				0.005,
+				dark_metal,
+				_front
+			)
 			_bar(
-				Vector3(side * 0.045, 0.713, z),
-				Vector3(side * 0.045, 0.717, z),
-				0.004,
+				Vector3(side * 0.045, 0.704, z),
+				Vector3(side * 0.045, 0.708, z),
+				0.005,
 				_metal,
 				_front
 			)
 			var socket := CylinderMesh.new()
-			socket.top_radius = 0.0022
-			socket.bottom_radius = 0.0022
+			socket.top_radius = 0.0025
+			socket.bottom_radius = 0.0025
 			socket.height = 0.0002
 			socket.radial_segments = 6
-			_mesh(socket, polymer, _front, Vector3(side * 0.045, 0.7171, z))
+			_mesh(socket, polymer, _front, Vector3(side * 0.045, 0.7081, z))
 		# Circumferential grip grooves catch light without noisy normal textures.
 		for i in range(13):
 			var x: float = side * (0.305 + i * 0.0071)
@@ -784,6 +799,7 @@ func _build_cockpit() -> void:
 			0.0035,
 			polymer
 		)
+	_build_steering_damper(dark_metal, polymer)
 	# Display face normal points upward and toward the rider, not skyward.
 	var instruments := Node3D.new()
 	instruments.name = "LiveInstrumentCluster"
@@ -796,6 +812,63 @@ func _build_cockpit() -> void:
 	instruments.add_child(face)
 	_beveled_panel(Vector2(0.177, 0.097), 0.001, 0.008, display_material, face)
 	update_instruments(0, 1500, 1)
+
+
+func _build_steering_damper(mount: Material, polymer: Material) -> void:
+	# Original visual reconstruction of the transverse damper visible in the
+	# supplied cockpit frame. These dimensions are estimates, not factory CAD.
+	var assembly := Node3D.new()
+	assembly.name = "SteeringDamper"
+	_front.add_child(assembly)
+	var satin := _material(Color("9ca4ab"), 0.92, 0.24)
+	var shaft := _material(Color("c6cbd0"), 0.96, 0.13)
+	_bar(Vector3(-0.045, 0.665, 0.292), Vector3(0.115, 0.665, 0.292), 0.009, satin, assembly)
+	_bar(Vector3(-0.100, 0.665, 0.292), Vector3(-0.041, 0.665, 0.292), 0.0045, shaft, assembly)
+	for x in [-0.045, 0.115]:
+		_lathe(
+			[
+				Vector2(-0.005, 0.010),
+				Vector2(-0.005, 0.009),
+				Vector2(-0.003, 0.010),
+				Vector2(0.003, 0.010),
+				Vector2(0.005, 0.009),
+				Vector2(0.005, 0.010)
+			],
+			satin,
+			assembly,
+			Vector3(x, 0.665, 0.292)
+		)
+	for x in [0.110, 0.113, 0.116, 0.119]:
+		_lathe(
+			[
+				Vector2(-0.0005, 0.009),
+				Vector2(-0.0005, 0.0102),
+				Vector2(0.0005, 0.0102),
+				Vector2(0.0005, 0.009)
+			],
+			polymer,
+			assembly,
+			Vector3(x, 0.665, 0.292)
+		)
+	# Mounting bridge and visible pivot fasteners connect the cylinder to the yoke.
+	_chamfered_box(
+		Vector3(0.036, 0.018, 0.044), Vector3(0.018, 0.643, 0.292), 0.006, mount, assembly
+	)
+	_bar(Vector3(0.018, 0.590, 0.245), Vector3(0.018, 0.643, 0.292), 0.009, mount, assembly)
+	_lathe(
+		[
+			Vector2(-0.011, 0.009),
+			Vector2(-0.011, 0.012),
+			Vector2(0.011, 0.012),
+			Vector2(0.011, 0.009)
+		],
+		mount,
+		assembly,
+		Vector3(0.018, 0.665, 0.292)
+	)
+	_bar(Vector3(-0.100, 0.657, 0.292), Vector3(-0.100, 0.673, 0.292), 0.009, mount, assembly)
+	_bar(Vector3(-0.100, 0.665, 0.292), Vector3(-0.094, 0.601, 0.250), 0.007, mount, assembly)
+	_bar(Vector3(-0.100, 0.673, 0.292), Vector3(-0.100, 0.676, 0.292), 0.0045, shaft, assembly)
 
 
 func _build_chassis() -> void:
