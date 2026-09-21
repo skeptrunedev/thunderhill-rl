@@ -18,6 +18,7 @@ func _run() -> void:
 	var asphalt_study_metadata := {}
 	var ground_study := "production"
 	var canopy_strength := NAN
+	var canopy_additive := false
 	var ground_study_metadata := {}
 	var photographic_contrast := 0.0
 	var photographic_height_blend := 0.0
@@ -65,7 +66,9 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--canopy-backscatter="):
+		if arg == "--canopy-additive":
+			canopy_additive = true
+		elif arg.begins_with("--canopy-backscatter="):
 			var value := arg.get_slice("=", 1)
 			if (
 				not value.is_valid_float()
@@ -552,6 +555,9 @@ func _run() -> void:
 		return
 	root.size = SIZE
 	root.content_scale_size = SIZE
+	if canopy_additive and not is_finite(canopy_strength):
+		_fail("Canopy additive mode requires an explicit strength")
+		return
 	var game = load("res://main.tscn").instantiate()
 	root.add_child(game)
 	if game.bike == null:
@@ -680,7 +686,7 @@ func _run() -> void:
 			_fail("Canopy study requires production terrain")
 			return
 		ground_study_metadata = load("res://scripts/canopy_light_study.gd").apply(
-			game.track, canopy_strength
+			game.track, canopy_strength, canopy_additive
 		)
 	if ground_study_metadata.has("error"):
 		_fail(ground_study_metadata.error)

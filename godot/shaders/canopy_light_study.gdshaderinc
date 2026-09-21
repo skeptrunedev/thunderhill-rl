@@ -3,6 +3,7 @@
 // omitted in BOTH the zero-strength control and candidate, not in production.
 // Original broad backscatter lobe is an appearance hypothesis, not a calibrated
 // or energy-conserving canopy BRDF. Ambient and shadow attenuation are retained.
+uniform bool canopy_additive = false;
 uniform float canopy_backscatter_strength : hint_range(0.0, 4.0) = 0.0;
 void light() {
     float nl = max(dot(NORMAL, LIGHT), 0.0);
@@ -15,6 +16,6 @@ void light() {
     float fdl = 1.0 + fd90 * pow(1.0 - nl, 5.0);
     float toward_sun = max(dot(VIEW, LIGHT), 0.0);
     float lobe = toward_sun * toward_sun;
-    float response = 1.0 + canopy_backscatter_strength * canopy_coverage * lobe;
+    float response = (canopy_additive ? 0.0 : 1.0) + canopy_backscatter_strength * canopy_coverage * lobe;
     DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * nl * fdv * fdl * response / PI;
 }

@@ -425,3 +425,28 @@ not a complete shimmer or native performance test. The known ObjectDB exit
 warning remains. Real Vulkan compilation passed for control and candidate;
 out-of-range input returned exit two. GDScript format and diff checks passed.
 No default rendering, physics or agent behavior changed.
+
+
+## Additive canopy pass
+
+`--canopy-additive` now pairs with an explicit `--canopy-backscatter` strength
+in both preview tools. The helper duplicates the original terrain material and
+attaches a depth-tested additive next pass. Its direct light expression contains
+only the extra canopy term. Ambient, specular and fog are disabled on the added
+pass, preserving those terms in the base material. This deliberately leaves fog
+attenuation of the added contribution unresolved; it remains an experiment.
+It also remains an uncalibrated, non energy conserving angular response.
+
+At exit station 1350, a fresh production capture and the zero-strength additive
+capture are pixel identical. An older production capture differed at 104 pixels
+by at most four channel levels, and the same difference occurs against the fresh
+production repeat. Thus the discrepancy is not introduced by the additive pass.
+Evidence is `artifacts/canopy-add-zero-check.json` and
+`canopy-add-production-repeat`. The exact cause of the older capture difference
+has not been established.
+
+Strength 1.5 gives a gentler field brightening than the earlier strength three
+replacement trial. Static captures are `canopy-add15-straight` and
+`canopy-add15-exit`. The recorded replay completed 2699 transitions and 700
+frames in `canopy-add15-motion.avi`. Its fixed movie timing is not a native Mac
+performance measurement. Production does not install the extra pass.

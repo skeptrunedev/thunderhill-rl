@@ -10,13 +10,16 @@ func _initialize() -> void:
 func _run() -> void:
 	var mode := ""
 	var canopy_strength := NAN
+	var canopy_additive := false
 	var replay := ""
 	var directional_wear := NAN
 	var hybrid_aggregate := false
 	var curved_uv := true
 	var directional_composition := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--canopy-backscatter="):
+		if arg == "--canopy-additive":
+			canopy_additive = true
+		elif arg.begins_with("--canopy-backscatter="):
 			var value := arg.get_slice("=", 1)
 			if (
 				not value.is_valid_float()
@@ -88,6 +91,10 @@ func _run() -> void:
 		push_error("Hybrid aggregate replaces directional wear; choose one study")
 		quit(2)
 		return
+	if canopy_additive and not is_finite(canopy_strength):
+		push_error("Canopy additive mode requires an explicit strength")
+		quit(2)
+		return
 	var game = load("res://main.tscn").instantiate()
 	root.add_child(game)
 	var report: Dictionary
@@ -121,7 +128,7 @@ func _run() -> void:
 			quit(2)
 			return
 		var canopy: Dictionary = load("res://scripts/canopy_light_study.gd").apply(
-			game.track, canopy_strength
+			game.track, canopy_strength, canopy_additive
 		)
 		if canopy.has("error"):
 			push_error(canopy.error)
