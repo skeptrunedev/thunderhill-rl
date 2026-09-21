@@ -401,6 +401,8 @@ func _build_trees(rows: Array) -> void:
 	var foliage_mat := _material(Color.WHITE, 1.0)
 	foliage_mat.metallic_specular = 0.0
 	foliage_mat.vertex_color_use_as_albedo = true
+	# Leaf palette and instance tint are authored as sRGB hexadecimal colors.
+	foliage_mat.vertex_color_is_srgb = true
 	var foliage_instance := MultiMeshInstance3D.new()
 	foliage_instance.name = "ObservedTreeCrowns"
 	foliage_instance.multimesh = foliage

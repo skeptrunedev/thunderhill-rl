@@ -68,3 +68,20 @@ The pinned acquisition was run a second time successfully, verifying all downloa
 `tools/fetch_grass.py` acquires pinned CC0 Grass Medium 01 source files and extracts three complete author tufts, preserving mesh shape and atlas coordinates. The source dry diffuse RGB and alpha mask form one 1K RGBA atlas. Mesh triangles, conversion details, authors, licenses and source hashes are stored in `godot/assets/grass/grass.json`. This JSON is explicitly included in native export presets.
 
 Godot instantiates these tufts in spatial patches with bounded visibility. Placement and scale remain artistic estimates. Broad terrain color variation uses several spatial scales instead of a repeating sine pattern; this changes appearance only, not surface identity or tire grip.
+
+## Tree source evaluation
+
+[Poly Haven Tree Small 02](https://polyhaven.com/a/tree_small_02) is published
+under [CC0](https://polyhaven.com/license). Its
+[file API](https://api.polyhaven.com/files/tree_small_02) and all four glTF
+metadata files were inspected. Each exposes one `tree_small_02_LOD0` node with
+2,062,487 triangles, including 1,939,380 leaf triangles. Texture resolution does
+not reduce that geometry. The shared binary is 95,102,324 bytes. It is therefore
+not accepted as a direct replacement for the current instanced foliage.
+
+The publisher labels the asset with LODs, but no separate lower detail glTF was
+found. Blender, FBX and USD contents remain uninspected. Inspecting the Blender
+source for authored lower detail variants is the next source evaluation step.
+Its Burkea africana species tag is not evidence of a Thunderhill species match.
+No tree model or textures from this candidate are bundled. API responses, glTF
+metadata and verified checksums are in `artifacts/tree-asset-audit`.

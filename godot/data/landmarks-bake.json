@@ -1,10 +1,10 @@
 {
-  "build_ms": 6310.58,
+  "build_ms": 7194.47,
   "collision": "Runtime pit wall construction unchanged; no collision in this scene",
-  "geometry_sha256": "4847d873f88878dc46ad6577e85ce354dcb15ab83d43f6f857bbe8a54e5557ed",
+  "geometry_sha256": "ee011073ad1cf4f365bf4c120812f1d026c9601ad298dd9c107a9faab3b25a89",
   "godot_version": "4.7.2-stable (official)",
-  "load_ms": 7.586,
-  "scene_sha256": "097d4f3b7691b64f95f43f5ca77dd787493791392f8d808b13166dbd4284d540",
+  "load_ms": 7.697,
+  "scene_sha256": "22e403c6c605ac4ce559a452b7fc71eb1ff5721537b3ca90e846277c10492921",
   "schema_version": 1,
   "sources": {
     "data/landmarks.json": "d5b43fb77e3ad5c8de2464d8c25d1ca9639a37efcd9b200ee07befb942b4e085",
@@ -14,7 +14,7 @@
     "data/terrain.json": "c643f764f23253de59b1417ac0ab803604d47acbd0c70bb173fc455a586a0543",
     "data/track.json": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
     "scripts/curb_surface.gd": "b2de99aba0dd705d76d11c2541a0bf9484b65e91c04b59e2fdc5b4f2baa72cb4",
-    "scripts/landmarks.gd": "bf439b6a3bd54fd907289bea49400b2dab2dade60db1ff285f4c893f58602fed",
+    "scripts/landmarks.gd": "01f25b65dd62c6b1fa8ea74bf160e21245788c752d65caa7b732e90827470e65",
     "scripts/offroad_surface.gd": "744a4e65b018e1fca24b5d4bbfd6b41202bc596795d83328a6188315ea2099d9",
     "scripts/track.gd": "4e81be9120925827b60f4d7ede97aed24b82796ec01dabd1350ceddaab44f11e",
     "scripts/triangle_ribbon.gd": "cf097ef2009e7073216ca56619f3dcd7cd19d64e2220687762744e4ad4418fe1",

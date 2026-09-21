@@ -278,3 +278,26 @@ process completed and is no longer running. Evidence is preserved as
 `artifacts/Thunderhill-debug-game-5cd19a5.log`, `.jsonl`, `.png` and `.png.json`.
 The capture counters still showed 183 objects and draw calls with the intended
 camera, demonstrating why these CPU counters cannot certify rendered pixels.
+
+## Tree vertex color correction
+
+The authored leaf palette uses hexadecimal sRGB colors. Its material previously
+left `vertex_color_is_srgb` disabled, interpreting those values as linear light.
+The material now enables that conversion. The pinned engine's
+[material shader generation](https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/scene/resources/material.cpp#L1113)
+and [Mobile instance color multiplication](https://github.com/godotengine/godot/blob/ed1daf0bf001b61586d9930840f2f1394092c079/servers/rendering/renderer_rd/shaders/forward_mobile/scene_forward_mobile.glsl#L337)
+were inspected. Geometry, crown placement and scene lighting are unchanged.
+
+`godot/tools/preview_trees.gd` loads the actual baked foliage and captures the
+same camera with conversion disabled and enabled. Both 1280 by 800 images were
+validated and inspected. The corrected crown is deeper olive; the original is
+pale gray green. The diagnostic records material flags, vertex color range,
+selected mapped tree, camera transform and image dimensions in
+`artifacts/tree-color-preview/comparison.json`.
+
+Run with a graphical renderer and
+`--script res://tools/preview_trees.gd -- --output-dir=/absolute/new/directory`.
+It refuses to overwrite captures and rejects black or incorrectly sized images.
+This corrects a rendering interpretation error; it does not calibrate foliage
+reflectance or make the existing box shaped branches and procedural leaves
+photorealistic. Those visible geometry limitations remain.
