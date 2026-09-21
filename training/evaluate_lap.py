@@ -23,11 +23,14 @@ def main():
     p.add_argument("--godot", required=True)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--max-actions", type=int, default=9000)
+    p.add_argument("--generation", type=int, help="Known generation of this adapter")
     p.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
     p.add_argument(
         "--compile", action="store_true", help="Compile CUDA decode with a static cache"
     )
     args = p.parse_args()
+    if args.generation is not None and args.generation < 0:
+        p.error("Generation must be nonnegative")
     if args.compile and args.device != "cuda":
         p.error("Compiled inference requires CUDA")
     out = args.output.resolve()
@@ -80,7 +83,10 @@ def main():
             lambda: "lap-eval-" + adapter_hash[:12],
             road_telemetry=road,
         )
-        env.reset()
+        display = {"model_name": MODEL, "evaluation": True}
+        if args.generation is not None:
+            display["generation"] = args.generation
+        env.reset(policy_display=display)
         view = json.loads(env.observe())
         # Merge LoRA once to avoid separate adapter kernels on every decoded token.
         # Check numerical equivalence on the actual initial observation first.

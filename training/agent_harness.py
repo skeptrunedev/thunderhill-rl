@@ -76,11 +76,12 @@ class ThunderhillEnv:
             self._log("infrastructure_failure", error=self._fault)
             raise
 
-    def reset(self, **kwargs) -> str:
+    def reset(self, *, policy_display=None, **kwargs) -> str:
         self._fault = None
-        self._observation = self._request(
-            {"op": "reset", "policy_id": f"interactive-step-{self._step()}"}
-        )
+        request = {"op": "reset", "policy_id": f"interactive-step-{self._step()}"}
+        if policy_display is not None:
+            request["policy_display"] = policy_display
+        self._observation = self._request(request)
         self._reward, self._calls = 0.0, 0
         self._receipt = secrets.token_hex(4)
         self._log(

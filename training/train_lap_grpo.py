@@ -339,9 +339,18 @@ def main():
             print(json.dumps(summary), flush=True)
             return
 
-        def run_candidate(index, label, current_hash, first=None):
+        def run_candidate(index, label, current_hash, generation, first=None):
             client, data = workers[index]
-            reset_request = {"op": "reset", "policy_id": label}
+            display = {"model_name": MODEL, "generation": generation}
+            if first is None:
+                display["evaluation"] = True
+            else:
+                display.update(rollout_number=index + 1, rollout_count=4)
+            reset_request = {
+                "op": "reset",
+                "policy_id": label,
+                "policy_display": display,
+            }
             if snapshot_provenance:
                 reset_request["snapshot_id"] = snapshot_provenance[index]["snapshot_id"]
             obs = request(client, reset_request)
@@ -409,6 +418,7 @@ def main():
             record = {
                 "episode_id": episode,
                 "policy_id": label,
+                "policy_display": display,
                 "worker": index,
                 "prefix_adapter_sha256": prefix_hash,
                 "current_adapter_sha256": current_hash,
@@ -449,7 +459,7 @@ def main():
             )
             return record
 
-        baseline = run_candidate(0, "greedy-before", initial_hash)
+        baseline = run_candidate(0, "greedy-before", initial_hash, 0)
 
         def game_reward(prompts, completions, completion_ids, trainer_state, **kwargs):
             if len(completions) != 4 or any(
@@ -478,6 +488,7 @@ def main():
                     index,
                     f"grpo-step-{step}-candidate-{index}",
                     current_hash,
+                    step,
                     (text, ids),
                 )
                 record["optimizer_step"] = step
@@ -577,7 +588,7 @@ def main():
         trainer.save_model(str(checkpoint))
         tokenizer.save_pretrained(checkpoint)
         final_hash = checkpoint_hash(checkpoint)
-        after = run_candidate(0, "greedy-after", final_hash)
+        after = run_candidate(0, "greedy-after", final_hash, trainer.state.global_step)
         model.eval()
         inputs = tokenizer(branch_prompt, return_tensors="pt").to("cuda")
         with torch.inference_mode():

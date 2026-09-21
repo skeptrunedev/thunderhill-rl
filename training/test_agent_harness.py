@@ -41,6 +41,18 @@ class HarnessTests(unittest.TestCase):
         self.env = ThunderhillEnv(self.client, 0, self.trace, lambda: 7)
         self.env.reset()
 
+    def test_policy_display_is_forwarded_only_for_requested_episode(self):
+        metadata = {
+            "model_name": "example",
+            "generation": 2,
+            "rollout_number": 3,
+            "rollout_count": 4,
+        }
+        self.env.reset(policy_display=metadata)
+        self.assertEqual(self.client.requests[-1]["policy_display"], metadata)
+        self.env.reset()
+        self.assertNotIn("policy_display", self.client.requests[-1])
+
     def test_observation_is_read_only_and_excludes_privileged_state(self):
         before = len(self.client.requests)
         first = json.loads(self.env.observe())

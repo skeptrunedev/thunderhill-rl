@@ -71,6 +71,7 @@ var replay_path: String = ""
 var replay: RefCounted
 var decision_feed: Array[Dictionary] = []
 var policy_display: Dictionary = {}
+var startup_policy_display: Dictionary = {}
 var benchmark: RefCounted
 var benchmark_path := ""
 var frame_times: Array = []
@@ -162,6 +163,7 @@ func _ready() -> void:
 		push_error("Supply a nonempty model name and generation together")
 		get_tree().quit(2)
 		return
+	startup_policy_display = policy_display.duplicate(true)
 	if agent_max_episode_ticks > 0 and not agent_mode:
 		push_error("Agent episode tick limit requires agent mode")
 		get_tree().quit(2)
@@ -430,8 +432,10 @@ func reset_episode(
 	station: float,
 	checkpoint: String = "human",
 	initial_state: Dictionary = {},
-	snapshot: Dictionary = {}
+	snapshot: Dictionary = {},
+	display: Variant = null
 ) -> Dictionary:
+	policy_display = (startup_policy_display if display == null else display).duplicate(true)
 	var index := 0
 	for i in track.samples.size():
 		if (
@@ -1168,14 +1172,49 @@ func _create_snapshot(request: Dictionary) -> Dictionary:
 	return provenance.duplicate(true)
 
 
+func _validate_policy_display(value: Variant) -> String:
+	if not value is Dictionary:
+		return "policy_display must be an object"
+	for key: Variant in value:
+		if key not in ["model_name", "generation", "rollout_number", "rollout_count", "evaluation"]:
+			return "Unknown policy_display field: " + str(key)
+	if not value.get("model_name") is String or value.model_name.strip_edges().is_empty():
+		return "policy_display requires a nonempty model_name"
+	for key: String in ["generation", "rollout_number", "rollout_count"]:
+		if not value.has(key):
+			continue
+		var number: Variant = value[key]
+		if not (number is int or number is float):
+			return "policy_display " + key + " must be an integer"
+		if not is_finite(float(number)) or float(number) != floor(float(number)):
+			return "policy_display " + key + " must be an integer"
+		if number < (0 if key == "generation" else 1):
+			return "Invalid policy_display " + key
+	if value.has("rollout_number") != value.has("rollout_count"):
+		return "Rollout number and count must be supplied together"
+	if value.has("rollout_number") and value.rollout_number > value.rollout_count:
+		return "Rollout number exceeds count"
+	if value.has("evaluation"):
+		if not value.evaluation is bool or not value.evaluation:
+			return "evaluation must be true when supplied"
+		if value.has("rollout_number"):
+			return "Evaluation cannot also be a training rollout"
+	return ""
+
+
 func _request(request: Dictionary) -> Dictionary:
 	if not agent_mode:
 		return {"error": "Agent stepping requires --agent-port"}
 	var op: String = request.get("op", "")
 	if op == "reset":
 		for key: Variant in request:
-			if key not in ["op", "station", "policy_id", "snapshot_id"]:
+			if key not in ["op", "station", "policy_id", "snapshot_id", "policy_display"]:
 				return {"error": "Unknown reset field: " + str(key)}
+		var display: Variant = request.get("policy_display", startup_policy_display)
+		if request.has("policy_display"):
+			var display_error := _validate_policy_display(display)
+			if not display_error.is_empty():
+				return {"error": display_error}
 		if request.has("snapshot_id"):
 			var id: Variant = request.snapshot_id
 			if request.has("station"):
@@ -1184,7 +1223,7 @@ func _request(request: Dictionary) -> Dictionary:
 				return {"error": "Unknown worker snapshot"}
 			var snapshot: Dictionary = agent_snapshots[id]
 			return reset_episode(
-				snapshot.station, str(request.get("policy_id", "unassigned")), {}, snapshot
+				snapshot.station, str(request.get("policy_id", "unassigned")), {}, snapshot, display
 			)
 		var station: Variant = request.get("station", 0.0)
 		if (
@@ -1194,7 +1233,9 @@ func _request(request: Dictionary) -> Dictionary:
 			or station >= track.length_m
 		):
 			return {"error": "Invalid station"}
-		return reset_episode(float(station), str(request.get("policy_id", "unassigned")))
+		return reset_episode(
+			float(station), str(request.get("policy_id", "unassigned")), {}, {}, display
+		)
 	if request.get("episode_id", "") != episode_id:
 		return {"error": "Episode mismatch"}
 	if op == "observe":

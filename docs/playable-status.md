@@ -212,3 +212,9 @@ or physical lean. Negative input requests left, positive requests right. The
 control window is at most 0.10 simulated seconds and may end early on termination.
 Throttle bars are green, brake bars are orange, and each call pulses the panel
 using simulation time so movie exports remain synchronized.
+
+Future training recordings also include `rollout_number` and `rollout_count` in
+`policy_display`. The overlay displays `Rollout 2 of 4` beneath the generation.
+These identify the actual candidate within that update, starting at one.
+Evaluation recordings use `evaluation: true` and display `Evaluation` instead.
+Absent rollout metadata is explicitly unlabeled. Historical clips are unchanged.
