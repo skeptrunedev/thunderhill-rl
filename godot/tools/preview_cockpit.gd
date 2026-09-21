@@ -14,12 +14,42 @@ func _run() -> void:
 	var display_filtered := true
 	var wall_density := 1.0
 	var legacy_housing := false
+	var sun_shadows := true
+	var diagnostic_sun := false
+	var shadow_bias := -1.0
+	var normal_bias := -1.0
 	var arguments := OS.get_cmdline_user_args()
 	if "--display-filtered" in arguments and "--display-unfiltered" in arguments:
 		_fail("Choose one display filtering mode")
 		return
 	for arg in arguments:
-		if arg == "--legacy-housing":
+		if arg == "--diagnostic-sun":
+			diagnostic_sun = true
+		elif arg == "--sun-shadows-off":
+			sun_shadows = false
+		elif arg.begins_with("--shadow-normal-bias="):
+			var value := arg.trim_prefix("--shadow-normal-bias=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 8.0
+			):
+				_fail("Normal bias must be finite and between zero and eight")
+				return
+			normal_bias = float(value)
+		elif arg.begins_with("--shadow-bias="):
+			var value := arg.trim_prefix("--shadow-bias=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 2.0
+			):
+				_fail("Shadow bias must be finite and between zero and two")
+				return
+			shadow_bias = float(value)
+		elif arg == "--legacy-housing":
 			legacy_housing = true
 		elif arg == "--display-filtered":
 			display_filtered = true
@@ -77,6 +107,21 @@ func _run() -> void:
 		_fail("Steering exceeds simulation limits")
 		return
 	game.bike.update_pose(0.0, steering, 0.0)
+	var sun: DirectionalLight3D
+	for child in game.get_children():
+		if child is DirectionalLight3D:
+			sun = child
+	if sun == null:
+		_fail("Directional sunlight missing")
+		return
+	if diagnostic_sun:
+		var toward := game.bike.global_basis * Vector3(0.3, 0.8, -0.5).normalized()
+		sun.look_at(-toward, Vector3.UP)
+	sun.shadow_enabled = sun_shadows
+	if shadow_bias >= 0.0:
+		sun.shadow_bias = shadow_bias
+	if normal_bias >= 0.0:
+		sun.shadow_normal_bias = normal_bias
 	if legacy_housing:
 		var housing: MeshInstance3D = game.bike.find_child("InstrumentHousing", true, false)
 		if housing == null:
@@ -169,6 +214,11 @@ func _run() -> void:
 							"station_m": 400,
 							"display_filtered": display_filtered,
 							"legacy_housing": legacy_housing,
+							"sun_shadows": sun.shadow_enabled,
+							"diagnostic_sun": diagnostic_sun,
+							"toward_sun": str(sun.global_basis.z),
+							"shadow_bias": sun.shadow_bias,
+							"shadow_normal_bias": sun.shadow_normal_bias,
 							"housing_builder_sha256":
 							FileAccess.get_sha256("res://scripts/rounded_panel.gd"),
 							"display_has_mipmaps": display_has_mipmaps,
