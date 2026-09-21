@@ -89,3 +89,18 @@ passed. The 551 process intervals report median and p95 of 8.333 ms, but the
 screen was locked and the window unfocused. These values are not foreground
 presentation or sustained lap performance certification. The local rendered
 controls also passed; rebuilt scenery and landmark geometry hashes are unchanged.
+
+Clean followup build `993f48b1c644-ff55eb485c81` was installed under
+`~/Applications/ThunderhillReview/993f48b1c644-ff55eb485c81/Thunderhill.app`.
+The archive matched SHA256
+`8f1dbb7486a553354193753128bee9a4acad170331585a49357f2a2058fb8403` and signature
+verification passed. Its only content manifest addition relative to the tested
+candidate is the generated UID for the offline bake script. The game sources
+and material resource are identical.
+
+The clean app was opened in ordinary human mode with onboard camera two. One
+game process remained running. Its episode record confirms the clean commit and
+initialized track state (`artifacts/mac-993f48b-review-episode.jsonl`). The log
+file remained buffered while a process sample showed the active rendering loop;
+the process was not restarted. The corrected candidate's native image is also
+paired with the supplied footage in `artifacts/native-reference-comparison`.
