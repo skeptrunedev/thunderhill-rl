@@ -13,6 +13,7 @@ func _run() -> void:
 	var steering := 0.0
 	var display_filtered := true
 	var wall_density := 1.0
+	var reservoir_overrides := {}
 	var legacy_housing := false
 	var sun_shadows := true
 	var diagnostic_sun := false
@@ -106,6 +107,18 @@ func _run() -> void:
 			display_filtered = true
 		elif arg == "--display-unfiltered":
 			display_filtered = false
+		elif arg.begins_with("--reservoir-haze=") or arg.begins_with("--reservoir-blur-lod="):
+			var value := arg.get_slice("=", 1)
+			var haze := arg.begins_with("--reservoir-haze=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > (1.0 if haze else 4.0)
+			):
+				_fail("Reservoir haze or blur outside finite study bounds")
+				return
+			reservoir_overrides["wall_haze" if haze else "transmission_blur_lod"] = float(value)
 		elif arg.begins_with("--reservoir-wall-density="):
 			var value := arg.trim_prefix("--reservoir-wall-density=")
 			if (
@@ -253,6 +266,8 @@ func _run() -> void:
 			)
 			wall_absorption = baseline * wall_density
 			material.set_shader_parameter("wall_absorption", wall_absorption)
+			for parameter in reservoir_overrides:
+				material.set_shader_parameter(parameter, reservoir_overrides[parameter])
 			reservoir_count += 1
 	if display_count != 1:
 		_fail("Expected one live display material")
@@ -289,6 +304,7 @@ func _run() -> void:
 			{
 				"name": row.name,
 				"reservoir_wall_density": wall_density,
+				"reservoir_overrides": reservoir_overrides,
 				"reservoir_wall_absorption":
 				[wall_absorption.x, wall_absorption.y, wall_absorption.z],
 				"reservoir_shader_sha256":

@@ -1,11 +1,14 @@
 shader_type spatial;
 render_mode cull_back;
 
-uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_linear;
+uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_linear_mipmap;
 // Estimated absorption per metre, not measured brake fluid optical properties.
 uniform vec3 fluid_absorption = vec3(6.0, 24.0, 60.0);
 // Independent vessel wall absorption; appearance estimate, not measured plastic.
 uniform vec3 wall_absorption = vec3(600.0, 800.0, 1400.0);
+// Visual estimates for cloudy molded plastic, not measured scattering data.
+uniform float wall_haze : hint_range(0.0, 1.0) = 0.0;
+uniform float transmission_blur_lod : hint_range(0.0, 4.0) = 0.0;
 uniform float fluid_radius = 0.024;
 uniform float fluid_bottom = -0.020;
 uniform float fluid_top = 0.0081;
@@ -51,8 +54,10 @@ void fragment() {
     vec3 transmission = exp(-fluid_absorption * path_m - wall_absorption * wall_path);
     // The opaque scene copy supplies transmitted radiance. Transparent objects
     // are absent from that copy; this is not ray traced refraction or fluid slosh.
-    EMISSION = textureLod(scene_color, SCREEN_UV, 0.0).rgb * transmission * (1.0 - fresnel);
-    ALBEDO = vec3(0.015);
+    EMISSION = textureLod(scene_color, SCREEN_UV, transmission_blur_lod).rgb * transmission * (1.0 - fresnel) * (1.0 - wall_haze);
+    // Divert a restrained share of transmission into lit wall response. This
+    // keeps the haze dependent on scene lighting, rather than self illuminating.
+    ALBEDO = mix(vec3(0.015), vec3(0.32, 0.29, 0.24), wall_haze);
     ALPHA = 1.0;
     METALLIC = 0.0;
     ROUGHNESS = 0.12;
