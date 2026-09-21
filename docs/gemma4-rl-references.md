@@ -58,3 +58,17 @@ Limits: it defaults to Qwen2.5 0.5B, uses text observations, and does not establ
 | Recording | Save policy checkpoint identifiers, initial state, actions, and state trajectories for consistent evaluation replays. |
 
 First integration acceptance: two isolated simulator sessions from a shared initial state produce action dependent outcomes; the trainer updates E4B adapters; the rollout model receives those updates; held out evaluation and replay artifacts identify the exact checkpoint. Scale rollout counts only after measuring this loop on the intended RTX PRO. This is an implementation specification, not a claim that the integration is built.
+
+## September 21 executed local validation
+
+Selected TRL as the primary framework after rechecking the current CARLA and
+Catch examples and its Harbor interface. An actual RTX 2080 Ti run using TRL
+1.13.0, Gemma 3 270M and PEFT passed the small launch probe: game dependent
+rewards, nonzero adapter updates, changed policy logits, checkpoint reload and
+recorded episode attribution. [Reproduction and exact scope](../training/README.md).
+This does not validate E4B or repeated camera control.
+
+The earlier unauthenticated checkpoint access limitation is now outdated for the
+official model: `google/gemma-4-E4B-it` API and config requests succeeded, with
+`gated=false` and revision `ee0ef6023621cff504d758262d4e04895a5af4a2`.
+No E4B weights were downloaded or trained during this local validation.

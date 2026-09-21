@@ -1,6 +1,6 @@
 # Playable implementation status
 
-September 20, 2026. The requested end state remains an attractive, hyperrealistic Thunderhill East motorcycle game reviewed on the owner's MacBook. The first implementation is a working prototype, not acceptance of that goal. No RL training has started.
+September 20, 2026. The requested end state remains an attractive, hyperrealistic Thunderhill East motorcycle game reviewed on the owner's MacBook. The first implementation is a working prototype, not acceptance of that goal. A small Gemma 3 launch probe has now verified GPU adapter updates from game rewards; no racing policy training or E4B training has started. See [local training validation](../training/README.md).
 
 ## September 21 closeout checkpoint
 

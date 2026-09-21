@@ -25,14 +25,12 @@ from check_parallel import worker
 
 MODEL = "unsloth/gemma-3-270m-it"
 REVISION = "23cf460f6bb16954176b3ddcc8d4f250501458a9"
+# A deliberately neutral prompt avoids solving the launch task through prior
+# knowledge before the reward path has any variance to validate.
 PROMPT = [
     {
         "role": "user",
-        "content": (
-            "You control a motorcycle stopped on a clear straight. Choose a throttle for the next second. "
-            "The goal is forward progress. Reply with exactly one digit: 0 for no throttle, "
-            "or 1 for throttle 0.6. Do not explain."
-        ),
+        "content": "Pick a random letter: A or B. Reply with one letter only.",
     }
 ]
 
@@ -42,6 +40,7 @@ def main():
     parser.add_argument("--godot", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=False)
     assert torch.cuda.is_available(), (
         "CUDA is required; CPU execution cannot pass this test"
@@ -77,14 +76,14 @@ def main():
                     if isinstance(completion, list)
                     else completion
                 )
-                match = re.fullmatch(r"\s*([01])\s*", text)
+                match = re.fullmatch(r"\s*([AB])\s*", text)
                 policy = f"smoke-step-{trainer.state.global_step}"
                 obs = client.request({"op": "reset", "policy_id": policy})
                 episode = obs["episode_id"]
                 reward = -0.1
                 transitions = []
                 if match:
-                    throttle = 0.6 if match[1] == "1" else 0.0
+                    throttle = 0.6 if match[1] == "B" else 0.0
                     while not (obs["terminated"] or obs["truncated"]):
                         obs = client.request(
                             {
@@ -202,6 +201,32 @@ def main():
         client.request({"op": "reset", "policy_id": "smoke-finished"})
         recordings = list(data.rglob("*.jsonl"))
         assert recordings
+        recorded_rows = [
+            json.loads(line)
+            for path in recordings
+            for line in path.read_text().splitlines()
+        ]
+        recorded_episodes = {
+            row["episode_id"] for row in recorded_rows if row.get("type") == "episode"
+        }
+        assert all(sample["episode_id"] in recorded_episodes for sample in samples)
+        recorded_transitions = [
+            row for row in recorded_rows if row.get("type") == "transition"
+        ]
+        assert len(recorded_transitions) == sum(sample["ticks"] for sample in samples)
+        assert any(
+            len(
+                {
+                    row["reward"]
+                    for row in samples
+                    if row["policy_id"] == policy and row["valid_action"]
+                }
+            )
+            > 1
+            for policy in {row["policy_id"] for row in samples}
+        ), "No within-group game reward contrast"
+        token_b = tokenizer.encode("B", add_special_tokens=False)
+        assert len(token_b) == 1
         summary = {
             "ok": True,
             "model": MODEL,
@@ -226,6 +251,20 @@ def main():
             "max_adapter_delta": delta,
             "max_policy_logit_delta": logit_delta,
             "reloaded_logits_match": True,
+            "recorded_transitions": len(recorded_transitions),
+            "throttle_probability_before": (before_logits / config.temperature)
+            .softmax(-1)[0, token_b[0]]
+            .item(),
+            "throttle_probability_after": (after_logits / config.temperature)
+            .softmax(-1)[0, token_b[0]]
+            .item(),
+            "trainable_parameters": sum(p.numel() for p in before.values()),
+            "track_sha256": hashlib.sha256(
+                (ROOT / "godot/data/track.json").read_bytes()
+            ).hexdigest(),
+            "lock_sha256": hashlib.sha256(
+                (ROOT / "training/uv.lock").read_bytes()
+            ).hexdigest(),
             "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated(),
             "wall_seconds": time.monotonic() - started,
             "train_metrics": trained.metrics,

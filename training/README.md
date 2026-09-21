@@ -1,0 +1,99 @@
+# Local GPU validation
+
+Use Hugging Face TRL as the primary training framework, with PEFT adapters.
+The eventual control integration should use `GRPOTrainer.environment_factory`.
+The launch probe here deliberately uses the simpler reward callback to first
+verify the chain from model sampling to actual Godot outcomes to GPU updates.
+It does not yet implement repeated observations and decisions within an episode,
+Harbor integration, camera training, or Gemma 4 E4B training.
+
+Run from the repository root:
+
+```sh
+uv sync --project training --locked
+uv run --project training python training/smoke_grpo.py \
+  --godot /absolute/path/to/godot \
+  --output artifacts/my-new-training-check
+```
+
+The output directory must be new. It retains the adapter, tokenizer, trainer logs,
+model token outputs, episode identifiers and real Godot episode recordings.
+Dependencies are pinned in `uv.lock`. Model files are downloaded from the pinned
+`unsloth/gemma-3-270m-it` revision. They are not included in this repository;
+their Gemma terms remain separate from this repository's code license.
+
+The test uses a neutral A/B exploration prompt. A coasts and B applies throttle
+0.6 for one simulated second, starting from the same stationary reset. Valid
+actions receive the sum of measured legal progress from actual game transitions.
+Invalid output receives an explicit minus 0.1 syntax penalty and executes no
+physics. This is the diagnostic `launch-probe-v1` reward, not a racing reward.
+The full vocabulary remains available to generation; actions are not forced.
+Single token completions are intentional; their length cutoff remains eligible
+for training rather than being masked as an incomplete answer.
+
+Three GRPO steps sample eight candidates each. The test requires both valid
+actions to produce distinct rewards within a candidate group, finite nonzero LoRA
+changes, changed policy logits, saved and reloaded logit agreement, and persisted
+recordings for every episode. Only LoRA parameters may be trainable. FP32 and
+Transformers generation keep this small compatibility test straightforward on
+Turing; this configuration is not the proposed high throughput E4B deployment.
+No model or training data is uploaded to an external tracking service.
+
+## Framework selection
+
+[TRL](https://github.com/huggingface/trl) has an Apache 2.0 license and about
+19,000 GitHub stars at the September 21, 2026 check. Its
+[agent interface](https://huggingface.co/docs/trl/grpo_trainer#agent-training)
+supports separate environment instances, action tools, observations and episode
+rewards. The current docs list Gemma 4 E2B among tested models; exact E4B
+compatibility still requires a run. The
+[Harbor adapter](https://huggingface.co/docs/trl/main/en/harbor)
+provides a path to the project's intended harness.
+
+Read these concrete references at upstream commit
+`ccdaa0065cee4174d2b4eb60f1856c51e51232ed`:
+
+* [Gemma CARLA](https://github.com/huggingface/trl/blob/ccdaa0065cee4174d2b4eb60f1856c51e51232ed/examples/grpo_carla/carla_vlm_gemma.py)
+  for repeated driving actions, camera observations and environment rewards.
+* [Catch](https://github.com/huggingface/trl/blob/ccdaa0065cee4174d2b4eb60f1856c51e51232ed/examples/grpo_catch/grpo_catch.py)
+  for grouped interactive rollouts and colocated vLLM generation.
+
+[Unsloth](https://github.com/unslothai/unsloth) remains a candidate for reducing
+E4B memory use with TRL. Its [Gemma guide](https://unsloth.ai/docs/models/gemma-4/train)
+distinguishes quantized and ordinary LoRA requirements; advertised minimums are
+not evidence that our camera and rollout workload fits. [verl](https://github.com/verl-project/verl)
+has a real interactive agent loop, but its distributed infrastructure adds
+complexity that is unnecessary for this first local test.
+
+The local GPU is an RTX 2080 Ti with 11 GB, compute capability 7.5. The official
+[E4B checkpoint](https://huggingface.co/google/gemma-4-E4B-it) is publicly
+accessible as of this check. E4B denotes effective computation, not total resident
+parameters. Roughly eight billion total parameters mean ordinary two byte weights
+alone exceed this GPU's capacity. Quantized E4B training, longer trajectories,
+vision observations and target RTX PRO throughput remain separate tests. A small
+Gemma success establishes working training machinery, not racing competence.
+
+## Verified local result
+
+The September 21 run passed, using the pinned dependencies above. The compact
+[measured result](results/rtx2080ti-gemma270m.json) is committed; complete artifacts
+are in `artifacts/training-smoke-04/`.
+
+* Three GRPO steps sampled 24 completions, including 23 valid actions.
+* Four coast actions produced about minus 0.017 metres of signed progress;
+  nineteen throttle actions produced about 2.896 metres. One invalid C output
+  received the explicit syntax penalty. Every valid action executed 120 ticks.
+* All 2,760 transitions and all episode identities were found in isolated Godot
+  recordings. Reward variation included both valid actions within a group.
+* The 368,640 trainable adapter parameters changed, with maximum absolute change
+  0.000193. Policy logits changed and matched after checkpoint reload.
+* At sampling temperature 1.5, the prompt's throttle token probability increased
+  from 0.5465 to 0.8804. This measures the trained launch probe, not held out
+  generalization, lap completion or improved racing skill.
+* Peak PyTorch allocated memory was 2,198,125,056 bytes (about 2.05 GiB), including
+  the reload check. This is not total system GPU use or an E4B memory estimate.
+
+Earlier runs correctly failed the nonzero update gate when every candidate chose
+the same action. Another run found a relative user data path error after a valid
+update; the final harness resolves its artifact directory before starting Godot
+and verifies the episode records explicitly. Those runs are not counted as passes.

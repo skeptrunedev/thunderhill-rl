@@ -1,0 +1,46 @@
+{
+  "ok": true,
+  "model": "unsloth/gemma-3-270m-it",
+  "revision": "23cf460f6bb16954176b3ddcc8d4f250501458a9",
+  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+  "cuda_capability": [
+    7,
+    5
+  ],
+  "dtype": "float32",
+  "versions": {
+    "torch": "2.14.0",
+    "trl": "1.13.0",
+    "peft": "0.21.0",
+    "transformers": "5.17.0"
+  },
+  "source_commit": "a85fd192109cc2b9423bbf0c588661d5b6eba306",
+  "script_sha256": "10932ec060cd230e2160da524b1640c21c69dbaae41bc04bb1b09404caaf73f5",
+  "optimizer_steps": 3,
+  "sampled_rollouts": 24,
+  "valid_actions": 23,
+  "game_reward_values": [
+    -0.017208211137488088,
+    2.8955845715229507
+  ],
+  "max_adapter_delta": 0.00019255862571299076,
+  "max_policy_logit_delta": 4.538185119628906,
+  "reloaded_logits_match": true,
+  "recorded_transitions": 2760,
+  "throttle_probability_before": 0.5465103983879089,
+  "throttle_probability_after": 0.8803583383560181,
+  "trainable_parameters": 368640,
+  "track_sha256": "a9ad305331e90dc90b7aed703b3ff7f4d850dabd580ed6a84d826a8ce4a93c04",
+  "lock_sha256": "30fc191c0c8f15382a5dc9849670c18b2558acc9c69e7e9df65714925f09d27b",
+  "peak_cuda_allocated_bytes": 2198125056,
+  "wall_seconds": 18.42666577687487,
+  "train_metrics": {
+    "train_runtime": 6.1767,
+    "train_samples_per_second": 3.886,
+    "train_steps_per_second": 0.486,
+    "total_flos": 0.0,
+    "train_loss": 1.9868214925130207e-08,
+    "epoch": 0.125
+  },
+  "scope": "One decision launch probe with Gemma3 270M, not E4B, camera training, racing skill or throughput"
+}
