@@ -61,3 +61,39 @@ placement code, ground data, landmark exclusions or source grass assets, run
 real renderer. Headless baking is rejected. Commit the regenerated scene and
 `data/scenery-bake.json` together with the source change. The package tool rejects
 stale inputs. See [the verification details](surface-rendering.md#static-scenery-bake).
+
+## Short recorded review clips
+
+`tools/clip_replay.py` extracts a time interval for authoritative state playback.
+It preserves original transition rows and tick numbers, makes the preceding
+recorded state the initial state, and retains the source policy and geometry
+identity. A `playback_clip` manifest entry records the source SHA256, requested
+interval, actual tick boundaries and duration. It rejects unavailable time
+ranges, discontinuous ticks and existing output files. It does not create
+training samples or a new control benchmark.
+
+```sh
+python3 tools/clip_replay.py /absolute/episode.jsonl --start 57.5 --end 80 --output /absolute/clip.jsonl
+godot --path godot --write-movie /absolute/clip.avi --fixed-fps 30 --quit-after 700 -- --replay=/absolute/clip.jsonl --preview-camera=1
+```
+
+The frame limit includes a short stationary tail after playback finishes. Movie
+writing fixes frame timing; its reported frame intervals are not live gameplay
+performance. The project currently records at its 1280 by 800 window override.
+Startup lighting may settle during initial frames, so inspect those separately
+from steady playback.
+
+The current Turn 2 review is `artifacts/turn2-motion.mp4`, with original AVI and
+sampled contact sheet in `artifacts/turn2-motion-review`. Godot consumed all
+2,699 selected transitions, preserving ticks 6901 through 9599 from the existing
+privileged QA driver recording. This is not a learned policy. The 700 frame,
+30 FPS movie covers approximately 22.49 seconds of recorded movement plus its
+stationary tail. Source geometry hashes match current track, terrain and surface
+files. The updated extraction tool reproduced identical selected states after
+range validation was tightened.
+
+Sampled frames confirm the field pattern persists around the bend. They also
+show that the field remains too smooth, the cockpit too approximate and the
+camera too upright compared with the supplied footage. Sampling every two
+seconds cannot establish absence of fine temporal shimmer. Native Mac playback
+and human visual acceptance remain outstanding.
