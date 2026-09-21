@@ -20,21 +20,23 @@ void fragment() {
     // UV is measured in metres. The aggregate tile scale is an artistic estimate:
     // the publisher supplies no physical dimensions for Asphalt010.
     vec2 detail = UV * 1.6;
-    float broad = pavement_noise(UV / vec2(2.7, 19.0));
-    float fine = pavement_noise(UV / vec2(0.6, 4.0) + vec2(8.3, 2.1));
-    float variation = mix(0.84, 1.04, broad * 0.7 + fine * 0.3);
+    // Reference 00:20 and 00:40 show coherent longitudinal surface variation,
+    // not the previous strong isotropic cloud pattern. This is original material
+    // detail, not a claim about the measured rubber line or repaving seams.
+    float broad = pavement_noise(UV / vec2(2.7, 28.0));
+    float streak = pavement_noise(UV / vec2(0.45, 12.0) + vec2(8.3, 2.1));
+    float fine_streak = pavement_noise(UV / vec2(0.055, 7.0) + vec2(19.7, 1.4));
+    float variation = mix(0.92, 1.04, broad) * mix(0.97, 1.03, streak) * mix(0.98, 1.02, fine_streak);
     vec3 aggregate = texture(color_map, detail).rgb;
     // Offset secondary albedo suppresses visible repetition without rotating
     // tangent space normals away from the ribbon's actual UV frame.
     aggregate = mix(aggregate, texture(color_map, detail * 0.71 + vec2(0.37, 0.61)).rgb, 0.28);
     // Neutral warm binder under the cool sky, matched to the inspected dry footage.
     ALBEDO = aggregate * vec3(0.53, 0.50, 0.46) * variation;
-    // Dry resurfaced asphalt still reflects at grazing angles. These values are
-    // appearance tuning against the onboard references, not measured BRDF data.
-    // Metre scale directional variation breaks up the grazing reflection.
-    // Center the contribution to retain the existing nominal dry finish.
-    float finish_variation = (broad * 0.7 + fine * 0.3 - 0.5) * 0.14;
-    ROUGHNESS = clamp(texture(rough_map, detail).r * 0.48 + 0.20 + finish_variation, 0.52, 0.79);
+    // Keep source aggregate relief subtle. Broad cloudy source roughness was
+    // making the grazing reflection read like coarse concrete in the comparison.
+    ROUGHNESS = clamp(0.62 + (texture(rough_map, detail).r - 0.5) * 0.10
+                      + (streak - 0.5) * 0.035 + (broad - 0.5) * 0.06, 0.52, 0.72);
     NORMAL_MAP = texture(normal_map, detail).rgb;
-    NORMAL_MAP_DEPTH = 0.18;
+    NORMAL_MAP_DEPTH = 0.07;
 }

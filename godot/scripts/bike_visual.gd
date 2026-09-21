@@ -29,10 +29,11 @@ var _instrument_readout := Vector3(-1, -1, -1)
 
 
 func _ready() -> void:
-	_red = _material(Color("bc101b"), 0.48, 0.25)
+	# Solid red paint is a dielectric coating, not partially exposed metal.
+	_red = _material(Color("bc101b"), 0.0, 0.20)
 	_red.clearcoat_enabled = true
-	_red.clearcoat = 0.8
-	_red.clearcoat_roughness = 0.18
+	_red.clearcoat = 0.9
+	_red.clearcoat_roughness = 0.08
 	_black = _material(Color("14191b"), 0.5, 0.36)
 	_metal = _material(Color("a5abb0"), 0.9, 0.25)
 	_gold = _material(Color("ab8650"), 0.8, 0.28)

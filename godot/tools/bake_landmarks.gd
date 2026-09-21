@@ -13,6 +13,7 @@ const SOURCES := [
 	"data/terrain.json",
 	"data/surface.json",
 	"data/landmarks.json",
+	"data/clubhouse-profile.json",
 	"data/pit-wall.json",
 	"tools/bake_landmarks.gd",
 	"tools/bake_scenery.gd"

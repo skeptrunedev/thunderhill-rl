@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "osm_way": 44958778,
+  "source_landmarks_sha256": "d5b43fb77e3ad5c8de2464d8c25d1ca9639a37efcd9b200ee07befb942b4e085",
+  "reference": {
+    "page": "https://www.thunderhill.com/track-info/facility",
+    "image": "https://cdn.prod.website-files.com/619df2608f1a121ee5a594e7/61dd6ff44fc6e549702a903d_thunderhill-facility.jpg",
+    "image_sha256": "e96f56428d94e8d316719aa695c419933b5092aa72b5167447eeb8e15e0e62a6",
+    "observed": "Low open south patio, low connecting wings, taller central tower with two horizontal glazing bands and projecting roof cap",
+    "license": "Image used for inspection only; not distributed"
+  },
+  "status": "Original approximate architectural reconstruction inside mapped footprint; heights, section cuts, window spacing and roof overhang are visual estimates, not survey measurements",
+  "parts": [
+    {
+      "name": "South covered patio",
+      "clip_xz": [
+        -60,
+        493.3,
+        0,
+        520
+      ],
+      "base_m": 0,
+      "height_m": 3.2,
+      "kind": "carport",
+      "window_rows": [],
+      "roof_overhang_m": 0.25
+    },
+    {
+      "name": "Low clubhouse body",
+      "clip_xz": [
+        -60,
+        440,
+        0,
+        493.3
+      ],
+      "base_m": 0,
+      "height_m": 3.4,
+      "kind": "yes",
+      "window_rows": [
+        [
+          1.05,
+          2.35
+        ]
+      ],
+      "roof_overhang_m": 0.22
+    },
+    {
+      "name": "Upper control tower",
+      "clip_xz": [
+        -33.28,
+        470.85,
+        -12.3,
+        486.6
+      ],
+      "base_m": 3.4,
+      "height_m": 5.8,
+      "kind": "yes",
+      "window_rows": [
+        [
+          0.6,
+          2.0
+        ],
+        [
+          3.55,
+          4.95
+        ]
+      ],
+      "band_windows": true,
+      "roof_overhang_m": 0.65
+    }
+  ]
+}

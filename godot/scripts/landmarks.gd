@@ -33,8 +33,20 @@ func build(track: Node3D, include_divider := true) -> void:
 			surface.set_smooth_group(-1)
 	for area in data.paving:
 		_build_paving(area)
+	var clubhouse: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/clubhouse-profile.json")
+	)
+	if (
+		clubhouse.get("source_landmarks_sha256", "")
+		!= FileAccess.get_sha256("res://data/landmarks.json")
+	):
+		initialization_error = "Clubhouse profile mapped footprint source mismatch"
+		return
 	for building in data.buildings:
-		_build_building(building)
+		if building.osm_way == clubhouse.osm_way:
+			_build_clubhouse(building, clubhouse)
+		else:
+			_build_building(building)
 	for fence in data.fences:
 		if fence.osm_way == divider_data.replaces_osm_way:
 			continue
@@ -170,6 +182,64 @@ func _polygon(row: Dictionary) -> PackedVector2Array:
 	return polygon
 
 
+# The mapped outline contains both covered patio and enclosed rooms. A single
+# extrusion incorrectly made the patio a tall solid block. Split only this
+# observed building into low roof volumes and an upper control tower.
+func _build_clubhouse(row: Dictionary, profile: Dictionary) -> void:
+	var footprint := _polygon(row)
+	var floor_y := INF
+	for p in footprint:
+		floor_y = minf(floor_y, _point([p.x, p.y]).y)
+	floor_y -= 0.10
+	for part: Dictionary in profile.parts:
+		var r: Array = part.clip_xz
+		var clip := PackedVector2Array(
+			[Vector2(r[0], r[1]), Vector2(r[2], r[1]), Vector2(r[2], r[3]), Vector2(r[0], r[3])]
+		)
+		var polygons := Geometry2D.intersect_polygons(footprint, clip)
+		assert(not polygons.is_empty(), "Clubhouse section misses mapped footprint")
+		for polygon: PackedVector2Array in polygons:
+			# Keep the original footprint winding so facade offsets face outward.
+			var area := 0.0
+			for i in polygon.size():
+				area += polygon[i].cross(polygon[(i + 1) % polygon.size()])
+			if area > 0.0:
+				polygon.reverse()
+			var section := part.duplicate(true)
+			section.points = []
+			for p in polygon:
+				section.points.append([p.x, p.y])
+			section.floor_y = floor_y + float(part.base_m)
+			_build_building(section)
+
+
+func _window(a: Vector3, b: Vector3, low: float, top: float, band: bool) -> void:
+	var along := (b - a).normalized()
+	var outward := along.cross(Vector3.UP).normalized()
+	var left := a + outward * 0.045
+	var right := b + outward * 0.045
+	_quad(
+		_glass,
+		left + Vector3.UP * low,
+		right + Vector3.UP * low,
+		right + Vector3.UP * top,
+		left + Vector3.UP * top
+	)
+	# Slim projecting frames break the featureless dark rectangle and cast real
+	# shadows. Profile dimensions are artistic, not measured window joinery.
+	for lift in [low, top]:
+		_beam(
+			_roofs,
+			left + outward * 0.025 + Vector3.UP * lift,
+			right + outward * 0.025 + Vector3.UP * lift,
+			0.075
+		)
+	var count := maxi(1, ceili(a.distance_to(b) / (1.2 if band else 1.4)))
+	for i in count + 1:
+		var p := left.lerp(right, float(i) / count) + outward * 0.025
+		_beam(_roofs, p + Vector3.UP * low, p + Vector3.UP * top, 0.055)
+
+
 func _build_building(row: Dictionary) -> void:
 	var polygon := _polygon(row)
 	var triangles := Geometry2D.triangulate_polygon(polygon)
@@ -177,7 +247,7 @@ func _build_building(row: Dictionary) -> void:
 	var floor_y := INF
 	for p in polygon:
 		floor_y = minf(floor_y, _point([p.x, p.y]).y)
-	floor_y -= 0.10
+	floor_y = float(row.get("floor_y", floor_y - 0.10))
 	var height: float = row.height_m
 	var roof_y := floor_y + height
 	for i in range(0, triangles.size(), 3):
@@ -199,7 +269,14 @@ func _build_building(row: Dictionary) -> void:
 		var length := a.distance_to(b)
 		var along := (b - a).normalized()
 		var outward := along.cross(Vector3.UP).normalized()
-		_beam(_roofs, a + Vector3.UP * (height - 0.1), b + Vector3.UP * (height - 0.1), 0.22, 0.24)
+		var overhang: float = row.get("roof_overhang_m", 0.11)
+		_beam(
+			_roofs,
+			a + Vector3.UP * (height - 0.1),
+			b + Vector3.UP * (height - 0.1),
+			overhang * 2.0,
+			0.20
+		)
 		if row.kind == "carport":
 			var count := maxi(1, ceili(length / 7.0))
 			for j in count + 1:
@@ -207,28 +284,21 @@ func _build_building(row: Dictionary) -> void:
 				_beam(_metal, p, p + Vector3.UP * height, 0.18)
 		else:
 			_quad(_walls, a, b, b + Vector3.UP * height, a + Vector3.UP * height)
-			# Facade panels communicate scale. They are not surveyed window positions.
+			# Unreviewed buildings retain the original estimated panel placement.
+			# The clubhouse uses reference driven horizontal bands on the tower.
 			if length > 5.0:
-				var count := maxi(1, floori(length / 4.5))
-				for j in count:
-					var center := a.lerp(b, (float(j) + 0.5) / count) + outward * 0.035
-					var half := minf(1.3, length / float(count) * 0.28)
-					var low := 0.25 if row.kind in ["garage", "garages"] else 1.1
-					var top := 2.7 if row.kind in ["garage", "garages"] else 2.25
-					_quad(
-						_glass,
-						center - along * half + Vector3.UP * low,
-						center + along * half + Vector3.UP * low,
-						center + along * half + Vector3.UP * top,
-						center - along * half + Vector3.UP * top
-					)
-					if height > 6.0:
-						_quad(
-							_glass,
-							center - along * half + Vector3.UP * 4.4,
-							center + along * half + Vector3.UP * 4.4,
-							center + along * half + Vector3.UP * 5.7,
-							center - along * half + Vector3.UP * 5.7
+				var garage: bool = row.kind in ["garage", "garages"]
+				var levels: Array = row.get(
+					"window_rows", [[0.25, 2.7]] if garage else [[1.1, 2.25]]
+				)
+				var band: bool = row.get("band_windows", false)
+				var count := 1 if band else maxi(1, floori(length / 4.5))
+				for level: Array in levels:
+					for j in count:
+						var center := a.lerp(b, (float(j) + 0.5) / count)
+						var half := length * 0.5 - 0.7 if band else minf(1.3, length / count * 0.28)
+						_window(
+							center - along * half, center + along * half, level[0], level[1], band
 						)
 
 
