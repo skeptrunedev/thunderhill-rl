@@ -2,6 +2,44 @@
 
 September 20, 2026. The requested end state remains an attractive, hyperrealistic Thunderhill East motorcycle game reviewed on the owner's MacBook. The first implementation is a working prototype, not acceptance of that goal. No RL training has started.
 
+## September 21 closeout checkpoint
+
+The owner reports the game is mostly playable and wants to move toward Gemma
+fine tuning. Further visual experiments are deferred. This is acceptance of
+playability for the next phase, not a claim of photographic or physical realism.
+The detailed motorcycle asset remains deferred at the owner's request.
+
+Fresh local checks passed against the current game:
+
+* `tools/check_agent.py`: frozen observations, fixed tick advancement, duplicate
+  and stale request handling, invalid controls, repeatable reset, differing action
+  outcomes, checkpoint attribution, 36 recorded transitions and 12 replayed states.
+* `tools/check_camera.py`: five rendered 640 by 360 PNG observations, matching
+  hashes and immutable artifacts, frozen capture ticks, changed pixels after an
+  action, queued reset and advance serialization, and headless rejection.
+
+Evidence: `artifacts/agent-closeout-check.json` and
+`artifacts/qa/closeout-camera/summary.json`. These are short integration checks,
+not proof of long episode stability or parallel isolation. No model training ran.
+
+Before a learning pilot, finish versioned reward configuration, bounded episode
+and invalid action budgets, explicit terminal reasons, parallel isolation checks,
+and the trainer's observation, action and token trace joins. The current game
+records raw progress, elapsed time and crash components; it is not yet a complete
+training harness. Harbor integration and a verified adapter update remain open.
+The full requirements remain in [the RL contract](rl-game-contract.md).
+
+The optional Turn 2 edge hypothesis is preserved in development tools only.
+`build_turn2_exit_envelope.py` requires its original track hash and sampled
+historical profiles; `build_track.py --post-envelope` applies it only when
+explicitly requested. Eight analytic tests pass. A default full reconstruction
+produced byte identical track, terrain and surface files. An isolated candidate
+build also succeeded, with maximum horizontal anchor residuals about 0.098 metres
+on either side after refitting. Those residuals measure agreement with provisional
+anchors, not real track accuracy. The candidate has not been installed or accepted;
+its source imagery and taper assumptions remain uncertain. Production geometry,
+textures and the playable package are unchanged by these development tools.
+
 ## Implemented
 
 * Road clipped terrain with source elevations restored outside a provisional shoulder transition, shared off road render/contact triangles, and terrain provenance hashes. See [conforming ground](conforming-ground.md).

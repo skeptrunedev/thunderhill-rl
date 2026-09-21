@@ -192,12 +192,60 @@ def apply_plan_study(track, study):
     }
 
 
+def final_envelope_residuals(baseline, samples, envelope):
+    """Compare final horizontal mesh edges to anchors in baseline station space."""
+    p = np.array([s["p"] for s in samples], dtype=float)[:, [0, 2]]
+    tangent = np.roll(p, -1, axis=0) - np.roll(p, 1, axis=0)
+    left = np.column_stack((tangent[:, 1], -tangent[:, 0]))
+    left /= np.linalg.norm(left, axis=1)[:, None]
+    half = np.array([s["width"] for s in samples]) / 2
+    stations = np.array([s["s"] for s in baseline["samples"]])
+    anchors = envelope["anchors"]
+    anchor_stations = np.array([a["station_m"] for a in anchors])
+    report = {}
+    for side, sign in (("right", -1), ("left", 1)):
+        edges = p + sign * left * half[:, None]
+        actual = np.column_stack([
+            np.interp(anchor_stations, stations, edges[:, axis], period=baseline["length_m"])
+            for axis in range(2)
+        ])
+        target = np.array([a[f"{side}_xz_m"] for a in anchors])
+        residual = np.linalg.norm(actual - target, axis=1)
+        report[side] = {
+            "maximum_horizontal_residual_m": float(residual.max()),
+            "rms_horizontal_residual_m": float(np.sqrt(np.mean(residual ** 2))),
+            "anchor_horizontal_residual_m": residual.tolist(),
+        }
+    return {
+        "baseline_anchor_stations_m": anchor_stations.tolist(),
+        "method": "Final rounded sample mesh edges interpolated by unchanged sample identity in baseline station coordinates; horizontal residuals only, not survey accuracy",
+        **report,
+    }
+
+
+def apply_post_envelope(track, envelope, corrected_points, origin, source_stations):
+    """Layer an independently pinned envelope onto the unrounded plan geometry."""
+    corrected_xz, widths, correction = apply_envelope(track, envelope)
+    baseline_xz = np.array([s["p"] for s in track["samples"]])[:, [0, 2]]
+    points = corrected_points + (corrected_xz - baseline_xz) * [1, -1]
+    geometry = geometry_samples(points, widths, origin, source_stations)
+    metadata = {
+        "baseline_track_sha256": envelope["baseline_track_sha256"],
+        "baseline_length_m": track["length_m"],
+        **correction,
+        "final_edge_residuals": final_envelope_residuals(track, geometry[0], envelope),
+    }
+    return points, widths, geometry, metadata
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT)
     parser.add_argument("--pavement-envelope", type=Path, default=ROOT / "data/reference/pit-envelope.json")
     parser.add_argument("--plan-study", type=Path, default=ROOT / "data/reference/turn2-plan-study.json",
                         help="Apply a hash pinned horizontal study and refit lidar, then regenerate terrain interfaces")
+    parser.add_argument("--post-envelope", type=Path,
+                        help="Apply one independently hash pinned edge envelope after the plan stage and refit lidar")
     args = parser.parse_args()
     output = args.output_dir
     output.mkdir(parents=True, exist_ok=True)
@@ -241,6 +289,15 @@ def main() -> None:
         track["length_m"] = round(float(segments.sum()), 3)
         track["metadata"]["lidar"] = fit_metadata
         track["metadata"]["plan_study"] = {"source_sha256": digest(args.plan_study), **plan_metadata}
+    if args.post_envelope is not None:
+        corrected_points, widths, geometry, post_metadata = apply_post_envelope(
+            track, load_json(args.post_envelope), corrected_points, origin, source_stations
+        )
+        samples, segments, heights, banks, xyz, left_xyz, fit_metadata = geometry
+        track["samples"] = samples
+        track["length_m"] = round(float(segments.sum()), 3)
+        track["metadata"]["lidar"] = fit_metadata
+        track["metadata"]["post_envelope"] = {"source_sha256": digest(args.post_envelope), **post_metadata}
     terrain = build_terrain(origin, xyz, left_xyz, widths, banks)
     (output / "track.json").write_text(json.dumps(track, separators=(",", ":")) + "\n")
     (output / "terrain.json").write_text(json.dumps(terrain, separators=(",", ":")) + "\n")
