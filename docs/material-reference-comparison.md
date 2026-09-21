@@ -1477,3 +1477,46 @@ fidelity. The simplified geometry and missing component detail remain visible.
 Headless motorcycle geometry/dashboard checks and rendered human control checks
 passed. Native Mac execution and sustained performance of this revision remain
 unverified.
+
+
+## Layered field placement diagnostic
+
+The v7 material remains production. New candidates are retained as studies, not
+adopted solely because their pixels differ. `mowing_detail_strength` defaults to
+zero. Its optional continuous arc length streaks use the existing Turn 2 mowing
+coordinates and filter unresolved noise. The first render at
+`artifacts/mowing-streaks-v1` adds fine directional variation but does not resolve
+the field's broad material organization.
+
+`build_field_coverage.py` now supports explicit `overlap_policy: source_over`.
+The default still rejects overlapping regions. Ordered source over blending
+preserves the underlying material through an overlaid polygon's feather, rather
+than replacing its alpha and accidentally revealing unannotated ground. Four
+focused tests pass, including overlap feather endpoints. Existing disjoint
+regions retain the same rasterization behavior.
+
+`data/reference/turn2-straw-regions-layered.json` is a candidate with an expanded
+pale eastern field and a broad western darker region traced against the existing
+historical aerial crop. The map in `artifacts/turn2-straw-expanded-map` has SHA256
+`2b3f7a20f30ba39f71bb2c21ff1be875a3cba754f7d689955980f5db6572afe6`.
+Its minimum road clearance is 2.579 metres. That minimum does not describe the
+whole boundary: the remaining pale field setback is materially wider along the
+eastern curve. Independent visual inspection supports the polygon's historical
+placement but cannot establish the current straw boundary or feather width.
+
+The western dark overlay alone changes no channel by more than two levels in
+the station 950 capture, so it does not address entry foreground uniformity.
+Expanded outline entry and apex comparisons are saved in
+`artifacts/turn2-straw-expanded-comparison`. Their effect is modest. The additional
+1.5 pale gain trial in `artifacts/turn2-straw-expanded-pale-verified` makes the
+mapped island too conspicuous without fixing the brown foreground. It is not
+adopted. The preview CLI records this isolated gain control; shader defaults must
+be read through RenderingServer when no material override exists.
+
+For locating future edits, stations 950, 1065 and 1150 project to approximately
+(421.9,349.4), (600.9,315.4) and (648.6,186.4) within the reviewed 750 by 440
+crop. These positions are computed from current track samples and the pinned
+datum transform, not inferred from a screenshot. Correct the field transition
+along that actual road boundary before increasing the whole pale region's gain.
+The scene is still visibly synthetic. Native Mac testing was unavailable because
+the intended Tailscale peer reported offline during this pass.

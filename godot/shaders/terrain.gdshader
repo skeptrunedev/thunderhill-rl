@@ -158,18 +158,21 @@ float mowing_gain(vec2 point) {
     float mowing_bands = sin(mowing_phase * TAU) * 0.12
                + sin(mowing_phase * TAU * 0.47 + 1.3) * 0.05;
     float continuity = 0.65 + coverage_noise(point / vec2(17.0, 21.0)) * 0.7;
-    // Continuous arc length joins the two straight arms of the mowing path.
-    // The Turn 2 center is excluded by mowing_region, so the polar origin
-    // cannot introduce visible streak singularities.
-    float along = mowing_offset.x;
-    if (mowing_offset.x > 0.0) {
-        along = atan(mowing_offset.x, mowing_offset.y) * mowing_distance;
-    } else if (mowing_offset.y < 0.0) {
-        along = PI * mowing_distance - mowing_offset.x;
+    float streaks = 0.0;
+    if (mowing_detail_strength > 0.0) {
+        // Continuous arc length joins the two straight arms of the mowing path.
+        // The Turn 2 center is excluded by mowing_region, so the polar origin
+        // cannot introduce visible streak singularities.
+        float along = mowing_offset.x;
+        if (mowing_offset.x > 0.0) {
+            along = atan(mowing_offset.x, mowing_offset.y) * mowing_distance;
+        } else if (mowing_offset.y < 0.0) {
+            along = PI * mowing_distance - mowing_offset.x;
+        }
+        vec2 streak_uv = vec2(mowing_distance, along);
+        streaks = coverage_noise(streak_uv / vec2(0.38, 7.0)) * 0.36
+                      + coverage_noise(streak_uv / vec2(1.1, 19.0) + vec2(17.0, 3.0)) * 0.24;
     }
-    vec2 streak_uv = vec2(mowing_distance, along);
-    float streaks = coverage_noise(streak_uv / vec2(0.38, 7.0)) * 0.36
-                  + coverage_noise(streak_uv / vec2(1.1, 19.0) + vec2(17.0, 3.0)) * 0.24;
     return 1.0 + mowing_region * (mowing_bands * continuity * mowing_visibility * mowing_band_strength
                                   + streaks * mowing_detail_strength);
 }

@@ -82,10 +82,21 @@ def rasterize(regions, lower, size, dimensions):
             t = np.where(inside, np.clip(distance / feather, 0, 1), 0)
             alpha = t * t * (3 - 2 * t)
             block = output[start:stop]
-            select = alpha > 0
-            block[select, 0] = coverage
-            block[select, 1] = pale
-            block[select, 3] = alpha[select]
+            # Straight alpha source over preserves the lower region through
+            # an overlaid region's feather instead of erasing it to zero.
+            old_alpha = block[..., 3].copy()
+            combined_alpha = alpha + old_alpha * (1 - alpha)
+            for channel, value in enumerate((coverage, pale, 0)):
+                numerator = value * alpha + block[..., channel] * old_alpha * (
+                    1 - alpha
+                )
+                block[..., channel] = np.divide(
+                    numerator,
+                    combined_alpha,
+                    out=np.zeros_like(alpha),
+                    where=combined_alpha > 0,
+                )
+            block[..., 3] = combined_alpha
     return output
 
 
@@ -111,6 +122,9 @@ def build(output_dir, annotation_path):
     if not np.isfinite(pixel_m) or not 0.25 <= pixel_m <= 4:
         raise ValueError("Output spacing must be finite and between 0.25 and 4 metres")
     output_dimensions = np.ceil(size / pixel_m).astype(int).tolist()
+    overlap_policy = annotations.get("overlap_policy", "reject")
+    if overlap_policy not in ("reject", "source_over"):
+        raise ValueError("Unknown overlap policy")
     regions = []
     ids = set()
     for region in annotations["regions"]:
@@ -120,7 +134,9 @@ def build(output_dir, annotation_path):
         polygon = local_polygon(
             region["polygon_pixels"], extent, dimensions, origin, transform
         )
-        if any(polygon.intersection(previous[0]).area > 0 for previous in regions):
+        if overlap_policy == "reject" and any(
+            polygon.intersection(previous[0]).area > 0 for previous in regions
+        ):
             raise ValueError(
                 "Overlapping region interiors require explicit material priority"
             )
@@ -158,6 +174,7 @@ def build(output_dir, annotation_path):
             "license": "Public domain",
             "attribution": "USDA NAIP; USGS The National Map",
         },
+        "overlap_policy": overlap_policy,
         "annotation_path": str(annotation_path.relative_to(ROOT)),
         "annotation_sha256": sha256(annotation_path),
         "horizontal_datum": datum,
@@ -169,7 +186,7 @@ def build(output_dir, annotation_path):
         "output_pixel_m": (size / output_dimensions).tolist(),
         "mapping": "uv = (world_xz - local_origin_xz) / local_size_xz; PNG top is north; outside rectangle has zero alpha",
         "encoding": "RGBA8 linear numerical data without sRGB conversion. R target grass coverage; G pale straw response weight; B unused zero; A regional blend weight. Outside annotations RGBA is zero.",
-        "algorithm": "Source pixel center annotation polygons densified to one pixel then inverse transformed using pinned datum grids. Interior boundary distance at local output pixel centers controls smoothstep alpha; no exterior feather and no invented stripes.",
+        "algorithm": "Source pixel center annotation polygons densified to one pixel then inverse transformed using pinned datum grids. Interior boundary distance at local output pixel centers controls smoothstep alpha; regions use straight alpha source over in listed order when explicitly enabled; no exterior feather and no invented stripes.",
         "regions": [
             {
                 "id": annotation["id"],

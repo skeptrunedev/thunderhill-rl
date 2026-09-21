@@ -26,6 +26,7 @@ func _run() -> void:
 	var retained_swath := NAN
 	var mowing_band := NAN
 	var mowing_detail := NAN
+	var pale_straw_scale := NAN
 	var detail_source := ""
 	var lean_deg := 0.0
 	var lateral_m := 0.0
@@ -79,6 +80,17 @@ func _run() -> void:
 			asphalt_detail["authored_tile_m" if is_tile else "authored_relief_m"] = float(value)
 		elif arg.begins_with("--terrain-detail="):
 			detail_source = arg.trim_prefix("--terrain-detail=")
+		elif arg.begins_with("--pale-straw-gain-scale="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.5
+				or float(value) > 2.0
+			):
+				_fail("Pale straw gain scale must be finite and within 0.5 to two")
+				return
+			pale_straw_scale = float(value)
 		elif arg.begins_with("--mowing-detail-strength="):
 			var value := arg.get_slice("=", 1)
 			if (
@@ -392,6 +404,12 @@ func _run() -> void:
 		paving_joint_strength = RenderingServer.shader_get_parameter_default(
 			pavement_material.shader.get_rid(), "paving_joint_strength"
 		)
+	if is_finite(pale_straw_scale):
+		var material: ShaderMaterial = game.track.terrain_material
+		var gain: Vector3 = RenderingServer.shader_get_parameter_default(
+			material.shader.get_rid(), "pale_straw_gain"
+		)
+		material.set_shader_parameter("pale_straw_gain", gain * pale_straw_scale)
 	if is_finite(mowing_detail):
 		game.track.terrain_material.set_shader_parameter("mowing_detail_strength", mowing_detail)
 	if is_finite(mowing_band):
@@ -556,9 +574,13 @@ func _run() -> void:
 								if not detail_source.is_empty()
 								else ""
 							),
+							"pale_straw_gain":
+							str(
+								_material_parameter(game.track.terrain_material, "pale_straw_gain")
+							),
 							"mowing_detail_strength":
-							game.track.terrain_material.get_shader_parameter(
-								"mowing_detail_strength"
+							_material_parameter(
+								game.track.terrain_material, "mowing_detail_strength"
 							),
 							"mowing_band_strength":
 							game.track.terrain_material.get_shader_parameter(
@@ -753,3 +775,10 @@ func _apply_sky_patch(material: ShaderMaterial, path: String) -> Dictionary:
 		}
 	)
 	return projection
+
+
+func _material_parameter(material: ShaderMaterial, parameter: String) -> Variant:
+	var value: Variant = material.get_shader_parameter(parameter)
+	if value != null:
+		return value
+	return RenderingServer.shader_get_parameter_default(material.shader.get_rid(), parameter)

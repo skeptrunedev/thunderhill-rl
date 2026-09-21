@@ -35,6 +35,20 @@ class FieldCoverageTests(unittest.TestCase):
         np.testing.assert_allclose(values[2:, :3], np.tile([0.95, 0.8, 0], (4, 1)))
         np.testing.assert_allclose(values[:, 3], [0, 0, 7 / 27, 20 / 27, 1, 1])
 
+    def test_overlaid_region_feather_preserves_underlying_material(self):
+        values = rasterize(
+            [
+                (shapely.box(-10, -10, 10, 10), 0.9, 0.8, 1),
+                (shapely.box(0, -10, 10, 10), 0.5, 0.2, 2),
+            ],
+            [-1.5, -0.5],
+            [4, 1],
+            [4, 1],
+        )[0]
+        np.testing.assert_allclose(values[:, 0], [0.9, 0.9, 0.7, 0.5])
+        np.testing.assert_allclose(values[:, 1], [0.8, 0.8, 0.5, 0.2])
+        np.testing.assert_allclose(values[:, 3], 1)
+
     def test_invalid_polygon_and_parameters_fail(self):
         extent = {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10}
         origin = {"easting": 0, "northing": 0}
