@@ -710,8 +710,8 @@ func _build_cockpit() -> void:
 			switchgear
 		)
 		_box(Vector3(0.014, 0.008, 0.006), Vector3(0, -0.009, 0.027), dark_metal, switchgear)
-		# Amber reservoir appearance follows the footage; the opaque finish is
-		# an approximation, not physical transmission or simulated fluid motion.
+		# Amber reservoir tint and transmitted background follow the footage.
+		# Screen transmission and analytic absorption omit refraction and slosh.
 		var fluid := ShaderMaterial.new()
 		fluid.shader = preload("res://shaders/reservoir.gdshader")
 		# The footage shows raised pots on stalks, above the bar and display sides.
@@ -723,6 +723,23 @@ func _build_cockpit() -> void:
 			0.005,
 			dark_metal,
 			_front
+		)
+		# Outlet and feed hose connect the vessel to the master cylinder.
+		_bar(
+			Vector3(side * 0.235, reservoir_base, 0.205),
+			Vector3(side * 0.235, reservoir_base - 0.012, 0.205),
+			0.007,
+			polymer,
+			_front
+		)
+		_hose(
+			[
+				Vector3(side * 0.235, reservoir_base - 0.01, 0.205),
+				Vector3(side * 0.242, 0.743, 0.214),
+				Vector3(side * 0.253, 0.720, 0.218)
+			],
+			0.004,
+			polymer
 		)
 		_mesh(
 			_reservoir_shell(false),

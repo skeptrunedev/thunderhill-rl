@@ -164,3 +164,25 @@ previous isolated tall weeds; distant terrain still lacks field structure.
 The rendered human control test passes with zero failures. Local frame samples
 are not a Mac performance certification. The macOS development export is
 validated separately, and the game remains below the requested realism target.
+
+## Reservoir transmission
+
+The reservoir shader now samples opaque scene radiance and attenuates it through
+an analytic bounded cylinder representing the fluid. Ray intersections with the
+cylinder sides and fluid top/bottom determine the path length. Estimated RGB
+absorption coefficients produce the amber transmission using exponential
+attenuation. A thin wall tint and grazing reflection term describe the vessel.
+Fluid dimensions and absorption are appearance estimates, not manufacturer
+measurements. Added outlets and feed hoses sit separately from the supports.
+
+This is screen based transmission without refractive displacement, multiple
+internal reflections or sloshing. Godot copies the screen before transparent
+objects, so they are absent from the transmitted image. This limitation follows
+the [engine documentation](https://docs.godotengine.org/en/stable/tutorials/shaders/screen-reading_shaders.html).
+The fluid top is fixed in vessel coordinates. It is a visual material, not a
+fluid simulation or an RL observation of brake fluid condition.
+
+The real Vulkan Mobile cockpit render is
+`artifacts/reservoir-absorption-final.png`, compared with video frame 00:10.
+Transmission is visibly amber instead of an opaque brown surface. This improves
+one material but does not resolve approximate cockpit proportions and details.

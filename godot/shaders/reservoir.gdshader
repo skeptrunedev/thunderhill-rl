@@ -1,25 +1,60 @@
 shader_type spatial;
-render_mode cull_disabled;
+render_mode cull_back;
 
-// Opaque appearance approximation guided by the supplied onboard footage.
-// This models a tinted pot and fluid boundary, not optical transmission or slosh.
-uniform vec3 fluid_color : source_color = vec3(0.40, 0.19, 0.045);
-uniform vec3 empty_color : source_color = vec3(0.34, 0.29, 0.20);
-uniform float half_height = 0.0225;
-varying float local_height;
+uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_linear;
+// Estimated absorption per metre, not measured brake fluid optical properties.
+uniform vec3 fluid_absorption = vec3(6.0, 24.0, 60.0);
+uniform float fluid_radius = 0.024;
+uniform float fluid_bottom = -0.020;
+uniform float fluid_top = 0.0081;
+varying vec3 local_position;
+varying vec3 local_camera;
 
 void vertex() {
-    local_height = VERTEX.y;
+    local_position = VERTEX;
+    local_camera = (inverse(MODELVIEW_MATRIX) * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+}
+
+float fluid_path(vec3 p, vec3 direction) {
+    float a = dot(direction.xz, direction.xz);
+    float b = dot(p.xz, direction.xz);
+    float c = dot(p.xz, p.xz) - fluid_radius * fluid_radius;
+    float near_t = 0.0;
+    float far_t = 1000.0;
+    if (a < 0.000001) {
+        if (c > 0.0) { return 0.0; }
+    } else {
+        float discriminant = b * b - a * c;
+        if (discriminant <= 0.0) { return 0.0; }
+        float root = sqrt(discriminant);
+        near_t = max(near_t, (-b - root) / a);
+        far_t = min(far_t, (-b + root) / a);
+    }
+    if (abs(direction.y) < 0.000001) {
+        if (p.y < fluid_bottom || p.y > fluid_top) { return 0.0; }
+    } else {
+        float bottom_t = (fluid_bottom - p.y) / direction.y;
+        float top_t = (fluid_top - p.y) / direction.y;
+        near_t = max(near_t, min(bottom_t, top_t));
+        far_t = min(far_t, max(bottom_t, top_t));
+    }
+    return max(0.0, far_t - near_t);
 }
 
 void fragment() {
-    float level = local_height / (2.0 * half_height) + 0.5;
-    float boundary = smoothstep(0.67, 0.70, level);
-    float meniscus = 1.0 - smoothstep(0.0, 0.025, abs(level - 0.68));
-    ALBEDO = mix(fluid_color, empty_color, boundary) * (1.0 + 0.18 * meniscus);
+    float facing = clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
+    float path_m = fluid_path(local_position, normalize(local_position - local_camera));
+    float fresnel = 0.04 + 0.96 * pow(1.0 - facing, 5.0);
+    float wall_path = 0.0015 / max(facing, 0.2);
+    vec3 transmission = exp(-fluid_absorption * path_m - vec3(3.0, 4.0, 7.0) * wall_path);
+    // The opaque scene copy supplies transmitted radiance. Transparent objects
+    // are absent from that copy; this is not ray traced refraction or fluid slosh.
+    EMISSION = textureLod(scene_color, SCREEN_UV, 0.0).rgb * transmission * (1.0 - fresnel);
+    ALBEDO = vec3(0.015);
+    ALPHA = 1.0;
     METALLIC = 0.0;
-    ROUGHNESS = 0.27;
+    ROUGHNESS = 0.12;
     SPECULAR = 0.5;
-    CLEARCOAT = 0.45;
-    CLEARCOAT_ROUGHNESS = 0.2;
+    CLEARCOAT = 0.35;
+    CLEARCOAT_ROUGHNESS = 0.1;
 }
