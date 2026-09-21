@@ -50,3 +50,64 @@ production color and environment lighting. The study variant at 1.6 is in
 color but cannot correct the cloud placement. Saturation operates only outside
 the cubemap pass; no lighting or reflection color grading is introduced.
 Neither this variant nor the candidate sky is a demonstrated footage match.
+
+## Original cirrus panorama
+
+The current production sky is the original generated
+[`cirrus-v1.png`](../assets/source/sky-studies/cirrus-v1.png), with its complete
+prompt and provenance in the adjacent README. The built in imagegen tool
+received descriptions of cloud morphology observed in the supplied video,
+not a video frame as image input. The actual output is 1774 by 887 pixels,
+despite the requested 3840 by 1920. It is LDR color, not recovered HDR radiance.
+
+Before authoring it, a new reference search inspected 20 official thumbnails.
+The publisher API verified the pinned 2K files for
+[Cloud Layers](https://polyhaven.com/a/cloud_layers) and
+[Cayley Lookout](https://polyhaven.com/a/cayley_lookout). Cloud Layers was tested
+with its solar azimuth aligned to production. Its source trees extend above
+the attempted eight degree latitude cutoff, producing vertical smearing in
+`artifacts/cloud-layers-rider/production.png`. This candidate was rejected.
+Cayley has useful filaments but a low sun and captured landscape. It was not
+adopted. The acquisition CLI now stores all HDR studies in ignored artifacts,
+including its default historical sky, so it cannot overwrite production sky
+metadata merely by acquiring a reference.
+
+The original panorama has elongated feathered bands and broad blue openings.
+Root and independent review find its cloud morphology substantially closer
+than Kloofendal's bulky cumulus. Reference cloud density, bright left side haze,
+deep blue gaps and fine fragments still differ. The generated clouds remain
+somewhat soft and painterly. This improves cloud type, not weather reconstruction.
+
+The first LDR radiance scale of three was too bright and blue. Scale one is
+adopted for both background and environment, with the existing 0.7 background
+and 0.45 lighting multipliers. The direct sun direction is retained from the
+previous setup; the generated texture has no solar disk. Shader conversion
+decodes sRGB explicitly. The runtime `.res` uses the existing linear color
+mipmap builder, extended with explicit asset source/output arguments, and
+contains ten mip levels. The raw generated PNG is preserved unchanged.
+
+At station 2000, the opposite view revealed a narrow segmented seam. A four
+percent periodic overlap made the source endpoints continuous but did not
+remove the artifact. Longitude's wrap was still entering implicit derivatives
+as a full texture width. The shader now wraps the longitude derivatives to
+their shortest periodic difference and uses `textureGrad`; derivatives also
+follow the overlap scale. `artifacts/cirrus-runtime-opposite/production.png`
+was inspected by root and independently: the seam is absent without an obvious
+replacement stripe. This is a sampled view check, not all angle motion coverage.
+
+The initial lower hemisphere was blue, causing conspicuous blue lower cockpit
+reflections. The environment pass now blends into estimated ground radiance
+below the horizon, using the shared dry ground linear tint scaled by 0.35.
+This is an artistic distant ground approximation, not local reflection probes
+or measured bounce light. Background sky shading does not use this blend.
+`artifacts/cirrus-ground-cockpit/production.png` shows reduced blue rims on the
+reservoirs and hardware. Root inspected the final cockpit render. The top 80
+rows differ from the preceding capture by less than 0.04 display byte values
+per channel on average; they are not byte identical.
+
+Human controls passed after the final lighting adjustment. Linux timing was
+median 17.361 ms and p95 20.854 ms over 264 frames, not a native Mac benchmark.
+Physics, agent controls, reward data and track contact surfaces are unchanged.
+The game still has substantial geometry, vegetation and lighting fidelity gaps.
+Mac export passed as `0da228c4819a-288176de9df8`; native execution and performance
+remain unverified for this build.

@@ -279,7 +279,12 @@ func _environment() -> void:
 	var sky := Sky.new()
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = preload("res://shaders/sky.gdshader")
-	sky_mat.set_shader_parameter("panorama", preload("res://assets/sky/kloofendal_2k.hdr"))
+	sky_mat.set_shader_parameter("panorama", preload("res://assets/sky/cirrus_v1.res"))
+	sky_mat.set_shader_parameter("panorama_is_srgb", true)
+	sky_mat.set_shader_parameter("panorama_energy", 1.0)
+	sky_mat.set_shader_parameter("panorama_seam_overlap", 0.04)
+	sky_mat.set_shader_parameter("use_ground_radiance", true)
+	sky_mat.set_shader_parameter("ground_radiance", TrackScript.DRY_GROUND_TINT * 0.35)
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY

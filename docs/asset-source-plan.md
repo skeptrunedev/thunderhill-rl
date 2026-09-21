@@ -11,7 +11,7 @@ Verified 19 September 2026. This is a source inventory for the first playable se
 | Dry grass ground | [Poly Haven Withered Grass](https://polyhaven.com/a/withered_grass), Charlotte Baglioni, CC0 | Candidate for summer terrain, mixed with exposed soil to avoid an uninterrupted carpet. Published tile width is 2 m. |
 | Gravel | [Poly Haven Gravel Stones](https://polyhaven.com/a/gravel_stones), Amal Kumar, CC0 | Use only where reference confirms gravel. Published tile width is 2 m; the source is coarse grey gravel, not proof of Thunderhill's runoff composition. |
 | Nearby grass silhouettes | [Poly Haven Grass Medium 01](https://polyhaven.com/a/grass_medium_01), Rico Cilliers and Rob Tuytel, CC0 | Includes a dry diffuse variant. Bake or reduce to sparse cards and simplified clumps before use. The source page lists 2 million triangles, so importing the full asset as every grass instance is unsuitable. |
-| Sky lighting reference | [Poly Haven Kloofendal 48d Partly Cloudy Pure Sky](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky), Greg Zaal and Jarod Guest, CC0 | Sky only image avoids importing an unrelated landscape skyline. It is a lighting candidate, not a photograph of Thunderhill. Match sun direction and cloud cover to the selected reference session. |
+| Previous sky lighting reference | [Poly Haven Kloofendal 48d Partly Cloudy Pure Sky](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky), Greg Zaal and Jarod Guest, CC0 | Sky only image avoids importing an unrelated landscape skyline. It is a lighting candidate, not a photograph of Thunderhill. Match sun direction and cloud cover to the selected reference session. |
 
 [Poly Haven Asphalt 02](https://polyhaven.com/a/asphalt_02) is also CC0, but its weathering and cracks make it a poor default for newly repaved racing pavement. Keep it out of the initial racing surface.
 
@@ -85,3 +85,9 @@ source for authored lower detail variants is the next source evaluation step.
 Its Burkea africana species tag is not evidence of a Thunderhill species match.
 No tree model or textures from this candidate are bundled. API responses, glTF
 metadata and verified checksums are in `artifacts/tree-asset-audit`.
+
+The production sky now uses the original generated cirrus panorama described in
+[its authoring record](../assets/source/sky-studies/README.md) and
+[the sky lighting study](sky-lighting.md). It is an LDR appearance estimate,
+not a captured Thunderhill sky or measured HDR lighting. The previous CC0 HDR
+remains available as a reference.

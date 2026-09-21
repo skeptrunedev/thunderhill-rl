@@ -12,8 +12,38 @@ func _run() -> void:
 	var output := ""
 	var sky_source := ""
 	var camera_mode := 2
+	var station_m := 400.0
+	var match_sun_azimuth := false
+	var production_only := false
+	var sky_yaw := 0.0
+	var minimum_elevation := -90.0
+	var source_sha256 := ""
+	var panorama_is_srgb := false
+	var panorama_energy := 1.0
+	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--output-dir="):
+		if arg.begins_with("--station-m="):
+			var value := arg.trim_prefix("--station-m=")
+			if not value.is_valid_float() or not is_finite(float(value)) or float(value) < 0.0:
+				_fail("Station must be finite and nonnegative")
+				return
+			station_m = float(value)
+		elif arg.begins_with("--sky-min-elevation-deg="):
+			var value := arg.trim_prefix("--sky-min-elevation-deg=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 30.0
+			):
+				_fail("Minimum sky elevation must be finite and between zero and 30 degrees")
+				return
+			minimum_elevation = float(value)
+		elif arg == "--match-sun-azimuth":
+			match_sun_azimuth = true
+		elif arg == "--production-only":
+			production_only = true
+		elif arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
 		elif arg.begins_with("--sky-source="):
 			sky_source = arg.trim_prefix("--sky-source=")
@@ -29,7 +59,18 @@ func _run() -> void:
 	if DirAccess.make_dir_recursive_absolute(output) != OK:
 		_fail("Cannot create output directory")
 		return
+	if (match_sun_azimuth or minimum_elevation > -90.0) and sky_source.is_empty():
+		_fail("Sky orientation and horizon studies require a candidate sky source")
+		return
 	var variants := [
+		{
+			"name": "production",
+			"mapper": Environment.TONE_MAPPER_FILMIC,
+			"exposure": 1.0,
+			"sky": 0.7,
+			"sun": "fff0d5",
+			"fog": 0.00035
+		},
 		{
 			"name": "sky_chroma",
 			"mapper": Environment.TONE_MAPPER_FILMIC,
@@ -88,6 +129,8 @@ func _run() -> void:
 			"fog": 0.00016
 		}
 	]
+	if production_only:
+		variants = [variants[0]]
 	for row in variants:
 		if FileAccess.file_exists(output.path_join(row.name + ".png")):
 			_fail("Refusing to overwrite captures")
@@ -106,7 +149,10 @@ func _run() -> void:
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	game.hud.visible = false
 	game.camera_mode = camera_mode
-	game.reset_episode(400.0)
+	if station_m >= game.track.length_m:
+		_fail("Station exceeds lap length")
+		return
+	game.reset_episode(station_m)
 	game._update_visual(1.0)
 	var environment: Environment
 	var sun: DirectionalLight3D
@@ -118,6 +164,13 @@ func _run() -> void:
 	if environment == null or sun == null:
 		_fail("Game lighting missing")
 		return
+	if sky_source.is_empty():
+		var material: ShaderMaterial = environment.sky.sky_material
+		var texture: Texture2D = material.get_shader_parameter("panorama")
+		source_sha256 = FileAccess.get_sha256(texture.resource_path)
+		panorama_is_srgb = bool(material.get_shader_parameter("panorama_is_srgb"))
+		panorama_energy = float(material.get_shader_parameter("panorama_energy"))
+		seam_overlap = float(material.get_shader_parameter("panorama_seam_overlap"))
 	if not sky_source.is_empty():
 		var source: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(sky_source))
 		var image := Image.load_from_file(source.local_path)
@@ -131,8 +184,36 @@ func _run() -> void:
 		environment.sky.sky_material.set_shader_parameter(
 			"panorama", ImageTexture.create_from_image(image)
 		)
+		if source.get("encoding", "linear") not in ["linear", "srgb"]:
+			_fail("Candidate encoding must be linear or srgb")
+			return
+		seam_overlap = float(source.get("seam_overlap", 0.0))
+		if not is_finite(seam_overlap) or seam_overlap < 0.0 or seam_overlap > 0.1:
+			_fail("Seam overlap must be finite and within zero to 0.1")
+			return
+		environment.sky.sky_material.set_shader_parameter("panorama_seam_overlap", seam_overlap)
+		environment.sky.sky_material.set_shader_parameter(
+			"use_ground_radiance", bool(source.get("use_ground_radiance", false))
+		)
+		panorama_is_srgb = source.get("encoding", "linear") == "srgb"
+		panorama_energy = float(source.get("radiance_scale", 1.0))
+		if not is_finite(panorama_energy) or panorama_energy <= 0.0 or panorama_energy > 16.0:
+			_fail("Candidate radiance scale must be positive and at most 16")
+			return
+		environment.sky.sky_material.set_shader_parameter("panorama_is_srgb", panorama_is_srgb)
+		environment.sky.sky_material.set_shader_parameter("panorama_energy", panorama_energy)
+		source_sha256 = source.sha256
 		var direction: Array = source.toward_sun
-		sun.look_at(-Vector3(direction[0], direction[1], direction[2]), Vector3.UP)
+		var toward := Vector3(direction[0], direction[1], direction[2])
+		if match_sun_azimuth:
+			var previous := sun.global_basis.z
+			sky_yaw = atan2(previous.x, previous.z) - atan2(toward.x, toward.z)
+			toward = Basis(Vector3.UP, sky_yaw) * toward
+		environment.sky.sky_material.set_shader_parameter("panorama_yaw", sky_yaw)
+		sun.look_at(-toward, Vector3.UP)
+	environment.sky.sky_material.set_shader_parameter(
+		"minimum_source_y", sin(deg_to_rad(minimum_elevation))
+	)
 	for row in variants:
 		environment.tonemap_mode = row.mapper
 		environment.tonemap_exposure = row.exposure
@@ -160,7 +241,23 @@ func _run() -> void:
 			JSON.stringify(
 				{
 					"sky_source": sky_source,
-					"station_m": 400,
+					"runtime_panorama_path":
+					environment.sky.sky_material.get_shader_parameter("panorama").resource_path,
+					"source_sha256": source_sha256,
+					"panorama_is_srgb": panorama_is_srgb,
+					"panorama_energy": panorama_energy,
+					"panorama_seam_overlap": seam_overlap,
+					"use_ground_radiance":
+					environment.sky.sky_material.get_shader_parameter("use_ground_radiance"),
+					"ground_radiance":
+					str(environment.sky.sky_material.get_shader_parameter("ground_radiance")),
+					"panorama_yaw_radians": sky_yaw,
+					"minimum_source_elevation_deg": minimum_elevation,
+					"matched_sun_azimuth": match_sun_azimuth,
+					"toward_sun":
+					[sun.global_basis.z.x, sun.global_basis.z.y, sun.global_basis.z.z],
+					"sky_shader_sha256": FileAccess.get_sha256("res://shaders/sky.gdshader"),
+					"station_m": station_m,
 					"camera": camera_mode,
 					"fov": game.camera.fov,
 					"camera_transform": str(game.camera.global_transform),
