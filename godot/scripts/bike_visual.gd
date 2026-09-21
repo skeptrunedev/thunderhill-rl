@@ -7,8 +7,15 @@ extends Node3D
 ## Approximate eye location inside the original helmet mesh, not measured rider data.
 const RIDER_EYE_LOCAL := Vector3(0.0, 1.51, -0.30)
 ## Approximate onboard framing anchor, not a measured eye or camera mount.
-const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.14, -0.30)
-const ONBOARD_LOOK_DOWN := 0.40
+const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.37, -0.30)
+const ONBOARD_LOOK_DOWN := 0.30
+const ONBOARD_FOV_DEG := 90.0
+## Reference guided framing estimates, not a recovered camera calibration.
+const ONBOARD_ROLL_SCALE := 0.65
+const RIDER_ROLL_SCALE := 0.22
+## Nominal active area derived from Ducati 6.9 inch diagonal and 8:3 aspect.
+const DISPLAY_DIAGONAL_M := 6.9 * 0.0254
+const DISPLAY_SIZE_M := Vector2(8.0, 3.0) * (DISPLAY_DIAGONAL_M / sqrt(73.0))
 
 var _front: Node3D
 var _rear_wheel: Node3D
@@ -655,7 +662,7 @@ func _build_cockpit() -> void:
 	var accent := _material(Color("9f1822"), 0.05, 0.47)
 	_display_viewport = SubViewport.new()
 	_display_viewport.name = "InstrumentTexture"
-	_display_viewport.size = Vector2i(1024, 560)
+	_display_viewport.size = Vector2i(1280, 480)
 	_display_viewport.disable_3d = true
 	_display_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(_display_viewport)
@@ -852,10 +859,10 @@ func _build_cockpit() -> void:
 	instruments.position = Vector3(0, 0.745, 0.12)
 	instruments.rotation.x = -0.55
 	_front.add_child(instruments)
-	# Original molded outline and rim radii estimated from cockpit footage.
+	# Housing bezel, depth and corner radii remain original visual estimates.
 	var housing := _mesh(
 		preload("res://scripts/rounded_panel.gd").build(
-			Vector2(0.196, 0.119), 0.025, 0.012, 0.0025
+			DISPLAY_SIZE_M + Vector2(0.020, 0.020), 0.025, 0.010, 0.0025
 		),
 		polymer,
 		instruments
@@ -864,7 +871,7 @@ func _build_cockpit() -> void:
 	var face := Node3D.new()
 	face.position.z = 0.013
 	instruments.add_child(face)
-	_beveled_panel(Vector2(0.177, 0.097), 0.001, 0.008, display_material, face)
+	_beveled_panel(DISPLAY_SIZE_M, 0.001, 0.004, display_material, face)
 	update_instruments(0, 1500, 1)
 
 

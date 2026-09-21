@@ -1649,3 +1649,36 @@ its soft bands looked like furrows rather than irregular flattened straw.
 Both root and independent review preferred the original amplitude. The field
 still looks too smooth and uniform overall. These fixed views do not establish
 motion stability or a photographic match.
+
+## Playable onboard framing
+
+Both riding views previously retained only 22 percent of motorcycle roll in
+camera orientation. The onboard anchor was also low enough that its display,
+handlebar and damper obscured much of the road in a leaned pose. Frame 40 shows
+substantial landscape banking with a less rotated dashboard. An independent
+manual image review estimated a terrain boundary angle around 16 to 17 degrees
+and dashboard edge around minus 7 degrees. Uneven terrain, perspective and
+unknown stabilization prevent treating this as a measured camera calibration.
+
+The onboard preset now uses an estimated 1.37 metre anchor height, 0.30 radian
+downward gaze, 90 degree FOV and 0.65 roll coupling. The helmet eye retains its
+existing 0.22 coupling and framing. The agent camera uses its own configuration.
+Named constants replace duplicated roll literals, including in the pitch
+override diagnostic. These are appearance estimates; bike dynamics are unchanged.
+
+`artifacts/onboard-framing-comparison/00.png` compares the old and new actual
+runtime camera at the same station, lean and lateral position. Both root and
+independent review favour the increased road visibility and banking. The
+reference comparison in `01.png` remains visibly different: cockpit placement,
+reservoir proportions, shadow and surface appearance need work. This is an
+improved playable framing preset, not a recovered camera mount.
+
+The owner subsequently chose current manufacturer cockpit specifications.
+The display now follows Ducati's nominal 6.9 inch, 8:3 active area and 1280 by
+480 raster, with a newly arranged original functional layout. The molded bezel
+and mount remain estimates. `artifacts/current-ducati-display.png` verifies the
+rendered hardware and live speed, gear, RPM and lap readings. The earlier
+`artifacts/turn2-onboard.mp4` verifies the new camera framing but predates this
+screen shape correction. It must not be presented as the final cockpit render.
+Human controls and the five real agent camera observation checks passed before
+the display adjustment; the functional motorcycle display test passed afterward.

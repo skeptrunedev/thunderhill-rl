@@ -862,12 +862,13 @@ func _update_visual(dt: float) -> void:
 		var onboard := camera_mode == 2
 		var anchor: Vector3 = bike.ONBOARD_CAMERA_LOCAL if onboard else bike.RIDER_EYE_LOCAL
 		var look_down: float = bike.ONBOARD_LOOK_DOWN if onboard else 0.25
-		camera.fov = 74.0 if onboard else 90.0
+		camera.fov = bike.ONBOARD_FOV_DEG if onboard else 90.0
 		camera.global_position = bike.to_global(anchor)
 		var upright := Vector3.UP.slide(riding_tangent).normalized()
 		var gaze := riding_tangent * cos(look_down) - upright * sin(look_down)
 		camera.look_at(camera.position + gaze * 30.0, upright)
-		camera.rotate_object_local(Vector3.FORWARD, sim.lean * 0.22)
+		var roll_scale: float = bike.ONBOARD_ROLL_SCALE if onboard else bike.RIDER_ROLL_SCALE
+		camera.rotate_object_local(Vector3.FORWARD, sim.lean * roll_scale)
 
 
 func _input(event: InputEvent) -> void:

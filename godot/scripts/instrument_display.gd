@@ -1,6 +1,6 @@
 extends Control
 ## Original live race display, composed as a high resolution material texture.
-## The supplied cockpit footage guides density and hierarchy, not firmware assets.
+## Original graphics for the current manufacturer 1280 by 480 display specification.
 var readout: Dictionary = {}
 var speed_text := "000"
 var gear_text := "N"
@@ -35,30 +35,31 @@ func _text(text: String, at: Vector2, pixels: int, color := WHITE) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(0, 0, 1024, 560), Color("070b10"))
-	_text("TRACK", Vector2(48, 49), 27, RED)
-	_text("RPM x 1000", Vector2(752, 48), 21, MUTED)
+	draw_rect(Rect2(0, 0, 1280, 480), Color("070b10"))
+	_text("TRACK", Vector2(48, 42), 26, RED)
+	_text("RPM x 1000", Vector2(1050, 42), 21, MUTED)
 	var rpm: float = readout.get("rpm", 0)
-	# A rising scale with small half-thousand ticks remains legible in perspective.
 	for tick in range(29):
-		var x := 52.0 + tick * 32.4
-		var y := 158.0 - minf(float(tick), 16.0) * 2.6
+		var x := 52.0 + tick * 41.7
+		var y := 143.0 - minf(float(tick), 16.0) * 2.0
 		var color := RED if tick >= 24 else WHITE
 		var major := tick % 2 == 0
 		draw_line(Vector2(x, y), Vector2(x, y - (16 if major else 8)), color, 2, true)
 		if major:
 			_text(str(tick / 2), Vector2(x - 7, y - 24), 20, color)
 		var active := rpm >= float(tick) * 500.0
-		draw_rect(Rect2(x, y + 8, 27, 17), color if active else Color("202b31"))
-	draw_line(Vector2(48, 204), Vector2(974, 204), Color("3a4851"), 2, true)
-	_text("LAP TIME", Vector2(54, 249), 23, MUTED)
-	_text(lap_text, Vector2(50, 342), 78)
-	_text("GEAR", Vector2(783, 252), 23, MUTED)
-	_text(gear_text, Vector2(776, 372), 132)
-	draw_line(Vector2(727, 231), Vector2(727, 390), Color("3a4851"), 2, true)
-	_text(speed_text, Vector2(56, 456), 68)
-	_text("km/h", Vector2(213, 454), 25, MUTED)
-	_text(rpm_text, Vector2(421, 449), 28, MUTED)
-	draw_line(Vector2(48, 490), Vector2(974, 490), Color("3a4851"), 2, true)
-	_text("THUNDERHILL", Vector2(52, 527), 22, MUTED)
-	_text("EAST  /  PRACTICE", Vector2(701, 527), 21, MUTED)
+		draw_rect(Rect2(x, y + 8, 35, 15), color if active else Color("202b31"))
+	draw_line(Vector2(48, 184), Vector2(1232, 184), Color("3a4851"), 2, true)
+	_text("SPEED", Vector2(52, 228), 23, MUTED)
+	_text(speed_text, Vector2(48, 336), 98)
+	_text("km/h", Vector2(252, 332), 26, MUTED)
+	_text("GEAR", Vector2(426, 228), 23, MUTED)
+	_text(gear_text, Vector2(433, 362), 144)
+	_text("LAP TIME", Vector2(716, 228), 23, MUTED)
+	_text(lap_text, Vector2(710, 332), 88)
+	for x in [376, 656]:
+		draw_line(Vector2(x, 213), Vector2(x, 369), Color("3a4851"), 2, true)
+	draw_line(Vector2(48, 400), Vector2(1232, 400), Color("3a4851"), 2, true)
+	_text("THUNDERHILL", Vector2(52, 446), 24, MUTED)
+	_text(rpm_text, Vector2(501, 446), 26, MUTED)
+	_text("EAST / PRACTICE", Vector2(988, 446), 23, MUTED)

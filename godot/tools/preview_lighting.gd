@@ -479,7 +479,10 @@ func _run() -> void:
 		var pitch := deg_to_rad(float(camera_overrides["pitch-deg"]))
 		var gaze := tangent * cos(pitch) - upright * sin(pitch)
 		game.camera.look_at(game.camera.global_position + gaze * 30.0, upright)
-		game.camera.rotate_object_local(Vector3.FORWARD, game.sim.lean * 0.22)
+		var roll_scale: float = (
+			game.bike.ONBOARD_ROLL_SCALE if camera_mode == 2 else game.bike.RIDER_ROLL_SCALE
+		)
+		game.camera.rotate_object_local(Vector3.FORWARD, game.sim.lean * roll_scale)
 	if camera_overrides.has("fov-deg"):
 		game.camera.fov = camera_overrides["fov-deg"]
 	if view_yaw_deg != 0.0:

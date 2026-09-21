@@ -114,3 +114,31 @@ is listed as downloadable CC Attribution. Its identity is generic; a Ducati
 match has not been established. Both component sources need visual evaluation
 before adoption. Download status here is publisher metadata, not a completed
 archive retrieval. No new third party motorcycle asset is bundled.
+
+## Accepted motorcycle direction, 21 September 2026
+
+The owner explicitly selected the current manufacturer Streetfighter V4 S
+appearance over conflicting cockpit proportions in the footage, and accepted
+the OUTPISTON motorcycle asset's noncommercial restriction. This supersedes the
+previous unrestricted asset requirement for that motorcycle. Keep the game code
+MIT licensed and identify the motorcycle and modifications separately under its
+asset license. Do not describe the asset itself as unrestricted open source.
+
+The live publisher API was checked again: model
+`c501252f8af64c559bf91dc306c3a550`, author OUTPISTON, title "2024 Ducati
+StreetFighter V4 S", downloadable, CC Attribution NonCommercial ShareAlike 4.0.
+The publisher requires credit, noncommercial use and the same license for
+modified versions. The authorized download endpoint returned HTTP 401 because
+no authenticated Sketchfab session was supplied. No archive has been acquired
+or imported. A downloaded source archive is still needed. Its 2024 label remains
+a model identity discrepancy to inspect and adapt against the current bike;
+license acceptance does not resolve that discrepancy.
+
+Ducati's current [electronics specification](https://www.ducati.com/ww/en/bikes/streetfighter/streetfighter-v4/electronics)
+and [US motorcycle specification](https://www.ducati.com/us/en/bikes/streetfighter/streetfighter-v4)
+confirm the 6.9 inch display with 1280 by 480 pixels and 8:3 aspect. The original
+functional display now uses those raster dimensions and an active rectangle
+derived from the nominal diagonal and aspect. Housing bezel, corner radii,
+depth and placement remain estimates. The graphics are original game readouts,
+not extracted Ducati firmware. The screen layout was redesigned for the wider
+aspect rather than stretching the earlier tall display.
