@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "purpose": "Artistic placement of flattened pale straw based on historical aerial appearance, not measured vegetation coverage",
+  "source": {
+    "image": "artifacts/reference/ortho/east-2022.png",
+    "image_sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
+    "export_sha256": "f776b342ff9aa6cd2830ecacf57c1c6ac015794557f4f781b2db6d66eae44165",
+    "export_request": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?f=json&bbox=556880%2C4376248%2C558008%2C4377699&bboxSR=26910&imageSR=26910&size=1880%2C2419&format=png&interpolation=RSP_NearestNeighbor&mosaicRule=%7B%22mosaicMethod%22%3A+%22esriMosaicLockRaster%22%2C+%22lockRasterIds%22%3A+%5B23435%5D%7D",
+    "extent": {
+      "xmin": 556880,
+      "ymin": 4376247.8,
+      "xmax": 558008,
+      "ymax": 4377699.2,
+      "spatialReference": {
+        "wkid": 26910,
+        "latestWkid": 26910
+      }
+    },
+    "license": "Public domain",
+    "attribution": "USDA NAIP; USGS The National Map"
+  },
+  "annotation_path": "data/reference/turn2-straw-regions.json",
+  "annotation_sha256": "0009a50e743b4fbe7c072c28c3fd4da8f1c9438c88f1ca26550b056b5d73fb4f",
+  "horizontal_datum": {
+    "source_crs": "EPSG:6339",
+    "target_crs": "EPSG:26910",
+    "operation": "proj=pipeline step inv proj=utm zone=10 ellps=GRS80 step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif step inv proj=gridshift no_z_transform grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif step inv proj=gridshift grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif step proj=utm zone=10 ellps=GRS80",
+    "grid_sha256": {
+      "us_noaa_nadcon5_nad83_2007_nad83_2011_conus.tif": "560d65e871afdcfed3d736074f5b3b82cb2fd74d25f988cc556824eceeafce96",
+      "us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif": "73ea6609fcdbc971771dc0481be19f4d6aa5118ddbd3e0734ff1cf0facf0f40a",
+      "us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif": "703434db8e87dd5c35579151410a9e5892d5769f4f2f9c6b0e2b700ae537e2ff",
+      "us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif": "e12ac2e886edafe616e0994c610ad3daa01db17c00d0e9938145d956f249fc2f"
+    },
+    "manifest_sha256": "950e9e57d04f62b12f8c9284dacfd9146dddb0df6a97d0d86d4157a437e32604",
+    "vertical": "Horizontal transformation only; NAVD88 heights are unchanged"
+  },
+  "track_sha256": "7e02ae659b252cbdf52e6378c96a254cf72facea0db7b9d3a539c9b6c298165a",
+  "surface_sha256": "c0fbcf8df2ff73ac5dec213f67978091c57c9019302ef12a77eab9868b967dae",
+  "local_origin_xz": [
+    -586.5781278515933,
+    -466.00422843545675
+  ],
+  "local_size_xz": [
+    1127.9990616173018,
+    1451.4028657516465
+  ],
+  "output_dimensions": [
+    1128,
+    1452
+  ],
+  "output_pixel_m": [
+    0.9999991681004449,
+    0.9995887505176628
+  ],
+  "mapping": "uv = (world_xz - local_origin_xz) / local_size_xz; PNG top is north; outside rectangle has zero alpha",
+  "encoding": "RGBA8 linear numerical data without sRGB conversion. R target grass coverage; G pale straw response weight; B unused zero; A regional blend weight. Outside annotations RGBA is zero.",
+  "algorithm": "Source pixel center annotation polygons densified to one pixel then inverse transformed using pinned datum grids. Interior boundary distance at local output pixel centers controls smoothstep alpha; no exterior feather and no invented stripes.",
+  "regions": [
+    {
+      "id": "turn2_interior_pale_straw",
+      "local_area_m2": 28541.859774598204,
+      "road_clearance_m": 7.147790480821207,
+      "target_grass_coverage": 0.95,
+      "pale_straw_response": 0.8,
+      "interior_feather_m": 3.0
+    }
+  ],
+  "output_sha256": "e08578da50238c5ee6e4ad163e405c34ad20f5c48b20db369e11b22a67a032d1",
+  "limitations": [
+    "Historical July 2022 appearance predates repave and current footage",
+    "Polygon boundaries and material weights are artistic estimates, not measured vegetation coverage or reflectance",
+    "Only the reviewed Turn 2 interior is annotated; other regions remain unchanged",
+    "Existing aerial detail may supply mowing variation; this map adds no synthetic stripe pattern",
+    "Material appearance only; never use for friction, physics, or track geometry"
+  ]
+}

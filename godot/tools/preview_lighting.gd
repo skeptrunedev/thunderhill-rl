@@ -11,6 +11,9 @@ func _initialize() -> void:
 func _run() -> void:
 	var output := ""
 	var sky_source := ""
+	var field_map_path := ""
+	var field_map_sha256 := ""
+	var field_map_strength := -1.0
 	var camera_mode := 2
 	var station_m := 400.0
 	var fog_density := -1.0
@@ -27,7 +30,20 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--fog-density="):
+		if arg.begins_with("--field-map-strength="):
+			var value := arg.trim_prefix("--field-map-strength=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Field map strength must be finite and within zero to one")
+				return
+			field_map_strength = float(value)
+		elif arg.begins_with("--field-map="):
+			field_map_path = arg.trim_prefix("--field-map=")
+		elif arg.begins_with("--fog-density="):
 			var value := arg.trim_prefix("--fog-density=")
 			if (
 				not value.is_valid_float()
@@ -196,6 +212,56 @@ func _run() -> void:
 	if game.bike == null:
 		_fail("Game failed to initialize")
 		return
+	if not field_map_path.is_empty():
+		if not field_map_path.is_absolute_path():
+			_fail("Field map requires an absolute metadata path")
+			return
+		var field_data: Variant = JSON.parse_string(FileAccess.get_file_as_string(field_map_path))
+		if not field_data is Dictionary:
+			_fail("Invalid field map metadata")
+			return
+		for key in ["local_origin_xz", "local_size_xz", "output_dimensions"]:
+			var values: Variant = field_data.get(key)
+			if not values is Array or values.size() != 2:
+				_fail("Invalid field map coordinates: " + key)
+				return
+			for value: Variant in values:
+				if not (value is float or value is int) or not is_finite(float(value)):
+					_fail("Nonfinite field map coordinate")
+					return
+				if key != "local_origin_xz" and float(value) <= 0.0:
+					_fail("Field map dimensions must be positive")
+					return
+		var field_image_path := field_map_path.get_basename() + ".png"
+		field_map_sha256 = FileAccess.get_sha256(field_image_path)
+		if field_map_sha256.is_empty() or field_map_sha256 != field_data.get("output_sha256"):
+			_fail("Field map image hash mismatch")
+			return
+		var field_image := Image.load_from_file(field_image_path)
+		if (
+			field_image == null
+			or field_image.get_width() != field_data.output_dimensions[0]
+			or field_image.get_height() != field_data.output_dimensions[1]
+			or field_image.generate_mipmaps() != OK
+		):
+			_fail("Invalid field map image or mipmaps")
+			return
+		var field_material: ShaderMaterial = game.track.terrain_material
+		field_material.set_shader_parameter(
+			"field_surface_map", ImageTexture.create_from_image(field_image)
+		)
+		field_material.set_shader_parameter(
+			"field_surface_origin",
+			Vector2(field_data.local_origin_xz[0], field_data.local_origin_xz[1])
+		)
+		field_material.set_shader_parameter(
+			"field_surface_size", Vector2(field_data.local_size_xz[0], field_data.local_size_xz[1])
+		)
+		field_material.set_shader_parameter("field_surface_strength", 1.0)
+	if field_map_strength >= 0.0:
+		game.track.terrain_material.set_shader_parameter(
+			"field_surface_strength", field_map_strength
+		)
 	game.paused = true
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	game.hud.visible = false
@@ -313,6 +379,14 @@ func _run() -> void:
 					. stringify(
 						{
 							"sky_source": sky_source,
+							"field_map": field_map_path,
+							"field_map_strength":
+							game.track.terrain_material.get_shader_parameter(
+								"field_surface_strength"
+							),
+							"field_map_sha256": field_map_sha256,
+							"terrain_shader_sha256":
+							FileAccess.get_sha256("res://shaders/terrain.gdshader"),
 							"runtime_panorama_path":
 							(
 								environment

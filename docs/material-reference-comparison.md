@@ -1107,3 +1107,53 @@ pale flattened straw against exposed earth while keeping fine texture scale
 and normals independent of those broad transitions. This is a proposed authored
 appearance map, not a measured contemporary coverage or friction map. Do not
 repeat the rejected global contrast, enlarged tile, or generic stripe changes.
+
+## Registered Turn 2 straw coverage
+
+The first authored region is now implemented as an editable source pixel polygon
+in `data/reference/turn2-straw-regions.json`. It follows the broad pale central
+and eastern field in the historical aerial. The inspected crop was verified
+pixel for pixel against source bounds `[1000, 1720, 1750, 2160]`. This outline
+and its appearance weights are estimates, not a contemporary vegetation survey.
+
+`tools/build_field_coverage.py` verifies the source hash, transforms densified
+polygon edges through the pinned inverse datum operation, checks that the region
+avoids road geometry, and rasterizes at local pixel centers. The 1128 by 1452
+linear data texture shares the existing terrain map bounds. Its red channel
+requests 0.95 grass coverage, green requests 0.8 pale straw response, blue is
+unused, and alpha feathers inside the annotation over 3 metres. Outside the
+annotation all channels are zero. Minimum clearance from road geometry is
+approximately 7.15 metres. The importer disables alpha border modification and
+premultiplication and enables mipmaps without lossy compression.
+
+The shader blends this mapped coverage with the existing field appearance,
+retaining the shoulder alpha and later access corridor handling. Pale straw
+uses an artistic linear multiplier `(1.40, 1.48, 1.55)`. An earlier warmer
+multiplier made the patch too golden. Fine texture scale and the independently
+differentiated material relief remain unchanged; the map does not create
+raised borders or affect friction, collisions, agent actions or rewards.
+
+Matched views are in `artifacts/field-map-baseline-rider/` versus
+`artifacts/field-map-muted-rider/`, and `artifacts/field-map-baseline-apex/`
+versus `artifacts/field-map-muted-apex/`. Root and independent visual review
+accepted the clearer pale interior against the darker roadside strip. Neither
+view showed an obvious polygon corner or isolated bright island. The broad
+region remains simpler than the footage and the foreground still reads as
+textured earth. These stills do not establish a complete moving lap match.
+
+The candidate can be reproduced with `preview_lighting.gd --field-map` and an
+absolute map metadata path. `--field-map-strength=0` disables the adopted map
+for baseline comparisons; strengths must be finite and within zero to one.
+Three focused tests cover pixel center registration and axis direction,
+interior feathering and outside neutrality, and invalid inputs. The production
+map retains the candidate SHA256
+`e08578da50238c5ee6e4ad163e405c34ad20f5c48b20db369e11b22a67a032d1`.
+
+The final imported production texture was checked against its source MD5 and
+rendered in `artifacts/field-map-production-rider/production.png`. Both scenery
+bakes passed with unchanged geometry fingerprints. Human controls passed with
+zero failures; local Linux frame timing was median 17.290 ms and p95 18.926 ms
+over 269 frames. This is a runtime check, not a controlled performance benchmark.
+Python checks, formatting and diff checks pass. The MacBook was offline during
+this pass, so native Mac verification remains pending.
+Mac export passed as `1ae73280c01d-1b3b7582c5d2`.

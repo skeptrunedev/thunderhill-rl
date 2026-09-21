@@ -157,6 +157,30 @@ func _build_terrain() -> void:
 		"macro_origin", Vector2(macro.local_origin_xz[0], macro.local_origin_xz[1])
 	)
 	mat.set_shader_parameter("macro_size", Vector2(macro.local_size_xz[0], macro.local_size_xz[1]))
+	var field_map: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://assets/materials/field_coverage.json")
+	)
+	for source: String in ["track", "surface"]:
+		if (
+			field_map.get(source + "_sha256")
+			!= FileAccess.get_sha256("res://data/" + source + ".json")
+		):
+			initialization_error = "Field surface map " + source + " source mismatch"
+			return
+	if (
+		field_map.get("local_origin_xz") != macro.local_origin_xz
+		or field_map.get("local_size_xz") != macro.local_size_xz
+	):
+		initialization_error = "Field surface and terrain mapping mismatch"
+		return
+	mat.set_shader_parameter("field_surface_map", load("res://assets/materials/field_coverage.png"))
+	mat.set_shader_parameter(
+		"field_surface_origin", Vector2(field_map.local_origin_xz[0], field_map.local_origin_xz[1])
+	)
+	mat.set_shader_parameter(
+		"field_surface_size", Vector2(field_map.local_size_xz[0], field_map.local_size_xz[1])
+	)
+	mat.set_shader_parameter("field_surface_strength", 1.0)
 	terrain_material = mat
 	_mesh(st, mat, "MeasuredTerrain")
 	_startup_mark("terrain_render_mesh_complete")

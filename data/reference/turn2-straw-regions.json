@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "purpose": "Artistic placement of flattened pale straw based on historical aerial appearance, not measured vegetation coverage",
+  "source_image": "artifacts/reference/ortho/east-2022.png",
+  "source_sha256": "e49486d2d4f9c40b8d83a00e9ff02dd86407e5f09454f44cc835e1cd9f96573a",
+  "coordinate_convention": "Original source pixel center indices; column right, row down; add 0.5 when converting to projected coordinates",
+  "review_crop_pixel_bounds": [
+    1000,
+    1720,
+    1750,
+    2160
+  ],
+  "target_output_pixel_m": 1.0,
+  "regions": [
+    {
+      "id": "turn2_interior_pale_straw",
+      "target_grass_coverage": 0.95,
+      "pale_straw_response": 0.8,
+      "interior_feather_m": 3.0,
+      "polygon_pixels": [
+        [
+          1260,
+          1740
+        ],
+        [
+          1330,
+          1747
+        ],
+        [
+          1420,
+          1770
+        ],
+        [
+          1510,
+          1805
+        ],
+        [
+          1565,
+          1840
+        ],
+        [
+          1590,
+          1885
+        ],
+        [
+          1606,
+          1928
+        ],
+        [
+          1604,
+          1970
+        ],
+        [
+          1585,
+          2007
+        ],
+        [
+          1550,
+          2038
+        ],
+        [
+          1508,
+          2056
+        ],
+        [
+          1465,
+          2058
+        ],
+        [
+          1420,
+          2046
+        ],
+        [
+          1370,
+          2025
+        ],
+        [
+          1320,
+          2008
+        ],
+        [
+          1290,
+          1960
+        ],
+        [
+          1278,
+          1900
+        ],
+        [
+          1265,
+          1840
+        ]
+      ],
+      "rationale": "Broad pale interior field with fine historic mowing texture visible in supplied crop; excludes road edge and darker western vegetation. Outline and response are artistic estimates."
+    }
+  ]
+}

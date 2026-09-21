@@ -6,6 +6,12 @@ uniform sampler2D soil_color : source_color, filter_linear_mipmap_anisotropic, r
 uniform sampler2D terrain_macro : filter_linear_mipmap_anisotropic, repeat_disable;
 // Independent data channels: RGB is fine color gain / 2, alpha is grass coverage.
 uniform sampler2D terrain_detail : filter_linear_mipmap_anisotropic, repeat_disable;
+// Nonrepeating authored region data: target coverage, pale straw weight, unused, blend.
+uniform sampler2D field_surface_map : filter_linear_mipmap, repeat_disable;
+uniform vec2 field_surface_origin;
+uniform vec2 field_surface_size = vec2(1.0);
+uniform float field_surface_strength : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 pale_straw_gain = vec3(1.40, 1.48, 1.55);
 uniform vec2 macro_origin;
 uniform vec2 macro_size;
 uniform vec3 ground_tint = vec3(1.0);
@@ -192,6 +198,16 @@ void fragment() {
         grass_coverage *= mix(1.0, mix(0.70, 1.0, pale_straw), straw_abundance);
     }
     grass_coverage *= 1.0 - sparse_straw * field_patch_strength * (1.0 - 0.5 * straw_abundance);
+    if (field_surface_strength > 0.0) {
+        vec2 field_map_uv = (world_pos.xz - field_surface_origin) / field_surface_size;
+        vec4 mapped_field = texture(field_surface_map, field_map_uv);
+        float inside_map = step(0.0, field_map_uv.x) * step(field_map_uv.x, 1.0)
+                         * step(0.0, field_map_uv.y) * step(field_map_uv.y, 1.0);
+        float mapped_weight = mapped_field.a * field_surface_strength * inside_map;
+        // Retain bare shoulder coverage and existing access corridor handling.
+        grass_coverage = mix(grass_coverage, detail.a * mapped_field.r, mapped_weight);
+        straw_color_gain = mix(straw_color_gain, mix(vec3(1.0), pale_straw_gain, mapped_field.g), mapped_weight);
+    }
     float retained_grass;
     vec4 region = cleared_field(world_pos.xz, retained_grass);
     float corridor = region.a;
