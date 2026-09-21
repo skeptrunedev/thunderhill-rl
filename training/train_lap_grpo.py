@@ -10,13 +10,16 @@ import copy
 import hashlib
 import importlib.metadata
 import json
+import math
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from pathlib import Path
 
 import torch
 from datasets import Dataset
 from lap_policy import RoadTelemetry, parse_action
+from lap_prefix import load_prefix
 from lap_rollout import REWARD_VERSION, audit_rollout, physical_snapshot, rollout_reward
 from peft import PeftModel
 from smoke_grpo import MODEL, REVISION, worker
@@ -121,30 +124,73 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--steps", type=int, default=3)
     parser.add_argument("--prefix-actions", type=int, default=40)
+    parser.add_argument(
+        "--prefix-decisions",
+        type=Path,
+        help="Replay this verified model evaluation prefix once per worker, then use worker snapshots",
+    )
+    parser.add_argument(
+        "--prefix-adapter",
+        type=Path,
+        help="Source checkpoint for saved prefix, when different from --adapter",
+    )
     parser.add_argument("--continuation-actions", type=int, default=20)
     parser.add_argument("--temperature", type=float, default=1.2)
+    parser.add_argument("--learning-rate", type=float, default=1e-5)
+    parser.add_argument(
+        "--validate-prefix-only",
+        action="store_true",
+        help="Verify saved prefix and four worker snapshots without loading model weights or using CUDA",
+    )
     args = parser.parse_args()
     if (
         min(args.steps, args.prefix_actions, args.continuation_actions) < 1
+        or not math.isfinite(args.temperature)
         or args.temperature <= 0
+        or not math.isfinite(args.learning_rate)
+        or args.learning_rate <= 0
     ):
-        parser.error("Action budgets, steps, and temperature must be positive")
+        parser.error(
+            "Action budgets and steps must be positive; temperature and learning rate must be finite and positive"
+        )
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
-    if not torch.cuda.is_available():
+    if args.validate_prefix_only and not args.prefix_decisions:
+        parser.error("--validate-prefix-only requires --prefix-decisions")
+    if not args.validate_prefix_only and not torch.cuda.is_available():
         raise RuntimeError("This training probe requires CUDA")
     set_seed(71)
-    torch.cuda.reset_peak_memory_stats()
+    if not args.validate_prefix_only:
+        torch.cuda.reset_peak_memory_stats()
     started = time.monotonic()
     road = RoadTelemetry()
     initial_hash = checkpoint_hash(args.adapter)
+    prefix_hash = (
+        checkpoint_hash(args.prefix_adapter) if args.prefix_adapter else initial_hash
+    )
+    if args.prefix_adapter and not args.prefix_decisions:
+        parser.error("--prefix-adapter requires --prefix-decisions")
     tokenizer = AutoTokenizer.from_pretrained(args.adapter, padding_side="left")
-    model = PeftModel.from_pretrained(
-        AutoModelForCausalLM.from_pretrained(
-            MODEL, revision=REVISION, dtype=torch.float32, attn_implementation="sdpa"
-        ).cuda(),
-        str(args.adapter),
-        is_trainable=True,
+    source_prefix, source_provenance = (
+        load_prefix(
+            args.prefix_decisions, args.prefix_actions, prefix_hash, road, tokenizer
+        )
+        if args.prefix_decisions
+        else (None, None)
+    )
+    model = (
+        None
+        if args.validate_prefix_only
+        else PeftModel.from_pretrained(
+            AutoModelForCausalLM.from_pretrained(
+                MODEL,
+                revision=REVISION,
+                dtype=torch.float32,
+                attn_implementation="sdpa",
+            ).cuda(),
+            str(args.adapter),
+            is_trainable=True,
+        )
     )
     samples, groups = [], []
     with ExitStack() as stack:
@@ -162,34 +208,102 @@ def main():
         ]
         trace = stack.enter_context((out / "rollouts.jsonl").open("w"))
         mask_trace = stack.enter_context((out / "loss-masks.jsonl").open("w"))
-        client, _ = workers[0]
-        observation = request(
-            client, {"op": "reset", "policy_id": "frozen-model-prefix"}
-        )
-        reset_snapshot = physical_snapshot(observation)
-        prefix = []
-        for index in range(args.prefix_actions):
-            prompt = road.prompt(observation)
-            text, ids = generate(model, tokenizer, prompt)
-            controls = parse_action(text)
-            row = {
-                "phase": "prefix",
-                "before_tick": observation["tick"],
-                "prompt": prompt,
-                "completion": text,
-                "completion_ids": ids,
-                "controls": controls,
-                "adapter_sha256": initial_hash,
-                "loss_mask": [0] * len(ids),
-            }
-            observation = advance(client, observation, controls)
-            row["after_tick"] = observation["tick"]
-            row["after_snapshot"] = physical_snapshot(observation)
-            prefix.append(row)
-            if finished(observation):
-                raise RuntimeError(
-                    f"Frozen model prefix failed after {index + 1} controls"
+        snapshot_provenance = []
+        if source_prefix is not None:
+
+            def prepare_worker(index):
+                client, _ = workers[index]
+                obs = request(
+                    client, {"op": "reset", "policy_id": "saved-model-prefix"}
                 )
+                original = physical_snapshot(obs)
+                for frozen in source_prefix:
+                    if (
+                        obs["tick"] != frozen["before_tick"]
+                        or road.prompt(obs) != frozen["prompt"]
+                    ):
+                        raise ValueError(
+                            "Saved prefix replay prompt differs from source"
+                        )
+                    obs = advance(client, obs, frozen["controls"])
+                    if obs["state"] != frozen["source_after_state"]:
+                        raise ValueError(
+                            "Saved prefix replay state differs from source"
+                        )
+                    for key in (
+                        obs["track"].keys() & frozen["source_after_track"].keys()
+                    ):
+                        if obs["track"][key] != frozen["source_after_track"][key]:
+                            raise ValueError(f"Saved prefix replay track {key} differs")
+                    if finished(obs):
+                        raise ValueError("Saved prefix replay failed")
+                snapshot = client.request(
+                    {
+                        "op": "snapshot",
+                        "episode_id": obs["episode_id"],
+                        "expected_tick": obs["tick"],
+                    }
+                )
+                if (
+                    snapshot.get("version") != "worker-snapshot-v1"
+                    or snapshot.get("source_episode_id") != obs["episode_id"]
+                    or snapshot.get("source_tick") != obs["tick"]
+                    or not snapshot.get("snapshot_id")
+                ):
+                    raise RuntimeError(f"Invalid worker snapshot response: {snapshot}")
+                restored = request(
+                    client,
+                    {
+                        "op": "reset",
+                        "snapshot_id": snapshot["snapshot_id"],
+                        "policy_id": "prefix-snapshot-validation",
+                    },
+                )
+                if physical_snapshot(restored) != physical_snapshot(obs):
+                    raise ValueError(
+                        "Worker snapshot restore differs from captured branch"
+                    )
+                return original, obs, snapshot
+
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                prepared = list(pool.map(prepare_worker, range(4)))
+            reset_snapshot, observation, _ = prepared[0]
+            for original, obs, snapshot in prepared:
+                if original != reset_snapshot or physical_snapshot(
+                    obs
+                ) != physical_snapshot(observation):
+                    raise ValueError("Worker prefix states are not identical")
+                snapshot_provenance.append(snapshot)
+            prefix = source_prefix
+        else:
+            client, _ = workers[0]
+            observation = request(
+                client, {"op": "reset", "policy_id": "frozen-model-prefix"}
+            )
+            reset_snapshot = physical_snapshot(observation)
+            prefix = []
+            for index in range(args.prefix_actions):
+                prompt = road.prompt(observation)
+                text, ids = generate(model, tokenizer, prompt)
+                controls = parse_action(text)
+                row = {
+                    "phase": "prefix",
+                    "before_tick": observation["tick"],
+                    "prompt": prompt,
+                    "completion": text,
+                    "completion_ids": ids,
+                    "controls": controls,
+                    "adapter_sha256": prefix_hash,
+                    "loss_mask": [0] * len(ids),
+                }
+                observation = advance(client, observation, controls)
+                row["after_tick"] = observation["tick"]
+                row["after_snapshot"] = physical_snapshot(observation)
+                prefix.append(row)
+                if finished(observation):
+                    raise RuntimeError(
+                        f"Frozen model prefix failed after {index + 1} controls"
+                    )
         branch_snapshot = physical_snapshot(observation)
         if observation["state"]["speed"] <= 0:
             raise RuntimeError("Model prefix did not reach a moving state")
@@ -198,7 +312,9 @@ def main():
         (out / "frozen-prefix.json").write_text(
             json.dumps(
                 {
-                    "adapter_sha256": initial_hash,
+                    "adapter_sha256": prefix_hash,
+                    "source_provenance": source_provenance,
+                    "worker_snapshots": snapshot_provenance,
                     "episode_id": observation["episode_id"],
                     "reset_snapshot": reset_snapshot,
                     "branch_snapshot": branch_snapshot,
@@ -209,17 +325,35 @@ def main():
             )
             + "\n"
         )
+        if args.validate_prefix_only:
+            summary = {
+                "ok": True,
+                "prefix_validation_only": True,
+                "model_weights_loaded": False,
+                "cuda_training_run": False,
+                "branch_tick": prefix_tick,
+                "source_provenance": source_provenance,
+                "identical_worker_snapshots": len(snapshot_provenance),
+            }
+            (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+            print(json.dumps(summary), flush=True)
+            return
 
         def run_candidate(index, label, current_hash, first=None):
             client, data = workers[index]
-            obs = request(client, {"op": "reset", "policy_id": label})
-            if physical_snapshot(obs) != reset_snapshot:
+            reset_request = {"op": "reset", "policy_id": label}
+            if snapshot_provenance:
+                reset_request["snapshot_id"] = snapshot_provenance[index]["snapshot_id"]
+            obs = request(client, reset_request)
+            episode_reset = physical_snapshot(obs)
+            expected_reset = branch_snapshot if snapshot_provenance else reset_snapshot
+            if episode_reset != expected_reset:
                 raise ValueError(
                     "Candidate reset state differs from frozen prefix reset"
                 )
             episode = obs["episode_id"]
             decisions, transitions = [], []
-            for frozen in prefix:
+            for frozen in [] if snapshot_provenance else prefix:
                 if road.prompt(obs) != frozen["prompt"]:
                     raise ValueError("Frozen prefix replay observation diverged")
                 obs = advance(client, obs, frozen["controls"])
@@ -261,19 +395,37 @@ def main():
                 if finished(obs):
                     break
             reward = rollout_reward(transitions, prefix_tick, invalid)
+            stop_reason = (
+                "invalid_model_action"
+                if invalid
+                else obs["termination_reason"]
+                if obs["terminated"]
+                else obs["truncation_reason"]
+                if obs["truncated"]
+                else "track_limits"
+                if not obs["track"]["lap_valid"]
+                else "trainer_action_horizon"
+            )
             record = {
                 "episode_id": episode,
                 "policy_id": label,
                 "worker": index,
-                "prefix_adapter_sha256": initial_hash,
+                "prefix_adapter_sha256": prefix_hash,
                 "current_adapter_sha256": current_hash,
                 "prefix_tick": prefix_tick,
-                "reset_snapshot": reset_snapshot,
+                "reset_snapshot": episode_reset,
+                "snapshot_provenance": snapshot_provenance[index]
+                if snapshot_provenance
+                else None,
+                "prefix_source_provenance": source_provenance,
                 "branch_snapshot": branch_snapshot,
                 "decisions": decisions,
                 "sampled_completion_ids": first[1] if first else [],
                 "sampled_completion": first[0] if first else None,
                 "invalid_syntax": invalid,
+                "rollout_stop_reason": stop_reason,
+                "trainer_truncated": stop_reason == "trainer_action_horizon",
+                "post_branch_action_budget": 1 + args.continuation_actions,
                 "reward_components": reward,
                 "final_observation": {
                     key: value for key, value in obs.items() if key != "transitions"
@@ -341,7 +493,7 @@ def main():
             gradient_accumulation_steps=4,
             num_generations=4,
             max_completion_length=32,
-            learning_rate=1e-5,
+            learning_rate=args.learning_rate,
             beta=0.0,
             temperature=args.temperature,
             top_p=1.0,
@@ -363,6 +515,9 @@ def main():
                     "model": MODEL,
                     "revision": REVISION,
                     "initial_adapter_sha256": initial_hash,
+                    "prefix_adapter_sha256": prefix_hash,
+                    "prefix_source_provenance": source_provenance,
+                    "snapshot_restarts": bool(snapshot_provenance),
                     "prefix_actions": args.prefix_actions,
                     "continuation_actions": args.continuation_actions,
                     "reward_version": REWARD_VERSION,
@@ -466,6 +621,11 @@ def main():
             != [row.get("controls") for row in after["decisions"]],
             "current_adapter_sha256": final_hash,
             "initial_adapter_sha256": initial_hash,
+            "prefix_adapter_sha256": prefix_hash,
+            "prefix_source_provenance": source_provenance,
+            "branch_tick": prefix_tick,
+            "greedy_stop_before": baseline["rollout_stop_reason"],
+            "greedy_stop_after": after["rollout_stop_reason"],
             "reward_version": REWARD_VERSION,
             "train_metrics": trained.metrics,
             "groups": [[row["reward_components"] for row in group] for group in groups],
