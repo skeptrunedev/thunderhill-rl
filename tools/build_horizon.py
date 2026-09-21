@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["numpy==2.4.3", "rasterio==1.4.4", "scipy==1.17.1"]
+# dependencies = ["numpy==2.4.3", "rasterio==1.4.4", "scipy==1.17.1", "pyproj==3.7.2"]
 # ///
 """Sample actual surrounding USGS terrain for the distant game horizon.
 
@@ -14,11 +14,35 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
-from rasterio.windows import from_bounds
 from rasterio.warp import transform as transform_coordinates
 from scipy.ndimage import map_coordinates
+from pyproj.enums import TransformDirection
+from terrain_datum import terrain_transform
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def sample_window(raster, east, north):
+    """Bilinear sample pixel centers; never extend edge elevations beyond coverage."""
+    east, north = np.asarray(east), np.asarray(north)
+    if east.shape != north.shape or not (np.isfinite(east).all() and np.isfinite(north).all()):
+        raise ValueError("Invalid DEM sample coordinates")
+    if raster.transform.b != 0 or raster.transform.d != 0:
+        raise ValueError("Rotated DEM rasters are unsupported")
+    cols = (east - raster.transform.c) / raster.transform.a - .5
+    rows = (north - raster.transform.f) / raster.transform.e - .5
+    if (np.any(cols < 0) or np.any(cols > raster.width - 1)
+            or np.any(rows < 0) or np.any(rows > raster.height - 1)):
+        raise ValueError("Transformed horizon grid leaves the source DEM")
+    left, top = int(np.floor(cols.min())), int(np.floor(rows.min()))
+    right = min(raster.width - 1, int(np.ceil(cols.max())))
+    bottom = min(raster.height - 1, int(np.ceil(rows.max())))
+    window = rasterio.windows.Window(left, top, right - left + 1, bottom - top + 1)
+    raw = raster.read(1, window=window, masked=True)
+    values = map_coordinates(raw.astype(float).filled(np.nan),
+                            [(rows - top).ravel(), (cols - left).ravel()],
+                            order=1, mode="constant", cval=np.nan).reshape(east.shape)
+    return values, raw, rasterio.windows.bounds(window, raster.transform)
 
 
 def main():
@@ -27,28 +51,29 @@ def main():
     sources = json.loads((ROOT / "data/reference/geometry-sources.json").read_text())
     source = next(p for q in sources["catalog_queries"] for p in q["products"] if p["format"] == "GeoTIFF" and "NorthCoastRanges_B23" in p["title"])
     origin = track["origin"]
+    datum, registration = terrain_transform()
     step, margin = 32.0, 2000.0
     detail_bounds = [float(detail["x0"]), float(detail["z0"]), float(detail["x0"] + (detail["nx"] - 1) * detail["step"]), float(detail["z0"] + (detail["nz"] - 1) * detail["step"])]
     with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif", GDAL_HTTP_TIMEOUT="60"):
         with rasterio.open(source["downloadURL"]) as raster:
             assert raster.crs.to_epsg() == 26910, "Unexpected source raster projection"
-            # Snap inward to the source tile if the requested margin approaches its edge.
-            x0 = np.ceil(max(detail_bounds[0] - margin, raster.bounds.left + 1 - origin["easting"]) / step) * step
-            x1 = np.floor(min(detail_bounds[2] + margin, raster.bounds.right - 1 - origin["easting"]) / step) * step
-            z0 = np.ceil(max(detail_bounds[1] - margin, origin["northing"] - raster.bounds.top + 1) / step) * step
-            z1 = np.floor(min(detail_bounds[3] + margin, origin["northing"] - raster.bounds.bottom - 1) / step) * step
+            # Convert the tile envelope into the game datum before local clipping.
+            # A one metre inset exceeds the interpolation footprint; sampling below
+            # independently checks every transformed point against pixel centers.
+            west, south, east, north = datum.transform_bounds(
+                *raster.bounds, direction=TransformDirection.INVERSE,
+                densify_pts=21, errcheck=True)
+            x0 = np.ceil(max(detail_bounds[0] - margin, west + 1 - origin["easting"]) / step) * step
+            x1 = np.floor(min(detail_bounds[2] + margin, east - 1 - origin["easting"]) / step) * step
+            z0 = np.ceil(max(detail_bounds[1] - margin, origin["northing"] - north + 1) / step) * step
+            z1 = np.floor(min(detail_bounds[3] + margin, origin["northing"] - south - 1) / step) * step
             xs = np.arange(x0, x1 + .1, step)
             zs = np.arange(z0, z1 + .1, step)
             xx, zz = np.meshgrid(xs, zs)
-            world_x = xx + origin["easting"]
-            world_y = origin["northing"] - zz
-            bounds = (float(world_x.min()-2), float(world_y.min()-2), float(world_x.max()+2), float(world_y.max()+2))
-            window = from_bounds(*bounds, transform=raster.transform).round_offsets().round_lengths()
-            raw = raster.read(1, window=window, masked=True)
-            transform = raster.window_transform(window)
-            cols = (world_x - transform.c) / transform.a - .5
-            rows = (world_y - transform.f) / transform.e - .5
-            heights = map_coordinates(raw.filled(np.nan), [rows.ravel(), cols.ravel()], order=1, mode="nearest").reshape(xx.shape) - origin["elevation_m"]
+            world_x, world_y = datum.transform(
+                xx + origin["easting"], origin["northing"] - zz, errcheck=True)
+            heights, raw, bounds = sample_window(raster, world_x, world_y)
+            heights -= origin["elevation_m"]
             raw_hash = hashlib.sha256(np.asarray(raw).tobytes()).hexdigest()
     # Use the documented seamless 1/3 arc second product only where the
     # high resolution lidar project has no data. These are real elevations.
@@ -63,14 +88,9 @@ def main():
     with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif", GDAL_HTTP_TIMEOUT="60"):
         with rasterio.open(coarse_source["url"]) as coarse:
             cx, cy = transform_coordinates("EPSG:26910", coarse.crs, world_x.ravel().tolist(), world_y.ravel().tolist())
-            pad_x, pad_y = abs(coarse.transform.a)*2, abs(coarse.transform.e)*2
-            coarse_bounds = (min(cx)-pad_x,min(cy)-pad_y,max(cx)+pad_x,max(cy)+pad_y)
-            coarse_window = from_bounds(*coarse_bounds, transform=coarse.transform).round_offsets().round_lengths()
-            coarse_raw = coarse.read(1,window=coarse_window,masked=True)
-            coarse_transform = coarse.window_transform(coarse_window)
-            cc = (np.asarray(cx)-coarse_transform.c)/coarse_transform.a-.5
-            cr = (np.asarray(cy)-coarse_transform.f)/coarse_transform.e-.5
-            low_detail = map_coordinates(coarse_raw.filled(np.nan),[cr,cc],order=1,mode="nearest").reshape(heights.shape)-origin["elevation_m"]
+            low_detail, coarse_raw, coarse_bounds = sample_window(
+                coarse, np.asarray(cx).reshape(heights.shape), np.asarray(cy).reshape(heights.shape))
+            low_detail -= origin["elevation_m"]
             assert np.isfinite(low_detail).all(), "Seamless terrain source has unavailable elevations"
             coarse_source["source_crs"] = str(coarse.crs)
             coarse_source["source_window_bounds"] = list(coarse_bounds)
@@ -81,7 +101,7 @@ def main():
     assert len(heights) == len(xs) * len(zs)
     assert x0 < detail_bounds[0] < detail_bounds[2] < x1
     assert z0 < detail_bounds[1] < detail_bounds[3] < z1
-    result = {"schema_version": 1, "nx": len(xs), "nz": len(zs), "step": step, "x0": float(x0), "z0": float(z0), "heights": np.round(heights, 3).tolist(), "detail_bounds": {"x0": detail_bounds[0], "z0": detail_bounds[1], "x1": detail_bounds[2], "z1": detail_bounds[3]}, "metadata": {"source": source["title"], "source_url": source["downloadURL"], "source_metadata_url": source["vendorMetaUrl"], "source_crs": "EPSG:26910", "vertical_datum": "NAVD88", "fine_source_collection_year": 2023, "coarse_source": coarse_source, "fine_source_used_sample_count": int(fine_valid.sum()), "source_window_bounds_utm": list(bounds), "source_window_shape": list(raw.shape), "source_window_float32_sha256": raw_hash, "render_sampling_m": step, "requested_margin_m": margin, "actual_margins_m": [detail_bounds[0]-float(x0), detail_bounds[1]-float(z0), float(x1)-detail_bounds[2], float(z1)-detail_bounds[3]], "coverage_rule": "Use actual 1m lidar DEM where available, documented seamless 1/3 arc second USGS DEM outside its footprint", "modifications": "Bilinear sampling of real USGS 1m and seamless 1/3 arc second elevation rasters at 32m spacing, subtraction of game elevation origin; no synthetic hills", "license": "USGS 3DEP public domain", "overlap_instruction": "Root renderer must exclude detailed patch interior and stitch boundary to detailed terrain; horizon samples are independent historical elevations, not road collision."}}
+    result = {"schema_version": 1, "nx": len(xs), "nz": len(zs), "step": step, "x0": float(x0), "z0": float(z0), "heights": np.round(heights, 3).tolist(), "detail_bounds": {"x0": detail_bounds[0], "z0": detail_bounds[1], "x1": detail_bounds[2], "z1": detail_bounds[3]}, "metadata": {"source": source["title"], "source_url": source["downloadURL"], "source_metadata_url": source["vendorMetaUrl"], "source_crs": "EPSG:26910", "vertical_datum": "NAVD88", "horizontal_registration": registration, "fine_source_collection_year": 2023, "coarse_source": coarse_source, "fine_source_used_sample_count": int(fine_valid.sum()), "source_window_bounds_utm": list(bounds), "source_window_shape": list(raw.shape), "source_window_float32_sha256": raw_hash, "render_sampling_m": step, "requested_margin_m": margin, "actual_margins_m": [detail_bounds[0]-float(x0), detail_bounds[1]-float(z0), float(x1)-detail_bounds[2], float(z1)-detail_bounds[3]], "coverage_rule": "Use actual 1m lidar DEM where available, documented seamless 1/3 arc second USGS DEM outside its footprint", "modifications": "Bilinear sampling of real USGS 1m and seamless 1/3 arc second elevation rasters at 32m spacing, subtraction of game elevation origin; no synthetic hills", "license": "USGS 3DEP public domain", "overlap_instruction": "Root renderer must exclude detailed patch interior and stitch boundary to detailed terrain; horizon samples are independent historical elevations, not road collision."}}
     target = ROOT / "godot/data/horizon.json"
     target.write_text(json.dumps(result, separators=(",", ":")) + "\n")
     assert target.stat().st_size < 1_000_000

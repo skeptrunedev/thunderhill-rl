@@ -157,3 +157,34 @@ check transformed pixel bounds explicitly, use the corrected coordinates in the
 coarse reprojection, record the pinned registration metadata, and regenerate the
 horizon. The existing analytic ramp datum test is the closest verification
 pattern. This defect concerns surrounding visual terrain, not driving contact.
+
+### Horizon datum correction applied
+
+The subsequent terrain pass fixes the separate registration defect above.
+`build_horizon.py` now uses the pinned horizontal operation for both the raster
+coverage envelope and every local grid sample. Coarse source reprojection starts
+from those corrected EPSG:26910 coordinates. Both raster resolutions use a shared
+window sampler that rejects coordinates outside pixel center support instead of
+extending boundary heights. The generated metadata records the operation and
+verified grid hashes. No vertical datum conversion or synthetic heights were added.
+
+Regeneration from the two documented USGS URLs retains the 160 by 171 grid,
+32 metre spacing and local bounds. Of 27,360 samples, 20,365 use fine lidar and
+6,995 use the documented coarse source. Compared with the previous committed
+heights, median absolute change is 0.019 m, the 95th percentile is 0.115 m,
+and signed extrema are minus 0.618 m and plus 0.612 m. These are changes in
+sampled visual terrain, not measurements of improved driving accuracy.
+
+The analytic datum suite passes all four tests, including a nonsquare raster
+with unequal pixel dimensions, boundary pixel centers and rejection beyond
+all four boundaries. Root inspected `artifacts/horizon-datum-wide/production.png`
+against `artifacts/fog-isolated-wide-view/production.png`: no obvious silhouette
+or seam regression, and no substantial visual realism improvement is claimed.
+Human controls pass with zero failures (Linux median 17.361 ms, p95 18.653 ms,
+266 frames). Material uniformity, scenery detail and distant landscape structure
+remain visible fidelity gaps.
+Mac export passed as `db5b145bdd56-c7bbdf87a84e`. The first packaging process
+terminated with signal 15 after the engine export stage, before writing its
+manifest. After confirming that process had ended, a fresh packaging invocation
+completed the archive checks and provenance manifest. Native Mac execution
+remains unverified for this build.
