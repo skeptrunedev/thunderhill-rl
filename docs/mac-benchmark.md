@@ -104,3 +104,28 @@ initialized track state (`artifacts/mac-993f48b-review-episode.jsonl`). The log
 file remained empty while a process sample showed the active rendering loop;
 the process was not restarted. The corrected candidate's native image is also
 paired with the supplied footage in `artifacts/native-reference-comparison`.
+
+
+## Curved field review build
+
+Clean build `6e787eaccf05-d45977febd68` contains the accepted curved straw
+mapping, with production lighting unchanged. Its archive SHA256 is
+`46d11100448217b98324f6b680db7f9a014b18dc0f119785baf45e4d8a63d516`.
+Local and transferred archive hashes match; native strict deep code signature
+verification passed. It is installed at
+`/Users/skeptrune/Applications/ThunderhillReview/6e787eaccf05-d45977febd68/Thunderhill.app`.
+
+The actual exported executable completed a station 1150 onboard capture on the
+M3 Pro Metal renderer, exited zero and reported screenshot result zero.
+`artifacts/Thunderhill-curved-native.png` was inspected locally. Native output
+is 1152 by 720 because macOS constrained the requested window; sidecar reports
+visible, focused, drawable and current camera. This verifies native rendering,
+not full lap performance. The field flows along the bend, while pavement,
+cockpit and wider scenery remain visibly synthetic.
+
+The default Linux replay completed all 2699 transitions and 700 movie frames;
+`artifacts/curved-default-motion.mp4` is the review clip. Six sampled frames
+around eight seconds show no obvious abrupt texture transition. This limited
+inspection is not proof of no shimmer across a full lap. The existing ObjectDB
+exit warning remains. The ordinary human game was then launched for review with
+onboard camera two, without replay or preview mode.
