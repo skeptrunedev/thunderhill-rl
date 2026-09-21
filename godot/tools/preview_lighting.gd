@@ -13,6 +13,7 @@ func _run() -> void:
 	var sky_source := ""
 	var camera_mode := 2
 	var station_m := 400.0
+	var fog_density := -1.0
 	var lean_deg := 0.0
 	var lateral_m := 0.0
 	var view_yaw_deg := 0.0
@@ -26,7 +27,18 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--lateral-m="):
+		if arg.begins_with("--fog-density="):
+			var value := arg.trim_prefix("--fog-density=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 0.002
+			):
+				_fail("Fog density must be finite and between zero and 0.002")
+				return
+			fog_density = float(value)
+		elif arg.begins_with("--lateral-m="):
 			var value := arg.get_slice("=", 1)
 			if (
 				not value.is_valid_float()
@@ -167,6 +179,9 @@ func _run() -> void:
 	]
 	if production_only:
 		variants = [variants[0]]
+	if fog_density >= 0.0:
+		for row in variants:
+			row.fog = fog_density
 	for row in variants:
 		if FileAccess.file_exists(output.path_join(row.name + ".png")):
 			_fail("Refusing to overwrite captures")
@@ -266,6 +281,8 @@ func _run() -> void:
 		"minimum_source_y", sin(deg_to_rad(minimum_elevation))
 	)
 	for row in variants:
+		if row.name == "production" and fog_density < 0.0:
+			row.fog = environment.fog_density
 		environment.tonemap_mode = row.mapper
 		environment.tonemap_exposure = row.exposure
 		environment.fog_density = row.fog

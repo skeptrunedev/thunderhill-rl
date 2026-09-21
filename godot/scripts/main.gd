@@ -293,7 +293,7 @@ func _environment() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
 	env.fog_light_color = Color("b9bdad")
-	env.fog_density = 0.00035
+	env.fog_density = 0.00008
 	env.fog_sky_affect = 0.12
 	var world := WorldEnvironment.new()
 	world.environment = env

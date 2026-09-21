@@ -111,3 +111,49 @@ Physics, agent controls, reward data and track contact surfaces are unchanged.
 The game still has substantial geometry, vegetation and lighting fidelity gaps.
 Mac export passed as `0da228c4819a-288176de9df8`; native execution and performance
 remain unverified for this build.
+
+## Isolated fog correction
+
+The distant pale ridge was partly an atmosphere setting, not a grass texture
+resolution problem. The surrounding measured hills share the terrain material.
+An isolated comparison reduced fog density from 0.00035 to 0.00008 while holding
+camera transform, sky texture, sun direction, exposure and material settings
+fixed. These are appearance estimates, not reconstructed weather measurements.
+
+Paired captures are `artifacts/fog-baseline-turn2/` versus
+`artifacts/fog-isolated-turn2/`, `fog-baseline-crest/` versus
+`fog-isolated-crest/`, and `fog-baseline-wide-view/` versus
+`fog-isolated-wide-view/`. They use stations 950, 3000 and 2000 respectively.
+All paired metadata was checked for identical camera, sky and sun, and identical
+variant parameters other than fog density. Root and independent review accepted
+the lower density: the cream colored ridge becomes dry brown, with no obvious
+loss of useful depth or excessive saturation. The wider view makes the existing
+simple silhouette more visible. It does not add missing landscape layers.
+Production now uses the lower density.
+
+`preview_lighting.gd --fog-density` permits isolated finite values from zero to
+0.002 and records the effective value in each variant. Without this override,
+the production variant reads the runtime environment fog density. Nonfinite,
+negative and excessive inputs were rejected. Human controls passed with zero
+failures; local Linux timing was median 17.316 ms and p95 26.253 ms over 263
+frames. This is a functional check, not a native Mac performance certification.
+Mac export completed as `2e1f357b9c31-ec09e30262d5`; native execution of this
+build remains unverified.
+
+### Separate horizon registration defect, correction pending
+
+Code inspection found `tools/build_horizon.py` adding EPSG:6339 game origin
+coordinates directly into an EPSG:26910 raster without applying the pinned
+horizontal operation used by detailed terrain. The same mislabeled coordinates
+reach coarse raster reprojection, and boundary clipping mixes these systems.
+Both independent audit and root execution of `terrain_transform()` confirmed
+an origin adjustment of +0.255285 m east and minus 0.446407 m north, a horizontal
+magnitude of 0.514247 m. This is a real registration defect but does not explain
+the large color mismatch. Its vertical effect has not been measured.
+
+The builder and horizon data remain unchanged in this fog pass. The next terrain
+correction must transform sample coordinates before constructing raster windows,
+check transformed pixel bounds explicitly, use the corrected coordinates in the
+coarse reprojection, record the pinned registration metadata, and regenerate the
+horizon. The existing analytic ramp datum test is the closest verification
+pattern. This defect concerns surrounding visual terrain, not driving contact.
