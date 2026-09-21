@@ -1833,3 +1833,32 @@ coverage remaps are not supported as the primary route to the fidelity goal.
 Rendered human controls passed with zero failures. Linux frame intervals
 were 17.36 ms median and 20.88 ms p95 across 265 samples. Mac package
 `e5bee3ee1350-aff68223c957` exported successfully but is not native verified.
+
+## Preserve unresolved paint wear
+
+The road marking shader multiplied exposed substrate by its detail visibility,
+making distant paint completely intact. It now blends toward approximate mean
+worn coverage when individual chips become unresolved, rather than toward zero.
+The correction applies only to edge paint. Curb materials, marking dimensions,
+contact geometry and wear strength remain unchanged.
+
+The mean estimate is 0.168 before multiplying by wear amount. Numerical
+integration of the thresholded cubic value noise with independent uniform corner
+values, uniform cell positions, Python random seed 7391 and 400000 samples gave
+0.168025 with estimated standard error 0.000517. This is a filtering model,
+not measured Thunderhill paint wear or an exact average of the shader hash.
+Resolved detail retains the original expression. Both developer preview tools
+support `--paint-pristine-distance` for the preceding behavior and
+`--paint-mean-wear` for the corrected default.
+
+Matched apex captures differ by at most two channel levels. Explicit sky,
+field, road interior and cockpit crops are identical; the road crop containing
+the far painted edge changes. `artifacts/paint-mean-isolation.json` records
+the bounds. The native pixel crop comparison is `paint-mean-comparison/00.png`.
+The difference is subtle and does not solve the broader material mismatch.
+
+Actual Vulkan compilation and rendering passed, as did rendered human controls,
+GDScript formatting and diff checks. The compatible replay completed 600
+transitions and 180 movie frames. Nine sampled frames showed no obvious broad
+transition; this is not a full aliasing or Mac performance test. The known
+ObjectDB exit warning remains. Evidence is `artifacts/paint-mean-motion*`.

@@ -16,6 +16,7 @@ func _run() -> void:
 	var exit_scuff := NAN
 	var textured_scuff := false
 	var analytic_scuff := false
+	var paint_mean_wear := true
 	var broad_wear := true
 	var broad_wear_override := false
 	var hybrid_aggregate := false
@@ -27,7 +28,11 @@ func _run() -> void:
 	var photographic_corridor := true
 	var directional_composition := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--asphalt-narrow-wear":
+		if arg == "--paint-pristine-distance":
+			paint_mean_wear = false
+		elif arg == "--paint-mean-wear":
+			paint_mean_wear = true
+		elif arg == "--asphalt-narrow-wear":
 			broad_wear = false
 			broad_wear_override = true
 		elif arg == "--asphalt-broad-wear":
@@ -222,6 +227,10 @@ func _run() -> void:
 	var pavement: ShaderMaterial = game.track.get_node("RacingSurface").material_override
 	pavement.set_shader_parameter("broad_wear_enabled", broad_wear)
 	report["broad_wear_enabled"] = broad_wear
+	game.track.get_node("EdgePaint").material_override.set_shader_parameter(
+		"edge_paint_mean_wear", paint_mean_wear
+	)
+	report["edge_paint_mean_wear"] = paint_mean_wear
 	if is_finite(directional_wear):
 		pavement.set_shader_parameter("directional_wear_strength", directional_wear)
 	if is_finite(exit_scuff):

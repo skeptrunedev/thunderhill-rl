@@ -48,6 +48,7 @@ func _run() -> void:
 	var asphalt_detail := {}
 	var textured_scuff := false
 	var analytic_scuff := false
+	var paint_mean_wear := true
 	var broad_wear := true
 	var broad_wear_override := false
 	var retained_swath := NAN
@@ -75,7 +76,11 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--asphalt-narrow-wear":
+		if arg == "--paint-pristine-distance":
+			paint_mean_wear = false
+		elif arg == "--paint-mean-wear":
+			paint_mean_wear = true
+		elif arg == "--asphalt-narrow-wear":
 			broad_wear = false
 			broad_wear_override = true
 		elif arg == "--asphalt-broad-wear":
@@ -727,6 +732,9 @@ func _run() -> void:
 	game.track.get_node("RacingSurface").material_override.set_shader_parameter(
 		"broad_wear_enabled", broad_wear
 	)
+	game.track.get_node("EdgePaint").material_override.set_shader_parameter(
+		"edge_paint_mean_wear", paint_mean_wear
+	)
 	var production_terrain_material: ShaderMaterial = game.track.terrain_material
 	production_terrain_material.set_shader_parameter("photographic_corridor", photographic_corridor)
 	production_terrain_material.set_shader_parameter("photographic_aerial", photographic_aerial)
@@ -1018,6 +1026,7 @@ func _run() -> void:
 							"sun_projection_in_front": sun_in_front,
 							"asphalt_study": asphalt_study,
 							"broad_wear_enabled": broad_wear,
+							"edge_paint_mean_wear": paint_mean_wear,
 							"asphalt_study_metadata": asphalt_study_metadata,
 							"exit_scuff_texture_enabled":
 							_material_parameter(pavement, "exit_scuff_texture_enabled"),

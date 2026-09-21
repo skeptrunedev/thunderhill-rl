@@ -6,6 +6,8 @@ uniform vec3 paint_tint : source_color = vec3(1.0);
 uniform float wear_amount : hint_range(0.0, 1.0) = 0.2;
 uniform bool curb_stripes = false;
 uniform bool edge_paint = false;
+// Preserve unresolved worn area rather than reverting to intact paint.
+uniform bool edge_paint_mean_wear = true;
 uniform float edge_paint_width_m = 0.20;
 // Appearance estimates: the thin marking follows aggregate rather than being flat.
 uniform float paint_aggregate_pitch_m = 0.008;
@@ -70,6 +72,11 @@ void fragment() {
     float chips = surface_noise(p * 85.0);
     float detail_weight = 1.0 - smoothstep(0.006, 0.025, length(fwidth(p)));
     float exposed = smoothstep(0.62, 0.84, chips) * wear_amount * detail_weight;
+    if (edge_paint && edge_paint_mean_wear) {
+        // Approximate mean of thresholded cubic value noise with uniform corner
+        // values. This is a filtering estimate, not measured track paint wear.
+        exposed += 0.168 * wear_amount * (1.0 - detail_weight);
+    }
     vec3 pigment = pow(COLOR.rgb, vec3(2.2)) * paint_tint;
     if (curb_stripes) {
         // Continuous distance avoids quantizing stripe boundaries to track vertices.
