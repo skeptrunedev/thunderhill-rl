@@ -25,9 +25,12 @@ token. A second action queued before its observation arrives therefore cannot
 reuse the old token. Stale or invalid actions execute no physics and are recorded.
 The token is a sequencing receipt, not an authentication credential.
 
-The initial allowlist includes tick, speed, gear, lean, done and the observation
-token. Perfect future curvature, tire friction, reward internals and ideal racing
-lines are not exposed. Godot still records privileged state for verification.
+The initial launch diagnostic allowlist includes tick, speed, gear, lean, done
+and the observation token. Road telemetry is the standard input for lap training.
+`lap_policy.py` adds simulator supplied road position, angle and distance to the
+lookahead center, and upcoming centerline curvature. This is privileged geometry,
+not camera perception or a recommended action. Teacher controls appear only in
+offline training examples. Godot records full state for verification.
 Receipts vary between candidates; initial physical state remains identical. This
 is not a claim that all prompt tokens or sampled trajectories are identical.
 
@@ -71,8 +74,8 @@ template does not. This validates the framework and harness, not Gemma 4 support
 
 ## Remaining work
 
-Camera observations and their calibration must join this tool flow with explicit
-capture ticks. Add a telemetry or vision experiment specification, longer budgets,
+Road telemetry is the selected observation mode; camera input is not required.
+Add a versioned telemetry experiment specification, longer budgets,
 an invalid command budget, and a racing reward covering lap validity and timing.
 Harbor integration should wrap this same environment and independently verify its
 recordings. Checkpoint reload and evaluation must be validated for the interactive

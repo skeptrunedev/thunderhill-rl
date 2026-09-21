@@ -87,7 +87,7 @@ class LapPolicyTests(unittest.TestCase):
                 for line in (folder / "dataset/eval.jsonl").read_text().splitlines()
             ]
             for row in train + evaluation:
-                features = json.loads(row["prompt"].split("\n")[-2])
+                features = json.loads(row["prompt"].split("\n")[1])
                 self.assertEqual(features["speed"], row["source_row"])
                 self.assertNotIn("tick", features)
                 self.assertNotIn("station", features)

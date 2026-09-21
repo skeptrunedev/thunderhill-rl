@@ -85,7 +85,7 @@ class RoadTelemetry:
             "STEER_MILLI THROTTLE_PERCENT FRONT_PERCENT REAR_PERCENT. "
             "Steer -1000..1000; pedals 0..100.\n"
             + json.dumps(self.features(observation), separators=(",", ":"))
-            + "\nAction: "
+            + "\nAction:\n"
         )
 
 

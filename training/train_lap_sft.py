@@ -19,7 +19,7 @@ def main():
     p.add_argument("--dataset", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--steps", type=int, default=600)
-    p.add_argument("--batch", type=int, default=4)
+    p.add_argument("--batch", type=int, default=2)
     args = p.parse_args()
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
@@ -36,6 +36,15 @@ def main():
         rows = [
             json.loads(line) for line in (args.dataset / name).read_text().splitlines()
         ]
+        prompts = tokenizer([row["prompt"] for row in rows])["input_ids"]
+        full = tokenizer(
+            [row["prompt"] + row["completion"] + tokenizer.eos_token for row in rows]
+        )["input_ids"]
+        for index, (prompt, tokens) in enumerate(zip(prompts, full)):
+            if tokens[: len(prompt)] != prompt:
+                raise ValueError(f"{name} row {index}: unstable prompt token boundary")
+            if len(tokens) > 256:
+                raise ValueError(f"{name} row {index}: completion would be truncated")
         return Dataset.from_list(
             [
                 {
