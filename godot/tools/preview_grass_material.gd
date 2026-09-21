@@ -11,11 +11,17 @@ func _initialize() -> void:
 func _run() -> void:
 	var output := ""
 	var candidate := ""
+	var frames := 1
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
+		elif arg.begins_with("--frames="):
+			frames = int(arg.trim_prefix("--frames="))
 		elif arg.begins_with("--candidate="):
 			candidate = arg.trim_prefix("--candidate=")
+	if frames < 1 or frames > 120:
+		_fail("Frame count must be between 1 and 120")
+		return
 	if (
 		not output.is_absolute_path()
 		or not candidate.is_absolute_path()
@@ -26,7 +32,11 @@ func _run() -> void:
 	if DirAccess.make_dir_recursive_absolute(output) != OK:
 		_fail("Cannot create output directory")
 		return
-	for filename in ["existing.png", "candidate.png", "comparison.json"]:
+	var filenames := ["comparison.json"]
+	for name: String in ["existing", "candidate"]:
+		for index in frames:
+			filenames.append(name + ".png" if frames == 1 else "%s_%02d.png" % [name, index])
+	for filename in filenames:
 		if FileAccess.file_exists(output.path_join(filename)):
 			_fail("Refusing to overwrite " + filename)
 			return
@@ -66,17 +76,27 @@ func _run() -> void:
 	game.camera.current = true
 	var material: ShaderMaterial = track.terrain_material
 	var original: Texture2D = material.get_shader_parameter("grass_color")
-	for name: String in ["existing", "candidate"]:
-		material.set_shader_parameter("grass_color", original if name == "existing" else texture)
-		for frame in 10:
-			await RenderingServer.frame_post_draw
-		var capture := root.get_texture().get_image()
-		if (
-			Validation.classify(capture, SIZE) != "nonblack"
-			or capture.save_png(output.path_join(name + ".png")) != OK
-		):
-			_fail("Capture failed: " + name)
-			return
+	var samples: Array = []
+	for index in frames:
+		var pose := position + forward * (0.30 * index)
+		pose.y = track.terrain_surface_height(pose) + 1.5
+		game.camera.global_position = pose
+		game.camera.look_at(pose + target - position)
+		for name: String in ["existing", "candidate"]:
+			material.set_shader_parameter(
+				"grass_color", original if name == "existing" else texture
+			)
+			for frame in 10:
+				await RenderingServer.frame_post_draw
+			var capture := root.get_texture().get_image()
+			var filename := name + ".png" if frames == 1 else "%s_%02d.png" % [name, index]
+			if (
+				Validation.classify(capture, SIZE) != "nonblack"
+				or capture.save_png(output.path_join(filename)) != OK
+			):
+				_fail("Capture failed: " + filename)
+				return
+			samples.append({"filename": filename, "position": [pose.x, pose.y, pose.z]})
 	var file := FileAccess.open(output.path_join("comparison.json"), FileAccess.WRITE)
 	if file == null:
 		_fail("Cannot write comparison")
@@ -89,6 +109,10 @@ func _run() -> void:
 					JSON
 					. stringify(
 						{
+							"existing": original.resource_path,
+							"frames_per_material": frames,
+							"step_m": 0.30,
+							"samples": samples,
 							"candidate": candidate,
 							"candidate_sha256": FileAccess.get_sha256(candidate),
 							"source_size": [source.get_width(), source.get_height()],
@@ -97,7 +121,7 @@ func _run() -> void:
 							"camera_target": [target.x, target.y, target.z],
 							"fov": 74.0,
 							"limitation":
-							"Albedo study only: both use existing grass normal and roughness; these are not matching PBR maps for the candidate"
+							"Both albedos use the production shader luminance based relief and roughness, not measured PBR maps"
 						},
 						"  "
 					)

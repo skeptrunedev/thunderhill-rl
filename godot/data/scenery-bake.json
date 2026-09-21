@@ -1,10 +1,10 @@
 {
-  "build_ms": 13956.317,
+  "build_ms": 13229.03,
   "geometry_sha256": "e17b94d41d877c6fdddec095f333b8a1997d61624f075ca032baa9bcd165fa7f",
   "godot_version": "4.7.2-stable (official)",
   "grass_instances": 96000,
-  "load_ms": 35.186,
-  "scene_sha256": "8224c4136f3e34cb68f7c4d7e5ec687342797fa25bbd608893259b34313123f2",
+  "load_ms": 34.764,
+  "scene_sha256": "4f5083cb22920fab43434e766bc6e987bbc0153c3b1975a8ffe2d16e47287cd8",
   "schema_version": 1,
   "sources": {
     "assets/grass/dry_grass_rgba.png": "64460b09ab5915ca0fc92d19f00c66d2286d5bb4a21b7b591f704f40830f15e1",
@@ -17,7 +17,7 @@
     "scripts/curb_surface.gd": "b2de99aba0dd705d76d11c2541a0bf9484b65e91c04b59e2fdc5b4f2baa72cb4",
     "scripts/offroad_surface.gd": "744a4e65b018e1fca24b5d4bbfd6b41202bc596795d83328a6188315ea2099d9",
     "scripts/scenery.gd": "b0c2342558579d40869cddfb8b6627781f0098416bd82993402fb23537c5e38f",
-    "scripts/track.gd": "d1f55d5a21a16832b404704df9d22a4371aae644292003e64da49fc12ea199bf",
+    "scripts/track.gd": "dcb5fd4a9853aa418986de9973396c4680afd6eda27bea673823f203ca667419",
     "scripts/triangle_ribbon.gd": "cf097ef2009e7073216ca56619f3dcd7cd19d64e2220687762744e4ad4418fe1",
     "tools/bake_scenery.gd": "30848ea919a0019d57b862e9dbb1f7e7d7870abfcd1d564407354e169ea15dbe"
   }

@@ -19,3 +19,9 @@ Grass tuft meshes and `grass/dry_grass_rgba.png` derive from Grass Medium 01, mo
 The rough concrete diffuse, OpenGL normal and roughness JPGs are Rough Concrete by Dimitrios Savva / Poly Haven, CC0: https://polyhaven.com/a/rough_concrete . License: https://polyhaven.com/license . The published tile width is 1.2 metres. Publisher MD5 and acquired SHA256 hashes are pinned in `data/reference/material-candidates.json`. The shader applies paint tint, reduces color contrast and normal intensity, and adds restrained wear. This is a generic material approximation for the pit divider and curbs, not a sampled Thunderhill surface.
 
 The leather normal and roughness JPGs are Leather Red 02 by Rob Tuytel / Poly Haven, CC0: https://polyhaven.com/a/leather_red_02 . License: https://polyhaven.com/license . The published tile width is 0.6 metres. Publisher MD5 and acquired SHA256 hashes are pinned in `data/reference/material-candidates.json`. The original black rider colors are retained, with object space triplanar grain, reduced normal intensity and adjusted roughness. This is a generic leather reference, not a scan of the rider's equipment.
+
+`materials/dry_cut_grass_v1.png` is an original generated grass material study,
+used with custom estimated relief and roughness in `terrain.gdshader`. The exact
+prompt, reference use and limitations are recorded in
+`assets/source/material-studies/README.md` at the repository root. No source
+video frame is redistributed in this texture. It is not a scanned PBR material.

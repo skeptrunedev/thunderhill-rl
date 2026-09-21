@@ -97,3 +97,25 @@ camera 2, 1280 by 720 was inspected against the same reference frame in
 triangular highlight artifact. This does not establish a complete cockpit match;
 reservoir transmission, fitting geometry, housing edge profiles and many fine
 features remain unfinished.
+
+## Custom grass shader and texture integration
+
+The original 1254 pixel cut grass study now supplies the terrain albedo. The
+shader derives restrained relief and roughness from its filtered luminance,
+replacing unrelated normal and roughness maps from the previous grass source.
+This is an artistic approximation. Brightness cannot establish measured height
+or reflectance. Geographic color gains and the road shoulder soil blend remain.
+
+Manual mirrored UVs use a clamped sampler and explicit gradients from the
+unfolded UV coordinates. This avoids opposite edge filtering and mip derivative
+cancellation at mirror folds. The source still repeats with reflected symmetry
+every four metres, so this does not solve medium distance repetition.
+
+The real renderer produced twelve paired camera positions, 0.30 metres apart,
+in `artifacts/grass-relief-motion/`. Production uses the new source (`existing`
+in that tool); the comparison candidate is the previous Withered Grass albedo.
+These sampled positions are not a continuous motion or temporal shimmer test.
+Near straw detail is more continuous, but distant fields remain too smooth and
+standing grass too sparse. A rider view at station 520 was also inspected.
+Human controls pass with zero failures. Near one to one visual acceptance remains
+unmet. No training was run.

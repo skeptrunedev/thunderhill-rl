@@ -6,13 +6,16 @@ Withered Grass albedo as a technical reference. It is an original generated
 material study, not a measured scan or a crop from the video. Reference frames
 remain in ignored inspection artifacts. The actual output is 1254 by 1254 pixels,
 not the requested 2048 by 2048. No matched normal, height or roughness map exists.
-It is not installed as the production ground material.
+It is installed as `godot/assets/materials/dry_cut_grass_v1.png`. The terrain
+shader derives artistic relief and roughness from filtered luminance. These are
+appearance estimates, not recovered material measurements.
 
-The paired Godot study uses this candidate and the existing albedo at the same
-2 metre tile size, with identical camera, geometry, normal map, roughness and
-lighting. The candidate reads more like continuous straw near the camera, but
-repetition, distance detail and the mismatch with the existing normal map remain
-unresolved. It does not establish photographic realism.
+The paired Godot study compares albedos at the same 2 metre tile size, with
+identical camera, geometry, lighting and derived relief shader. The previous
+unrelated grass normal and roughness maps are no longer used. Mirrored sampling
+uses clamped edges and explicit gradients for mip selection at mirror folds.
+The texture reads more like continuous straw near the camera, but repetition
+and distance detail remain unresolved. It does not establish photographic realism.
 
 ## Exact generation prompt
 
