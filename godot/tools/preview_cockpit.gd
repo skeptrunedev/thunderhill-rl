@@ -11,9 +11,18 @@ func _initialize() -> void:
 func _run() -> void:
 	var output := ""
 	var steering := 0.0
+	var display_filtered := true
 	var wall_density := 1.0
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--reservoir-wall-density="):
+	var arguments := OS.get_cmdline_user_args()
+	if "--display-filtered" in arguments and "--display-unfiltered" in arguments:
+		_fail("Choose one display filtering mode")
+		return
+	for arg in arguments:
+		if arg == "--display-filtered":
+			display_filtered = true
+		elif arg == "--display-unfiltered":
+			display_filtered = false
+		elif arg.begins_with("--reservoir-wall-density="):
 			var value := arg.trim_prefix("--reservoir-wall-density=")
 			if (
 				not value.is_valid_float()
@@ -65,10 +74,17 @@ func _run() -> void:
 		_fail("Steering exceeds simulation limits")
 		return
 	game.bike.update_pose(0.0, steering, 0.0)
+	var display_count := 0
 	var reservoir_count := 0
 	var wall_absorption := Vector3.ZERO
 	for node in game.bike.find_children("*", "MeshInstance3D", true, false):
 		var material = node.material_override
+		if (
+			material is ShaderMaterial
+			and material.shader.resource_path == "res://shaders/instrument_screen.gdshader"
+		):
+			material.set_shader_parameter("footprint_filter", display_filtered)
+			display_count += 1
 		if (
 			material is ShaderMaterial
 			and material.shader.resource_path == "res://shaders/reservoir.gdshader"
@@ -79,6 +95,9 @@ func _run() -> void:
 			wall_absorption = baseline * wall_density
 			material.set_shader_parameter("wall_absorption", wall_absorption)
 			reservoir_count += 1
+	if display_count != 1:
+		_fail("Expected one live display material")
+		return
 	if reservoir_count != 2:
 		_fail("Expected two reservoir materials")
 		return
@@ -86,6 +105,7 @@ func _run() -> void:
 	variants[0].pitch = game.bike.ONBOARD_LOOK_DOWN
 	variants[0].fov = game.camera.fov
 	var report: Array = []
+	var display_has_mipmaps := false
 	for row in variants:
 		if row.name != "production":
 			game.camera.global_position = game.bike.to_global(row.anchor)
@@ -96,6 +116,9 @@ func _run() -> void:
 			game.camera.fov = row.fov
 		for frame in 24:
 			await RenderingServer.frame_post_draw
+		if row.name == "production":
+			var display_image: Image = game.bike._display_viewport.get_texture().get_image()
+			display_has_mipmaps = display_image.has_mipmaps()
 		var capture := root.get_texture().get_image()
 		if (
 			Validation.classify(capture, SIZE) != "nonblack"
@@ -130,6 +153,10 @@ func _run() -> void:
 					. stringify(
 						{
 							"station_m": 400,
+							"display_filtered": display_filtered,
+							"display_has_mipmaps": display_has_mipmaps,
+							"display_shader_sha256":
+							FileAccess.get_sha256("res://shaders/instrument_screen.gdshader"),
 							"visual_steering_rad": steering,
 							"resolution": [SIZE.x, SIZE.y],
 							"main_script_sha256": FileAccess.get_sha256("res://scripts/main.gd"),

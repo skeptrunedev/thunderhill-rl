@@ -124,3 +124,35 @@ not a registered 1:1 match. Road curvature in the image, distant terrain silhoue
 lens parameters, exposure, exact position and motion blur remain different.
 Increasing lean to move the dashboard would confound bike pose with camera
 placement, so no gameplay roll response or rider anchor is changed here.
+
+## Filter the live instrument display at riding distance
+
+The instrument source was already 1024 by 560 pixels. Its single bilinear
+sample did not average the area covered by a screen pixel when the display was
+minified, causing thin ticks and labels to fragment into bright isolated pixels.
+The diagnostic readback of the live viewport image reports no mipmaps. The
+correction averages a four by four grid over the projected UV derivatives in
+the instrument shader. Samples are decoded to linear color before averaging.
+The display remains live; no CPU image readback or additional viewport is added
+to gameplay. Reflection, housing geometry and instrument readings are unchanged.
+
+`artifacts/display-filter-baseline/` and `artifacts/display-filter-candidate/`
+contain four matching camera variants. Root and independent inspection accepted
+the candidate: small labels and ticks are more continuous without obvious blur
+of the large timer or gear digits. Metadata confirms identical camera and
+reservoir states across all four pairs. Small labels remain limited by their
+screen size; stationary frames do not establish temporal stability. The shader
+now defaults to the filter enabled. The cockpit preview follows that default;
+`--display-unfiltered` selects the baseline and `--display-filtered` explicitly
+selects the candidate. Contradictory flags are rejected. Readback is confined to
+the diagnostic preview, which records filter state and shader hash.
+
+`artifacts/filtered-display-rider-view/production.png` verifies the adopted
+shader from the existing artistic station 950 rider pose. Motorcycle readouts,
+geometry checks and rider visibility passed. Human controls passed with zero
+failures; local Linux timing was median 17.326 ms and p95 19.231 ms over 267
+frames. This is not an isolated GPU cost measurement or native Mac benchmark.
+Formatting and whitespace checks passed. Tailscale reports the intended MacBook
+offline, last seen 2026-09-21 09:00 UTC. The complete cockpit still needs further
+shape and surface detail before it resembles the footage closely.
+Mac export passed as `f8a72cc2c25f-1478320bf958`; native execution is unverified.
