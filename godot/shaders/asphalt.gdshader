@@ -1,6 +1,8 @@
 shader_type spatial;
 render_mode cull_disabled;
 uniform float lap_length_m;
+// Appearance study offset; independent of tire grip and surface identity.
+uniform float roughness_offset : hint_range(-0.3, 0.2) = 0.0;
 uniform sampler2D color_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D normal_map : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rough_map : filter_linear_mipmap_anisotropic, repeat_enable;
@@ -162,4 +164,5 @@ void fragment() {
         NORMAL_MAP = texture(normal_map, detail).rgb;
         NORMAL_MAP_DEPTH = 0.07;
     }
+    ROUGHNESS = clamp(ROUGHNESS + roughness_offset * (1.0 - edge_weight), 0.25, 0.9);
 }

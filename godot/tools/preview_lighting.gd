@@ -18,6 +18,9 @@ func _run() -> void:
 	var station_m := 400.0
 	var fog_density := -1.0
 	var paving_joint_strength := -1.0
+	var asphalt_roughness := NAN
+	var retained_swath := NAN
+	var detail_source := ""
 	var lean_deg := 0.0
 	var lateral_m := 0.0
 	var view_yaw_deg := 0.0
@@ -31,7 +34,31 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--paving-joint-strength="):
+		if arg.begins_with("--terrain-detail="):
+			detail_source = arg.trim_prefix("--terrain-detail=")
+		elif arg.begins_with("--retained-swath-strength="):
+			var value := arg.trim_prefix("--retained-swath-strength=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Retained swath strength must be finite and within zero to one")
+				return
+			retained_swath = float(value)
+		elif arg.begins_with("--asphalt-roughness-offset="):
+			var value := arg.trim_prefix("--asphalt-roughness-offset=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < -0.3
+				or float(value) > 0.2
+			):
+				_fail("Asphalt roughness offset must be finite and between -0.3 and 0.2")
+				return
+			asphalt_roughness = float(value)
+		elif arg.begins_with("--paving-joint-strength="):
 			var value := arg.trim_prefix("--paving-joint-strength=")
 			if (
 				not value.is_valid_float()
@@ -224,6 +251,11 @@ func _run() -> void:
 	if game.bike == null:
 		_fail("Game failed to initialize")
 		return
+	if not detail_source.is_empty():
+		var detail_error := _apply_terrain_detail(game.track.terrain_material, detail_source)
+		if not detail_error.is_empty():
+			_fail(detail_error)
+			return
 	if not field_map_path.is_empty():
 		if not field_map_path.is_absolute_path():
 			_fail("Field map requires an absolute metadata path")
@@ -284,6 +316,12 @@ func _run() -> void:
 		)
 		paving_joint_strength = RenderingServer.shader_get_parameter_default(
 			pavement_material.shader.get_rid(), "paving_joint_strength"
+		)
+	if is_finite(retained_swath):
+		game.track.terrain_material.set_shader_parameter("retained_swath_strength", retained_swath)
+	if is_finite(asphalt_roughness):
+		game.track.get_node("RacingSurface").material_override.set_shader_parameter(
+			"roughness_offset", asphalt_roughness
 		)
 	game.paused = true
 	game.process_mode = Node.PROCESS_MODE_DISABLED
@@ -409,7 +447,26 @@ func _run() -> void:
 					. stringify(
 						{
 							"sky_source": sky_source,
+							"terrain_detail_source": detail_source,
+							"terrain_detail_source_sha256":
+							(
+								FileAccess.get_sha256(detail_source)
+								if not detail_source.is_empty()
+								else ""
+							),
+							"retained_swath_strength":
+							game.track.terrain_material.get_shader_parameter(
+								"retained_swath_strength"
+							),
 							"paving_joint_strength": paving_joint_strength,
+							"asphalt_roughness_offset":
+							(
+								game
+								. track
+								. get_node("RacingSurface")
+								. material_override
+								. get_shader_parameter("roughness_offset")
+							),
 							"asphalt_shader_sha256":
 							FileAccess.get_sha256("res://shaders/asphalt.gdshader"),
 							"field_map": field_map_path,
@@ -481,3 +538,45 @@ func _run() -> void:
 func _fail(message: String) -> void:
 	push_error(message)
 	quit(2)
+
+
+func _apply_terrain_detail(material: ShaderMaterial, path: String) -> String:
+	if not path.is_absolute_path():
+		return "Terrain detail requires an absolute metadata path"
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not data is Dictionary:
+		return "Invalid terrain detail metadata"
+	for source in ["track", "surface"]:
+		if data.get(source + "_sha256") != FileAccess.get_sha256("res://data/" + source + ".json"):
+			return "Terrain detail geometry source mismatch"
+	for key in ["local_origin_xz", "local_size_xz", "output_dimensions"]:
+		var values: Variant = data.get(key)
+		if not values is Array or values.size() != 2:
+			return "Invalid terrain detail coordinates"
+		for value: Variant in values:
+			if not (value is float or value is int) or not is_finite(float(value)):
+				return "Nonfinite terrain detail coordinate"
+			if key != "local_origin_xz" and float(value) <= 0.0:
+				return "Terrain detail dimensions must be positive"
+	var origin := Vector2(data.local_origin_xz[0], data.local_origin_xz[1])
+	var size := Vector2(data.local_size_xz[0], data.local_size_xz[1])
+	if (
+		not origin.is_equal_approx(material.get_shader_parameter("macro_origin"))
+		or not size.is_equal_approx(material.get_shader_parameter("macro_size"))
+	):
+		return "Terrain detail mapping differs from production macro"
+	var image_path := path.get_basename() + ".png"
+	var digest := FileAccess.get_sha256(image_path)
+	if digest.is_empty() or digest != data.get("output_sha256"):
+		return "Terrain detail image hash mismatch"
+	var image := Image.load_from_file(image_path)
+	if (
+		image == null
+		or image.get_width() != data.output_dimensions[0]
+		or image.get_height() != data.output_dimensions[1]
+	):
+		return "Terrain detail image dimensions mismatch"
+	if image.generate_mipmaps() != OK:
+		return "Cannot generate terrain detail mipmaps"
+	material.set_shader_parameter("terrain_detail", ImageTexture.create_from_image(image))
+	return ""

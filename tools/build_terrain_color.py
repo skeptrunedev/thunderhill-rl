@@ -18,10 +18,10 @@ from pathlib import Path
 
 import numpy as np
 import shapely
-from shapely import STRtree
 from PIL import Image
 from pyproj.enums import TransformDirection
 from scipy.ndimage import gaussian_filter, map_coordinates
+from shapely import STRtree
 from terrain_datum import terrain_transform
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,12 +100,22 @@ def terrain_gains(rgb, pixel_m, smoothing_sigma_m=6.0, *, clip_gains=True):
     return gains, valid, median
 
 
-def terrain_detail_gains(rgb, pixel_m):
+def validate_detail_settings(detail_sigma_m, detail_pixel_m):
+    if not np.isfinite(detail_sigma_m) or not 0.1 <= detail_sigma_m <= 2.0:
+        raise ValueError("Detail sigma must be finite and within 0.1 through 2 metres")
+    if not np.isfinite(detail_pixel_m) or not 0.5 <= detail_pixel_m <= 2.0:
+        raise ValueError("Detail pixel size must be finite and within 0.5 through 2 metres")
+
+
+def terrain_detail_gains(rgb, pixel_m, detail_sigma_m=0.6):
     """Retain accepted aerial detail relative to the existing broad color layer."""
+    validate_detail_settings(detail_sigma_m, 1.0)
     # Form the ratio before output clamping. Clamping both components first
     # destroys variations where an entire light or dark region saturates.
     broad, _, _ = terrain_gains(rgb, pixel_m, clip_gains=False)
-    fine, _, _ = terrain_gains(rgb, pixel_m, smoothing_sigma_m=0.6, clip_gains=False)
+    fine, _, _ = terrain_gains(
+        rgb, pixel_m, smoothing_sigma_m=detail_sigma_m, clip_gains=False
+    )
     return np.clip(fine / broad, 0.75, 1.25)
 
 
@@ -211,7 +221,8 @@ def resample_local_gains(
     return result / samples**2
 
 
-def build(output_dir=ROOT / "godot/assets/materials"):
+def build(output_dir=ROOT / "godot/assets/materials", *, detail_sigma_m=0.6, detail_pixel_m=1.0):
+    validate_detail_settings(detail_sigma_m, detail_pixel_m)
     source_dir = ROOT / "artifacts/reference/ortho"
     source = source_dir / "east-2022.png"
     if sha256(source) != SOURCE_HASH:
@@ -280,8 +291,10 @@ def build(output_dir=ROOT / "godot/assets/materials"):
     (output_dir / "terrain_macro.json").write_text(
         json.dumps(metadata, indent=2) + "\n"
     )
-    detail_dimensions = np.ceil(local_size).astype(int).tolist()
-    detail_gains = terrain_detail_gains(np.asarray(image, dtype=float) / 255, spacing)
+    detail_dimensions = np.ceil(local_size / detail_pixel_m).astype(int).tolist()
+    detail_gains = terrain_detail_gains(
+        np.asarray(image, dtype=float) / 255, spacing, detail_sigma_m
+    )
     detail_rgb = resample_local_gains(
         detail_gains, extent, origin, transform, lower, local_size, detail_dimensions
     )
@@ -306,11 +319,11 @@ def build(output_dir=ROOT / "godot/assets/materials"):
         "output_dimensions": detail_dimensions,
         "output_pixel_m": (local_size / detail_dimensions).tolist(),
         "settings": {
-            "fine_smoothing_sigma_m": 0.6,
+            "fine_smoothing_sigma_m": detail_sigma_m,
             "broad_smoothing_sigma_m": 6.0,
             "detail_gain_range": [0.75, 1.25],
             "grass_blend_distance_m": [0.5, 3.5],
-            "target_output_pixel_m": 1.0,
+            "target_output_pixel_m": detail_pixel_m,
             "color_filter": SETTINGS,
         },
         "algorithm": "Accepted tan pixels only; ratio of unclamped fine to broad normalized convolution gains, then clamp detail ratio to 0.75 through 1.25; same datum transform and 4 by 4 quadrature as macro. Alpha uses smoothstep of exact horizontal distance to surface road ring segments at output pixel centers.",
@@ -340,4 +353,7 @@ def build(output_dir=ROOT / "godot/assets/materials"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "godot/assets/materials")
-    build(parser.parse_args().output_dir)
+    parser.add_argument("--detail-sigma-m", type=float, default=0.6)
+    parser.add_argument("--detail-pixel-m", type=float, default=1.0)
+    args = parser.parse_args()
+    build(args.output_dir, detail_sigma_m=args.detail_sigma_m, detail_pixel_m=args.detail_pixel_m)

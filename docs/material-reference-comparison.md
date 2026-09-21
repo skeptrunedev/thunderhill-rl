@@ -1343,3 +1343,45 @@ benchmark or proof of Mac performance. Dashboard and glove geometry checks
 also pass. The Mac peer reported online, but SSH timed out during this pass,
 so native Mac verification remains outstanding.
 Mac export passed as `b95fc47a2bbe-f2b3e8086617`; native execution is unverified.
+
+## Terrain structure and source sampling studies
+
+Two matched appearance trials were rejected for production. Lowering asphalt
+roughness by 0.12 at station 700 changed the highlight but did not establish
+closer footage similarity. `roughness_offset` remains zero. The bounded preview
+argument records the selected value independently from contact and friction.
+
+The authored pale field region overwrote earlier swath color variation. A
+centered retained swath trial first affected only a small distant patch because
+its coordinates were gated by the narrow Turn 2 corridor. Expanding it with
+the existing global elongated field pattern increased its extent, but still
+produced generic mottling rather than the reference's coherent mowing marks.
+Root and independent visual review rejected both variants. The new
+`retained_swath_strength` remains zero. Captures are in `artifacts/field-swath-control`,
+`artifacts/field-swath-candidate`, `artifacts/field-swath-expanded` and
+`artifacts/field-swath-expanded-apex`. Coverage, corridors and contact data
+were not changed by these shader trials.
+
+`build_terrain_color.py` now supports bounded detail smoothing and output
+spacing studies while preserving existing defaults. The finer candidate uses
+0.2 metre Gaussian sigma and 0.6 metre output pixels, compared with the original
+0.6 metre sigma and 1 metre pixels. These are processing parameters, not newly
+measured vegetation dimensions. The input remains the pinned historical
+public domain NAIP image. The broad macro image is independently unchanged.
+The preview tool can load a candidate detail map after verifying its image
+hash, dimensions, local mapping and geometry source hashes. A synthetic narrow
+stripe test verifies contrast retention through output area integration, while
+rejected source colors must remain neutral under both filtering settings.
+
+The source sampling candidate was rendered at the same Turn 2 entry and apex
+poses in `artifacts/terrain-detail-fine-turn2` and `artifacts/terrain-detail-fine-apex`.
+Root found no clear improvement in the recognizable field structures against
+the footage, so its larger detail map was not adopted. The runtime map and
+builder defaults remain unchanged. Finer sampling preserves more historical
+source signal, but that alone does not establish better rendered fidelity.
+Eleven terrain color tests, Ruff, Godot preview compilation and formatting pass.
+Nonfinite asphalt roughness input is rejected before rendering.
+Human controls pass with zero failures (Linux median 17.217 ms, p95 24.864 ms,
+265 frames). Mac export passes as `7880a095bd5b-246d85cdc600`, without native
+Mac verification. These checks validate the tooling integration and unchanged
+production material defaults, not a new visual fidelity claim.

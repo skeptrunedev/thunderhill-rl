@@ -11,9 +11,10 @@ from build_terrain_color import (
     dry_terrain_mask,
     local_raster_bounds,
     resample_local_gains,
-    terrain_gains,
-    terrain_detail_gains,
     shoulder_coverage,
+    terrain_detail_gains,
+    terrain_gains,
+    validate_detail_settings,
 )
 from pyproj import Transformer
 
@@ -126,6 +127,42 @@ class TerrainColorTests(unittest.TestCase):
                 np.testing.assert_allclose(detail[80, 370], 1, atol=1e-12)
                 self.assertGreaterEqual(detail.min(), 0.75)
                 self.assertLessEqual(detail.max(), 1.25)
+
+    def test_fine_detail_preserves_narrow_stripes_without_rejected_color_bleed(self):
+        # Two source pixels (1.2 m) represent a narrow historical field streak.
+        # Compare contrast after the complete output pixel area integration.
+        image = np.full((80, 80, 3), [0.55, 0.48, 0.37])
+        image[:, 39:41] *= 0.94
+        transform = Transformer.from_pipeline("+proj=affine")
+        extent = {"xmin": 0, "xmax": 48, "ymin": 0, "ymax": 48}
+        origin = {"easting": 0, "northing": 48}
+        contrasts = []
+        for sigma, pixel in ((0.6, 1.0), (0.2, 0.6)):
+            detail = terrain_detail_gains(image, (0.6, 0.6), sigma)
+            sampled = resample_local_gains(
+                detail, extent, origin, transform, [0, 0], [48, 48],
+                [round(48 / pixel)] * 2,
+            )
+            center_row = sampled[sampled.shape[0] // 2, :, 0]
+            contrasts.append(1 - center_row.min())
+            for rejected in ([0, 0, 0], [0.4, 0.4, 0.4], [0, 0.8, 0], [1, 1, 1]):
+                uniform = np.full_like(image, [0.55, 0.48, 0.37])
+                uniform[10:70, 10:70] = rejected
+                np.testing.assert_allclose(
+                    terrain_detail_gains(uniform, (0.6, 0.6), sigma), 1, atol=1e-12
+                )
+        self.assertGreater(contrasts[1], contrasts[0] * 1.4)
+
+    def test_detail_settings_reject_invalid_bounds(self):
+        for invalid in (float("nan"), float("inf"), -1, 0, 0.09, 2.01):
+            with self.subTest(sigma=invalid), self.assertRaises(ValueError):
+                validate_detail_settings(invalid, 1.0)
+        for invalid in (float("nan"), float("inf"), -1, 0, 0.49, 2.01):
+            with self.subTest(pixel=invalid), self.assertRaises(ValueError):
+                validate_detail_settings(0.6, invalid)
+        for sigma in (0.1, 2.0):
+            for pixel in (0.5, 2.0):
+                validate_detail_settings(sigma, pixel)
 
     def test_shoulder_distance_and_pixel_center_mapping(self):
         # Rectangle right edge is x=0, well away from the other three edges.

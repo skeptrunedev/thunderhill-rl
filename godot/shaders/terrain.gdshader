@@ -24,6 +24,9 @@ uniform float field_soil_strength : hint_range(0.0, 1.0) = 0.0;
 uniform float field_patch_strength : hint_range(0.0, 1.0) = 0.5;
 // Original curved mowing appearance, guided by the retained straw corridor.
 uniform float straw_swath_strength : hint_range(0.0, 1.0) = 1.0;
+// Study only: retain centered swath color inside the authored field map.
+// Zero preserves the existing regional appearance; no bare patches are restored.
+uniform float retained_swath_strength : hint_range(0.0, 1.0) = 0.0;
 // Original appearance parameters, not measured plant height or reflectance.
 uniform float grass_tile_m = 1.0;
 // One retains full random rotation; zero preserves the source straw direction.
@@ -158,6 +161,12 @@ void fragment() {
     float sparse_straw = smoothstep(-0.20, 0.30, swaths);
     float straw_abundance = 0.0;
     vec3 straw_color_gain = vec3(1.0);
+    // Reuse the existing elongated field pattern throughout the mapped region.
+    // This orientation and pattern are original appearance estimates, not
+    // reconstructed mowing passes. The regional map below limits their extent.
+    vec3 swath_contrast = vec3(0.29, 0.27, 0.22) / vec3(1.105, 1.095, 1.07);
+    float centered_field = smoothstep(-0.23, 0.23, swaths) - 0.5;
+    vec3 retained_swath_gain = vec3(1.0) + centered_field * swath_contrast;
     if (straw_swath_strength > 0.0) {
         // The existing flattened straw corridors guide broad field appearance.
         // Bare access corridors (zero retained grass) do not seed mowing passes.
@@ -196,6 +205,16 @@ void fragment() {
         straw_abundance = straw_swath_strength * field_weight;
         straw_color_gain = mix(vec3(1.0), mix(vec3(0.96), vec3(1.25, 1.23, 1.18), pale_straw), straw_abundance);
         grass_coverage *= mix(1.0, mix(0.70, 1.0, pale_straw), straw_abundance);
+        // Symmetric thresholds give neutral response at unresolved rows = 0.
+        // Divide the existing endpoint difference by its midpoint, retaining
+        // contrast without its overall brightening. The expected mean is one
+        // for a symmetric noise distribution, not a measured finite-map mean.
+        float centered_rows = smoothstep(-0.23, 0.23, rows) - 0.5;
+        // Blend toward curved structure only where the existing guide supports
+        // it, avoiding radial patterns beyond its clamped endpoint coordinates.
+        retained_swath_gain = mix(retained_swath_gain,
+                                 vec3(1.0) + centered_rows * swath_contrast,
+                                 straw_abundance);
     }
     grass_coverage *= 1.0 - sparse_straw * field_patch_strength * (1.0 - 0.5 * straw_abundance);
     if (field_surface_strength > 0.0) {
@@ -206,7 +225,9 @@ void fragment() {
         float mapped_weight = mapped_field.a * field_surface_strength * inside_map;
         // Retain bare shoulder coverage and existing access corridor handling.
         grass_coverage = mix(grass_coverage, detail.a * mapped_field.r, mapped_weight);
-        straw_color_gain = mix(straw_color_gain, mix(vec3(1.0), pale_straw_gain, mapped_field.g), mapped_weight);
+        vec3 mapped_straw_gain = mix(vec3(1.0), pale_straw_gain, mapped_field.g);
+        mapped_straw_gain *= mix(vec3(1.0), retained_swath_gain, retained_swath_strength);
+        straw_color_gain = mix(straw_color_gain, mapped_straw_gain, mapped_weight);
     }
     float retained_grass;
     vec4 region = cleared_field(world_pos.xz, retained_grass);
