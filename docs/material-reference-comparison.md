@@ -386,3 +386,38 @@ rebuilt and serialization checks preserved all 96000 grass instances. Human
 controls passed with zero failures; local Linux frame times were median
 17.049 ms and p95 17.361 ms over 275 frames. This is not native Mac performance
 certification. No contact geometry, physics parameters or agent interface changed.
+
+## Historical pavement tone study
+
+`tools/build_pavement_tone.py` creates a 64 by 2048 numerical gain map from
+the pinned July 2022 NAIP source. Sampling follows the pavement's original
+triangle UV mapping and centered edge tangents, including the closed lap.
+Source pixels are classified before bilinear resampling so rejected paint or
+soil colors cannot bleed into accepted pavement. Normalized smoothing uses a
+neutral median prior. RGB rejection is not semantic segmentation; shadows can
+survive. Source, export metadata, track, generator and output hashes are recorded.
+
+The asphalt shader can apply this map without changing road geometry, contact
+or friction. The outer strip fades to neutral. Matched captures at stations
+400, 900 and 3000 are in `artifacts/pavement-tone-study/`, made with
+`godot/tools/preview_pavement.gd`. Each pair preserves the same camera and
+lighting and compares strength zero with 0.65.
+
+The visual change is small: station 400 is nearly indistinguishable, station
+900 has a mild broad tone shift, and station 3000 has a soft patch near the
+bend. Independent visual review agreed that this does not establish improved
+reference fidelity. No obvious seams or colored contamination were visible.
+**Production strength remains zero.** The historical layer is retained as a
+reproducible optional study, not presented as a realism upgrade. It predates
+the repave and does not reproduce current longitudinal wear or grazing response.
+
+Four Python regression tests cover rejected colors, rejection before sampling,
+periodic filtering and actual triangle mapping. All passed. The 202 curb
+surface checks passed. Remaining material work needs footage matched camera
+views and authored color, relief and roughness, with temporal checks at speed.
+The overall scene is still visibly unlike the onboard reference.
+
+Final human controls passed with zero failures. Linux frame times were median
+17.202 ms and p95 23.344 ms over 263 frames. The Mac export completed as build
+`291bd93c36e8-a6956c4bf8e1`; this is a packaging check, not a new native Mac
+runtime or visual acceptance test.

@@ -4,6 +4,10 @@ uniform float lap_length_m;
 uniform sampler2D color_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D normal_map : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rough_map : filter_linear_mipmap_anisotropic, repeat_enable;
+// Historical aerial tone, not a measured material or friction field.
+uniform sampler2D pavement_tone : filter_linear_mipmap_anisotropic, repeat_enable;
+// The historical trial did not improve reference fidelity enough for production.
+uniform float pavement_tone_strength : hint_range(0.0, 1.0) = 0.0;
 
 varying vec3 world_position;
 
@@ -40,6 +44,10 @@ void fragment() {
     aggregate = mix(aggregate, texture(color_map, detail * 0.71 + vec2(0.37, 0.61)).rgb, 0.28);
     // Neutral warm binder under the cool sky, matched to the inspected dry footage.
     ALBEDO = aggregate * vec3(0.53, 0.50, 0.46) * variation;
+    float across = clamp(UV.x / max(UV2.x, 0.001), 0.0, 1.0);
+    float tone_interior = smoothstep(0.10, 0.22, min(across, 1.0 - across));
+    float observed_tone = texture(pavement_tone, vec2(across, UV.y / lap_length_m)).r * 2.0;
+    ALBEDO *= mix(1.0, observed_tone, pavement_tone_strength * tone_interior);
     // Binder-rich edge appearance from the footage. Width and irregularity
     // are artistic estimates; the existing pavement boundary remains intact.
     float edge_distance = max(0.0, min(UV.x, UV2.x - UV.x));

@@ -269,6 +269,21 @@ func _build_road() -> void:
 	var asphalt := ShaderMaterial.new()
 	asphalt.shader = load("res://shaders/asphalt.gdshader")
 	asphalt.set_shader_parameter("lap_length_m", length_m)
+	var tone: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://assets/materials/pavement_tone.json")
+	)
+	if (
+		tone.get("track_sha256") != FileAccess.get_sha256("res://data/track.json")
+		or (
+			tone.get("output_sha256")
+			!= FileAccess.get_sha256("res://assets/materials/pavement_tone.png")
+		)
+	):
+		initialization_error = "Historical pavement tone source mismatch"
+		push_error(initialization_error)
+		get_tree().quit(2)
+		return
+	asphalt.set_shader_parameter("pavement_tone", load("res://assets/materials/pavement_tone.png"))
 	for pair in [["color_map", "Color"], ["normal_map", "NormalGL"], ["rough_map", "Roughness"]]:
 		asphalt.set_shader_parameter(
 			pair[0], load("res://assets/materials/Asphalt010_1K-JPG_%s.jpg" % pair[1])
