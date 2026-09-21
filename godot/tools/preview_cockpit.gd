@@ -11,8 +11,20 @@ func _initialize() -> void:
 func _run() -> void:
 	var output := ""
 	var steering := 0.0
+	var wall_density := 1.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--steering="):
+		if arg.begins_with("--reservoir-wall-density="):
+			var value := arg.trim_prefix("--reservoir-wall-density=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 200.0
+			):
+				_fail("Wall density multiplier must be between zero and 200")
+				return
+			wall_density = float(value)
+		elif arg.begins_with("--steering="):
 			var value := arg.trim_prefix("--steering=")
 			if not value.is_valid_float():
 				_fail("Steering must be numeric radians")
@@ -53,6 +65,23 @@ func _run() -> void:
 		_fail("Steering exceeds simulation limits")
 		return
 	game.bike.update_pose(0.0, steering, 0.0)
+	var reservoir_count := 0
+	var wall_absorption := Vector3.ZERO
+	for node in game.bike.find_children("*", "MeshInstance3D", true, false):
+		var material = node.material_override
+		if (
+			material is ShaderMaterial
+			and material.shader.resource_path == "res://shaders/reservoir.gdshader"
+		):
+			var baseline: Vector3 = RenderingServer.shader_get_parameter_default(
+				material.shader.get_rid(), "wall_absorption"
+			)
+			wall_absorption = baseline * wall_density
+			material.set_shader_parameter("wall_absorption", wall_absorption)
+			reservoir_count += 1
+	if reservoir_count != 2:
+		_fail("Expected two reservoir materials")
+		return
 	variants[0].anchor = game.bike.ONBOARD_CAMERA_LOCAL
 	variants[0].pitch = game.bike.ONBOARD_LOOK_DOWN
 	variants[0].fov = game.camera.fov
@@ -77,6 +106,11 @@ func _run() -> void:
 		report.append(
 			{
 				"name": row.name,
+				"reservoir_wall_density": wall_density,
+				"reservoir_wall_absorption":
+				[wall_absorption.x, wall_absorption.y, wall_absorption.z],
+				"reservoir_shader_sha256":
+				FileAccess.get_sha256("res://shaders/reservoir.gdshader"),
 				"anchor": [row.anchor.x, row.anchor.y, row.anchor.z],
 				"pitch_rad": row.pitch,
 				"fov": row.fov,

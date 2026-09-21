@@ -94,13 +94,14 @@ func _check_reservoir(mesh: ArrayMesh, cap: bool) -> bool:
 	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
 	var radius := 0.030 if cap else 0.028
-	var half_height := 0.004 if cap else 0.0225
+	var bottom := -0.004 if cap else -0.0225
+	var top := 0.010 if cap else 0.0225
 	var edges := {}
 	var signed_volume := 0.0
 	for i in vertices.size():
 		assert(vertices[i].is_finite() and normals[i].is_finite())
 		assert(absf(normals[i].length() - 1.0) < 0.0001)
-		assert(absf(vertices[i].y) <= half_height + 0.000001)
+		assert(vertices[i].y >= bottom - 0.000001 and vertices[i].y <= top + 0.000001)
 		assert(Vector2(vertices[i].x, vertices[i].z).length() <= radius + 0.000001)
 	for i in range(0, indices.size(), 3):
 		var a := vertices[indices[i]]
@@ -119,7 +120,7 @@ func _check_reservoir(mesh: ArrayMesh, cap: bool) -> bool:
 			edges[key] = edges.get(key, 0) + 1
 	for count in edges.values():
 		assert(count == 2)
-	assert(signed_volume > 0 and signed_volume <= PI * radius * radius * 2 * half_height)
+	assert(signed_volume > 0 and signed_volume <= PI * radius * radius * (top - bottom))
 
 	return true
 

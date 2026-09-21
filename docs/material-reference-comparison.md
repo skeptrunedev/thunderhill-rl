@@ -656,3 +656,42 @@ strip is distinguishable at this wider scale. Its uniform soil treatment and
 soft edge are still simpler than the aerial, and its deliberately untraced
 junction remains visible. The overview is a diagnostic view, not a riding camera.
 Mac export passed as `a620ac1f0d56-223165bf3cd1`; native execution is unverified.
+
+## Smoked reservoir walls and cap profile
+
+The current cockpit audit (`artifacts/cockpit-current-audit/production.png`)
+shows clear pale reservoir walls compared with the dark smoked vessels in the
+supplied 00:10 frame. The existing shader used absorption (3, 4, 7) over a
+nominal 1.5 mm wall path, so it transmitted almost all background light at
+normal incidence. The fluid tint alone could not darken the empty upper vessel.
+The closed mesh winding and outward normals were checked; reversing geometry
+would not address this material discrepancy.
+
+Wall absorption is now independent of fluid absorption. Matched camera studies
+used (300, 400, 700) in `artifacts/cockpit-smoked-wall/` and (600, 800, 1400) in
+`artifacts/cockpit-smoked-wall-dense/`. Root and independent visual review found
+the latter closer to the reference's smoked appearance, particularly in the
+upper chamber. It is adopted as an appearance estimate, not measured polymer
+absorption. Fluid absorption, fill level and lighting are unchanged.
+
+`artifacts/cockpit-cap-profile/` isolates a taller grip sidewall with the first
+tint. The cap height increases from 8 to 14 mm while retaining its lower mating
+face and radius. It reads more like the prominent molded screw lid in the
+reference. This dimension is an artistic estimate, not a manufacturer part
+measurement. Mesh bounds, closed edges, signed volume and outward normals pass
+the existing geometry checks with the updated height bounds.
+
+The combined final result is `artifacts/cockpit-reservoir-final/production.png`.
+It was visually inspected after adopting both changes. The scene still lacks
+refraction: background paint lines pass through the vessel without bending.
+The mirrored mounts, hardware detail and overall cockpit fidelity remain
+incomplete. These changes do not establish photographic realism.
+
+The cockpit tool accepts `--reservoir-wall-density` as a multiplier on the
+shader default. Captures record the effective coefficients and shader checksum
+for each camera pose. The value is validated as finite and within 0 to 200.
+Cockpit geometry/readout checks and human controls passed. Local Linux frame
+times were median 17.361 ms and p95 21.750 ms over 269 frames, not native Mac
+performance measurements. No physics or control interface changed.
+Nonfinite wall density exited with status 2. Mac export passed as
+`39c83c9a0021-9fa84dbcfac3`; it has not been run natively on the MacBook.

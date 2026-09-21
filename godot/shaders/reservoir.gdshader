@@ -4,6 +4,8 @@ render_mode cull_back;
 uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_linear;
 // Estimated absorption per metre, not measured brake fluid optical properties.
 uniform vec3 fluid_absorption = vec3(6.0, 24.0, 60.0);
+// Independent vessel wall absorption; appearance estimate, not measured plastic.
+uniform vec3 wall_absorption = vec3(600.0, 800.0, 1400.0);
 uniform float fluid_radius = 0.024;
 uniform float fluid_bottom = -0.020;
 uniform float fluid_top = 0.0081;
@@ -46,7 +48,7 @@ void fragment() {
     float path_m = fluid_path(local_position, normalize(local_position - local_camera));
     float fresnel = 0.04 + 0.96 * pow(1.0 - facing, 5.0);
     float wall_path = 0.0015 / max(facing, 0.2);
-    vec3 transmission = exp(-fluid_absorption * path_m - vec3(3.0, 4.0, 7.0) * wall_path);
+    vec3 transmission = exp(-fluid_absorption * path_m - wall_absorption * wall_path);
     // The opaque scene copy supplies transmitted radiance. Transparent objects
     // are absent from that copy; this is not ray traced refraction or fluid slosh.
     EMISSION = textureLod(scene_color, SCREEN_UV, 0.0).rgb * transmission * (1.0 - fresnel);

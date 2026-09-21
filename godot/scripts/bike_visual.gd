@@ -584,7 +584,8 @@ func _hose(points: Array[Vector3], radius: float, material: Material) -> void:
 		_bar(vertices[i], vertices[i + 1], radius, material, _front)
 
 
-## Original molded vessel and screw cap, within the previous cylinder bounds.
+## Original molded vessel and screw cap. The raised 14 mm grip profile is an
+## appearance estimate from the supplied cockpit view, not a measured part.
 ## Profile entries are height, outer radius and radial grip recess depth.
 ## These proportions are visual estimates from footage, not measured parts.
 func _reservoir_shell(cap: bool) -> ArrayMesh:
@@ -593,8 +594,8 @@ func _reservoir_shell(cap: bool) -> ArrayMesh:
 		profile = [
 			Vector3(-0.004, 0.028, 0),
 			Vector3(-0.003, 0.030, 0.0012),
-			Vector3(0.0025, 0.030, 0.0012),
-			Vector3(0.004, 0.0285, 0)
+			Vector3(0.0085, 0.030, 0.0012),
+			Vector3(0.010, 0.0285, 0)
 		]
 	else:
 		profile = [
