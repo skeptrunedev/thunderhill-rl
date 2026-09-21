@@ -4,6 +4,11 @@ uniform float lap_length_m;
 uniform sampler2D color_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D normal_map : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rough_map : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform bool authored_surface = false;
+uniform sampler2D authored_color : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float authored_color_gain = 0.30;
+uniform float authored_tile_m = 0.8;
+uniform float authored_relief_m = 0.00035;
 // Historical aerial tone, not a measured material or friction field.
 uniform sampler2D pavement_tone : filter_linear_mipmap_anisotropic, repeat_enable;
 // The historical trial did not improve reference fidelity enough for production.
@@ -16,7 +21,14 @@ void vertex() {
 }
 
 float pavement_hash(vec2 cell) {
-    return fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+    // Integer lattice hashing gives shared corners identical values. The sine
+    // hash amplified floating point differences into visible long stripe seams.
+    uvec2 lattice = uvec2(ivec2(cell));
+    uint value = lattice.x * 1664525u + lattice.y * 1013904223u;
+    value = (value ^ (value >> 16u)) * 2246822519u;
+    value = (value ^ (value >> 13u)) * 3266489917u;
+    value = value ^ (value >> 16u);
+    return float(value & 16777215u) / 16777216.0;
 }
 
 float pavement_noise(vec2 p) {
@@ -38,12 +50,20 @@ void fragment() {
     float streak = pavement_noise(UV / vec2(0.45, 12.0) + vec2(8.3, 2.1));
     float fine_streak = pavement_noise(UV / vec2(0.055, 7.0) + vec2(19.7, 1.4));
     float variation = mix(0.92, 1.04, broad) * mix(0.97, 1.03, streak) * mix(0.98, 1.02, fine_streak);
-    vec3 aggregate = texture(color_map, detail).rgb;
-    // Offset secondary albedo suppresses visible repetition without rotating
-    // tangent space normals away from the ribbon's actual UV frame.
-    aggregate = mix(aggregate, texture(color_map, detail * 0.71 + vec2(0.37, 0.61)).rgb, 0.28);
-    // Neutral warm binder under the cool sky, matched to the inspected dry footage.
-    ALBEDO = aggregate * vec3(0.53, 0.50, 0.46) * variation;
+    vec2 authored_uv = UV / authored_tile_m;
+    vec2 authored_dx = dFdx(authored_uv);
+    vec2 authored_dy = dFdy(authored_uv);
+    vec3 authored = vec3(0.0);
+    if (authored_surface) {
+        authored = textureGrad(authored_color, authored_uv, authored_dx, authored_dy).rgb;
+        ALBEDO = mix(vec3(0.10), authored, 0.70) * authored_color_gain * variation;
+        ALBEDO *= mix(0.84, 1.12, broad);
+    } else {
+        vec3 aggregate = texture(color_map, detail).rgb;
+        // Original generic material remains available for matched comparisons.
+        aggregate = mix(aggregate, texture(color_map, detail * 0.71 + vec2(0.37, 0.61)).rgb, 0.28);
+        ALBEDO = aggregate * vec3(0.53, 0.50, 0.46) * variation;
+    }
     float across = clamp(UV.x / max(UV2.x, 0.001), 0.0, 1.0);
     float tone_interior = smoothstep(0.10, 0.22, min(across, 1.0 - across));
     float observed_tone = texture(pavement_tone, vec2(across, UV.y / lap_length_m)).r * 2.0;
@@ -64,11 +84,23 @@ void fragment() {
     float binder = mix(0.16, 0.38, pavement_noise(edge_domain * 2.9 + vec2(31.0)));
     float aggregate_binder = binder + (edge_grain - 0.5) * 0.24;
     ALBEDO *= mix(1.0, aggregate_binder, edge_weight);
-    // Keep source aggregate relief subtle. Broad cloudy source roughness was
-    // making the grazing reflection read like coarse concrete in the comparison.
-    ROUGHNESS = clamp(0.62 + (texture(rough_map, detail).r - 0.5) * 0.10
-                      + (streak - 0.5) * 0.035 + (broad - 0.5) * 0.06, 0.52, 0.72);
-    ROUGHNESS = mix(ROUGHNESS, 0.72, edge_weight);
-    NORMAL_MAP = texture(normal_map, detail).rgb;
-    NORMAL_MAP_DEPTH = 0.07;
+    if (authored_surface) {
+        // Estimated relief from this albedo, not a recovered height scan.
+        // Mip filtered samples avoid resolving subpixel stones at a distance.
+        vec2 texel = 1.0 / vec2(textureSize(authored_color, 0));
+        vec3 weights = vec3(0.2126, 0.7152, 0.0722);
+        float h = dot(authored, weights);
+        float hx = dot(textureGrad(authored_color, authored_uv + vec2(texel.x, 0.0), authored_dx, authored_dy).rgb, weights);
+        float hy = dot(textureGrad(authored_color, authored_uv + vec2(0.0, texel.y), authored_dx, authored_dy).rgb, weights);
+        vec2 slope = vec2(hx - h, hy - h) * authored_relief_m / (texel * authored_tile_m);
+        NORMAL_MAP = normalize(vec3(-slope, 1.0)) * 0.5 + 0.5;
+        NORMAL_MAP_DEPTH = 1.0;
+        ROUGHNESS = mix(clamp(0.62 + (h - 0.10) * 0.20 + (broad - 0.5) * 0.06, 0.58, 0.68), 0.72, edge_weight);
+    } else {
+        ROUGHNESS = clamp(0.62 + (texture(rough_map, detail).r - 0.5) * 0.10
+                          + (streak - 0.5) * 0.035 + (broad - 0.5) * 0.06, 0.52, 0.72);
+        ROUGHNESS = mix(ROUGHNESS, 0.72, edge_weight);
+        NORMAL_MAP = texture(normal_map, detail).rgb;
+        NORMAL_MAP_DEPTH = 0.07;
+    }
 }

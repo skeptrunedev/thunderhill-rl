@@ -1,5 +1,11 @@
 # Asset attribution
 
+`materials/racing_asphalt_v1.png` is an original generated asphalt albedo.
+Its exact prompt, source hash and artistic shader estimates are recorded in
+`assets/source/material-studies/README.md`. It contains no extracted video
+pixels and is not a measured scan. It replaces the generic Asphalt010 material
+in normal gameplay; that material remains available for comparison studies.
+
 The material JPG files in `materials/` are CC0 assets, separate from the MIT game code. Their pinned source hashes are in `data/reference/material-candidates.json` at the repository root.
 
 * Asphalt010, Lennart Demes / ambientCG: https://ambientcg.com/a/Asphalt010 . CC0: https://docs.ambientcg.com/license/

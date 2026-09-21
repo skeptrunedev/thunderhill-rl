@@ -269,6 +269,10 @@ func _build_road() -> void:
 	var asphalt := ShaderMaterial.new()
 	asphalt.shader = load("res://shaders/asphalt.gdshader")
 	asphalt.set_shader_parameter("lap_length_m", length_m)
+	asphalt.set_shader_parameter("authored_surface", true)
+	asphalt.set_shader_parameter(
+		"authored_color", load("res://assets/materials/racing_asphalt_v1.res")
+	)
 	var tone: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://assets/materials/pavement_tone.json")
 	)

@@ -421,3 +421,53 @@ Final human controls passed with zero failures. Linux frame times were median
 17.202 ms and p95 23.344 ms over 263 frames. The Mac export completed as build
 `291bd93c36e8-a6956c4bf8e1`; this is a packaging check, not a new native Mac
 runtime or visual acceptance test.
+
+## Original asphalt surface study
+
+The original `racing-asphalt-v1.png` albedo replaces the source character of
+the generic aggregate. Its source prompt and limits are documented in
+`assets/source/material-studies/README.md`. Shader controls separate fine
+aggregate color, shallow estimated relief, broad longitudinal variation and
+roughness. Initial gain 1.0 was too bright; matching the previous material's
+average linear color required gain 0.30 with restrained contrast. The first
+roughness trial at 0.56 produced excessive broad glare; 0.62 reduced it.
+
+Paired studies are in `artifacts/authored-asphalt-v1/`,
+`artifacts/authored-asphalt-v1-tuned/` and
+`artifacts/authored-asphalt-v1-roughness/`. The last samples twelve positions
+at 0.5 metre intervals at each of three stations. Independent inspection found
+better foreground grain but also a curved filtering boundary near station
+3005.5. Disabling relief left the boundary unchanged, as did unlit rendering.
+The decisive isolation was variation only: it reproduced the boundary without
+the texture, while raw albedo did not. The floating point sine hash in the
+procedural variation was responsible. Integer lattice hashing removed the
+boundary at stations 400 and 3000 while retaining the foreground grain.
+`artifacts/authored-asphalt-integer/` contains the corrected comparisons.
+The exact compiler arithmetic behind the sine hash discrepancy is not proven.
+An earlier fixed mip trial masked the boundary; it did not establish a texture
+filtering cause and is not used in production.
+
+The preview tool supports `--candidate`, `--frames`, `--offset-m`,
+`--flat-relief`, `--unlit`, `--fixed-mip`, `--linear-mips`, `--world-uv`,
+`--raw-albedo` and `--variation-only`, recording those
+settings, source hashes and each camera pose. Diagnostic shaders are copies;
+they do not change production render modes. Sampled stationary frames are not
+proof of full lap temporal stability.
+
+Separately, the material's mipmaps are baked in linear light, then encoded
+back to sRGB. This preserves average color at distance. The original mean
+linear RGB is approximately (0.1052, 0.1007, 0.0956); averaging encoded sRGB
+first yields (0.0886, 0.0841, 0.0810) after decoding. The baked ImageTexture
+contains the corrected chain, with source, builder and output hashes recorded
+in its JSON manifest. The source PNG remains unchanged. Regression tests verify
+black/white averaging, alpha, source preservation and image dimensions. This
+brightness correction is independent of the procedural seam fix.
+
+The final production capture is `artifacts/authored-asphalt-production.png`,
+at station 3005.5 with rider camera one. It loads the baked runtime resource,
+not the preview's external image. The curved boundary is absent and fine grain
+remains visible. Both scenery manifests were rebuilt with unchanged geometry
+fingerprints. Human controls passed with zero failures; Linux median frame
+time was 17.242 ms and p95 21.801 ms over 267 frames. Mac packaging passed as
+`7434768d3780-a7890d635c6e`. No fresh native Mac performance or full lap motion
+acceptance is claimed. No collision, physics or agent protocol was changed.

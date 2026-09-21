@@ -1,5 +1,26 @@
 # Dry cut grass study
 
+## Original racing asphalt
+
+`racing-asphalt-v1.png` is original generated albedo, not extracted video pixels
+or a measured scan. It is copied unchanged to
+`godot/assets/materials/racing_asphalt_v1.png`. Actual dimensions are 1254 square,
+despite requesting 2048. Both copies have SHA256
+`7d412b9ad0c6900e6bf6b184fa2f30a084db3a4534010053027c5a8933ec7f2d`.
+Video frames 00:20 and 00:40 guided human inspection; the generator received
+the text prompt below without an image reference. Dimensions, relief and
+reflectance are artistic estimates. The runtime shader uses a 0.8 metre tile,
+linear gain 0.30, contrast 0.70 around linear gray 0.10 and a 0.35 mm
+luminance based relief coefficient. This is not a calibrated height map.
+`godot/tools/bake_asphalt_material.gd` builds `racing_asphalt_v1.res` with
+linear light mip averaging, encoded back to sRGB. The runtime loads that baked
+texture with anisotropic filtering. Its JSON manifest pins the source, builder
+and output hashes. The PNG remains an unchanged authoring input.
+
+### Exact asphalt prompt
+
+Create an original seamless photorealistic PBR BASE COLOR texture for freshly resurfaced motorcycle racing circuit asphalt, to use in an open source 3D Thunderhill East racing game. Square 2048x2048 if possible. Orthographic top down, flat even diffuse illumination, no perspective or lighting gradient. Dense fine compacted dark warm neutral gray bitumen, tiny tightly embedded angular dark gray mineral aggregate, very occasional slightly lighter stone, extremely fine pores. Physical coverage about 0.8 by 0.8 meters, aggregate mostly 2 to 6 mm, fine smooth rolled surface, not gravel, not concrete. Restrained natural tonal variation, no broad cloudy patches, no large stones, no white speckle overload. Subtle nearly vertical fine compaction striations but no conspicuous lines. Perfectly tileable edges. NO lane paint, no cracks, no tire marks, no oil spills, no objects, no labels, no watermark. This is a game albedo material, not a photograph of a road scene; no baked reflections, no shadows, no vignette. Keep fine details sharp and realistic. Need original artwork not copied from a published texture.
+
 ## Flattened straw revision
 
 `dry-cut-grass-v2.png` is the current ground and stubble albedo, copied to
