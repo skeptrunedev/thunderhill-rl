@@ -4,6 +4,9 @@ uniform sampler2D panorama : filter_linear_mipmap, repeat_enable;
 uniform bool panorama_is_srgb = false;
 // An authored LDR sky needs an explicit artistic radiance scale, not an HDR claim.
 uniform float panorama_energy = 1.0;
+// Artistic cloud radiance reconstruction for the authored LDR panorama.
+// One is unchanged; this is not a measured HDR conversion.
+uniform float cloud_radiance_gain : hint_range(1.0, 4.0) = 1.0;
 // Periodic overlap for authored skies without a captured solar disk.
 // Captured HDR panoramas retain zero to preserve their angular calibration.
 uniform float panorama_seam_overlap : hint_range(0.0, 0.1) = 0.0;
@@ -53,7 +56,11 @@ void sky() {
     } else {
         COLOR = sample_panorama(uv, dx, dy);
     }
-    COLOR *= panorama_energy;
+    float source_luminance = dot(COLOR, vec3(0.2126, 0.7152, 0.0722));
+    float source_chroma = (max(max(COLOR.r, COLOR.g), COLOR.b) - min(min(COLOR.r, COLOR.g), COLOR.b)) / max(source_luminance, 0.001);
+    float cloud = smoothstep(0.30, 0.80, source_luminance)
+                * (1.0 - smoothstep(0.20, 0.65, source_chroma));
+    COLOR *= panorama_energy * mix(1.0, cloud_radiance_gain, cloud);
     if (AT_CUBEMAP_PASS) {
         if (use_ground_radiance) {
             float ground_weight = 1.0 - smoothstep(-0.12, 0.02, direction.y);

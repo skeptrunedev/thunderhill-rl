@@ -30,13 +30,36 @@ func _run() -> void:
 	var match_sun_azimuth := false
 	var production_only := false
 	var sky_yaw := 0.0
+	var cloud_gain := NAN
+	var authored_yaw := NAN
 	var minimum_elevation := -90.0
 	var source_sha256 := ""
 	var panorama_is_srgb := false
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--asphalt-tile-m=") or arg.begins_with("--asphalt-relief-m="):
+		if arg.begins_with("--authored-sky-yaw-deg="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or absf(float(value)) > 360.0
+			):
+				_fail("Authored sky yaw must be finite and within 360 degrees")
+				return
+			authored_yaw = deg_to_rad(float(value))
+		elif arg.begins_with("--cloud-radiance-gain="):
+			var value := arg.get_slice("=", 1)
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 1.0
+				or float(value) > 4.0
+			):
+				_fail("Cloud radiance gain must be finite and between one and four")
+				return
+			cloud_gain = float(value)
+		elif arg.begins_with("--asphalt-tile-m=") or arg.begins_with("--asphalt-relief-m="):
 			var value := arg.get_slice("=", 1)
 			var is_tile := arg.begins_with("--asphalt-tile-m=")
 			var lower := 0.05 if is_tile else 0.0
@@ -180,6 +203,9 @@ func _run() -> void:
 				_fail("Camera must be 0, 1 or 2")
 				return
 			camera_mode = int(value)
+	if is_finite(authored_yaw) and not sky_source.is_empty():
+		_fail("Authored yaw is only for the production panorama without a captured solar disk")
+		return
 	if (is_finite(view_roll_deg) or view_yaw_deg != 0.0) and camera_mode == 0:
 		_fail("View roll study requires a rider or onboard camera")
 		return
@@ -390,6 +416,11 @@ func _run() -> void:
 	if environment == null or sun == null:
 		_fail("Game lighting missing")
 		return
+	if is_finite(authored_yaw):
+		sky_yaw = authored_yaw
+		environment.sky.sky_material.set_shader_parameter("panorama_yaw", sky_yaw)
+	if is_finite(cloud_gain):
+		environment.sky.sky_material.set_shader_parameter("cloud_radiance_gain", cloud_gain)
 	if sky_source.is_empty():
 		var material: ShaderMaterial = environment.sky.sky_material
 		var texture: Texture2D = material.get_shader_parameter("panorama")
@@ -526,6 +557,10 @@ func _run() -> void:
 							"source_sha256": source_sha256,
 							"panorama_is_srgb": panorama_is_srgb,
 							"panorama_energy": panorama_energy,
+							"cloud_radiance_gain":
+							environment.sky.sky_material.get_shader_parameter(
+								"cloud_radiance_gain"
+							),
 							"panorama_seam_overlap": seam_overlap,
 							"use_ground_radiance":
 							environment.sky.sky_material.get_shader_parameter(
