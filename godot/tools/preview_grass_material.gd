@@ -17,8 +17,44 @@ func _run() -> void:
 	var station_m := 1830.0
 	var ground_tint := Vector3.ZERO
 	var field_soil_strength := -1.0
+	var field_patch_strength := -1.0
+	var soil_value := -1.0
+	var grass_tile_m := -1.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--field-soil-strength="):
+		if arg.begins_with("--grass-tile-m="):
+			var value := arg.trim_prefix("--grass-tile-m=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.25
+				or float(value) > 8
+			):
+				_fail("Grass tile must be between 0.25 and eight metres")
+				return
+			grass_tile_m = float(value)
+		elif arg.begins_with("--soil-value="):
+			var value := arg.trim_prefix("--soil-value=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.1
+				or float(value) > 1
+			):
+				_fail("Soil value must be between 0.1 and one")
+				return
+			soil_value = float(value)
+		elif arg.begins_with("--field-patch-strength="):
+			var value := arg.trim_prefix("--field-patch-strength=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0
+				or float(value) > 1
+			):
+				_fail("Field patch strength must be between zero and one")
+				return
+			field_patch_strength = float(value)
+		elif arg.begins_with("--field-soil-strength="):
 			var value := arg.trim_prefix("--field-soil-strength=")
 			if not value.is_valid_float():
 				_fail("Field soil strength must be numeric")
@@ -130,6 +166,24 @@ func _run() -> void:
 	game.camera.fov = 74.0
 	game.camera.current = true
 	var material: ShaderMaterial = track.terrain_material
+	if grass_tile_m >= 0.0:
+		material.set_shader_parameter("grass_tile_m", grass_tile_m)
+	else:
+		grass_tile_m = RenderingServer.shader_get_parameter_default(
+			material.shader.get_rid(), "grass_tile_m"
+		)
+	if soil_value >= 0.0:
+		material.set_shader_parameter("soil_value", soil_value)
+	else:
+		soil_value = RenderingServer.shader_get_parameter_default(
+			material.shader.get_rid(), "soil_value"
+		)
+	if field_patch_strength >= 0.0:
+		material.set_shader_parameter("field_patch_strength", field_patch_strength)
+	else:
+		field_patch_strength = RenderingServer.shader_get_parameter_default(
+			material.shader.get_rid(), "field_patch_strength"
+		)
 	if ground_tint != Vector3.ZERO:
 		material.set_shader_parameter("ground_tint", ground_tint)
 	ground_tint = material.get_shader_parameter("ground_tint")
@@ -179,6 +233,8 @@ func _run() -> void:
 							"detail_gain_exponent": detail_gain_exponent,
 							"ground_tint_linear": [ground_tint.x, ground_tint.y, ground_tint.z],
 							"field_soil_strength": field_soil_strength,
+							"field_patch_strength": field_patch_strength,
+							"soil_value": soil_value,
 							"terrain_shader_sha256":
 							FileAccess.get_sha256("res://shaders/terrain.gdshader"),
 							"macro_map_sha256":
@@ -193,7 +249,7 @@ func _run() -> void:
 							"candidate": candidate,
 							"candidate_sha256": FileAccess.get_sha256(candidate),
 							"source_size": [source.get_width(), source.get_height()],
-							"tile_m": 2.0,
+							"tile_m": grass_tile_m,
 							"camera_position": [position.x, position.y, position.z],
 							"camera_target": [target.x, target.y, target.z],
 							"fov": 74.0,

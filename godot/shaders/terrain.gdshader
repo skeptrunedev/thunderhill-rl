@@ -14,12 +14,15 @@ uniform float detail_gain_exponent = 1.0;
 // Optional appearance study, not land cover labels. Current aerial tone trial
 // misses the uniform foreground problem, so production keeps it disabled.
 uniform float field_soil_strength : hint_range(0.0, 1.0) = 0.0;
+// Original interrupted straw swaths, not measured mowing or vegetation data.
+uniform float field_patch_strength : hint_range(0.0, 1.0) = 0.5;
 // Original appearance parameters, not measured plant height or reflectance.
-uniform float grass_tile_m = 2.0;
+uniform float grass_tile_m = 1.0;
 uniform float grass_relief_m = 0.010;
 // Original fine soil material, with estimated scale and shallow relief.
 uniform float soil_tile_m = 1.0;
 uniform float soil_relief_m = 0.0015;
+uniform float soil_value : hint_range(0.1, 1.0) = 0.7;
 varying vec3 world_pos;
 
 void vertex() {
@@ -94,8 +97,15 @@ void fragment() {
     float field_tone = dot(macro_gain, vec3(0.2126, 0.7152, 0.0722));
     float sparse_field = 1.0 - smoothstep(0.65, 1.0, field_tone);
     grass_coverage *= 1.0 - sparse_field * field_soil_strength;
+    // Multiple scales interrupt elongated sparse areas instead of making
+    // equally spaced stripes. Preserve the existing bare shoulder footprint.
+    vec2 field_uv = mat2(vec2(0.94, 0.342), vec2(-0.342, 0.94)) * world_pos.xz;
+    float swaths = coverage_noise(field_uv / vec2(2.2, 18.0)) * 0.65
+                 + coverage_noise(field_uv / vec2(11.0, 13.0)) * 0.35;
+    float sparse_straw = smoothstep(-0.20, 0.30, swaths);
+    grass_coverage *= 1.0 - sparse_straw * field_patch_strength;
     float soil_weight = (1.0 - grass_coverage) * macro_weight;
-    ALBEDO = mix(grass, soil, soil_weight) * ground_tint * macro_gain * detail_gain;
+    ALBEDO = mix(grass, soil * soil_value, soil_weight) * ground_tint * macro_gain * detail_gain;
     // A single albedo does not contain measured PBR maps. Bright straw over
     // darker soil supplies an explicitly artistic relief/roughness estimate.
     // Derivatives of the filtered sample naturally remove unresolved relief.

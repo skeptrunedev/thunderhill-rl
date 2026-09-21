@@ -19,7 +19,7 @@ const ROAD_LIFT: float = 0.04
 const SHOULDER_WIDTH: float = 6.0
 ## Shared linear albedo multiplier for dry ground and standing vegetation.
 ## Artistic palette matching, not measured Thunderhill reflectance.
-const DRY_GROUND_TINT := Vector3(0.65, 0.56, 0.43)
+const DRY_GROUND_TINT := Vector3(0.4225, 0.364, 0.2795)
 
 
 func _ready() -> void:

@@ -29,8 +29,9 @@ Create an original seamless photorealistic PBR BASE COLOR texture for freshly re
 as appearance reference and v1 as an explicit negative reference. This is an
 original generated material, not a scan or extracted video texture. Its connected
 straw and soil regions remain more readable than v1 at riding height in the
-matched station 400 and 3000 studies. Two metre runtime scale remains an
-appearance estimate. The stronger bundles can expose mirrored repetition; no
+matched station 400 and 3000 studies. A later scale comparison adopted one
+metre rather than two metres to reduce oversized wiry foreground strands.
+Runtime scale remains an appearance estimate. The stronger bundles can expose mirrored repetition; no
 full lap temporal stability claim is made. Luminance derived relief and roughness
 remain artistic estimates. V1 is preserved for comparison.
 

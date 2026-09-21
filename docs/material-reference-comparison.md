@@ -471,3 +471,45 @@ fingerprints. Human controls passed with zero failures; Linux median frame
 time was 17.242 ms and p95 21.801 ms over 267 frames. Mac packaging passed as
 `7434768d3780-a7890d635c6e`. No fresh native Mac performance or full lap motion
 acceptance is claimed. No collision, physics or agent protocol was changed.
+
+## Ground brightness, scale and sparse coverage
+
+The controlled station 400 studies in `artifacts/grass-value-baseline/` and
+`artifacts/grass-value-dark/` isolate a 0.65 multiplier on the existing linear
+ground tint. This changes brightness, not the hue ratios tested earlier. The
+darkened field reads more brown and less uniformly golden, closer in character
+to the inspected footage. Because the viewpoints and lighting are not precisely
+matched, this is an artistic value adjustment rather than calibrated albedo.
+
+`artifacts/grass-value-soil-3000/` and `artifacts/grass-value-scale/` compare the
+same surface at two metre and one metre grass scales. The smaller scale reduces
+oversized wiry foreground strands and is adopted. The source texture is unchanged.
+Independent visual review found brightness and scale the strongest improvements.
+
+The terrain shader now supports interrupted elongated sparse straw patches,
+with appearance strength 0.5, and a separate soil albedo value multiplier 0.7.
+These add restrained soil contrast but do not reconstruct measured mowing paths.
+The two noise scales and their orientation are original appearance estimates.
+Neither changes collision, friction or the preexisting shoulder footprint.
+Coverage remains within zero to one, and existing bare shoulders remain bare.
+Relief parameters and fine source textures are unchanged.
+
+The shared `DRY_GROUND_TINT` also colors the standing stubble. Both scenery
+bakes were regenerated so it does not retain the earlier brighter tint. The
+production rider view is `artifacts/grass-field-production.png`. Human controls
+passed with zero failures. Local Linux frame time was median 17.349 ms and
+p95 22.565 ms over 265 frames. These are not new native Mac results: the user's
+MacBook was offline in the Tailscale check during this pass.
+
+The preview tool records and validates `--grass-tile-m`, `--soil-value` and
+`--field-patch-strength`, in addition to its existing controls. The updated
+scene is still visibly simpler than the footage; these material improvements
+do not establish photographic realism or a complete track appearance match.
+
+Final close views are `artifacts/grass-field-final-close/existing_00.png`
+through `existing_05.png`, sampled 0.30 metres apart. The first and last were
+inspected with the rebuilt stubble tint. Thin dark stubble remains conspicuous
+in places, so this does not resolve all vegetation appearance issues or certify
+motion stability. Invalid scale, nonfinite soil value and out of range patch
+strength exited with status 2. Mac export passed as
+`16d5c95a5f56-631e58d2fc0b`.
