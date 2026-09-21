@@ -10,18 +10,18 @@ This is a short process isolation check, not a throughput or camera benchmark.
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack, contextmanager
 import json
 import os
-from pathlib import Path
 import shutil
 import socket
 import subprocess
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
 
-from check_agent import Client, ROOT
+from check_agent import ROOT, Client
 
 
 @contextmanager
