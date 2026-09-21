@@ -41,6 +41,8 @@ func _run() -> void:
 	var paving_joint_strength := -1.0
 	var asphalt_roughness := NAN
 	var asphalt_detail := {}
+	var textured_scuff := false
+	var analytic_scuff := false
 	var retained_swath := NAN
 	var mapped_aerial_contrast := NAN
 	var mowing_band := NAN
@@ -66,7 +68,11 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--canopy-additive":
+		if arg == "--asphalt-analytic-scuff":
+			analytic_scuff = true
+		elif arg == "--asphalt-textured-scuff":
+			textured_scuff = true
+		elif arg == "--canopy-additive":
 			canopy_additive = true
 		elif arg.begins_with("--canopy-backscatter="):
 			var value := arg.get_slice("=", 1)
@@ -448,12 +454,23 @@ func _run() -> void:
 	if (
 		asphalt_study != "production"
 		and (
-			not asphalt_detail.is_empty()
+			textured_scuff
+			or analytic_scuff
+			or not asphalt_detail.is_empty()
 			or is_finite(asphalt_roughness)
 			or paving_joint_strength >= 0.0
 		)
 	):
 		_fail("Independent asphalt study cannot combine production material overrides")
+		return
+	if analytic_scuff and textured_scuff:
+		_fail("Choose either analytic or textured scuffs")
+		return
+	if (
+		(textured_scuff or analytic_scuff)
+		and float(asphalt_detail.get("exit_scuff_strength", 0.0)) <= 0.0
+	):
+		_fail("Textured scuff requires a positive explicit exit scuff strength")
 		return
 	if sky_patch_off and not sky_patch_path.is_empty():
 		_fail("Choose either a sky patch override or sky patch off")
@@ -654,6 +671,12 @@ func _run() -> void:
 	for parameter in asphalt_detail:
 		game.track.get_node("RacingSurface").material_override.set_shader_parameter(
 			parameter, asphalt_detail[parameter]
+		)
+	if textured_scuff:
+		asphalt_study_metadata = load("res://scripts/pavement_deposit_study.gd").apply(game.track)
+	if analytic_scuff:
+		game.track.get_node("RacingSurface").material_override.set_shader_parameter(
+			"exit_scuff_texture_enabled", false
 		)
 	var production_terrain_material: ShaderMaterial = game.track.terrain_material
 	production_terrain_material.set_shader_parameter(
@@ -932,6 +955,10 @@ func _run() -> void:
 							"sun_projection_in_front": sun_in_front,
 							"asphalt_study": asphalt_study,
 							"asphalt_study_metadata": asphalt_study_metadata,
+							"exit_scuff_texture_enabled":
+							_material_parameter(pavement, "exit_scuff_texture_enabled"),
+							"exit_scuff_strength":
+							_material_parameter(pavement, "exit_scuff_strength"),
 							"ground_study": ground_study,
 							"photographic_contrast_preservation": photographic_contrast,
 							"photographic_height_blend": photographic_height_blend,

@@ -336,6 +336,9 @@ func _build_road() -> void:
 	asphalt.set_shader_parameter("lap_length_m", length_m)
 	asphalt.set_shader_parameter("authored_surface", true)
 	asphalt.set_shader_parameter(
+		"exit_scuff_mask", load("res://assets/materials/road_scuff_v1.png")
+	)
+	asphalt.set_shader_parameter(
 		"authored_color", load("res://assets/materials/racing_asphalt_v1.res")
 	)
 	var tone: Dictionary = JSON.parse_string(

@@ -1,0 +1,8 @@
+{
+  "generator": "Built in image_gen tool",
+  "prompt": "Use case: photorealistic-natural. Asset type: grayscale texture mask for a physically shaded racing game, not a finished scene. Generate an orthographic top down scan-like image of sparse pale dry dust scrub deposits on a pure black background. Square texture. Represent a 4 metre by 4 metre patch of ground. Three uneven, broken, very shallow curved tire scrub streaks cross the central horizontal third, left to right. One is long and thin, the second is shorter thicker and frayed, the third is very faint and fragmented. Fine irregular granular flecks and dragged dusty bristle detail, substantial dark gaps, ragged widths and soft granular edges. Deposits should look like real sparse chalky soil dragged across pavement by a tire, not painted lines, ropes, cracks, smoke, glowing light trails, or tire tread imprints. Grayscale only: black means no deposit, white means high deposit coverage, mostly dark gray with scattered middle gray flecks. Entire outer 10 percent border must be pure black, marks fade out before the edges. Flat lighting, no highlights, no directional shadows, no perspective, no road background, no text, no labels. Original asset with realistic granular spatial complexity.",
+  "encoding": "Numeric grayscale deposit coverage, not color albedo",
+  "license": "Original generated project asset",
+  "limitation": "Not a measured scan. Generated texture contains approximate granular deposits.",
+  "source_sha256": "f0ba4db426c6e3faf873c25fab2f38ff1f4e9cbc6e0187f80243aaa9165f4812"
+}

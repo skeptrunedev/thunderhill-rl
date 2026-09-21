@@ -14,11 +14,17 @@ func _run() -> void:
 	var replay := ""
 	var directional_wear := NAN
 	var exit_scuff := NAN
+	var textured_scuff := false
+	var analytic_scuff := false
 	var hybrid_aggregate := false
 	var curved_uv := true
 	var directional_composition := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg == "--canopy-additive":
+		if arg == "--asphalt-analytic-scuff":
+			analytic_scuff = true
+		elif arg == "--asphalt-textured-scuff":
+			textured_scuff = true
+		elif arg == "--canopy-additive":
 			canopy_additive = true
 		elif arg.begins_with("--canopy-backscatter="):
 			var value := arg.get_slice("=", 1)
@@ -98,6 +104,14 @@ func _run() -> void:
 		push_error("Hybrid aggregate replaces pavement overrides; choose one study")
 		quit(2)
 		return
+	if analytic_scuff and textured_scuff:
+		push_error("Choose either analytic or textured scuffs")
+		quit(2)
+		return
+	if (textured_scuff or analytic_scuff) and (not is_finite(exit_scuff) or exit_scuff <= 0.0):
+		push_error("Textured scuff requires a positive explicit exit scuff strength")
+		quit(2)
+		return
 	if canopy_additive and not is_finite(canopy_strength):
 		push_error("Canopy additive mode requires an explicit strength")
 		quit(2)
@@ -147,6 +161,11 @@ func _run() -> void:
 		pavement.set_shader_parameter("directional_wear_strength", directional_wear)
 	if is_finite(exit_scuff):
 		pavement.set_shader_parameter("exit_scuff_strength", exit_scuff)
+	if textured_scuff:
+		report["deposit_study"] = load("res://scripts/pavement_deposit_study.gd").apply(game.track)
+	if analytic_scuff:
+		pavement.set_shader_parameter("exit_scuff_texture_enabled", false)
+	report["analytic_scuff_override"] = analytic_scuff
 	var effective_wear = pavement.get_shader_parameter("directional_wear_strength")
 	if effective_wear == null:
 		effective_wear = RenderingServer.shader_get_parameter_default(

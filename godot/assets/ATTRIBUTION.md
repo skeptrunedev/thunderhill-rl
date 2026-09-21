@@ -102,3 +102,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+`materials/road_scuff_v1.png` is an original generated grayscale deposit mask,
+used under the project MIT license. The built in image generation tool received
+text only. Exact prompt and source hash are in `materials/road_scuff_v1.json`.
+It is a numeric coverage texture with ordinary numeric mipmaps, not an sRGB
+albedo or a measured scan. Placement and dimensions are artistic estimates.

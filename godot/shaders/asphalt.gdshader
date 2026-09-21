@@ -32,7 +32,9 @@ uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.25;
 uniform float directional_wear_strength : hint_range(0.0, 1.0) = 0.8;
 // Local pale scrub marks guided by onboard frame 50. Placement, width and
 // composition are artistic estimates, not surveyed marks or a friction map.
-uniform float exit_scuff_strength : hint_range(0.0, 1.0) = 0.0;
+uniform float exit_scuff_strength : hint_range(0.0, 1.0) = 1.0;
+uniform bool exit_scuff_texture_enabled = true;
+uniform sampler2D exit_scuff_mask : filter_linear_mipmap_anisotropic, repeat_disable;
 // Frame 50 appearance study: local paving pass boundary, not surveyed or friction data.
 uniform float paving_joint_strength : hint_range(0.0, 1.0) = 1.0;
 uniform vec2 paving_joint_station_m = vec2(1263.588613, 1508.580953);
@@ -220,9 +222,18 @@ void fragment() {
     ROUGHNESS = clamp(ROUGHNESS + roughness_offset * (1.0 - edge_weight), 0.25, 0.9);
     if (exit_scuff_strength > 0.0) {
         vec2 scuff_metres = vec2(UV.x - UV2.x * 0.5, UV.y);
-        float scuff = exit_scuff(scuff_metres, 1355.5, -0.35, 0.018, 0.38, vec2(-7.0, 6.0));
-        scuff = max(scuff, exit_scuff(scuff_metres, 1356.3, -0.42, 0.014, 0.48, vec2(-3.5, 2.0)));
-        scuff = max(scuff, 0.25 * exit_scuff(scuff_metres, 1360.0, 0.38, -0.022, 0.28, vec2(-1.0, 4.0)));
+        float scuff;
+        if (exit_scuff_texture_enabled) {
+            vec2 mask_uv = vec2(scuff_metres.x / 12.0 + 0.5,
+                (scuff_metres.y - 1355.5 + scuff_metres.x * 0.35) / 8.0 + 0.5);
+            vec2 edge = min(mask_uv, vec2(1.0) - mask_uv);
+            float coverage = smoothstep(0.0, 0.05, min(edge.x, edge.y));
+            scuff = texture(exit_scuff_mask, mask_uv).r * coverage;
+        } else {
+            scuff = exit_scuff(scuff_metres, 1355.5, -0.35, 0.018, 0.38, vec2(-7.0, 6.0));
+            scuff = max(scuff, exit_scuff(scuff_metres, 1356.3, -0.42, 0.014, 0.48, vec2(-3.5, 2.0)));
+            scuff = max(scuff, 0.25 * exit_scuff(scuff_metres, 1360.0, 0.38, -0.022, 0.28, vec2(-1.0, 4.0)));
+        }
         scuff *= exit_scuff_strength * (1.0 - edge_weight);
         ALBEDO = mix(ALBEDO, vec3(0.22, 0.21, 0.19), scuff * 0.65);
         ROUGHNESS = mix(ROUGHNESS, 0.8, scuff);

@@ -484,3 +484,47 @@ or procedural motorcycle. The added pass remains experimental, not promoted.
 The candidate capture is 1152 by 720 and reports a visible, drawable but unfocused
 window. This verifies exported native rendering, not foreground performance.
 The ordinary curved field review game remains running separately.
+
+
+## Local pavement deposits
+
+A fresh station 1350 capture with directional wear zero removes the conspicuous
+blue elongated patches (`artifacts/road-isolation-wear0-exit`). Reducing wear to
+0.2 also makes the station 850 approach too uniform, so production wear stays
+0.8. Global roughness tuning alone does not supply the local pale crossing
+marks visible in onboard frame 50.
+
+Three analytic deposit curves were tested with finite extents, variable width,
+soft profiles and approximate footprint filtering. Even after revising their
+shape they read as blurred cords. The original generated numeric coverage mask
+`materials/road_scuff_v1.png` produces granular edges and interrupted deposits
+instead. It is now the production treatment near station 1355.5, projected over
+a 12 by 8 metre domain with a transverse shear of 0.35. These are appearance
+estimates, not surveyed coordinates or inferred friction. The mask affects
+albedo and roughness only. No reference video pixels are distributed. Exact
+generation prompt, source hash and provenance are in its sibling JSON.
+
+Static evidence: `artifacts/road-local-scuffs-soft`,
+`road-local-scuffs-broken`, `road-textured-scuffs-exit`, and
+`road-deposits-default`. The first textured screenshot used wear 0.2; the
+production capture and final movement test retain wear 0.8. Independent visual
+review preferred the granular treatment, while noting that the footage has
+broader patches and a stronger diagonal branch. This is a modest localized
+improvement, not photographic equivalence.
+
+The older turn two replay ends near station 1278 and therefore cannot verify
+these marks in motion. The new `artifacts/exit-deposit-replay.jsonl` extracts
+seconds 82 to 87 from the existing recorded QA lap, preserving 600 transitions
+and source provenance. `exit-deposit-motion.avi` completed those transitions and
+180 movie frames. Twelve sampled images from seconds 1 to 4.3 include passage
+over the marks without an obvious jump; they are not a full shimmer test. Movie
+timing is fixed and is not a native performance benchmark. Existing ObjectDB
+exit warning remains.
+
+`--asphalt-exit-scuff=0` removes the deposits for comparison. Explicit positive
+strength with `--asphalt-analytic-scuff` selects the earlier analytic treatment;
+`--asphalt-textured-scuff` explicitly selects the production mask. The two modes
+are mutually exclusive and cannot combine with an independent asphalt material.
+Human controls passed with zero failures and all rendered camera checks passed.
+Both dependent scenery bakes were refreshed; their geometry fingerprints match
+the preceding production state. Native export verification follows separately.
