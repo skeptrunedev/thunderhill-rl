@@ -70,6 +70,7 @@ var run_id: String
 var replay_path: String = ""
 var replay: RefCounted
 var decision_feed: Array[Dictionary] = []
+var policy_display: Dictionary = {}
 var benchmark: RefCounted
 var benchmark_path := ""
 var frame_times: Array = []
@@ -140,8 +141,27 @@ func _ready() -> void:
 			preview_mode = true
 		if arg.begins_with("--benchmark-recording="):
 			benchmark_path = arg.trim_prefix("--benchmark-recording=")
+		if arg.begins_with("--model-name="):
+			policy_display["model_name"] = arg.trim_prefix("--model-name=")
+		if arg.begins_with("--generation="):
+			var generation: String = arg.trim_prefix("--generation=")
+			if not generation.is_valid_int() or int(generation) < 0:
+				push_error("Generation must be a nonnegative integer")
+				get_tree().quit(2)
+				return
+			policy_display["generation"] = int(generation)
 		if arg.begins_with("--replay="):
 			replay_path = arg.trim_prefix("--replay=")
+	if (
+		policy_display.has("model_name") != policy_display.has("generation")
+		or (
+			policy_display.has("model_name")
+			and str(policy_display.model_name).strip_edges().is_empty()
+		)
+	):
+		push_error("Supply a nonempty model name and generation together")
+		get_tree().quit(2)
+		return
 	if agent_max_episode_ticks > 0 and not agent_mode:
 		push_error("Agent episode tick limit requires agent mode")
 		get_tree().quit(2)
@@ -474,6 +494,7 @@ func _start_recording(station: float) -> void:
 			"build": _build_provenance(),
 			"episode_id": episode_id,
 			"policy_id": policy_id,
+			"policy_display": policy_display.duplicate(true),
 			"track_sha256": FileAccess.get_sha256("res://data/track.json"),
 			"terrain_sha256": FileAccess.get_sha256("res://data/terrain.json"),
 			"surface_sha256": FileAccess.get_sha256("res://data/surface.json"),

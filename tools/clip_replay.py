@@ -3,6 +3,8 @@
 Decision sidecars must accompany the original complete episode recording. Their
 end ticks are joined to the recorded transitions before clipping. Native decision
 events are preserved when clipping a recording that already contains them.
+Model and generation labels are caller supplied presentation metadata, not
+verified model provenance. Existing labels survive clipping without changes.
 """
 import argparse
 import hashlib
@@ -67,9 +69,16 @@ def decision_rows(stream, manifest, decisions):
 
 
 def clip_replay(source: Path, output: Path, start: float, end: float,
-                decisions: Path | None = None) -> dict:
+                decisions: Path | None = None, *, model_name: str | None = None,
+                generation: int | None = None) -> dict:
     if not all(map(math.isfinite, (start, end))) or not 0 <= start < end:
         raise ValueError("Require finite 0 <= start < end seconds")
+    if (model_name is None) != (generation is None):
+        raise ValueError("Supply model_name and generation together")
+    if model_name is not None and (
+            not isinstance(model_name, str) or not model_name.strip()
+            or type(generation) is not int or generation < 0):
+        raise ValueError("Require a nonempty model name and nonnegative integer generation")
     if output.exists():
         raise FileExistsError(output)
     with source.open("rb") as stream:
@@ -117,6 +126,8 @@ def clip_replay(source: Path, output: Path, start: float, end: float,
     if last_seen_elapsed < end - 1e-8:
         raise ValueError("Source ends before requested clip endpoint")
     manifest["initial_state"] = initial
+    if model_name is not None:
+        manifest["policy_display"] = {"model_name": model_name, "generation": generation}
     # Keep only the call active at the initial state, then each call whose first
     # transition appears in the clip. Equal command text still means new calls.
     active = [event for event in events if event["tick"] <= initial["tick"]]
@@ -159,9 +170,15 @@ def main():
     parser.add_argument("--start", required=True, type=float)
     parser.add_argument("--end", required=True, type=float)
     parser.add_argument("--decisions", type=Path, help="Original evaluate_lap decisions JSONL")
+    parser.add_argument("--model-name", help="Caller supplied display name, paired with --generation")
+    parser.add_argument("--generation", type=int,
+                        help="Caller supplied experiment generation, paired with --model-name")
     args = parser.parse_args()
+    if (args.model_name is None) != (args.generation is None):
+        parser.error("--model-name and --generation must be supplied together")
     print(json.dumps(clip_replay(args.source, args.output, args.start, args.end,
-                                args.decisions), indent=2))
+                                args.decisions, model_name=args.model_name,
+                                generation=args.generation), indent=2))
 
 
 if __name__ == "__main__":

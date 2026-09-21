@@ -132,5 +132,36 @@ class DecisionClipTest(unittest.TestCase):
         self.assertEqual(result["model_decisions"], 4)
 
 
+    def test_explicit_display_labels_and_preservation(self):
+        label = {"model_name": "Gemma 3 270M", "generation": 0}
+        clip_replay(self.source, self.output, 0, 2, self.sidecar, **label)
+        self.assertEqual(self.read()[0]["policy_display"], label)
+        second = self.output.with_name("generation-999.jsonl")
+        clip_replay(self.output, second, 1, 2)
+        self.assertEqual(self.read(second)[0]["policy_display"], label)
+        override = self.output.with_name("override.jsonl")
+        clip_replay(second, override, 1.5, 2, model_name="Other model", generation=2)
+        self.assertEqual(self.read(override)[0]["policy_display"],
+                         {"model_name": "Other model", "generation": 2})
+
+    def test_absent_display_labels_are_not_inferred(self):
+        clip_replay(self.source, self.output, 0, 2)
+        self.assertNotIn("policy_display", self.read()[0])
+
+    def test_display_labels_require_complete_valid_pair(self):
+        cases = [{"model_name": "Gemma"}, {"generation": 0},
+                 {"model_name": "", "generation": 0},
+                 {"model_name": "  ", "generation": 0},
+                 {"model_name": "Gemma", "generation": -1},
+                 {"model_name": "Gemma", "generation": 1.5},
+                 {"model_name": "Gemma", "generation": True},
+                 {"model_name": 3, "generation": 0}]
+        for label in cases:
+            with self.subTest(label=label):
+                with self.assertRaises(ValueError):
+                    clip_replay(self.source, self.output, 0, 2, **label)
+                self.assertFalse(self.output.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

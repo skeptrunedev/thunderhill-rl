@@ -177,8 +177,9 @@ and human visual acceptance remain outstanding.
 Agent recordings now include a `model_decision` event before each accepted
 control call, with the simulation tick, elapsed time, action identifier and
 actual `control_bike` arguments. Retries do not duplicate events. The HUD shows
-the five latest calls in the upper left during live agent control and replay;
-the newest call is first. Repeated identical commands still appear separately.
+the model name, generation, current steering direction and percentage, throttle
+and brake bars, and two recent calls in the upper left during live agent control
+and replay. Repeated identical commands still appear separately.
 The feed shows issued controls, not generated explanations or inferred reasoning.
 
 For older evaluation recordings, join the saved model completions before clipping:
@@ -196,3 +197,18 @@ subsequent clipping. Render the enriched clip with the same movie command above.
 Verified with real headless agent transport and replay checks, seven clipping
 tests, and a rendered cockpit clip inspected for legible text. The example clip
 is the failed baseline corner attempt, not a completed lap.
+
+The readable overlay uses explicit `policy_display` manifest metadata. Supply
+`--model-name 'GEMMA 3  270M' --generation 0` to the clip tool, or
+`--model-name='GEMMA 3  270M' --generation=0` as Godot user arguments
+when starting a live agent recording. These are presentation labels supplied by
+the caller, never guessed from filenames. Missing labels are shown as unknown.
+For the corner experiment, generation zero means its starting adapter; each
+optimizer update advances the generation by one. Four sampled rollouts contribute
+to each update. Model checkpoint hashes remain the authoritative identity.
+
+Steering percentage is the normalized tool input magnitude, not steering angle
+or physical lean. Negative input requests left, positive requests right. The
+control window is at most 0.10 simulated seconds and may end early on termination.
+Throttle bars are green, brake bars are orange, and each call pulses the panel
+using simulation time so movie exports remain synchronized.
