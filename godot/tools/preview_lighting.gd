@@ -17,6 +17,7 @@ func _run() -> void:
 	var camera_mode := 2
 	var station_m := 400.0
 	var fog_density := -1.0
+	var paving_joint_strength := -1.0
 	var lean_deg := 0.0
 	var lateral_m := 0.0
 	var view_yaw_deg := 0.0
@@ -30,7 +31,18 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--field-map-strength="):
+		if arg.begins_with("--paving-joint-strength="):
+			var value := arg.trim_prefix("--paving-joint-strength=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Paving joint strength must be finite and within zero to one")
+				return
+			paving_joint_strength = float(value)
+		elif arg.begins_with("--field-map-strength="):
 			var value := arg.trim_prefix("--field-map-strength=")
 			if (
 				not value.is_valid_float()
@@ -262,6 +274,17 @@ func _run() -> void:
 		game.track.terrain_material.set_shader_parameter(
 			"field_surface_strength", field_map_strength
 		)
+	if paving_joint_strength >= 0.0:
+		game.track.get_node("RacingSurface").material_override.set_shader_parameter(
+			"paving_joint_strength", paving_joint_strength
+		)
+	else:
+		var pavement_material: ShaderMaterial = (
+			game.track.get_node("RacingSurface").material_override
+		)
+		paving_joint_strength = RenderingServer.shader_get_parameter_default(
+			pavement_material.shader.get_rid(), "paving_joint_strength"
+		)
 	game.paused = true
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	game.hud.visible = false
@@ -379,6 +402,9 @@ func _run() -> void:
 					. stringify(
 						{
 							"sky_source": sky_source,
+							"paving_joint_strength": paving_joint_strength,
+							"asphalt_shader_sha256":
+							FileAccess.get_sha256("res://shaders/asphalt.gdshader"),
 							"field_map": field_map_path,
 							"field_map_strength":
 							game.track.terrain_material.get_shader_parameter(

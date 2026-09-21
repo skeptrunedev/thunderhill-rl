@@ -15,6 +15,11 @@ uniform float authored_relief_m = 0.00035;
 uniform float surface_variation_strength : hint_range(0.0, 1.0) = 0.35;
 // Original longitudinal binder mottling, not a recovered tire or friction map.
 uniform float binder_mottling_strength : hint_range(0.0, 1.0) = 0.85;
+// Frame 50 appearance study: local paving pass boundary, not surveyed or friction data.
+uniform float paving_joint_strength : hint_range(0.0, 1.0) = 1.0;
+uniform vec2 paving_joint_station_m = vec2(1265.0, 1510.0);
+uniform float paving_joint_across = 0.46;
+uniform float paving_joint_width_m = 0.018;
 // Historical aerial tone, not a measured material or friction field.
 uniform sampler2D pavement_tone : filter_linear_mipmap_anisotropic, repeat_enable;
 // The historical trial did not improve reference fidelity enough for production.
@@ -103,6 +108,20 @@ void fragment() {
     float binder_pattern = mix(binder_patches, binder_streaks, 0.30);
     float mottling = (binder_pattern - 0.5) * binder_mottling_strength * (authored_surface ? 1.0 : 0.0);
     ALBEDO *= 1.0 + mottling * 0.80;
+    // A bounded original reconstruction of a visible paving joint. Integrate
+    // the narrow line over its projected pixel footprint to avoid distant crawl.
+    float joint_region = smoothstep(paving_joint_station_m.x, paving_joint_station_m.x + 16.0, UV.y)
+                       * (1.0 - smoothstep(paving_joint_station_m.y - 16.0, paving_joint_station_m.y, UV.y))
+                       * paving_joint_strength * (authored_surface ? 1.0 : 0.0);
+    float joint_distance = UV.x - UV2.x * paving_joint_across;
+    float joint_pixel_m = max(fwidth(joint_distance), 0.001);
+    float joint_half_width = paving_joint_width_m * 0.5;
+    float joint_overlap = max(0.0, min(joint_distance + joint_pixel_m * 0.5, joint_half_width)
+                                  - max(joint_distance - joint_pixel_m * 0.5, -joint_half_width));
+    float joint_line = joint_overlap / joint_pixel_m;
+    float paving_side = smoothstep(-joint_pixel_m * 0.5, joint_pixel_m * 0.5, joint_distance);
+    float paving_gain = mix(1.04, 0.92, paving_side) * (1.0 + joint_line * 0.30);
+    ALBEDO *= mix(1.0, paving_gain, joint_region);
     float tone_interior = smoothstep(0.10, 0.22, min(across, 1.0 - across));
     float observed_tone = texture(pavement_tone, vec2(across, UV.y / lap_length_m)).r * 2.0;
     ALBEDO *= mix(1.0, observed_tone, pavement_tone_strength * tone_interior);

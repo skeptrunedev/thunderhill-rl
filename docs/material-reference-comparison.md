@@ -1157,3 +1157,41 @@ over 269 frames. This is a runtime check, not a controlled performance benchmark
 Python checks, formatting and diff checks pass. The MacBook was offline during
 this pass, so native Mac verification remains pending.
 Mac export passed as `1ae73280c01d-1b3b7582c5d2`.
+
+## Local paving pass joint
+
+Reference frame 50 shows a narrow longitudinal construction boundary between
+slightly darker left pavement and lighter right pavement. The game previously
+contained broad mottling but no such local feature. An original appearance
+estimate now adds a restrained joint from station 1265 to 1510, with 16 metre
+fades at both ends. These station limits, the 18 mm line width, and its position
+at 0.46 of pavement UV width are artistic choices, not surveyed repave seams.
+The actual pavement mesh was checked: UV zero is the right edge and full width
+is the left edge. The first candidate had the orientation reversed; the adopted
+candidate corrects both the line position and the side tone response.
+
+`paving_joint_strength` defaults to 1. The right pass multiplier is 1.04 and the
+left is 0.92, with at most 30 percent local gain for the narrow line. The line's
+coverage is its interval overlap with the projected pixel footprint, retaining
+subpixel energy without a hard threshold. Roughness, texture scale, normals,
+track geometry and all contact or reward data remain unchanged. This feature
+must not be interpreted as an optimal racing line or friction boundary.
+
+`preview_lighting.gd --paving-joint-strength=0` produces the baseline;
+strength 1 produces the candidate. The command validates a finite unit range
+and records the selected strength and asphalt shader hash. Root and independent
+review accepted `artifacts/paving-joint-oriented/production.png` against
+`artifacts/paving-joint-baseline/production.png` as a modest improvement. It
+reads as a subtle construction seam, not a painted stripe. Root also inspected
+stations 1270, 1400.5 and 1498 for endpoint transitions and adjacent position
+continuity. These sampled stills do not establish stability over a moving lap.
+The reference's irregular crossing marks and more varied surface wear remain
+absent, and no exact video camera registration is claimed.
+
+Human controls passed with zero failures. Local Linux timing was median
+17.361 ms and p95 19.463 ms over 266 frames. Formatting and diff checks pass.
+Nonfinite and out of range preview strengths were rejected. The final production
+capture at station 1400 matches the reviewed candidate PNG exactly, and its
+metadata records the adopted strength of 1.
+Mac export passed as `ec35bbe82000-2f4c203e8c2f`; this build has not been verified
+running natively on the Mac.
