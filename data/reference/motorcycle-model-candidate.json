@@ -1,0 +1,24 @@
+{
+  "name": "2024 Ducati StreetFighter V4 S",
+  "license": {
+    "uri": "https://api.sketchfab.com/v3/licenses/2628dbe5140a4e9592126c8df566c0b7",
+    "label": "CC Attribution-NonCommercial-ShareAlike",
+    "fullName": "CC Attribution-NonCommercial-ShareAlike",
+    "requirements": "Author must be credited. No commercial use. Modified versions must have the same license.",
+    "url": "http://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "slug": "by-nc-sa"
+  },
+  "isDownloadable": true,
+  "vertexCount": 58404,
+  "faceCount": 102000,
+  "description": "* Year: 2024\n* Model: Streetfighter V4 S\n* Class: Streetfigher\n* Manufacturer: Ducati S.p.A\n* -\n* Engine: 1.1 Liter Desmosedici Stradale V4\n* Aspiration: Natural\n* Transmission: 6-speed\n* Power Output: 214 Horsepower\n* Torque: 88.5 lb-ft\n* -\n* Wet Weight no fuel: 189 Kg",
+  "viewerUrl": "https://sketchfab.com/3d-models/2024-ducati-streetfighter-v4-s-c501252f8af64c559bf91dc306c3a550",
+  "api_source": "https://api.sketchfab.com/v3/models/c501252f8af64c559bf91dc306c3a550",
+  "author": "OUTPISTON",
+  "status": "Candidate only; not downloaded or integrated. Noncommercial license decision pending.",
+  "limitations": [
+    "Publisher labels model year 2024, not verified against footage motorcycle.",
+    "Download availability is declared by API; authenticated download route not yet exercised.",
+    "Geometry and texture quality not inspected in engine."
+  ]
+}

@@ -22,10 +22,10 @@ MD5 = "2eba3a4d7eeb23cbfbeca364c97e7980"
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--candidate", choices=["aristea_wreck_puresky", "kloppenheim_05_puresky"])
+    parser.add_argument("--candidate", choices=["aristea_wreck_puresky", "kloppenheim_05_puresky", "kloppenheim_03_puresky"])
     args = parser.parse_args()
     asset = args.candidate or "kloofendal_48d_partly_cloudy_puresky"
-    pins = {"aristea_wreck_puresky": "e764c66f871ab0987f3fac422edc841d", "kloppenheim_05_puresky": "adb05080152dc9ee44ca41d6452748e4"}
+    pins = {"aristea_wreck_puresky": "e764c66f871ab0987f3fac422edc841d", "kloppenheim_05_puresky": "adb05080152dc9ee44ca41d6452748e4", "kloppenheim_03_puresky": "06abf490739e537e9339d619a2a3c941"}
     url = f"https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/{asset}_2k.hdr" if args.candidate else URL
     expected_md5 = pins[asset] if args.candidate else MD5
     path = ROOT / "artifacts/sky-studies" / f"{asset}.hdr" if args.candidate else ROOT / "godot/assets/sky/kloofendal_2k.hdr"

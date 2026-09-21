@@ -29,3 +29,24 @@ artifacts, leaving the production sky unchanged. The inspected
 [Kloppenheim 05](https://polyhaven.com/a/kloppenheim_05_puresky) alternatives did
 not provide a convincing cloud match. They are not installed in the game. The
 current sky still differs from the footage's cloud structure.
+
+## Layered cloud study
+
+The publisher API supplied a verified 2K HDR and MD5 for
+[Kloppenheim 03](https://polyhaven.com/a/kloppenheim_03_puresky). The acquisition
+CLI now supports this additional candidate. It stays in ignored artifacts;
+production still uses Kloofendal. `preview_lighting.gd --camera=1` provides the
+rider eye comparison, and validates camera identifiers before loading the game.
+
+Matched rider views are in `artifacts/current-sky-rider/` and
+`artifacts/kloppenheim03-rider/`. The candidate replaces rounded clouds with
+thinner layers, but puts a broad pale veil where frame 00:20 shows larger blue
+openings and fine broken streaks. Reducing background energy to 0.4 darkened
+the scene background without solving cloud coverage. This is not adopted.
+
+An optional `background_saturation` shader uniform defaults to 1.0, preserving
+production color and environment lighting. The study variant at 1.6 is in
+`artifacts/kloppenheim03-chroma/sky_chroma.png`. It improves the blue opening's
+color but cannot correct the cloud placement. Saturation operates only outside
+the cubemap pass; no lighting or reflection color grading is introduced.
+Neither this variant nor the candidate sky is a demonstrated footage match.

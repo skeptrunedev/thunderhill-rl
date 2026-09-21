@@ -11,11 +11,18 @@ func _initialize() -> void:
 func _run() -> void:
 	var output := ""
 	var sky_source := ""
+	var camera_mode := 2
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
 		elif arg.begins_with("--sky-source="):
 			sky_source = arg.trim_prefix("--sky-source=")
+		elif arg.begins_with("--camera="):
+			var value := arg.trim_prefix("--camera=")
+			if not value.is_valid_int() or int(value) < 0 or int(value) > 2:
+				_fail("Camera must be 0, 1 or 2")
+				return
+			camera_mode = int(value)
 	if not output.is_absolute_path() or DisplayServer.get_name() == "headless":
 		_fail("Use a real renderer and an absolute --output-dir")
 		return
@@ -23,6 +30,23 @@ func _run() -> void:
 		_fail("Cannot create output directory")
 		return
 	var variants := [
+		{
+			"name": "sky_chroma",
+			"mapper": Environment.TONE_MAPPER_FILMIC,
+			"exposure": 1.0,
+			"sky": 0.7,
+			"saturation": 1.6,
+			"sun": "fff0d5",
+			"fog": 0.00035
+		},
+		{
+			"name": "background_low",
+			"mapper": Environment.TONE_MAPPER_FILMIC,
+			"exposure": 1.0,
+			"sky": 0.4,
+			"sun": "fff0d5",
+			"fog": 0.00035
+		},
 		{
 			"name": "sky_only",
 			"mapper": Environment.TONE_MAPPER_FILMIC,
@@ -81,7 +105,7 @@ func _run() -> void:
 	game.paused = true
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	game.hud.visible = false
-	game.camera_mode = 2
+	game.camera_mode = camera_mode
 	game.reset_episode(400.0)
 	game._update_visual(1.0)
 	var environment: Environment
@@ -115,6 +139,9 @@ func _run() -> void:
 		environment.fog_density = row.fog
 		sun.light_color = Color(row.sun)
 		environment.sky.sky_material.set_shader_parameter("background_energy", row.sky)
+		environment.sky.sky_material.set_shader_parameter(
+			"background_saturation", row.get("saturation", 1.0)
+		)
 		for frame in 24:
 			await RenderingServer.frame_post_draw
 		var capture := root.get_texture().get_image()
@@ -134,7 +161,7 @@ func _run() -> void:
 				{
 					"sky_source": sky_source,
 					"station_m": 400,
-					"camera": 2,
+					"camera": camera_mode,
 					"fov": game.camera.fov,
 					"camera_transform": str(game.camera.global_transform),
 					"variants": variants,
