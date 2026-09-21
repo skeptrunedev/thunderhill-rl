@@ -260,8 +260,14 @@ void fragment() {
         float aerial_weight = mix(1.0, mapped_aerial_contrast, mapped_weight);
         macro_gain = mix(vec3(1.0), macro_gain, aerial_weight);
         detail_gain = mix(vec3(1.0), detail_gain, aerial_weight);
-        // Retain bare shoulder coverage and existing access corridor handling.
-        grass_coverage = mix(grass_coverage, detail.a * mapped_field.r, mapped_weight);
+        // Preserve the interrupted shoulder blend when applying regional straw.
+        // Replacing it with raw detail alpha restored a smooth roadwide ribbon.
+        // Flattened straw reaches farther into the existing visual transition.
+        // Keep the zero and full coverage endpoints and explicit bare corridors.
+        float mapped_base = 1.0 - (1.0 - detail.a) * (1.0 - detail.a);
+        float mapped_transition = 4.0 * mapped_base * (1.0 - mapped_base);
+        float mapped_shoulder = clamp(mapped_base + mapped_transition * coverage_variation, 0.0, 1.0);
+        grass_coverage = mix(grass_coverage, mapped_shoulder * mapped_field.r, mapped_weight);
         vec3 mapped_straw_gain = mix(vec3(1.0), pale_straw_gain, mapped_field.g);
         mapped_straw_gain *= mix(vec3(1.0), retained_swath_gain, retained_swath_strength);
         straw_color_gain = mix(straw_color_gain, mapped_straw_gain, mapped_weight);

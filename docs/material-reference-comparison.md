@@ -1803,3 +1803,33 @@ Fixed frame rate capture is not a live performance measurement. Mac package
 when checked, so this package has not been tested there.
 The replay contact sheet was inspected at two second intervals without an
 obvious new field seam; this does not establish fine temporal stability.
+
+## Mapped shoulder compositing
+
+The regional straw override replaced the previously perturbed shoulder coverage
+with the smooth distance alpha, losing transition irregularity. It now retains
+that variation and biases flattened straw coverage through the existing
+transition with `1 - (1 - alpha)^2`. Zero and full coverage endpoints remain
+unchanged, and explicit bare corridors still apply afterward. This is an
+appearance estimate, not a measured shoulder width or vegetation survey.
+
+`artifacts/shoulder-blend-comparison` isolates noise preservation from the
+coverage bias. Both changes are small at scene scale; independent review did
+not find a convincing removal of the broad brown apron. The entry capture
+also remains visually similar. This fixes compositing consistency but does
+not establish a substantial realism improvement.
+
+A proposed mask overlap explanation was checked against current runtime data
+and rejected: the map metadata specifies 1 metre minimum road clearance and
+1.5 metre feathering. At the nearest apex sample, station 1149.572, source
+pixels sampled 1.5 and 2 metres beyond the left boundary have detail alpha
+127 and field alpha 188 out of 255. At 2.5 metres those values are 236 and
+255. These are nearest source pixel samples, not filtered rendered values,
+but they demonstrate that the two transitions overlap. Earlier candidate
+map measurements must not be substituted for the current source.
+
+The broad field material composition remains unresolved; further small
+coverage remaps are not supported as the primary route to the fidelity goal.
+Rendered human controls passed with zero failures. Linux frame intervals
+were 17.36 ms median and 20.88 ms p95 across 265 samples. Mac package
+`e5bee3ee1350-aff68223c957` exported successfully but is not native verified.
