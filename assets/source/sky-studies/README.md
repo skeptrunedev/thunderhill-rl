@@ -29,3 +29,26 @@ The video frame is a reference, not included as a runtime texture.
 Rejected after the rendered comparison: larger opaque cloud patches were
 softer than the reference's fine translucent streaks. It is not installed
 as a production asset. See `docs/sky-lighting.md` for the control experiment.
+
+## Rectilinear cirrus detail patch v1
+
+`cirrus-patch-v1.png` is an unchanged original generated image from the built in
+imagegen tool. Frame 40 was supplied as a morphology reference. The exact prompt
+is in `cirrus-patch-v1-prompt.txt`. The actual image is 1536 by 1024 RGB, SHA256
+`5a6022b36601e29483cae5f429b707cc43cb56b9b47ef2a6f40c031775a2a004`.
+It is distributed under the project's MIT license as an original asset.
+
+Unlike v1 and v2 panoramas, this is a rectilinear view. Its pixels cover a
+limited 100 degree horizontal field instead of all 360 degrees, allowing much
+finer visible cloud structure. The prompt's elevation is an artistic composition
+request, not recovered image calibration. Runtime placement uses estimated
+azimuth 82.5 degrees and elevation 30 degrees, with a 0.15 normalized edge
+feather. These are visual layout choices, not captured Thunderhill weather.
+
+The runtime PNG is `godot/assets/sky/cirrus_patch_v1.png`. Its sibling `.res`
+contains linear light filtered mip levels built with the existing color bake
+tool. `godot/data/sky.json` records production projection and provenance.
+The shader blends the patch into the original panorama in fixed world space,
+for both visible sky and environment light, while retaining the existing direct
+sun direction and lower hemisphere ground radiance. This remains LDR authored
+appearance. No photographic radiometry is claimed.

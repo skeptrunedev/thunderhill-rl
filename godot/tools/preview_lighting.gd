@@ -11,6 +11,9 @@ func _initialize() -> void:
 func _run() -> void:
 	var output := ""
 	var sky_source := ""
+	var sky_patch_path := ""
+	var sky_patch_off := false
+	var sky_patch_metadata := {}
 	var field_map_path := ""
 	var field_map_sha256 := ""
 	var field_map_strength := -1.0
@@ -195,6 +198,10 @@ func _run() -> void:
 			production_only = true
 		elif arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
+		elif arg == "--sky-patch-off":
+			sky_patch_off = true
+		elif arg.begins_with("--sky-patch="):
+			sky_patch_path = arg.trim_prefix("--sky-patch=")
 		elif arg.begins_with("--sky-source="):
 			sky_source = arg.trim_prefix("--sky-source=")
 		elif arg.begins_with("--camera="):
@@ -203,6 +210,9 @@ func _run() -> void:
 				_fail("Camera must be 0, 1 or 2")
 				return
 			camera_mode = int(value)
+	if sky_patch_off and not sky_patch_path.is_empty():
+		_fail("Choose either a sky patch override or sky patch off")
+		return
 	if is_finite(authored_yaw) and not sky_source.is_empty():
 		_fail("Authored yaw is only for the production panorama without a captured solar disk")
 		return
@@ -475,6 +485,13 @@ func _run() -> void:
 			toward = Basis(Vector3.UP, sky_yaw) * toward
 		environment.sky.sky_material.set_shader_parameter("panorama_yaw", sky_yaw)
 		sun.look_at(-toward, Vector3.UP)
+	if sky_patch_off:
+		environment.sky.sky_material.set_shader_parameter("sky_patch_enabled", false)
+	if not sky_patch_path.is_empty():
+		sky_patch_metadata = _apply_sky_patch(environment.sky.sky_material, sky_patch_path)
+		if sky_patch_metadata.has("error"):
+			_fail(sky_patch_metadata.error)
+			return
 	environment.sky.sky_material.set_shader_parameter(
 		"minimum_source_y", sin(deg_to_rad(minimum_elevation))
 	)
@@ -511,6 +528,13 @@ func _run() -> void:
 					. stringify(
 						{
 							"sky_source": sky_source,
+							"sky_patch": sky_patch_metadata,
+							"runtime_sky_patch_enabled":
+							environment.sky.sky_material.get_shader_parameter("sky_patch_enabled"),
+							"production_sky_metadata_sha256":
+							FileAccess.get_sha256("res://data/sky.json"),
+							"sky_patch_setup_sha256":
+							FileAccess.get_sha256("res://scripts/sky_patch.gd"),
 							"terrain_detail_source": detail_source,
 							"terrain_detail_source_sha256":
 							(
@@ -653,3 +677,61 @@ func _apply_terrain_detail(material: ShaderMaterial, path: String) -> String:
 		return "Cannot generate terrain detail mipmaps"
 	material.set_shader_parameter("terrain_detail", ImageTexture.create_from_image(image))
 	return ""
+
+
+func _apply_sky_patch(material: ShaderMaterial, path: String) -> Dictionary:
+	if not path.is_absolute_path() or not FileAccess.file_exists(path):
+		return {"error": "Sky patch requires an existing absolute manifest path"}
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not data is Dictionary or data.get("encoding") != "srgb":
+		return {"error": "Sky patch manifest must be a dictionary with srgb encoding"}
+	var image_path: Variant = data.get("local_path")
+	if not image_path is String or not image_path.is_absolute_path():
+		return {"error": "Sky patch image requires an absolute local_path"}
+	if not FileAccess.file_exists(image_path):
+		return {"error": "Sky patch image does not exist"}
+	var digest := FileAccess.get_sha256(image_path)
+	if digest.is_empty() or digest != data.get("sha256"):
+		return {"error": "Sky patch image hash mismatch"}
+	var bounds := {
+		"horizontal_fov_degrees": [1.0, 170.0],
+		"center_azimuth_degrees": [-360.0, 360.0],
+		"center_elevation_degrees": [-90.0, 90.0],
+		"feather_fraction": [0.001, 0.5]
+	}
+	for key in bounds:
+		var value: Variant = data.get(key)
+		if not (value is float or value is int):
+			return {"error": "Sky patch requires a numeric " + key}
+		if not is_finite(float(value)) or value < bounds[key][0] or value > bounds[key][1]:
+			return {"error": "Sky patch projection outside finite bounds: " + key}
+	var image := Image.load_from_file(image_path)
+	if image == null or image.is_empty():
+		return {"error": "Cannot load sky patch image"}
+	var dimensions := [image.get_width(), image.get_height()]
+	if dimensions[0] < 2 or dimensions[1] < 2 or dimensions[0] > 8192 or dimensions[1] > 8192:
+		return {"error": "Sky patch dimensions must be between 2 and 8192 pixels"}
+	if data.has("output_dimensions") and data.output_dimensions != dimensions:
+		return {"error": "Sky patch dimensions differ from manifest"}
+	image = preload("res://scripts/color_mipmaps.gd").build(image)
+	if image == null or image.is_empty():
+		return {"error": "Cannot build sky patch color mipmaps (requires RGB8 or RGBA8)"}
+	var projection := preload("res://scripts/sky_patch.gd").configure(
+		material,
+		ImageTexture.create_from_image(image),
+		float(data.horizontal_fov_degrees),
+		float(data.center_azimuth_degrees),
+		float(data.center_elevation_degrees),
+		float(data.feather_fraction)
+	)
+	projection.merge(
+		{
+			"manifest_path": path,
+			"manifest_sha256": FileAccess.get_sha256(path),
+			"local_path": image_path,
+			"sha256": digest,
+			"encoding": "srgb",
+			"output_dimensions": dimensions
+		}
+	)
+	return projection

@@ -23,5 +23,19 @@
     0.12739999999999999,
     0.09782500000000001
   ],
-  "ground_radiance_provenance": "Shared dry ground linear tint scaled by 0.35, artistic estimate for lower hemisphere illumination"
+  "ground_radiance_provenance": "Shared dry ground linear tint scaled by 0.35, artistic estimate for lower hemisphere illumination",
+  "detail_patch": {
+    "source": "assets/source/sky-studies/cirrus-patch-v1.png",
+    "sha256": "5a6022b36601e29483cae5f429b707cc43cb56b9b47ef2a6f40c031775a2a004",
+    "runtime_texture": "res://assets/sky/cirrus_patch_v1.res",
+    "dimensions": [
+      1536,
+      1024
+    ],
+    "horizontal_fov_degrees": 100.0,
+    "center_azimuth_degrees": 82.5,
+    "center_elevation_degrees": 30.0,
+    "feather_fraction": 0.15,
+    "status": "Original generated rectilinear cloud appearance from frame40 morphology. Projection is an artistic estimate, not recovered weather or lens calibration."
+  }
 }

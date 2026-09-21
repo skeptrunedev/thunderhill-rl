@@ -252,3 +252,50 @@ authoring constraints; exact video registration is still unproven.
 All three Godot rendering runs completed successfully with nonblack captures.
 Formatting and diff checks passed. No production asset or shader was changed
 in this study, and no new native build is claimed.
+
+## Rectilinear cloud detail, 21 September 2026
+
+Selective cloud radiance and 180 degree panorama rotation studies are retained
+as diagnostic controls but not adopted. Gain three alone barely changes the
+sparse viewing sector; rotating the panorama reveals broad smooth ribbons, and
+the gain washes out their bright regions. Captures are `cloud-radiance-control`,
+`cloud-radiance-three`, `cloud-yaw180` and `cloud-yaw180-neutral` in artifacts.
+The production radiance gain remains one and panorama yaw remains zero.
+
+The accepted new `cirrus-patch-v1` source allocates 1536 by 1024 pixels to one
+rectilinear sky region. It resolves fragmented cloud structure that the 1774
+pixel full panorama did not supply at riding view scale. A shared projection
+helper maps it into world directions and derives vertical field of view from
+image aspect. The shader fades all four edges and rejects the back hemisphere.
+Derivatives are computed before spatial coverage branching. It uses the same
+linear light mip construction and manual sRGB decode as the original sky.
+The base panorama supplies every direction outside the patch.
+
+At station 950, `cirrus-patch-v1-render/production.png` is visibly more detailed
+than `cloud-radiance-control/production.png`. The 1.5 cloud gain variant loses
+fine white shading and lightens the road, so it is not adopted. The production
+resource capture `cirrus-patch-v1-production/production.png` is pixel identical
+to the accepted loose source preview. This verifies the runtime texture path
+for that pose, not exact matching to the video.
+
+Additional views at station 400 (`cirrus-patch-v1-straight-repeat`) and station
+1450 (`cirrus-patch-v1-exit`) show no obvious hard blend boundary. The first
+station 400 process exited with signal 15 before saving; after its terminal
+status was confirmed, a fresh invocation completed in the separate repeat
+directory. No cause for that external termination is established.
+
+The arrangement, projection and lighting remain artistic estimates. Other sky
+directions still use the lower detail panorama. Finite angular view checks are
+not a full moving lap seam or performance acceptance test. The cardinal and
+polar projection test verifies handedness, aspect and a finite orthonormal basis.
+`preview_lighting.gd --sky-patch-off` gives a control without the production
+patch; `--sky-patch=/absolute/manifest.json` provides a validated alternative.
+Study metadata records enabled state, production metadata hash, helper hash and
+any override's source and projection. Physics and observation dimensions are
+unchanged.
+
+Human control checks passed with zero failures. The rendered agent camera suite
+passed all five recorded observations, including PNG hashes, immutable artifacts,
+frozen ticks, queued advance/reset ordering and headless capture rejection.
+These are compatibility checks, not an RL training result or visual approval.
+Comparison sheets are in `artifacts/cirrus-patch-comparison/`.

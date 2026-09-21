@@ -276,6 +276,9 @@ func _run_control_checks() -> void:
 
 
 func _environment() -> void:
+	var sky_metadata: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/sky.json")
+	)
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
@@ -287,6 +290,15 @@ func _environment() -> void:
 	sky_mat.set_shader_parameter("panorama_seam_overlap", 0.04)
 	sky_mat.set_shader_parameter("use_ground_radiance", true)
 	sky_mat.set_shader_parameter("ground_radiance", TrackScript.DRY_GROUND_TINT * 0.35)
+	var patch: Dictionary = sky_metadata.detail_patch
+	preload("res://scripts/sky_patch.gd").configure(
+		sky_mat,
+		preload("res://assets/sky/cirrus_patch_v1.res"),
+		float(patch.horizontal_fov_degrees),
+		float(patch.center_azimuth_degrees),
+		float(patch.center_elevation_degrees),
+		float(patch.feather_fraction)
+	)
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -312,9 +324,6 @@ func _environment() -> void:
 	sun.directional_shadow_split_1 = 0.04
 	sun.directional_shadow_blend_splits = true
 	add_child(sun)
-	var sky_metadata: Dictionary = JSON.parse_string(
-		FileAccess.get_file_as_string("res://data/sky.json")
-	)
 	var direction: Array = sky_metadata.toward_sun
 	sun.look_at(-Vector3(direction[0], direction[1], direction[2]), Vector3.UP)
 

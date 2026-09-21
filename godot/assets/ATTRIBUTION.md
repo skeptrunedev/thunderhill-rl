@@ -46,3 +46,9 @@ generated grass albedo. The earlier two Poly Haven atlas stems are no longer
 instantiated. Their source assets and provenance remain archived in the repo.
 The terrain shader's world space variation within the grass and soil blend is
 original procedural appearance detail, not surveyed vegetation coverage.
+
+`sky/cirrus_patch_v1.png` is an original generated rectilinear cirrus detail view,
+used under the project's MIT license. The built in imagegen tool used the supplied
+video frame only as a cloud morphology reference. The source image, exact prompt,
+hash and authoring limitations are in `assets/source/sky-studies/README.md` at the
+repository root. Its `.res` stores color mipmaps filtered in linear light.
