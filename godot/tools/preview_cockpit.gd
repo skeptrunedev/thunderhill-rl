@@ -10,8 +10,15 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var output := ""
+	var steering := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--output-dir="):
+		if arg.begins_with("--steering="):
+			var value := arg.trim_prefix("--steering=")
+			if not value.is_valid_float():
+				_fail("Steering must be numeric radians")
+				return
+			steering = float(value)
+		elif arg.begins_with("--output-dir="):
 			output = arg.trim_prefix("--output-dir=")
 	if not output.is_absolute_path() or DisplayServer.get_name() == "headless":
 		_fail("Use a real renderer and an absolute --output-dir")
@@ -42,6 +49,10 @@ func _run() -> void:
 	game.camera_mode = 2
 	game.reset_episode(400.0)
 	game._update_visual(1.0)
+	if not is_finite(steering) or absf(steering) > float(game.sim.parameters.steering_limit_rad):
+		_fail("Steering exceeds simulation limits")
+		return
+	game.bike.update_pose(0.0, steering, 0.0)
 	variants[0].anchor = game.bike.ONBOARD_CAMERA_LOCAL
 	variants[0].pitch = game.bike.ONBOARD_LOOK_DOWN
 	variants[0].fov = game.camera.fov
@@ -85,6 +96,7 @@ func _run() -> void:
 					. stringify(
 						{
 							"station_m": 400,
+							"visual_steering_rad": steering,
 							"resolution": [SIZE.x, SIZE.y],
 							"main_script_sha256": FileAccess.get_sha256("res://scripts/main.gd"),
 							"study_script_sha256":

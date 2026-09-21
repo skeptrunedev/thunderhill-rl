@@ -87,3 +87,32 @@ that framing can change the apparent tank and cockpit coverage substantially.
 The reference supports a missing dark headstock and ignition assembly, but one
 obscured onboard view is insufficient evidence for a particular tank recess.
 No tank reshaping or production camera change was adopted from this study.
+
+
+## Original headstock hardware study
+
+The cockpit now includes an original hexagonal steering stem fastener and a
+separate cylindrical ignition housing with a metallic rim, inserted key,
+mounting plate and short support. Their dimensions and chassis attachment are
+visual estimates, not an OEM mounting reconstruction. The requested official
+Ducati installation PDF could not be downloaded (HTTP 403); no mounting claim
+is based on that unread document.
+
+The stem fastener follows the visual steering assembly. The ignition stays on
+the chassis. Clearance was checked against the modeled yoke and headlight
+through the existing steering range of plus or minus 0.5 radians. The final
+housing is centered at bike local (0, 0.925, -0.570) metres. The plate is 44 by
+10 by 16 mm with a 3 mm bevel; its narrower footprint resolves a headlight
+intersection found during the full steering sweep. These are authoring values,
+not measured Ducati dimensions. Tank and production camera geometry are unchanged.
+
+The inspection tool accepts `--steering` in radians, validates against the
+simulation limit and records the visual angle. Earlier capture directories
+`cockpit-headstock`, `cockpit-headstock-clearance` and `headstock-final-left`
+contain intermediate placements. The final bracket capture is
+`artifacts/headstock-bracket-verified/production.png`; the neutral view in
+`artifacts/headstock-verified/production.png` predates only the bracket narrowing.
+The new hardware adds recognizable detail but is not positioned like the
+obscured ignition area in the video. It does not resolve the tank silhouette,
+display generation mismatch or the broader cockpit realism gap. The existing
+front assembly steering pivot is also a simplified visual mechanism.

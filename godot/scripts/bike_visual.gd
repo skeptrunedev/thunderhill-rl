@@ -800,6 +800,7 @@ func _build_cockpit() -> void:
 			polymer
 		)
 	_build_steering_damper(dark_metal, polymer)
+	_build_headstock(dark_metal, polymer)
 	# Display face normal points upward and toward the rider, not skyward.
 	var instruments := Node3D.new()
 	instruments.name = "LiveInstrumentCluster"
@@ -812,6 +813,50 @@ func _build_cockpit() -> void:
 	instruments.add_child(face)
 	_beveled_panel(Vector2(0.177, 0.097), 0.001, 0.008, display_material, face)
 	update_instruments(0, 1500, 1)
+
+
+func _build_headstock(dark_metal: Material, polymer: Material) -> void:
+	# Original visual hardware guided by the cockpit frame, not manufacturer CAD.
+	# The ignition stays on the chassis; only the stem fastener follows the yoke.
+	var stem := Node3D.new()
+	stem.name = "SteeringStemFastener"
+	_front.add_child(stem)
+	_bar(Vector3(0, 0.603, 0.225), Vector3(0, 0.610, 0.225), 0.022, dark_metal, stem)
+	var nut := CylinderMesh.new()
+	nut.top_radius = 0.017
+	nut.bottom_radius = 0.017
+	nut.height = 0.009
+	nut.radial_segments = 6
+	_mesh(nut, _metal, stem, Vector3(0, 0.614, 0.225))
+	_bar(Vector3(0, 0.6185, 0.225), Vector3(0, 0.619, 0.225), 0.009, polymer, stem)
+	var ignition := Node3D.new()
+	ignition.name = "IgnitionHousing"
+	ignition.position = Vector3(0.0, 0.925, -0.570)
+	add_child(ignition)
+	_bar(Vector3(0, -0.032, 0), Vector3(0, 0.021, 0), 0.023, polymer, ignition)
+	var rim := TorusMesh.new()
+	rim.inner_radius = 0.018
+	rim.outer_radius = 0.022
+	rim.rings = 32
+	rim.ring_segments = 8
+	_mesh(rim, dark_metal, ignition, Vector3(0, 0.021, 0))
+	_bar(Vector3(0, 0.021, 0), Vector3(0, 0.022, 0), 0.0175, _metal, ignition)
+	_chamfered_box(Vector3(0.003, 0.001, 0.012), Vector3(0, 0.0228, 0), 0.0003, polymer, ignition)
+	# A small inserted blade and molded key head give scale without fake lettering.
+	_chamfered_box(Vector3(0.002, 0.018, 0.007), Vector3(0, 0.032, 0), 0.0005, _metal, ignition)
+	_chamfered_box(Vector3(0.024, 0.017, 0.009), Vector3(0, 0.048, 0), 0.003, polymer, ignition)
+	_chamfered_box(
+		Vector3(0.044, 0.010, 0.016), Vector3(0, -0.029, -0.005), 0.003, dark_metal, ignition
+	)
+	_bar(Vector3(0, -0.034, -0.005), Vector3(0, -0.085, 0.005), 0.010, dark_metal, ignition)
+	for side in [-1.0, 1.0]:
+		_bar(
+			Vector3(side * 0.018, -0.024, -0.005),
+			Vector3(side * 0.018, -0.020, -0.005),
+			0.004,
+			_metal,
+			ignition
+		)
 
 
 func _build_steering_damper(mount: Material, polymer: Material) -> void:
