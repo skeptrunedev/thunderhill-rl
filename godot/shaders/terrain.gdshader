@@ -25,6 +25,8 @@ uniform float grass_rotation_spread : hint_range(0.0, 1.0) = 1.0;
 // Independent patch scale study; zero preserves the production source scale.
 uniform float grass_scale_spread : hint_range(0.0, 1.0) = 0.0;
 uniform float grass_relief_m = 0.010;
+// Luminance ranks pale straw over soil for material blending, not measured height.
+uniform float grass_height_blend : hint_range(0.0, 1.0) = 1.0;
 // Estimated field microtopography for shading only, not surveyed contact heights.
 // Rendered trials did not improve fidelity enough for production.
 uniform float field_relief_m : hint_range(0.0, 0.1) = 0.0;
@@ -194,12 +196,19 @@ void fragment() {
     vec4 region = cleared_field(world_pos.xz, retained_grass);
     float corridor = region.a;
     grass_coverage *= 1.0 - corridor * (1.0 - retained_grass);
+    float straw = dot(grass, vec3(0.2126, 0.7152, 0.0722));
+    // The source already includes earth beneath the straw. Preserve resolved
+    // pale strands instead of crossfading all of them into a second soil image.
+    // Endpoint coverage remains exactly bare soil or full source material.
+    float straw_rank = smoothstep(0.12, 0.55, straw);
+    float layered_coverage = smoothstep(0.0, 1.0, 2.0 * grass_coverage - 1.0 + straw_rank);
+    float resolved_straw = 1.0 - smoothstep(0.008, 0.05, length(fwidth(world_pos.xz)) / grass_tile_m);
+    grass_coverage = mix(grass_coverage, layered_coverage, grass_height_blend * resolved_straw);
     float soil_weight = (1.0 - grass_coverage) * macro_weight;
     ALBEDO = mix(grass * straw_color_gain, soil * mix(soil_value, 1.0, corridor * (1.0 - retained_grass)), soil_weight) * ground_tint * macro_gain * detail_gain * mix(vec3(1.0), region.rgb, corridor);
     // A single albedo does not contain measured PBR maps. Bright straw over
     // darker soil supplies an explicitly artistic relief/roughness estimate.
     // Derivatives of the filtered sample naturally remove unresolved relief.
-    float straw = dot(grass, vec3(0.2126, 0.7152, 0.0722));
     float grass_r = mix(0.98, 0.84, smoothstep(0.10, 0.48, straw));
     float soil_luminance = dot(soil, vec3(0.2126, 0.7152, 0.0722));
     float soil_r = mix(0.96, 0.88, smoothstep(0.10, 0.50, soil_luminance));

@@ -1053,3 +1053,40 @@ Human controls passed with zero failures. Local Linux timing was median
 17.361 ms and p95 23.181 ms over 266 frames, not a controlled performance
 comparison. Mac export passed as `a6a29e112206-e0ed16a32984`; this build has
 not been verified running natively on the Mac.
+
+## Preserve resolved straw in soil blends
+
+The production grass source already contains pale straw above brown soil.
+Crossfading that entire image into a second earth texture suppresses the straw
+along with the source's underlying soil. An isolated shader comparison replaces
+that uniform mixture with a luminance ranked material blend where detail resolves.
+It does not infer actual height from the source or change terrain geometry.
+
+`grass_height_blend` defaults to 1. The source's linear luminance is ranked with
+`smoothstep(0.12, 0.55, luminance)`. Layered coverage is
+`smoothstep(0, 1, 2 * coverage - 1 + rank)`, retaining exactly bare and fully
+covered endpoints. The effect fades over projected footprints of 0.008 through
+0.05 times the grass tile size, returning to the prior mixture for unresolved
+straw. Albedo, roughness and material gradient weights share the resulting
+coverage. Coverage derivatives are not introduced into relief. Palette, source
+textures, texture scales, aerial gains and lighting remain unchanged.
+
+`preview_grass_material.gd --candidate-height-blend=1` compares zero strength
+against the candidate. It rejects nonfinite and out of range strengths and
+other simultaneous candidate controls. Captures in
+`artifacts/straw-height-blend-turn2/`, `straw-height-blend-straight/` and
+`straw-height-blend-crest/` use stations 1065, 400 and 3000, each with three poses
+0.30 m apart. Root inspected each location. Independent review accepted all
+six pairs from Turn 2 and the straight: pale foreground strands survive more
+clearly, bare shoulders remain bare, and no obvious material edge seam appears.
+Nearby stills cannot establish shimmer free motion.
+
+`artifacts/straw-layered-rider-view/production.png` is the final runtime view at
+station 950 with the existing artistic reference pose. The source's tangled
+straw is more apparent, and distant brown uniformity remains. This is a modest
+material composition improvement, not a resolution upgrade or a photographic
+match. Broad pale field patterns still need work. Physics and observation
+protocols are unchanged.
+Human controls passed with zero failures (Linux median 17.313 ms, p95 18.863 ms,
+270 frames). Formatting and diff checks pass. Mac export passed as
+`53b4b529b5bf-3c5361a25ede`; native Mac execution remains unverified for this build.

@@ -30,10 +30,22 @@ func _run() -> void:
 	var candidate_scale_spread := -1.0
 	var candidate_field_relief := -1.0
 	var candidate_straw_swaths := -1.0
+	var candidate_height_blend := -1.0
 	var candidate_coverage_path := ""
 	var candidate_coverage: FieldCoverage
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--candidate-scale-spread="):
+		if arg.begins_with("--candidate-height-blend="):
+			var value := arg.trim_prefix("--candidate-height-blend=")
+			if (
+				not value.is_valid_float()
+				or not is_finite(float(value))
+				or float(value) < 0.0
+				or float(value) > 1.0
+			):
+				_fail("Height blend must be finite and between zero and one")
+				return
+			candidate_height_blend = float(value)
+		elif arg.begins_with("--candidate-scale-spread="):
 			var value := arg.trim_prefix("--candidate-scale-spread=")
 			if (
 				not value.is_valid_float()
@@ -200,6 +212,21 @@ func _run() -> void:
 			frames = int(arg.trim_prefix("--frames="))
 		elif arg.begins_with("--candidate="):
 			candidate = arg.trim_prefix("--candidate=")
+	if (
+		candidate_height_blend >= 0.0
+		and (
+			not candidate.is_empty()
+			or not candidate_coverage_path.is_empty()
+			or candidate_field_relief >= 0.0
+			or compare_fields
+			or not stubble_shader_path.is_empty()
+			or candidate_grass_rotation >= 0.0
+			or candidate_scale_spread >= 0.0
+			or candidate_straw_swaths >= 0.0
+		)
+	):
+		_fail("Height blend comparison uses the production texture and no other candidate changes")
+		return
 	if (candidate_tile_m >= 0.0 or candidate_grass_relief >= 0.0) and candidate.is_empty():
 		_fail("Candidate tile size and grass relief require a candidate texture")
 		return
@@ -262,6 +289,7 @@ func _run() -> void:
 		not output.is_absolute_path()
 		or (
 			candidate_field_relief < 0.0
+			and candidate_height_blend < 0.0
 			and candidate_straw_swaths < 0.0
 			and candidate_coverage_path.is_empty()
 			and not compare_fields
@@ -455,6 +483,10 @@ func _run() -> void:
 					else original_scale_spread
 				)
 			)
+			if candidate_height_blend >= 0.0:
+				material.set_shader_parameter(
+					"grass_height_blend", candidate_height_blend if name == "candidate" else 0.0
+				)
 			if candidate_straw_swaths >= 0.0:
 				material.set_shader_parameter(
 					"straw_swath_strength", candidate_straw_swaths if name == "candidate" else 0.0
@@ -505,6 +537,7 @@ func _run() -> void:
 								else original_scale_spread
 							),
 							"candidate_field_relief_m": candidate_field_relief,
+							"candidate_height_blend": candidate_height_blend,
 							"candidate_straw_swaths": candidate_straw_swaths,
 							"existing_grass_relief_m": original_grass_relief,
 							"candidate_grass_relief_m":
