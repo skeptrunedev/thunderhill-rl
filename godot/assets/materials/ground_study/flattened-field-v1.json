@@ -1,0 +1,11 @@
+{
+  "bake_tool_sha256": "9de215e54ac4f15690931cff28db77e020646267c57a8bf0c42d3d77d6d139da",
+  "builder_sha256": "bbff481478b3960d263623755ca6ddabcbc820be81ce6be2a384a440119dd05d",
+  "encoding": "sRGB color, mip levels filtered in linear light",
+  "height": 1254,
+  "limitation": "Original generated appearance estimate, not a measured scan",
+  "mipmaps": 10,
+  "output_sha256": "94623980d39852924cf11b9566eb220f32164f189e02d93449c922a6eee8b6a2",
+  "source_sha256": "7a86435be749f37c886966718b6656f0008c7c420cac56339747349532f45165",
+  "width": 1254
+}

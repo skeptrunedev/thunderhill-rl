@@ -1,0 +1,88 @@
+{
+  "asset": "grass_ground",
+  "source": "https://polyhaven.com/a/grass_ground",
+  "license": "CC0-1.0",
+  "license_url": "https://polyhaven.com/license",
+  "metadata_url": "https://api.polyhaven.com/info/grass_ground",
+  "files_url": "https://api.polyhaven.com/files/grass_ground",
+  "publisher_metadata": {
+    "type": 1,
+    "name": "Grass Ground",
+    "categories": [
+      "outdoor",
+      "natural",
+      "terrain",
+      "dirty"
+    ],
+    "category": "Ground & Terrain/Grass & Vegetation/Dry & Sparse Grass",
+    "attributes": {
+      "surface_use": "ground",
+      "origin": "natural",
+      "setting": "outdoor",
+      "condition": [
+        "dirty"
+      ]
+    },
+    "tags": [
+      "grass",
+      "dry grass",
+      "dirt",
+      "root",
+      "dead grass",
+      "turf",
+      "dry"
+    ],
+    "description": "Free 16K texture of worn grass on soil, matte and rough, with fine micro-bumps, subtle height, and natural brown-green variation.",
+    "authors": {
+      "Charlotte Baglioni": "All"
+    },
+    "category_id": "e9516d71-1efd-51d6-b3c4-ce945ee92604",
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "dimensions": [
+      2509.999990463257,
+      2509.999990463257
+    ],
+    "files_hash": "0835c92f7cacee85b306c2a35d2c006be11ea3c2",
+    "date_published": 1789689600,
+    "staging": null,
+    "img_version": "6fb7fdcf",
+    "download_count": 1140,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/grass_ground.png?width=256&height=256&v=6fb7fdcf"
+  },
+  "files": [
+    {
+      "channel": "Diffuse",
+      "path": "godot/assets/materials/scan_study/grass_ground_diff_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grass_ground/grass_ground_diff_2k.jpg",
+      "publisher_md5": "fd97f2402677e6686b2d9159fc3a4256",
+      "sha256": "4272bddc71a7fa659d1deeb13a9df8c42e68a5ac8cde7523187e4a081e028258",
+      "bytes": 3787330
+    },
+    {
+      "channel": "nor_gl",
+      "path": "godot/assets/materials/scan_study/grass_ground_nor_gl_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grass_ground/grass_ground_nor_gl_2k.jpg",
+      "publisher_md5": "c8b2dd95f09868c4aacb91f62c673344",
+      "sha256": "effa95c06af273c974476d9a74a234668a1c9292f60fffb4fa40348d638ee7f3",
+      "bytes": 5968024
+    },
+    {
+      "channel": "Rough",
+      "path": "godot/assets/materials/scan_study/grass_ground_rough_2k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grass_ground/grass_ground_rough_2k.jpg",
+      "publisher_md5": "0685285b42a7110ce0876f676a2f79c2",
+      "sha256": "afaed95537e894b8054db38c81712a6d9504b05b560274526621d91d5a95fbe7",
+      "bytes": 1525000
+    }
+  ],
+  "tile_m": 2.51,
+  "tile_status": "API dimensions 2509.99999 interpreted as millimetres; not measured Thunderhill straw",
+  "limitations": [
+    "Independent scanned PBR material comparison; source is not Thunderhill",
+    "Original publisher color, OpenGL normal and roughness retained without recoloring",
+    "No inferred height from albedo; no terrain geometry or physics changes"
+  ]
+}

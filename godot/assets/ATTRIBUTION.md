@@ -59,3 +59,13 @@ Source dimensions, SHA256, exact prompt and estimated shader parameters are
 recorded in `assets/source/material-studies/README.md` at the repository root.
 The sibling `.res` contains linear light filtered color mipmaps. This is an
 artist material, not a measured scan or extracted video frame.
+
+Ground experiments only: `materials/scan_study` contains Grass Ground by
+Charlotte Baglioni / Poly Haven, CC0. Source: https://polyhaven.com/a/grass_ground
+License: https://polyhaven.com/license . Exact publisher URLs, MD5 and SHA256
+values are pinned in `materials/scan_study/source.json`. This generic turf is
+not a Thunderhill scan.
+
+`materials/ground_study/flattened-field-v1.png` is original generated artwork
+under the project MIT license. Source, exact prompt and limitations are in
+`assets/source/ground-studies/` at the repository root.

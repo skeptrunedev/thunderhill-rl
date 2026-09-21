@@ -10,6 +10,8 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var output := ""
+	var ground_study := "production"
+	var ground_study_metadata := {}
 	var sky_source := ""
 	var sky_patch_path := ""
 	var sky_patch_off := false
@@ -46,7 +48,12 @@ func _run() -> void:
 	var panorama_energy := 1.0
 	var seam_overlap := 0.0
 	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--authored-sky-yaw-deg="):
+		if arg.begins_with("--ground-study="):
+			ground_study = arg.get_slice("=", 1)
+			if ground_study not in ["production", "generated", "scan", "geometry"]:
+				_fail("Unknown ground study mode")
+				return
+		elif arg.begins_with("--authored-sky-yaw-deg="):
 			var value := arg.get_slice("=", 1)
 			if (
 				not value.is_valid_float()
@@ -489,6 +496,16 @@ func _run() -> void:
 		game.track.get_node("RacingSurface").material_override.set_shader_parameter(
 			parameter, asphalt_detail[parameter]
 		)
+	var production_terrain_material: ShaderMaterial = game.track.terrain_material
+	if ground_study == "generated":
+		ground_study_metadata = load("res://scripts/ground_generated_study.gd").apply(game.track)
+	elif ground_study == "scan":
+		ground_study_metadata = load("res://scripts/ground_scan_study.gd").apply(game.track)
+	elif ground_study == "geometry":
+		ground_study_metadata = load("res://scripts/straw_geometry_study.gd").setup(game)
+	if ground_study_metadata.has("error"):
+		_fail(ground_study_metadata.error)
+		return
 	game.paused = true
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	game.hud.visible = false
@@ -646,6 +663,8 @@ func _run() -> void:
 					JSON
 					. stringify(
 						{
+							"ground_study": ground_study,
+							"ground_study_metadata": ground_study_metadata,
 							"sky_source": sky_source,
 							"sky_patch": sky_patch_metadata,
 							"runtime_secondary_sky_patch_enabled":
@@ -667,22 +686,22 @@ func _run() -> void:
 							),
 							"pale_straw_gain":
 							str(
-								_material_parameter(game.track.terrain_material, "pale_straw_gain")
+								_material_parameter(production_terrain_material, "pale_straw_gain")
 							),
 							"mapped_aerial_contrast":
 							_material_parameter(
-								game.track.terrain_material, "mapped_aerial_contrast"
+								production_terrain_material, "mapped_aerial_contrast"
 							),
 							"mowing_detail_strength":
 							_material_parameter(
-								game.track.terrain_material, "mowing_detail_strength"
+								production_terrain_material, "mowing_detail_strength"
 							),
 							"mowing_band_strength":
-							game.track.terrain_material.get_shader_parameter(
+							production_terrain_material.get_shader_parameter(
 								"mowing_band_strength"
 							),
 							"retained_swath_strength":
-							game.track.terrain_material.get_shader_parameter(
+							production_terrain_material.get_shader_parameter(
 								"retained_swath_strength"
 							),
 							"paving_joint_strength": paving_joint_strength,
@@ -699,7 +718,7 @@ func _run() -> void:
 							FileAccess.get_sha256("res://shaders/asphalt.gdshader"),
 							"field_map": field_map_path,
 							"field_map_strength":
-							game.track.terrain_material.get_shader_parameter(
+							production_terrain_material.get_shader_parameter(
 								"field_surface_strength"
 							),
 							"field_map_sha256": field_map_sha256,
