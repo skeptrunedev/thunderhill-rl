@@ -190,3 +190,49 @@ Human controls passed with zero failures. Local Linux timing was median 17.244 m
 and p95 23.022 ms over 265 frames, not a native Mac benchmark. Formatting and
 whitespace checks passed.
 Mac export passed as `0dd8be9062df-6ab845257227`; native execution is unverified.
+
+## Rider shadows independent of camera visibility
+
+The first person and policy cameras exclude the rider body layer to keep the
+helmet out of the lens. That also excluded its shadow caster, producing a
+partial silhouette. This behavior is described in [Godot issue 77383](https://github.com/godotengine/godot/issues/77383)
+and was reproduced in the local rendered comparison. The correction uses
+Godot's documented [shadow only geometry mode](https://docs.godotengine.org/en/stable/classes/class_geometryinstance3d.html#enum-geometryinstance3d-shadowcastingsetting).
+
+`rider_shadows.gd` installs 25 shadow only children beneath the existing rigid
+body and articulated limb meshes, after camera layer assignment. These share
+mesh and material resources and inherit the exact parent transforms. The
+visible originals stop casting, so chase views do not cast the geometry twice.
+The new instances use the world layer, which human and policy cameras both
+render. There is no independent shadow pose, decal, or simulated rider mass.
+Collision envelope construction remains before shadow installation.
+
+`preview_rider_shadow.gd` captures five pairs at station 1300: rider, onboard,
+policy pose, leaned rider and production lighting. Four use a diagnostic sun
+behind the rider at 30 degrees elevation, not a reconstruction of video lighting.
+Legacy mode hides the added casters and restores original mesh shadow casting;
+corrected mode uses the independent casters. Metadata verifies identical camera
+and sun within every pair. The policy diagnostic reproduces the policy pose in
+the presentation viewport; actual observation API verification is separate.
+
+`artifacts/rider-shadow-culling/` reproduces the missing helmet shadow and its
+restoration. The correction exposed coarse shadow sampling around the cockpit.
+The first directional shadow split is now 0.04 of the unchanged 160 metre range,
+with split blending enabled. Other split distances and atlas size are unchanged.
+`artifacts/rider-shadow-near-cascade/` shows a clearer head and shoulder silhouette
+and narrower stippled transitions around the dashboard. Root and independent
+review accepted the improvement. Some bezel edge stippling remains. Static
+captures do not establish moving cascade stability or native Mac performance.
+
+The rider camera test passes with mirrored lean and steering, checks that
+casters retain the original world transforms through all camera switches,
+and verifies that hidden original meshes remain excluded from policy views.
+`tools/check_camera.py` passes against the actual rendered observation API:
+five recorded observations, valid immutable PNGs, frozen capture ticks, and
+serialized queued advance/reset operations. Evidence is in
+`artifacts/qa/rider-shadow-camera/summary.json`. Idle redraws differed by up to
+four channel values, so byte identical idle rendering is not claimed.
+Human controls passed with zero failures, with Linux median 17.307 ms and
+p95 19.236 ms over 268 frames. This is not a controlled performance benchmark.
+Mac export passed as `d5306877af52-af61e9ee5c69`. Tailscale reported the MacBook
+offline, last seen 2026-09-21 09:40:00.1 UTC, so native execution is unverified.

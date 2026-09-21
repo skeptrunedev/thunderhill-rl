@@ -169,6 +169,8 @@ func _ready() -> void:
 	_startup_mark("environment_and_bike_complete")
 	AgentCameraScript.assign_rider_layer(bike.rider)
 	AgentCameraScript.assign_rider_layer(bike._arms, AgentCameraScript.RIDER_LIMB_LAYER)
+	preload("res://scripts/rider_shadows.gd").install(bike.rider)
+	preload("res://scripts/rider_shadows.gd").install(bike._arms)
 	camera = Camera3D.new()
 	camera.far = 3000
 	camera.near = 0.06
@@ -304,6 +306,9 @@ func _environment() -> void:
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 160
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	# Reserve the nearest cascade for cockpit and rider contact shadows.
+	sun.directional_shadow_split_1 = 0.04
+	sun.directional_shadow_blend_splits = true
 	add_child(sun)
 	var sky_metadata: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://data/sky.json")

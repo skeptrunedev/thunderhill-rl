@@ -12,6 +12,86 @@ func _initialize() -> void:
 	run.call_deferred()
 
 
+func _rider_meshes(node: Node) -> Array[MeshInstance3D]:
+	var result: Array[MeshInstance3D] = []
+	for child in node.get_children():
+		if child.name == "RiderShadow":
+			continue
+		if child is MeshInstance3D and child.is_visible_in_tree():
+			result.append(child)
+		result.append_array(_rider_meshes(child))
+	return result
+
+
+func _check_rider_shadows(game: Node, policy_camera: AgentCamera) -> void:
+	var meshes := _rider_meshes(game.bike.rider)
+	meshes.append_array(_rider_meshes(game.bike._arms))
+	check(meshes.size() > 6, "Shadow check must cover body and articulated limbs")
+	var proxies: Array[MeshInstance3D] = []
+	for original in meshes:
+		var proxy := original.get_node_or_null("RiderShadow") as MeshInstance3D
+		check(proxy != null, "Visible rider mesh has no independent shadow caster")
+		if proxy == null:
+			continue
+		proxies.append(proxy)
+		check(proxy.mesh == original.mesh, "Rider shadow geometry differs from visible geometry")
+		check(
+			proxy.material_override == original.material_override,
+			"Rider shadow material differs from visible material"
+		)
+		check(proxy.layers == 1, "Rider shadow must use the environment layer")
+		check(
+			proxy.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY,
+			"Rider shadow proxy must not render a visible surface"
+		)
+		check(
+			original.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF,
+			"Visible rider mesh duplicates its independent shadow caster"
+		)
+		check(
+			(original.layers & policy_camera.camera.cull_mask) == 0,
+			"Shadow installation exposed the original rider to the policy camera"
+		)
+	# Test actual articulated poses, then switch every presentation camera without
+	# stepping physics. Camera visibility must never move or hide the caster.
+	for lean in [-0.5, 0.5]:
+		for steering in [-0.35, 0.35]:
+			game.sim.lean = lean
+			game.sim.steering = steering
+			game._update_visual(1.0 / 60.0)
+			var poses: Array[Transform3D] = []
+			for proxy in proxies:
+				poses.append(proxy.global_transform)
+			for mode in [0, 1, 2]:
+				game.camera_mode = mode
+				game._update_visual(1.0 / 60.0)
+				for i in proxies.size():
+					var proxy := proxies[i]
+					var original := proxy.get_parent() as MeshInstance3D
+					check(
+						proxy.global_transform.is_equal_approx(original.global_transform),
+						"Rider shadow detached from its posed mesh"
+					)
+					check(
+						proxy.global_transform.is_equal_approx(poses[i]),
+						"Camera switch changed rider shadow pose"
+					)
+					check(proxy.is_visible_in_tree(), "Camera switch hides rider shadow caster")
+					check(
+						(
+							(proxy.layers & game.camera.cull_mask) != 0
+							and (proxy.layers & policy_camera.camera.cull_mask) != 0
+						),
+						"Rider shadow unavailable to a presentation or policy camera"
+					)
+					if mode != 0 and original.layers == AgentCamera.RIDER_LAYER:
+						check(
+							(original.layers & game.camera.cull_mask) == 0,
+							"Shadow installation exposed the body in a first person view"
+						)
+	game.sim.steering = 0.0
+
+
 func run() -> void:
 	var game = load("res://main.tscn").instantiate()
 	root.add_child(game)
@@ -71,6 +151,7 @@ func run() -> void:
 	game._update_visual(1.0 / 60.0)
 	check(game.camera.fov == 64.0, "Chase field of view was not restored")
 	check(game.camera.get_cull_mask_value(20), "Chase view lost rider mesh")
+	_check_rider_shadows(game, policy_camera)
 	var screenshot_camera := 1
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot-camera="):
