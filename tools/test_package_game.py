@@ -86,5 +86,60 @@ class BakeValidationTests(unittest.TestCase):
             package_game.validate_bakes()
 
 
+class PavementToneValidationTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.project = self.root / "godot"
+        root_patch = patch.object(package_game, "ROOT", self.root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+        self.sources = {
+            "assets/materials/pavement_tone.png": b"source pixels",
+            "assets/materials/pavement_tone.res": b"runtime resource",
+            "tools/bake_pavement_tone.gd": b"numeric mip builder",
+            "data/track.json": b"track source",
+        }
+        hashes = {}
+        for name, content in self.sources.items():
+            path = self.project / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+            hashes[name] = hashlib.sha256(content).hexdigest()
+        self.assets = self.project / "assets/materials"
+        (self.assets / "pavement_tone.json").write_text(json.dumps({
+            "output_sha256": hashes["assets/materials/pavement_tone.png"],
+            "track_sha256": hashes["data/track.json"],
+        }))
+        (self.assets / "pavement_tone_runtime.json").write_text(json.dumps({
+            "source_sha256": hashes["assets/materials/pavement_tone.png"],
+            "output_sha256": hashes["assets/materials/pavement_tone.res"],
+            "builder_sha256": hashes["tools/bake_pavement_tone.gd"],
+        }))
+
+    def test_valid_bake(self):
+        package_game.validate_pavement_tone()
+
+    def test_changed_input_resource_builder_and_track_rejected(self):
+        for name, content in self.sources.items():
+            with self.subTest(name=name):
+                path = self.project / name
+                path.write_bytes(b"modified bytes")
+                with self.assertRaisesRegex(RuntimeError, "Invalid pavement tone bake"):
+                    package_game.validate_pavement_tone()
+                path.write_bytes(content)
+
+    def test_missing_and_malformed_runtime_manifest(self):
+        path = self.assets / "pavement_tone_runtime.json"
+        path.unlink()
+        with self.assertRaisesRegex(RuntimeError, "Invalid pavement tone bake"):
+            package_game.validate_pavement_tone()
+        for content in ["{", "[]", "{}"]:
+            path.write_text(content)
+            with self.assertRaisesRegex(RuntimeError, "Invalid pavement tone bake"):
+                package_game.validate_pavement_tone()
+
+
 if __name__ == "__main__":
     unittest.main()

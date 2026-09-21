@@ -1,0 +1,11 @@
+{
+  "builder_sha256": "8fd5603d30e1913012260b14a1ce6a9c7dba7406dff1313d6767cef314bff106",
+  "dimensions": [
+    64,
+    2048
+  ],
+  "encoding": "Linear numerical gain data, mipmaps averaged without color conversion",
+  "mipmaps": 11,
+  "output_sha256": "8d9976b056a390878fd8b77cfac3a20c80af1c5b1f44208f5b21351b8abd8244",
+  "source_sha256": "1ad8812b6915aae7f063809f58b7beaff3e617551a81496dc897f1ce98643180"
+}

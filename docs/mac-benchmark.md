@@ -49,3 +49,43 @@ The universal app from clean commit `271a52caadc3fb4ad57e25b19fa6b9edc3064517`, 
 The shared native control check exited successfully with `HUMAN_CONTROLS_CHECK failures=0`. It exercised injected throttle, steering, both brakes, camera changes, pause and reset through the exported game. The 72 process frame intervals had median 66.667 ms and p95 74.723 ms. The screen was locked and six older review instances were open. Startup took several minutes; a process sample captured a wait inside Metal compilation during texture upload, while a subsequent sample showed progress beyond that wait. This does not isolate the full startup delay or establish acceptable foreground performance.
 
 Evidence is `artifacts/Thunderhill-controls-271a52c.log` and `artifacts/Thunderhill-startup-sample-271a52c.txt`. Installed app: `~/Applications/ThunderhillReview/271a52c/Thunderhill.app`. These checks do not include a native wall impact benchmark or physical keyboard delivery.
+
+## Imported pavement source packaging failure
+
+Native review of clean build `97903d85ffde-c13d8d829fb8` found an actual startup
+failure despite a successful export. The received archive matched SHA256
+`41627771f2d77508df060fcb145d238b11e04daf039ca02c5d20d9f96d2cdede`.
+Metal initialized, then the game exited with status two and
+`Historical pavement tone source mismatch`.
+
+The integrity check hashed the original `pavement_tone.png`, which exists in the
+editor project but is replaced by an imported texture in native packages.
+[Godot's import documentation](https://docs.godotengine.org/en/4.7/tutorials/assets_pipeline/import_process.html)
+explicitly distinguishes resource loading from raw access to imported sources.
+Export success alone did not establish that this game could launch.
+
+The fix bakes the numerical map into an explicit `ImageTexture` resource with a
+separate runtime manifest. The bake uses linear numerical mip averaging, not
+color conversion, and checks that saving and loading preserve the base pixel
+bytes. Runtime verifies the shipped resource hash, its source identity, and the
+track hash. Packaging additionally verifies original PNG, runtime resource,
+builder and track against their manifests. Integrity checks remain enabled.
+
+The package validation suite includes changed source pixels, changed runtime
+bytes, changed generator and track, and missing or malformed manifests. Nine
+package tests passed. Optional scanned ground study tools still rely on loose
+authoring images and are not supported by the ordinary native game entry point.
+
+The corrected candidate `97903d85ffde-eb3c3db27afe` transferred with matching
+archive SHA256 `5eebbf60212d24ca73b697552c9ae397552f056957c4d2e4a680f385e23b72ae`.
+The actual exported app launched on the M3 Pro using Metal 4, reached
+`THUNDERHILL_READY`, captured the onboard straight, and exited successfully.
+The retrieved 1152 by 720 image was visually inspected. Evidence is in
+`artifacts/mac-eb3c3db-straight.png`, its JSON sidecar and log. macOS constrained
+the requested 1280 by 720 window; the recorded dimensions are authoritative.
+
+Native controls passed with zero failures, and code signature verification
+passed. The 551 process intervals report median and p95 of 8.333 ms, but the
+screen was locked and the window unfocused. These values are not foreground
+presentation or sustained lap performance certification. The local rendered
+controls also passed; rebuilt scenery and landmark geometry hashes are unchanged.

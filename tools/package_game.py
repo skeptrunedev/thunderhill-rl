@@ -53,6 +53,28 @@ def validate_bakes():
         validate_scene_bake(name)
 
 
+def validate_pavement_tone():
+    """Validate authoring input and the explicit resource used in native builds."""
+    project = ROOT / "godot"
+    assets = project / "assets/materials"
+    try:
+        source = json.loads((assets / "pavement_tone.json").read_text())
+        runtime = json.loads((assets / "pavement_tone_runtime.json").read_text())
+        expected = {
+            "assets/materials/pavement_tone.png": source["output_sha256"],
+            "assets/materials/pavement_tone.res": runtime["output_sha256"],
+            "tools/bake_pavement_tone.gd": runtime["builder_sha256"],
+            "data/track.json": source["track_sha256"],
+        }
+        if runtime["source_sha256"] != source["output_sha256"]:
+            raise ValueError("Runtime resource was baked from another source")
+        for relative, digest in expected.items():
+            if hashlib.sha256((project / relative).read_bytes()).hexdigest() != digest:
+                raise ValueError(f"Source mismatch: {relative}")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise RuntimeError(f"Invalid pavement tone bake: {error}") from error
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--godot", required=True)
@@ -61,6 +83,7 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Use the debug export template for engine diagnostics")
     args = parser.parse_args()
     validate_bakes()
+    validate_pavement_tone()
     dirty = bool(git("status", "--porcelain"))
     if dirty and not args.allow_dirty:
         parser.error("Commit the verified source first, or explicitly use --allow-dirty for a development package")
