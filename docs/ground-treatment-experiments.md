@@ -608,3 +608,28 @@ The fresh default apex capture is pixel identical to the preceding control
 (`field-composition-default-check/pixel-check.json`). Rendered human controls
 passed with zero failures. This checks the existing playable path, not acceptance
 of either new material experiment.
+
+## Preserve the existing flattened band
+
+The photographic replacement discarded the existing corridor tint where its
+coverage was full. It now preserves that tint for retained grass corridors,
+using their current point strengths, widths, feathering and footprint. Bare
+access corridors remain excluded from photographic coverage. This requires no
+new generic noise or material samples and changes color only.
+
+The Turn 2 band is an original video guided estimate, explicitly not an aerial
+trace or surveyed mowing track (`data/reference/turn2-field-band-study.json`).
+Its tint is now preserved by default. Both preview tools accept
+`--no-photographic-corridor` for the previous appearance and
+`--photographic-corridor` to explicitly select the default.
+
+Root and independent visual review prefer this modest local change at the apex;
+the entry still has a soft brush stroke character, so its strength is not
+increased. It is not photographic equivalence. Evidence is
+`artifacts/photo-corridor-apex`, `photo-corridor-entry` and the matching entry
+control. The short recorded replay completed 600 transitions and 180 movie
+frames. Nine sampled frames show no obvious hard transition, without establishing
+full temporal stability or Mac performance. Existing ObjectDB exit warning
+remains. Human controls, field coverage checks and rendered agent camera checks
+passed; the latter include stepping, reset serialization and headless rejection.
+Formatter and diff checks passed. Native package verification follows separately.

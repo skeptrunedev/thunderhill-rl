@@ -31,6 +31,8 @@ uniform bool photographic_stochastic = false;
 uniform float photographic_field_patches : hint_range(0.0, 1.0) = 0.0;
 // Restore pinned historical ground variation through the replacement texture.
 uniform float photographic_aerial : hint_range(0.0, 1.0) = 0.0;
+// Preserve the existing video guided band through photographic replacement.
+uniform bool photographic_corridor = true;
 uniform float photographic_directional_composition : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_height_blend : hint_range(0.0, 1.0) = 0.0;
 uniform float photographic_contrast_preservation : hint_range(0.0, 1.0) = 0.0;
@@ -488,6 +490,9 @@ void fragment() {
             photo_dy = mix(photo_dy, dFdy(soil_luminance) * soil_relief_m, exposed);
         }
         photographic *= mix(vec3(1.0), macro_gain * detail_gain, photographic_aerial);
+        if (photographic_corridor) {
+            photographic *= mix(vec3(1.0), region.rgb, corridor * retained_grass);
+        }
         canopy_coverage = mix(canopy_coverage, 1.0, mask);
         ALBEDO = mix(ALBEDO, photographic * 0.55 * photographic_gain, mask);
         ROUGHNESS = mix(ROUGHNESS, photo_roughness, mask);

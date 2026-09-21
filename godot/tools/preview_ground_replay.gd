@@ -22,6 +22,7 @@ func _run() -> void:
 	var stochastic := false
 	var field_patches := 0.0
 	var photographic_aerial := 0.0
+	var photographic_corridor := true
 	var directional_composition := 0.0
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--asphalt-analytic-scuff":
@@ -42,6 +43,10 @@ func _run() -> void:
 				quit(2)
 				return
 			canopy_strength = float(value)
+		elif arg == "--no-photographic-corridor":
+			photographic_corridor = false
+		elif arg == "--photographic-corridor":
+			photographic_corridor = true
 		elif arg.begins_with("--photographic-aerial="):
 			var value := arg.get_slice("=", 1)
 			if (
@@ -183,6 +188,8 @@ func _run() -> void:
 	report["photographic_field_patches"] = field_patches
 	game.track.terrain_material.set_shader_parameter("photographic_aerial", photographic_aerial)
 	report["photographic_aerial"] = photographic_aerial
+	game.track.terrain_material.set_shader_parameter("photographic_corridor", photographic_corridor)
+	report["photographic_corridor"] = photographic_corridor
 	report["photographic_sparse_aligned"] = sparse_aligned
 	report["photographic_directional_composition"] = directional_composition
 	report["terrain_shader_sha256"] = FileAccess.get_sha256(

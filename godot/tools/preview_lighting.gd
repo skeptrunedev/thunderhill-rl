@@ -28,6 +28,7 @@ func _run() -> void:
 	var photographic_stochastic := false
 	var field_patches := 0.0
 	var photographic_aerial := 0.0
+	var photographic_corridor := true
 	var sky_source := ""
 	var solar_haze := 0.0
 	var solar_haze_broad := false
@@ -89,6 +90,10 @@ func _run() -> void:
 				_fail("Canopy strength must be finite and within zero to four")
 				return
 			canopy_strength = float(value)
+		elif arg == "--no-photographic-corridor":
+			photographic_corridor = false
+		elif arg == "--photographic-corridor":
+			photographic_corridor = true
 		elif arg.begins_with("--photographic-aerial="):
 			var value := arg.get_slice("=", 1)
 			if (
@@ -711,6 +716,7 @@ func _run() -> void:
 			"exit_scuff_texture_enabled", false
 		)
 	var production_terrain_material: ShaderMaterial = game.track.terrain_material
+	production_terrain_material.set_shader_parameter("photographic_corridor", photographic_corridor)
 	production_terrain_material.set_shader_parameter("photographic_aerial", photographic_aerial)
 	production_terrain_material.set_shader_parameter("photographic_field_patches", field_patches)
 	production_terrain_material.set_shader_parameter(
@@ -1010,6 +1016,7 @@ func _run() -> void:
 							"photographic_stochastic": photographic_stochastic,
 							"photographic_field_patches": field_patches,
 							"photographic_aerial": photographic_aerial,
+							"photographic_corridor": photographic_corridor,
 							"photographic_height_blend": photographic_height_blend,
 							"photographic_directional_composition":
 							photographic_directional_composition,
