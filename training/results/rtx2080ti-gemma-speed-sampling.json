@@ -1,0 +1,40 @@
+{
+  "model": "unsloth/gemma-3-270m-it",
+  "adapter_sha256": "5618108d3ad901be680fb7e745dc3a753c4a651821a07698daa4c2768f0bd8b6",
+  "action_index": 300,
+  "seed": 71,
+  "results": [
+    {
+      "temperature": 1.4,
+      "samples": 32,
+      "valid": 32,
+      "unique_valid": 4,
+      "throttle_values": [
+        0.14,
+        0.15
+      ]
+    },
+    {
+      "temperature": 1.8,
+      "samples": 32,
+      "valid": 25,
+      "unique_valid": 3,
+      "throttle_values": [
+        0.14,
+        0.15
+      ]
+    },
+    {
+      "temperature": 2.2,
+      "samples": 32,
+      "valid": 1,
+      "unique_valid": 1,
+      "throttle_values": [
+        0.14
+      ]
+    }
+  ],
+  "source_artifact": "artifacts/gemma-speed-sampling-01.json",
+  "source_sha256": "81951887b9dfab3d09e7a6850878c14792bba72f87d0a448f030fed439d17e62",
+  "interpretation": "Larger batches at temperature 1.4 provide valid alternatives; higher temperatures mostly damage syntax. This measures exploration, not driving improvement."
+}

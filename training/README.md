@@ -200,3 +200,23 @@ training on audited failures. Every trained checkpoint is evaluated, including
 the last cycle. `--start-generation` preserves generation numbering across
 training calls. Successful completion ends this safety curriculum; speed
 experiments then use fixed duration sections and compare complete lap times.
+
+
+## Speed exploration and repeated controls
+
+The first speed batch repeated the same action four times and produced zero
+reward variance and zero gradient. It was stopped rather than counted as
+improvement. [A sampling probe](results/rtx2080ti-gemma-speed-sampling.json)
+found that larger batches at temperature 1.4 contain valid throttle alternatives;
+higher temperatures mainly generate malformed commands.
+
+`probe_action_sampling.py` measures valid control diversity on an actual saved
+policy prompt before expensive simulator rollouts. `train_lap_grpo.py` accepts
+`--num-generations` (default four); larger groups reuse the same four isolated
+snapshot workers. Recorded rollout numbers use the actual group size.
+
+Greedy continuation text and token IDs are memoized by exact prompt within a
+single optimizer step. A new cache is created after every weight update and for
+each baseline or final evaluation. Sampled first actions remain sampled, and
+every physics transition is executed and audited independently. Cache hit counts
+are recorded. No simulator states or rewards are cached.

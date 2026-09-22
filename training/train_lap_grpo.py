@@ -18,6 +18,7 @@ from pathlib import Path
 
 import torch
 from datasets import Dataset
+from greedy_cache import GreedyGenerationCache
 from lap_policy import RoadTelemetry, parse_action
 from lap_prefix import load_prefix
 from lap_rollout import REWARD_VERSION, audit_rollout, physical_snapshot, rollout_reward
@@ -123,6 +124,12 @@ def main():
     parser.add_argument("--adapter", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--steps", type=int, default=3)
+    parser.add_argument(
+        "--num-generations",
+        type=int,
+        default=4,
+        help="Sampled candidates per optimizer step, reusing four simulator workers",
+    )
     parser.add_argument("--start-generation", type=int, default=0)
     parser.add_argument("--prefix-actions", type=int, default=40)
     parser.add_argument(
@@ -147,13 +154,14 @@ def main():
     if (
         args.start_generation < 0
         or min(args.steps, args.prefix_actions, args.continuation_actions) < 1
+        or args.num_generations < 2
         or not math.isfinite(args.temperature)
         or args.temperature <= 0
         or not math.isfinite(args.learning_rate)
         or args.learning_rate <= 0
     ):
         parser.error(
-            "Action budgets and steps must be positive; temperature and learning rate must be finite and positive"
+            "Action budgets and steps must be positive; num generations must be at least two; temperature and learning rate must be finite and positive"
         )
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
@@ -341,20 +349,33 @@ def main():
             print(json.dumps(summary), flush=True)
             return
 
-        def run_candidate(index, label, current_hash, generation, first=None):
-            client, data = workers[index]
+        def run_candidate(
+            index, label, current_hash, generation, first=None, greedy=None
+        ):
+            if greedy is None:
+                greedy = GreedyGenerationCache(
+                    lambda prompt: generate(model, tokenizer, prompt),
+                    scope=f"{label}:{current_hash}",
+                )
+            cache_hits_before, cache_misses_before = greedy.hits, greedy.misses
+            worker_index = index % len(workers)
+            client, data = workers[worker_index]
             display = {"model_name": MODEL, "generation": generation}
             if first is None:
                 display["evaluation"] = True
             else:
-                display.update(rollout_number=index + 1, rollout_count=4)
+                display.update(
+                    rollout_number=index + 1, rollout_count=args.num_generations
+                )
             reset_request = {
                 "op": "reset",
                 "policy_id": label,
                 "policy_display": display,
             }
             if snapshot_provenance:
-                reset_request["snapshot_id"] = snapshot_provenance[index]["snapshot_id"]
+                reset_request["snapshot_id"] = snapshot_provenance[worker_index][
+                    "snapshot_id"
+                ]
             obs = request(client, reset_request)
             episode_reset = physical_snapshot(obs)
             expected_reset = branch_snapshot if snapshot_provenance else reset_snapshot
@@ -381,7 +402,8 @@ def main():
             for action in range(1 + args.continuation_actions):
                 prompt = road.prompt(obs)
                 sampled = first is not None and action == 0
-                text, ids = first if sampled else generate(model, tokenizer, prompt)
+                hits_before = greedy.hits
+                text, ids = first if sampled else greedy(prompt)
                 decision = {
                     "phase": "sampled" if sampled else "continuation",
                     "before_tick": obs["tick"],
@@ -390,6 +412,7 @@ def main():
                     "completion_ids": ids,
                     "adapter_sha256": current_hash,
                     "loss_mask": [int(sampled)] * len(ids),
+                    "greedy_generation_cache_hit": greedy.hits > hits_before,
                 }
                 try:
                     controls = parse_action(text)
@@ -421,12 +444,12 @@ def main():
                 "episode_id": episode,
                 "policy_id": label,
                 "policy_display": display,
-                "worker": index,
+                "worker": worker_index,
                 "prefix_adapter_sha256": prefix_hash,
                 "current_adapter_sha256": current_hash,
                 "prefix_tick": prefix_tick,
                 "reset_snapshot": episode_reset,
-                "snapshot_provenance": snapshot_provenance[index]
+                "snapshot_provenance": snapshot_provenance[worker_index]
                 if snapshot_provenance
                 else None,
                 "prefix_source_provenance": source_provenance,
@@ -439,6 +462,11 @@ def main():
                 "trainer_truncated": stop_reason == "trainer_action_horizon",
                 "post_branch_action_budget": 1 + args.continuation_actions,
                 "reward_components": reward,
+                "greedy_generation_cache": {
+                    "scope": greedy.scope,
+                    "hits": greedy.hits - cache_hits_before,
+                    "misses": greedy.misses - cache_misses_before,
+                },
                 "final_observation": {
                     key: value for key, value in obs.items() if key != "transitions"
                 },
@@ -455,6 +483,7 @@ def main():
                         "policy": label,
                         "reward": reward,
                         "audit": record["recording_audit"],
+                        "greedy_generation_cache": record["greedy_generation_cache"],
                     }
                 ),
                 flush=True,
@@ -466,11 +495,11 @@ def main():
         )
 
         def game_reward(prompts, completions, completion_ids, trainer_state, **kwargs):
-            if len(completions) != 4 or any(
+            if len(completions) != args.num_generations or any(
                 prompt != branch_prompt for prompt in prompts
             ):
                 raise ValueError(
-                    "Expected exactly four candidates for the frozen branch state"
+                    f"Expected exactly {args.num_generations} candidates for the frozen branch state"
                 )
             step = trainer_state.global_step
             snapshot_path = out / f"sampled-policy-step-{step}"
@@ -478,6 +507,12 @@ def main():
             tokenizer.save_pretrained(snapshot_path)
             current_hash = checkpoint_hash(snapshot_path)
             group = []
+            # Parameters do not change during this reward call. Never reuse this
+            # cache across calls, optimizer updates, baseline, or final evaluation.
+            greedy = GreedyGenerationCache(
+                lambda prompt: generate(model, tokenizer, prompt),
+                scope=f"optimizer-step-{step}:{current_hash}",
+            )
             for index, (text, ids) in enumerate(
                 zip(completions, completion_ids, strict=True)
             ):
@@ -494,6 +529,7 @@ def main():
                     current_hash,
                     args.start_generation + step,
                     (text, ids),
+                    greedy=greedy,
                 )
                 record["optimizer_step"] = step
                 samples.append(record)
@@ -505,8 +541,8 @@ def main():
             output_dir=str(out / "trainer"),
             max_steps=args.steps,
             per_device_train_batch_size=1,
-            gradient_accumulation_steps=4,
-            num_generations=4,
+            gradient_accumulation_steps=args.num_generations,
+            num_generations=args.num_generations,
             max_completion_length=32,
             learning_rate=args.learning_rate,
             beta=0.0,
@@ -536,6 +572,7 @@ def main():
                     "start_generation": args.start_generation,
                     "prefix_actions": args.prefix_actions,
                     "continuation_actions": args.continuation_actions,
+                    "num_generations": args.num_generations,
                     "reward_version": REWARD_VERSION,
                     "track_sha256": road.track_sha256,
                     "trl_config": config.to_dict(),
@@ -552,7 +589,7 @@ def main():
             reward_funcs=game_reward,
             processing_class=tokenizer,
             train_dataset=Dataset.from_list(
-                [{"prompt": branch_prompt}] * (4 * args.steps)
+                [{"prompt": branch_prompt}] * (args.num_generations * args.steps)
             ),
             mask_trace=mask_trace,
             rollout_groups=groups,
@@ -630,6 +667,18 @@ def main():
             "revision": REVISION,
             "optimizer_steps": trainer.state.global_step,
             "sampled_rollouts": len(samples),
+            "greedy_generation_cache": {
+                "hits": sum(
+                    row["greedy_generation_cache"]["hits"]
+                    for row in [baseline, *samples, after]
+                ),
+                "misses": sum(
+                    row["greedy_generation_cache"]["misses"]
+                    for row in [baseline, *samples, after]
+                ),
+                "scope": "one reward call or separate greedy evaluation",
+                "physics_cached": False,
+            },
             "max_adapter_delta": delta,
             "reloaded_logits_match": True,
             "greedy_reward_before": before_reward,
