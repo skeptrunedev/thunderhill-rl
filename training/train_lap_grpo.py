@@ -533,6 +533,7 @@ def main():
                     "prefix_adapter_sha256": prefix_hash,
                     "prefix_source_provenance": source_provenance,
                     "snapshot_restarts": bool(snapshot_provenance),
+                    "start_generation": args.start_generation,
                     "prefix_actions": args.prefix_actions,
                     "continuation_actions": args.continuation_actions,
                     "reward_version": REWARD_VERSION,

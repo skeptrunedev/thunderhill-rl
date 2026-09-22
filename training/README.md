@@ -177,5 +177,26 @@ The [measured run](results/rtx2080ti-gemma-road-grpo.json) passed three updates 
 12 sampled rollouts, independent recording and loss mask audits, finite adapter
 changes and checkpoint reload. Its tiny reward change on an easy straight is not
 meaningful evidence of better driving. The supervised lap baseline reached about
-40 percent before leaving the track in a tight corner. No complete learned lap
-has been demonstrated yet.
+40 percent before leaving the track in a tight corner. The subsequent corner
+training result below supersedes that failed baseline.
+
+
+## First verified learned lap
+
+[Generation 10 completed a full lap](results/rtx2080ti-gemma-first-lap.json) in
+600.925 simulated seconds after ten corner GRPO updates (forty sampled rollouts).
+The reloaded checkpoint generated all 6,010 controls from road telemetry, with
+no teacher or fallback controller. Independent audit verified all 32 gates in
+order, 72,111 contiguous physics transitions, and zero off track ticks.
+
+This is a slow baseline on the training track, not evidence of general racing
+ability or improved lap time. Subsequent speed training must beat this complete
+legal lap under the same standing start and simulator conditions. Checkpoint
+`5618108d3ad901be680fb7e745dc3a753c4a651821a07698daa4c2768f0bd8b6`
+is retained unchanged for comparison.
+
+`train_lap_curriculum.py` can alternate compiled full lap evaluation with
+training on audited failures. Every trained checkpoint is evaluated, including
+the last cycle. `--start-generation` preserves generation numbering across
+training calls. Successful completion ends this safety curriculum; speed
+experiments then use fixed duration sections and compare complete lap times.
