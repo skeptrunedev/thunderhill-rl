@@ -22,6 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--godot", required=True)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--warmstart-dataset", type=Path)
     args = parser.parse_args()
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
@@ -110,12 +111,40 @@ def main():
             raise RuntimeError(
                 "Initial model did not complete ten valid control calls; inspect before recording"
             )
+        training_adapter = initial
+        evaluation_actions = 30
+        start_generation = 0
+        if args.warmstart_dataset:
+            warm = out / "warmstart"
+            stage(
+                "train_lap_sft.py",
+                ["--adapter", initial, "--dataset", args.warmstart_dataset,
+                 "--output", warm, "--steps", 100, "--batch", 2,
+                 "--learning-rate", 1e-4],
+            )
+            training_adapter = warm / "adapter"
+            evaluation_actions = 300
+            start_generation = 1
+            warm_eval = out / "warmstart-evaluation"
+            stage(
+                "evaluate_lap.py",
+                ["--adapter", training_adapter, "--godot", args.godot,
+                 "--output", warm_eval, "--generation", start_generation,
+                 "--max-actions", evaluation_actions],
+                evaluation=True,
+            )
+            warm_result = json.loads((warm_eval / "summary.json").read_text())
+            report["warmstart_evaluation"] = {
+                k: warm_result[k] for k in ("actions", "reason", "sim_seconds")
+            }
+            if warm_result["actions"] != evaluation_actions or warm_result["reason"] != "episode_tick_limit":
+                raise RuntimeError("Warm started model failed the longer control evaluation")
         trained = out / "grpo"
         stage(
             "train_lap_grpo.py",
             [
                 "--adapter",
-                initial,
+                training_adapter,
                 "--godot",
                 args.godot,
                 "--output",
@@ -132,6 +161,8 @@ def main():
                 1.0,
                 "--learning-rate",
                 1e-5,
+                "--start-generation",
+                start_generation,
             ],
         )
         learning = json.loads((trained / "summary.json").read_text())
@@ -151,15 +182,17 @@ def main():
                 "--output",
                 after,
                 "--generation",
-                1,
+                start_generation + 1,
                 "--max-actions",
-                30,
+                evaluation_actions,
             ],
             evaluation=True,
         )
         final = json.loads((after / "summary.json").read_text())
         if final["reason"] == "invalid_model_action":
             raise RuntimeError("Trained model produced malformed controls")
+        if args.warmstart_dataset and (final["actions"] != evaluation_actions or final["reason"] != "episode_tick_limit"):
+            raise RuntimeError("RL model failed the longer control evaluation")
         report.update(
             ok=True,
             optimizer_steps=learning["optimizer_steps"],

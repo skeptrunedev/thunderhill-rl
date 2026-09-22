@@ -34,7 +34,8 @@ GODOT = "/usr/local/bin/godot"
 PYTHON = "/opt/thunderhill/training/.venv/bin/python"
 ARTIFACT_VOLUME = "thunderhill-runs-v2"
 CACHE_VOLUME = "thunderhill-huggingface-v2"
-STAGES = {"diagnostic": "modal_diagnostic.py"}
+STAGES = {"diagnostic": "modal_diagnostic.py", "warmstart": "modal_diagnostic.py"}
+WARMSTART_DATASET = ROOT / "artifacts/lap-policy-dataset-v5-recovery"
 
 app = modal.App("thunderhill-gemma-validation")
 # Video job publication requires atomic hard links, supported by Volume v2.
@@ -82,6 +83,7 @@ image = (
         "/opt/thunderhill/training",
         ignore=[".venv", "__pycache__", "**/*.pyc"],
     )
+    .add_local_dir(str(WARMSTART_DATASET), "/opt/thunderhill/warmstart-data")
 )
 
 
@@ -122,6 +124,8 @@ def run(stage: str, run_id: str, source: dict) -> dict:
         "--output",
         str(output),
     ]
+    if stage == "warmstart":
+        command.extend(["--warmstart-dataset", "/opt/thunderhill/warmstart-data"])
     manifest = {
         "stage": stage,
         "run_id": run_id,

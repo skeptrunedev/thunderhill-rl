@@ -12,7 +12,11 @@ From the repository root:
 modal run --detach training/modal_app.py --run-id gemma4-diagnostic-01
 ```
 
-Every launch requires a fresh run ID. Existing output directories are never overwritten. `--stage diagnostic` is the only supported stage. The function allows one container, no automatic retries, and at most 30 minutes. Its subprocess gets 28 minutes, leaving time to flush recordings and persist failure information.
+Every launch requires a fresh run ID. Existing output directories are never overwritten. The function allows one container, no automatic retries, and at most 30 minutes. Its subprocess gets 28 minutes, leaving time to flush recordings and persist failure information.
+
+For the control reliability trial, use `--stage warmstart` with a fresh run ID. This runs 100 supervised optimizer steps on the existing `artifacts/lap-policy-dataset-v5-recovery` demonstrations, then requires 300 consecutive valid simulator actions before and after one GRPO update. The dataset directory is included in the Modal image source mounts. Supervised learning is explicitly recorded separately from RL; this stage teaches conservative demonstration behavior as well as syntax. It does not prove that RL improved driving.
+
+The warm start uses the same pinned model, road telemetry, chat formatting, turn terminator, and BF16 compute policy as rollout inference. Only completion tokens receive supervised loss. Strict parsing remains active; a malformed model output is never repaired into an applied action. Every simulator episode, including a failed evaluation, keeps its video job.
 
 The image installs Python 3.12 and the exact dependencies in `training/uv.lock` with `uv sync --frozen`. It includes Godot 4.7.2, the game source, track data, and assets, and imports the project before launch. By default it reads the same Godot binary used locally from `~/.local/share/thunderhill-tools/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64`. Set `THUNDERHILL_GODOT` to that binary's location if different on the launch machine.
 
