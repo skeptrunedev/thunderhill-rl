@@ -1,0 +1,219 @@
+{
+  "run_id": "gemma4-full-lap-smoke-01",
+  "status": {
+    "ok": true,
+    "run_id": "gemma4-full-lap-smoke-01",
+    "returncode": 0,
+    "elapsed_seconds": 766.483604013
+  },
+  "source_commit": "ca8366ad686c187a9d1249878dc699bb2743b965",
+  "scope": "20 second integration test, not a full lap or proof of improved racing",
+  "model": "google/gemma-4-E4B-it",
+  "revision": "ee0ef6023621cff504d758262d4e04895a5af4a2",
+  "initial_adapter_sha256": "d7f3fc08a7a02cd7841d5503678bee2453bb261f838dac12f1bf23ca75773ef3",
+  "verification": {
+    "adapter_sha256": "1dc3cc7787762fb0d97e7bda576ecfa97e1caa15465ab67718a64f11bc8bba0e",
+    "reloaded_logits_match": true
+  },
+  "update": {
+    "method": "TRL Dr GRPO full episode stateless action replay",
+    "trl_version": "1.13.0",
+    "loss": 1.0254993743075147e-08,
+    "episodes": 7,
+    "actions": 1400,
+    "generated_tokens": 18412,
+    "trained_tokens": 18412,
+    "later_actions": 1393,
+    "eos_tokens": 1400,
+    "prompt_tokens_in_loss": 0,
+    "padding_tokens_in_loss": 0,
+    "fixed_normalizer": 44800,
+    "max_behavior_logp_difference": 0.5938758850097656,
+    "rewards": [
+      0.03231620635826955,
+      0.03235804489348796,
+      0.03248749103208704,
+      0.032306003408102704,
+      0.03230459720715686,
+      0.03217134879111197,
+      0.032179984638294766
+    ],
+    "advantages": [
+      1.2824025625142454e-05,
+      5.4662560843549146e-05,
+      0.00018410869944263109,
+      2.6210754582936535e-06,
+      1.2148745124479499e-06,
+      -0.00013203354153244057,
+      -0.00012339769434964454
+    ],
+    "optimizer_steps": 1,
+    "generation": 3,
+    "gradient_norm": 1.12343814180349e-05,
+    "parameter_delta_l1": 15.254701231373474
+  },
+  "inference_profile": {
+    "selected_batch_size": 8,
+    "headroom_required": 0.15,
+    "compile_inference": true,
+    "compile_qualified": true,
+    "results": [
+      {
+        "batch_size": 4,
+        "repeats": 2,
+        "elapsed_seconds": 0.8641141210000001,
+        "valid_controls": 8,
+        "valid_calls_per_second": 9.258036416233962,
+        "calls_per_second": 9.258036416233962,
+        "tokens_per_second": 120.3544734110415,
+        "peak_reserved_bytes": 16001269760,
+        "peak_allocated_bytes": 15623523328,
+        "free_bytes": 68478566400,
+        "total_bytes": 85017624576,
+        "headroom_fraction": 0.8019850978904866,
+        "compile_qualified": true,
+        "eligible": true
+      },
+      {
+        "batch_size": 8,
+        "repeats": 2,
+        "elapsed_seconds": 0.9339985240000033,
+        "valid_controls": 16,
+        "valid_calls_per_second": 17.130648056570102,
+        "calls_per_second": 17.130648056570102,
+        "tokens_per_second": 222.69842473541132,
+        "peak_reserved_bytes": 16687038464,
+        "peak_allocated_bytes": 16024669184,
+        "free_bytes": 67478224896,
+        "total_bytes": 85017624576,
+        "headroom_fraction": 0.7936968979376627,
+        "compile_qualified": true,
+        "eligible": true
+      }
+    ]
+  },
+  "training_profile": {
+    "selected_microbatch_size": 16,
+    "headroom_fraction": 0.15,
+    "optimizer_state_reserve_bytes": 279052288,
+    "probes": [
+      {
+        "microbatch_size": 1,
+        "seconds": 0.1925684719999481,
+        "actions_per_second": 5.19295806636649,
+        "peak_allocated_bytes": 17188607488,
+        "peak_reserved_bytes": 17601396736,
+        "external_device_bytes": 896401408,
+        "projected_with_optimizer_bytes": 18776850432,
+        "device_total_bytes": 85017624576,
+        "fits_with_headroom": true
+      },
+      {
+        "microbatch_size": 2,
+        "seconds": 0.18522898649996478,
+        "actions_per_second": 10.797446111385922,
+        "peak_allocated_bytes": 19207590912,
+        "peak_reserved_bytes": 19780337664,
+        "external_device_bytes": 976093184,
+        "projected_with_optimizer_bytes": 21035483136,
+        "device_total_bytes": 85017624576,
+        "fits_with_headroom": true
+      },
+      {
+        "microbatch_size": 4,
+        "seconds": 0.1872322065000276,
+        "actions_per_second": 21.363845861632843,
+        "peak_allocated_bytes": 23086169600,
+        "peak_reserved_bytes": 24301797376,
+        "external_device_bytes": 976093184,
+        "projected_with_optimizer_bytes": 25556942848,
+        "device_total_bytes": 85017624576,
+        "fits_with_headroom": true
+      },
+      {
+        "microbatch_size": 8,
+        "seconds": 0.22316339200000357,
+        "actions_per_second": 35.84817352121925,
+        "peak_allocated_bytes": 30878575616,
+        "peak_reserved_bytes": 32640073728,
+        "external_device_bytes": 976093184,
+        "projected_with_optimizer_bytes": 33895219200,
+        "device_total_bytes": 85017624576,
+        "fits_with_headroom": true
+      },
+      {
+        "microbatch_size": 16,
+        "seconds": 0.4013431005000143,
+        "actions_per_second": 39.86613942052663,
+        "peak_allocated_bytes": 46168525824,
+        "peak_reserved_bytes": 48375005184,
+        "external_device_bytes": 976093184,
+        "projected_with_optimizer_bytes": 49630150656,
+        "device_total_bytes": 85017624576,
+        "fits_with_headroom": true
+      }
+    ],
+    "optimizer_steps": 0,
+    "sampled_rows": 1400,
+    "repeated_actual_rows_for_capacity": true
+  },
+  "evaluation": {
+    "before": {
+      "actions": 200,
+      "offtrack_ticks": 0,
+      "reason": "episode_tick_limit",
+      "success": false,
+      "reward_components": {
+        "version": "audited-full-lap-v1",
+        "legal_progress_m": 149.00022978831294,
+        "track_length_m": 4605.866,
+        "sim_seconds": 19.9999999999995,
+        "time_budget_seconds": 20.0,
+        "progress_fraction": 0.03235010089054109,
+        "completion_bonus": 0.0,
+        "speed_bonus": 0.0,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "total": 0.03235010089054109
+      }
+    },
+    "after": {
+      "actions": 200,
+      "offtrack_ticks": 0,
+      "reason": "episode_tick_limit",
+      "success": false,
+      "reward_components": {
+        "version": "audited-full-lap-v1",
+        "legal_progress_m": 149.16315722588956,
+        "track_length_m": 4605.866,
+        "sim_seconds": 19.9999999999995,
+        "time_budget_seconds": 20.0,
+        "progress_fraction": 0.032385474789299026,
+        "completion_bonus": 0.0,
+        "speed_bonus": 0.0,
+        "failure_penalty": 0.0,
+        "syntax_penalty": 0.0,
+        "total": 0.032385474789299026
+      }
+    }
+  },
+  "campaign_sha256": "ce3cace9f4299bd24d340a86d9abc45bd98dcb3c938fc8e6ebe923dbf025b24e",
+  "video_jobs": 10,
+  "notes": [
+    "BF16 sampling and training likelihoods differ numerically; exact behavior likelihoods are retained for TRL importance ratios.",
+    "This smoke checkpoint was preserved separately; the full campaign starts from the prior verified generation 2 checkpoint."
+  ],
+  "video_indexes_complete": 10,
+  "video_index_sha256": {
+    "gemma4-full-lap-smoke-01/experiment/capacity-probe/videos/index.json": "c55ccd44b25f65d42d8955caa776a712a06bc24fe3a400b4eb84bf9543e16395",
+    "gemma4-full-lap-smoke-01/experiment/generation-0002/rollout-0007/videos/index.json": "bb908b3b2f7c4b9c166e219a2f78b303941d8f1f28e4afcb59f4849ae57c7305",
+    "gemma4-full-lap-smoke-01/experiment/generation-0002/rollout-0006/videos/index.json": "7d0b4fe6226ce67a79e0151fee191826ff4c14e1f1e79b8eec46f38dd223193c",
+    "gemma4-full-lap-smoke-01/experiment/generation-0002/rollout-0000/videos/index.json": "588e8623f81cbdca1d9dadaba756bee9ec2d725d2ae08eb76bd9bc63f5abe2d8",
+    "gemma4-full-lap-smoke-01/experiment/generation-0002/rollout-0005/videos/index.json": "33c6dfe55f01cbbb261ec2bf41b371627ff1cc4511cd229d3aec7ce360a57579",
+    "gemma4-full-lap-smoke-01/experiment/generation-0002/rollout-0004/videos/index.json": "3b972a3267459d22fd5fefd42fc6edbc72f2637bcd986a241682a8002886a661",
+    "gemma4-full-lap-smoke-01/experiment/generation-0002/rollout-0003/videos/index.json": "577f0b2cbe87557cf66c1eb08fee99a944298f1d6d57e425bdba997b709baba0",
+    "gemma4-full-lap-smoke-01/experiment/generation-0002/rollout-0002/videos/index.json": "a1867032176505c94bf30603b4ac082f7fafbdf22b7852003cae2143d0e995b7",
+    "gemma4-full-lap-smoke-01/experiment/generation-0002/rollout-0001/videos/index.json": "5907876379fc6b0717698f10c8f8e4fc6852790e6d91a5d665f8a9cc9fe577d6",
+    "gemma4-full-lap-smoke-01/experiment/final-evaluation/rollout-0000/videos/index.json": "4e48b5e84d1babd249b91a0988a7e6c29ea2e5bcefc89306c493cb6548a509b7"
+  }
+}
