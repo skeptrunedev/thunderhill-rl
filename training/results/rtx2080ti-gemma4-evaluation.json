@@ -1,0 +1,143 @@
+{
+  "model": "google/gemma-4-E4B-it",
+  "revision": "ee0ef6023621cff504d758262d4e04895a5af4a2",
+  "adapter_sha256": "d7f3fc08a7a02cd7841d5503678bee2453bb261f838dac12f1bf23ca75773ef3",
+  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+  "inference_profile": "local-fp16",
+  "compute_dtype": "torch.float16",
+  "peak_cuda_allocated_bytes": 9490387456,
+  "actions": 1200,
+  "sim_seconds": 120.000000000042,
+  "wall_seconds": 1744.6133484300226,
+  "recorded_transitions": 14400,
+  "gates": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "offtrack_ticks": 0,
+  "recording_provenance_verified": true,
+  "teacher_used_at_inference": false,
+  "reason": "episode_tick_limit",
+  "test_budget_completed": true,
+  "full_lap_completed": false,
+  "legal_progress_m": 921.843948300566,
+  "lap_fraction": 0.200145629139138,
+  "precision_comparison": {
+    "reference_sha256": "7520cc3b2522ccba4208b164b75b8317aca1099956e5dd0b2cda404a25c94ff8",
+    "adapter_sha256": "d7f3fc08a7a02cd7841d5503678bee2453bb261f838dac12f1bf23ca75773ef3",
+    "samples": 12,
+    "exact_control_matches": 11,
+    "finite_logits": true,
+    "all_controls_valid": true,
+    "seconds": 21.29797739908099,
+    "results": [
+      {
+        "source_action_index": 0,
+        "reference": "control_bike 0 65 0 0",
+        "local": "control_bike 0 65 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 27,
+        "reference": "control_bike 3 14 0 0",
+        "local": "control_bike 3 14 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 54,
+        "reference": "control_bike -7 16 0 0",
+        "local": "control_bike -7 16 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 82,
+        "reference": "control_bike 4 14 0 0",
+        "local": "control_bike 4 14 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 109,
+        "reference": "control_bike -12 14 0 0",
+        "local": "control_bike -12 14 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 136,
+        "reference": "control_bike 2 14 0 0",
+        "local": "control_bike 2 14 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 163,
+        "reference": "control_bike 10 15 0 0",
+        "local": "control_bike 10 14 0 0",
+        "controls_match": false
+      },
+      {
+        "source_action_index": 190,
+        "reference": "control_bike 1 15 0 0",
+        "local": "control_bike 1 15 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 217,
+        "reference": "control_bike -10 14 0 0",
+        "local": "control_bike -10 14 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 245,
+        "reference": "control_bike 8 14 0 0",
+        "local": "control_bike 8 14 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 272,
+        "reference": "control_bike 2 14 0 0",
+        "local": "control_bike 2 14 0 0",
+        "controls_match": true
+      },
+      {
+        "source_action_index": 299,
+        "reference": "control_bike -7 14 0 0",
+        "local": "control_bike -7 14 0 0",
+        "controls_match": true
+      }
+    ],
+    "limitation": "FP16 local inference versus recorded H100 BF16 decisions; this is not numerical equivalence."
+  },
+  "limitation": "One deterministic local FP16 evaluation with privileged road telemetry. Covers the main straight, Turn 1 and approach to Turn 2. Not a full lap, H100 numerical equivalence, or a new training run.",
+  "sources": [
+    {
+      "path": "artifacts/gemma4-local-evaluation-01/summary.json",
+      "sha256": "62291f470989daef668aab72d28e5fc8ef2cca4f1b050516b60177d451293fdb"
+    },
+    {
+      "path": "artifacts/gemma4-local-evaluation-01/decisions.jsonl",
+      "sha256": "0d37c6dc75c60e6adf74478d415f2529261db63c7f5b61fcb3406c0dc6884344"
+    },
+    {
+      "path": "artifacts/gemma4-local-evaluation-01/precision-comparison.json",
+      "sha256": "838c8e27ea04494494384c0051ebb472f1f1e99b236ffc77f69cf1c5de706256"
+    },
+    {
+      "path": "/home/skeptrune/git_projects/morph/thunderhill-rl/artifacts/gemma4-local-evaluation-01/environment/data/godot/app_userdata/Thunderhill/runs/1790054997_1012816/1790054997_1012816_2.jsonl",
+      "sha256": "68cf56cfe0e1b9cfaf04939eea3b0d07b8eac9f7a2b4ef513aff05828f0eba51"
+    }
+  ],
+  "independent_raw_audit_passed": true,
+  "max_abs_lateral_m": 0.161067485809326,
+  "crashed": false,
+  "video": {
+    "complete": true,
+    "path": "artifacts/gemma4-local-evaluation-01/videos/78395d624949b9b0e6e32da6cfe7a243ec38caa74ddb21ff977cc0a6d7cfece7/attempt-0001/run.mp4",
+    "sha256": "a108257d3cc874fa82343b9d753cb1ac9fdce4bb20e6b15e999a4e9e90bbe844",
+    "frames": 3630,
+    "duration_seconds": 121.0,
+    "index_sha256": "e8988c215e8db9fb54eae5d36a9e31fdba58da3297cc16fc2bd17993c7764b68"
+  }
+}
