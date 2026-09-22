@@ -22,4 +22,12 @@ Then launch three generations, each allowing a complete lap up to 900 simulation
 modal run --detach training/modal_app.py --stage full-lap --run-id UNIQUE_CAMPAIGN_ID --source-run gemma4-warmstart-rl-01
 ```
 
-The cloud function has a six hour wall time limit and commits artifacts every minute. A timeout interrupts only the trainer first, allowing simulator recording closure. A short smoke test is infrastructure verification, not evidence of a completed lap or improved racing performance. Compare completion rate, audited lap times, failures and greedy evaluation across the preserved generations before judging improvement.
+The cloud function has a twelve hour wall time limit and commits artifacts every minute. A timeout interrupts only the trainer first, allowing simulator recording closure. A short smoke test is infrastructure verification, not evidence of a completed lap or improved racing performance. Compare completion rate, audited lap times, failures and greedy evaluation across the preserved generations before judging improvement.
+
+Completed runs can be archived and rendered automatically. Staging must be on the same filesystem as the destination, outside the watched artifacts tree:
+
+```sh
+DISPLAY=:1 python3 tools/archive_modal_run.py --run-id RUN_ID --staging-root ../thunderhill-downloads --output artifacts/modal-RUN_ID-archive --godot GODOT_PATH --ffmpeg FFMPEG_PATH --watch
+```
+
+The archive helper waits for terminal status, downloads through the Modal CLI, validates run identity, publishes the directory atomically and drains all video queues. It retains failed training attempts too.

@@ -118,7 +118,7 @@ def run(stage: str, run_id: str, source: dict, source_run: str = "") -> dict:
 
 
 @app.function(
-    image=image, gpu="H100", cpu=16, memory=131072, timeout=21600,
+    image=image, gpu="H100", cpu=16, memory=131072, timeout=43200,
     max_containers=1, retries=0,
     volumes={str(RUNS): artifacts, "/model-cache": cache},
 )
@@ -126,7 +126,7 @@ def run_campaign(stage: str, run_id: str, source: dict, source_run: str,
                  batch_candidates: str = "4,8,16,32,64") -> dict:
     if stage not in ("full-lap", "full-lap-smoke"):
         raise ValueError("Campaign stage must be full-lap or full-lap-smoke")
-    return _execute_run(stage, run_id, source, source_run, 21600, 21480, batch_candidates)
+    return _execute_run(stage, run_id, source, source_run, 43200, (3540 if stage == "full-lap-smoke" else 43020), batch_candidates)
 
 
 def validate_source(stage, source_run):
@@ -240,7 +240,7 @@ def _execute_run(stage, run_id, source, source_run, function_timeout, child_time
                 # Keep Godot alive while the trainer flushes and audits episodes.
                 process.send_signal(signal.SIGINT)
                 try:
-                    process.wait(timeout=30)
+                    process.wait(timeout=120 if stage == "full-lap" else 30)
                 except subprocess.TimeoutExpired:
                     os.killpg(process.pid, signal.SIGKILL)
                     process.wait()

@@ -134,7 +134,7 @@ class TrajectoryUpdater:
             result["advantages"].append(row["advantage"])
         return {k: torch.tensor(v, device=device, dtype=torch.float32 if k in ("old_per_token_logps", "advantages") else torch.long) for k, v in result.items()}
 
-    def profile_microbatches(self, episodes, candidates=(1, 2, 4, 8, 16)):
+    def profile_microbatches(self, episodes, candidates=(1, 2, 4, 8, 16, 32)):
         """Measure actual TRL forward/backward shapes; never take an optimizer step.
 
         Probes repeat actual sampled rows when necessary. Include the longest
@@ -244,6 +244,7 @@ class TrajectoryUpdater:
         loss_total = 0.0
         max_logp_difference = 0.0
         tokens_seen = 0
+        started = time.monotonic()
         for offset in range(0, len(rows), self.config.microbatch_size):
             chunk = rows[offset:offset + self.config.microbatch_size]
             batch = self.batch(chunk)
@@ -256,6 +257,14 @@ class TrajectoryUpdater:
             loss.backward()
             loss_total += loss.detach().item()
             tokens_seen += int(batch["completion_mask"].sum())
+            if offset // self.config.microbatch_size % 100 == 0 or offset + len(chunk) == len(rows):
+                progress = dict(event="training_progress", actions_trained=offset + len(chunk),
+                                actions_total=len(rows), tokens_trained=tokens_seen,
+                                elapsed_seconds=time.monotonic() - started)
+                temporary = self.output_dir / "progress.pending"
+                temporary.write_text(json.dumps(progress) + "\n")
+                temporary.replace(self.output_dir / "progress.json")
+                print(json.dumps(progress), flush=True)
         expected_tokens = sum(len(r["completion_ids"]) for r in rows)
         if tokens_seen != expected_tokens:
             raise AssertionError("Not all generated tokens received a loss mask")

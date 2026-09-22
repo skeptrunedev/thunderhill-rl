@@ -1,6 +1,8 @@
 """CPU verification using an actual tiny random transformer, without downloads."""
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import torch
 from tokenizers import Tokenizer
@@ -8,7 +10,7 @@ from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
 from transformers import GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
-from batched_policy import BatchedPolicy, GreedyRows
+from batched_policy import BatchedPolicy, GreedyRows, cuda_graph_evidence
 
 
 class BatchedPolicyTests(unittest.TestCase):
@@ -77,6 +79,29 @@ class BatchedPolicyTests(unittest.TestCase):
         self.model._compiled_call = lambda: None
         self.policy._qualify_compilation(2)
         self.assertTrue(self.policy.compile_qualified)
+
+    def test_default_width_and_overflow_fail_closed(self):
+        self.assertEqual(self.policy.compiled_prompt_length, 256)
+        self.policy.compile_inference = True
+        self.policy.compiled_prompt_length = 1
+        with self.assertRaisesRegex(ValueError, "never truncated"):
+            self.policy.generate(["ride road"])
+
+    def test_graph_evidence_counts_nodes_not_allocator_graph(self):
+        manager = SimpleNamespace(roots={}, graph=object(), path_state=SimpleNamespace(name="NONE"))
+        with patch("torch._inductor.cudagraph_trees.get_manager", return_value=manager) as getter:
+            evidence = cuda_graph_evidence(torch.device("cuda:0"))
+            self.assertFalse(evidence["cuda_graph_captured"])
+            getter.assert_called_once_with(0, create_if_none_exists=False)
+        child = SimpleNamespace(graph=object(), children={})
+        node = SimpleNamespace(graph=object(), children={1: [child]})
+        manager.roots = {0: [node]}
+        manager.path_state.name = "EXECUTION"
+        with patch("torch._inductor.cudagraph_trees.get_manager", return_value=manager):
+            evidence = cuda_graph_evidence(torch.device("cuda:0"))
+        self.assertEqual(evidence["captured_nodes"], 2)
+        self.assertEqual(evidence["path_state"], "EXECUTION")
+        self.assertTrue(evidence["cuda_graph_captured"])
 
     def test_training_mode_restored_and_bad_indices_rejected(self):
         self.model.train()

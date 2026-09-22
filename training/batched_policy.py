@@ -32,8 +32,38 @@ class GreedyRows(LogitsProcessor):
         return scores
 
 
+def cuda_graph_evidence(device):
+    """Read PyTorch 2.14 tree state without creating managers or capturing work.
+
+    Counts are process cumulative, not proof every model operation was captured.
+    The manager's own graph is an empty allocator graph and is excluded.
+    """
+    try:
+        from torch._dynamo.utils import counters
+        from torch._inductor.cudagraph_trees import get_manager
+        manager = get_manager(device.index or 0, create_if_none_exists=False)
+        pending = [] if manager is None else [node for nodes in manager.roots.values() for node in nodes]
+        seen, graphs = set(), 0
+        while pending:
+            node = pending.pop()
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            graphs += int(getattr(node, "graph", None) is not None)
+            pending.extend(child for children in node.children.values() for child in children)
+        path = getattr(manager, "path_state", None)
+        return {
+            "available": True, "scope": "process_cumulative",
+            "captured_nodes": graphs, "cuda_graph_captured": graphs > 0,
+            "skips": int(counters.get("inductor", {}).get("cudagraph_skips", 0)),
+            "path_state": getattr(path, "name", None),
+        }
+    except (ImportError, AttributeError) as error:
+        return {"available": False, "error": f"{type(error).__name__}: {error}"}
+
+
 class BatchedPolicy:
-    def __init__(self, model, tokenizer, *, compile_inference=False, compiled_prompt_length=512):
+    def __init__(self, model, tokenizer, *, compile_inference=False, compiled_prompt_length=256):
         self.model = model
         self.tokenizer = tokenizer
         self.compile_inference = compile_inference
@@ -133,6 +163,7 @@ class BatchedPolicy:
                 record = {"batch_size": size, "repeats": 2}
                 print(json.dumps({"event": "batch_profile_start", "batch_size": size,
                                   "compile_inference": self.compile_inference}), flush=True)
+                graphs_before = cuda_graph_evidence(device)
                 warmup_started = time.perf_counter()
                 try:
                     self.generate(batch)  # Warm kernels and the actual generation shape.
@@ -159,6 +190,11 @@ class BatchedPolicy:
                     # Account for device allocations outside PyTorch as well.
                     external = max(0, total - free - torch.cuda.memory_reserved(device))
                     headroom = max(0, total - external - peak) / total
+                    graphs_after = cuda_graph_evidence(device)
+                    record["cuda_graph_evidence"] = graphs_after
+                    if graphs_before.get("available") and graphs_after.get("available"):
+                        record["cuda_graph_nodes_added"] = graphs_after["captured_nodes"] - graphs_before["captured_nodes"]
+                        record["cuda_graph_skips_added"] = graphs_after["skips"] - graphs_before["skips"]
                     record.update(
                         elapsed_seconds=elapsed, valid_controls=valid,
                         valid_calls_per_second=valid / elapsed, calls_per_second=2 * size / elapsed,
@@ -183,5 +219,6 @@ class BatchedPolicy:
         best = max(eligible, key=lambda r: r["valid_calls_per_second"], default=None)
         return {"selected_batch_size": best["batch_size"] if best else None,
                 "headroom_required": headroom_fraction, "compile_inference": self.compile_inference,
+                "compiled_prompt_length": self.compiled_prompt_length,
                 "compile_qualified": self.compile_qualified,
                 "results": records}
