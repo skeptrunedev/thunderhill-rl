@@ -30,8 +30,10 @@ GEMMA4_SPEC = ModelSpec(
 SPEC_FILENAME = "model_spec.json"
 GEMMA4_KEY_MAPPING = {r"^model\.language_model\.": "model."}
 GEMMA4_UNUSED_PREFIXES = (
-    "model.audio_tower.", "model.vision_tower.",
-    "model.embed_audio.", "model.embed_vision.",
+    "model.audio_tower.",
+    "model.vision_tower.",
+    "model.embed_audio.",
+    "model.embed_vision.",
 )
 LORA_TARGET_MODULES = (
     "q_proj",
@@ -107,9 +109,24 @@ def load_base(spec: ModelSpec, device: str = "cuda"):
 def _validate_loading_info(spec: ModelSpec, info: dict) -> None:
     unexpected = info.get("unexpected_keys", ())
     if spec == GEMMA4_SPEC:
-        unexpected = [key for key in unexpected if not key.startswith(GEMMA4_UNUSED_PREFIXES)]
-    if unexpected or any(info.get(key) for key in ("missing_keys", "mismatched_keys", "error_msgs")):
+        unexpected = [
+            key for key in unexpected if not key.startswith(GEMMA4_UNUSED_PREFIXES)
+        ]
+    if unexpected or any(
+        info.get(key) for key in ("missing_keys", "mismatched_keys", "error_msgs")
+    ):
         raise ValueError(f"Pretrained model weights did not load completely: {info}")
+
+
+def inference_precision(model):
+    """Use the same BF16 compute policy inside and outside Accelerate."""
+    import torch
+
+    return torch.autocast(
+        device_type=model.device.type,
+        dtype=torch.bfloat16,
+        enabled=model.dtype == torch.bfloat16,
+    )
 
 
 class PolicyRoadTelemetry(RoadTelemetry):

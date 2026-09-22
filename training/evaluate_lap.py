@@ -15,7 +15,7 @@ from lap_policy import parse_action
 from peft import PeftModel
 from smoke_grpo import worker
 from transformers import AutoTokenizer, CompileConfig
-from model_runtime import PolicyRoadTelemetry, load_base, read_spec
+from model_runtime import PolicyRoadTelemetry, inference_precision, load_base, read_spec
 from video_jobs import enqueue_video
 
 
@@ -124,7 +124,7 @@ def main():
             ).to(args.device)
             if args.compile and inputs["input_ids"].shape[1] != 256:
                 raise ValueError("Policy prompt exceeds the fixed compiled input size")
-            with torch.inference_mode():
+            with torch.inference_mode(), inference_precision(model):
                 output = model.generate(
                     **inputs,
                     max_new_tokens=32,

@@ -25,7 +25,13 @@ from lap_rollout import REWARD_VERSION, audit_rollout, physical_snapshot, rollou
 from peft import PeftModel
 from smoke_grpo import worker
 from transformers import AutoTokenizer, set_seed
-from model_runtime import PolicyRoadTelemetry, load_base, read_spec, write_spec
+from model_runtime import (
+    PolicyRoadTelemetry,
+    inference_precision,
+    load_base,
+    read_spec,
+    write_spec,
+)
 from trl import GRPOConfig, GRPOTrainer
 from video_jobs import enqueue_video
 
@@ -69,7 +75,7 @@ def generate(model, tokenizer, prompt):
     was_training = model.training
     model.eval()
     try:
-        with torch.inference_mode():
+        with torch.inference_mode(), inference_precision(model):
             output = model.generate(
                 **inputs,
                 max_new_tokens=32,
@@ -93,7 +99,8 @@ class MaskAuditTrainer(GRPOTrainer):
         super().__init__(*args, **kwargs)
 
     def _generate_and_score_completions(self, inputs):
-        result = super()._generate_and_score_completions(inputs)
+        with inference_precision(self.model):
+            result = super()._generate_and_score_completions(inputs)
         group = self.rollout_groups[-1]
         masks = result["completion_mask"].detach().cpu().tolist()
         ids = result["completion_ids"].detach().cpu().tolist()
@@ -700,18 +707,22 @@ def main():
         )
         model.eval()
         inputs = tokenizer(branch_prompt, return_tensors="pt").to("cuda")
-        with torch.inference_mode():
+        with torch.inference_mode(), inference_precision(model):
             expected_logits = (
-                model(**inputs, logits_to_keep=1).logits[:, -1].detach().cpu()
+                model(**inputs, logits_to_keep=1).logits[:, -1].detach().float().cpu()
             )
         model.cpu()
         reloaded = PeftModel.from_pretrained(
             load_base(spec),
             str(checkpoint),
         ).eval()
-        with torch.inference_mode():
+        with torch.inference_mode(), inference_precision(reloaded):
             reloaded_logits = (
-                reloaded(**inputs, logits_to_keep=1).logits[:, -1].detach().cpu()
+                reloaded(**inputs, logits_to_keep=1)
+                .logits[:, -1]
+                .detach()
+                .float()
+                .cpu()
             )
         torch.testing.assert_close(
             expected_logits, reloaded_logits, rtol=1e-5, atol=1e-5
