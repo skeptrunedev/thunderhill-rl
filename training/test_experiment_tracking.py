@@ -21,6 +21,18 @@ def collection(rollouts):
 
 
 class TrackingTests(unittest.TestCase):
+    def test_heldout_samples_have_separate_metrics_and_median(self):
+        samples = [episode("stalled"), episode("track_limits"), episode("crash")]
+        for sample, distance in zip(samples, (0, 20, 100), strict=True):
+            sample["reward_components"]["legal_progress_m"] = distance
+        row = collection_metrics(dict(collection(samples), evaluation_only=True))
+        self.assertEqual(row["heldout/count"], 3)
+        self.assertEqual(row["heldout/mean_legal_progress_m"], 40)
+        self.assertEqual(row["heldout/median_legal_progress_m"], 20)
+        self.assertEqual(row["heldout/stall_rate"], 1 / 3)
+        self.assertEqual(row["heldout/track_limits_rate"], 1 / 3)
+        self.assertFalse(any(key.startswith("rollout/") or key.startswith("eval/") for key in row))
+
     def test_stall_is_distinct_from_crash_and_keeps_earned_reward(self):
         stalled = episode("stalled")
         stalled["reward_components"]["total"] = 0.12

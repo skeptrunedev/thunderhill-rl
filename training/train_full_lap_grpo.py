@@ -34,7 +34,8 @@ def digest(adapter):
     return hashlib.sha256((Path(adapter) / "adapter_model.safetensors").read_bytes()).hexdigest()
 
 
-def collect(policy, road, spec, godot, directory, adapter_hash, generation, count, seconds, tracker=None):
+def collect(policy, road, spec, godot, directory, adapter_hash, generation, count, seconds, tracker=None,
+            *, rollout_offset=0, rollout_total=None, evaluation_only=False):
     """Keep sampling weights frozen until every sampled and evaluation lane closes."""
     started = time.monotonic()
     with ExitStack() as stack:
@@ -42,8 +43,9 @@ def collect(policy, road, spec, godot, directory, adapter_hash, generation, coun
         episodes = [stack.enter_context(LapEpisode(
             godot=godot, output=directory / f"rollout-{index:04d}", road=road,
             adapter_sha256=adapter_hash, model=spec.model, revision=spec.revision,
-            generation=generation, rollout=max(1, index), rollout_count=max(1, count),
-            time_budget_seconds=seconds, evaluation=index == 0,
+            generation=generation, rollout=max(1, rollout_offset + index),
+            rollout_count=max(1, rollout_total or count),
+            time_budget_seconds=seconds, evaluation=evaluation_only or index == 0,
         )) for index in range(count + 1)]
         prompts = [episode.prompt() for episode in episodes]
         step = 0
@@ -85,13 +87,50 @@ def collect(policy, road, spec, godot, directory, adapter_hash, generation, coun
         ):
             raise ValueError("Native constrained generation produced an invalid tool call")
         training = []
-        for episode, summary in zip(episodes[1:], summaries[1:], strict=True):
+        for episode, summary in ([] if evaluation_only else zip(episodes[1:], summaries[1:], strict=True)):
             if not summary["training_eligible"]:
                 raise ValueError("Unusable episode cannot silently enter or leave the training group")
             training.append({"reward_components": summary["reward_components"], "decisions": [
                 {"prompt_ids": r["prompt_ids"], "completion_ids": r["completion_ids"],
                  "old_per_token_logps": r["behavior_logprobs"]} for r in episode.records]})
         return training, result, prompts[0]
+
+
+
+def collect_waves(policy, road, spec, godot, directory, adapter_hash, generation,
+                  count, seconds, capacity, tracker=None, *, evaluation_seed=None):
+    """Collect one frozen policy group with bounded concurrent simulator lanes.
+
+    Evaluation uses a separate, repeatable sampling stream restored on exit.
+    Its trajectories are deliberately never returned to the optimizer.
+    """
+    if count < 1 or capacity < 1:
+        raise ValueError("Positive rollout count and wave capacity required")
+    directory.mkdir(parents=True, exist_ok=True)
+    started = time.monotonic()
+    training, summaries, waves = [], [], []
+    evaluation_only = evaluation_seed is not None
+    with ExitStack() as stack:
+        if evaluation_only:
+            stack.enter_context(torch.random.fork_rng())
+            torch.manual_seed(evaluation_seed)
+        for offset in range(0, count, capacity):
+            wave_training, result, prompt = collect(
+                policy, road, spec, godot, directory / f"wave-{offset // capacity:04d}",
+                adapter_hash, generation, min(capacity, count - offset), seconds,
+                rollout_offset=offset, rollout_total=count, evaluation_only=evaluation_only)
+            training.extend(wave_training)
+            summaries.extend(result["rollouts"])
+            waves.append(result)
+    collection = dict(generation=generation, adapter_sha256=adapter_hash,
+                      elapsed_seconds=time.monotonic() - started,
+                      evaluation=waves[0]["evaluation"], rollouts=summaries, waves=waves)
+    if evaluation_only:
+        collection.update(evaluation_only=True, evaluation_seed=evaluation_seed)
+    publish(directory / "collection.json", collection)
+    if tracker is not None:
+        tracker.collection(collection)
+    return training, collection, prompt
 
 
 def save_checkpoint(model, tokenizer, spec, updater, directory, prompt):
@@ -134,6 +173,10 @@ def main():
     parser.add_argument("--time-budget-seconds", type=float, default=900)
     parser.add_argument("--batch-candidates", default="4,8,16,32,64")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--rollouts-per-generation", type=int)
+    parser.add_argument("--evaluation-interval", type=int, default=0)
+    parser.add_argument("--evaluation-rollouts", type=int, default=12)
+    parser.add_argument("--evaluation-seed", type=int, default=1073)
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--wandb-mode", choices=("offline", "online", "disabled"), default="offline")
     parser.add_argument("--wandb-project", default="thunderhill-rl")
@@ -141,6 +184,10 @@ def main():
     args = parser.parse_args()
     if args.generations < 1 or args.time_budget_seconds <= 0:
         parser.error("Positive generation count and episode budget required")
+    if args.rollouts_per_generation is not None and args.rollouts_per_generation < 2:
+        parser.error("At least two sampled rollouts per generation required")
+    if args.evaluation_interval < 0 or args.evaluation_rollouts < 1:
+        parser.error("Nonnegative evaluation interval and positive evaluation rollouts required")
     candidates = [int(v) for v in args.batch_candidates.split(",")]
     if not candidates or any(v < 3 for v in candidates):
         parser.error("Each batch needs one evaluation lane and at least two sampled rollouts")
@@ -185,6 +232,8 @@ def main():
                 "reward_version": REWARD_VERSION, "progress_meters_per_reward": PROGRESS_METERS_PER_REWARD,
                 "failure_penalty": FAILURE_PENALTY, "seed": 73,
                 "stall_config": asdict(DEFAULT_STALL_CONFIG),
+                "evaluation_interval": args.evaluation_interval, "evaluation_rollouts": args.evaluation_rollouts,
+                "evaluation_seed": args.evaluation_seed, "evaluations": [],
                 "initialization": "fresh_base_lora" if args.functiongemma else "existing_adapter",
                 "supervised_training_performed": False, "temperature": args.temperature,
                 "generations_requested": generations, "time_budget_seconds": seconds,
@@ -212,15 +261,27 @@ def main():
             probe.apply(row["completion"], row["completion_ids"], row["prompt_ids"],
                         behavior_logprobs=row["old_per_token_logps"])
         # One lane evaluates greedily. All remaining lanes are sampled rollouts.
-        count = profile["selected_batch_size"] - 1
+        capacity = profile["selected_batch_size"] - 1
+        count = args.rollouts_per_generation or capacity
         manifest["rollouts_per_generation"] = count
         tracker.run.config.update({"rollouts_per_generation": count})
         publish(args.output / "campaign.json", manifest)
         print(json.dumps({"profile": profile, "rollouts_per_generation": count}), flush=True)
+        def evaluate(generation):
+            _, result, _ = collect_waves(policy, road, spec, args.godot,
+                args.output / f"evaluation-{generation:04d}", current_hash, generation,
+                args.evaluation_rollouts, seconds, capacity, tracker=tracker,
+                evaluation_seed=args.evaluation_seed)
+            manifest["evaluations"].append(result)
+            publish(args.output / "campaign.json", manifest)
+
+        if args.evaluation_interval:
+            evaluate(args.initial_generation)
         for offset in range(generations):
             generation = args.initial_generation + offset
-            episodes, collection, prompt = collect(policy, road, spec, args.godot,
-                args.output / f"generation-{generation:04d}", current_hash, generation, count, seconds, tracker=tracker)
+            episodes, collection, prompt = collect_waves(policy, road, spec, args.godot,
+                args.output / f"generation-{generation:04d}", current_hash, generation, count, seconds,
+                capacity, tracker=tracker)
             # New rollout lengths and retained CUDA graphs change memory demand.
             # Requalify against each actual generation, allowing batches to grow or shrink.
             training_profile = updater.profile_microbatches(episodes)
@@ -236,6 +297,8 @@ def main():
                                             "update": audit, "verification": verification})
             publish(args.output / "campaign.json", manifest)
             print(json.dumps({"updated_generation": generation + 1, "audit": audit}), flush=True)
+            if args.evaluation_interval and ((offset + 1) % args.evaluation_interval == 0 or offset + 1 == generations):
+                evaluate(generation + 1)
         _, evaluation, _ = collect(policy, road, spec, args.godot,
             args.output / "final-evaluation", current_hash,
             args.initial_generation + generations, 0, seconds, tracker=tracker)

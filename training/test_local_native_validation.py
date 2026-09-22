@@ -45,6 +45,22 @@ class LocalValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "reload"):
             runner.validate_campaign(row, 3)
 
+    def test_requires_complete_rollout_groups_and_heldout_evaluations(self):
+        row = campaign()
+        row.update(rollouts_per_generation=3, evaluation_interval=2, evaluation_rollouts=2)
+        for generation in row["generations"]:
+            generation["update"]["episodes"] = 3
+        row["evaluations"] = [dict(generation=g, evaluation_only=True, rollouts=[{}, {}]) for g in (0, 2, 3)]
+        runner.validate_campaign(row, 3)
+        broken = copy.deepcopy(row)
+        broken["generations"][1]["update"]["episodes"] = 2
+        with self.assertRaisesRegex(ValueError, "rollout group"):
+            runner.validate_campaign(broken, 3)
+        broken = copy.deepcopy(row)
+        broken["evaluations"].pop()
+        with self.assertRaisesRegex(ValueError, "evaluation is missing"):
+            runner.validate_campaign(broken, 3)
+
     def exercise(self, returncode=0):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

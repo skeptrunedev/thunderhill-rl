@@ -31,8 +31,23 @@ def validate_campaign(campaign, generations):
             raise ValueError("Generation has no optimizer update from gameplay")
         if row.get("verification", {}).get("reloaded_logits_match") is not True:
             raise ValueError("Saved RL checkpoint did not pass reload verification")
+        if "rollouts_per_generation" in campaign:
+            expected = campaign["rollouts_per_generation"]
+            if len(row["collection"]["rollouts"]) != expected or update.get("episodes") != expected:
+                raise ValueError("Generation did not train from the requested rollout group")
     if "final_evaluation" not in campaign:
         raise ValueError("Final recorded evaluation is missing")
+    interval = campaign.get("evaluation_interval", 0)
+    if interval:
+        initial = rows[0]["generation"] - 1
+        expected_generations = {initial, initial + generations}
+        expected_generations.update(initial + offset for offset in range(interval, generations + 1, interval))
+        evaluations = campaign.get("evaluations", [])
+        if len(evaluations) != len(expected_generations) or {row["generation"] for row in evaluations} != expected_generations:
+            raise ValueError("Required baseline or checkpoint evaluation is missing")
+        for row in evaluations:
+            if row.get("evaluation_only") is not True or len(row["rollouts"]) != campaign["evaluation_rollouts"]:
+                raise ValueError("Held out evaluation has incorrect scope or rollout count")
 
 
 def parser():
@@ -43,6 +58,10 @@ def parser():
     p.add_argument("--time-budget-seconds", type=float, default=30)
     p.add_argument("--batch-candidates", default="4")
     p.add_argument("--temperature", type=float, default=1.0)
+    p.add_argument("--rollouts-per-generation", type=int)
+    p.add_argument("--evaluation-interval", type=int, default=0)
+    p.add_argument("--evaluation-rollouts", type=int, default=12)
+    p.add_argument("--evaluation-seed", type=int, default=1073)
     p.add_argument("--wandb-mode", choices=("offline", "online", "disabled"), default="online")
     p.add_argument("--wandb-project", default="thunderhill-rl")
     p.add_argument("--wandb-entity", default="skeptrune-org")
@@ -85,6 +104,11 @@ def run(args):
                    "--batch-candidates", args.batch_candidates, "--temperature", str(args.temperature),
                    "--wandb-mode", args.wandb_mode,
                    "--wandb-project", args.wandb_project, "--wandb-entity", args.wandb_entity]
+        if args.rollouts_per_generation is not None:
+            command.extend(["--rollouts-per-generation", str(args.rollouts_per_generation)])
+        command.extend(["--evaluation-interval", str(args.evaluation_interval),
+                        "--evaluation-rollouts", str(args.evaluation_rollouts),
+                        "--evaluation-seed", str(args.evaluation_seed)])
         log = logs / "rl.log"
         report.update(command=command, log=str(log), campaign_path=str(destination / "campaign.json"))
         publish()

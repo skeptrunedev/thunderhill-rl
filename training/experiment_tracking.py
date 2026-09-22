@@ -12,7 +12,7 @@ from contextlib import AbstractContextManager
 import json
 import math
 from pathlib import Path
-from statistics import mean
+from statistics import mean, median
 
 CONFIG_KEYS = (
     "model", "revision", "initial_adapter_sha256", "generations_requested",
@@ -20,7 +20,7 @@ CONFIG_KEYS = (
     "constrained_sampling_and_training", "rollouts_per_generation",
     "reward_version", "progress_meters_per_reward", "failure_penalty", "seed", "temperature",
     "training_method", "initialization", "supervised_training_performed",
-    "stall_config",
+    "stall_config", "evaluation_interval", "evaluation_rollouts", "evaluation_seed",
 )
 UPDATE_KEYS = (
     "loss", "episodes", "actions", "generated_tokens", "trained_tokens", "later_actions",
@@ -39,6 +39,7 @@ def episode_metrics(summary):
     metrics = {
         "completed": int(success), "crashed": int(obs["state"]["crashed"]),
         "stalled": int(summary["reason"] == "stalled"),
+        "track_limits": int(summary["reason"] == "track_limits"),
         "invalid_call_count": int(invalid), "tool_call_count": actions + int(invalid),
         "episode_seconds": obs["sim_time"], "actions": actions,
         "offtrack_ticks": summary["offtrack_ticks"], "gates_passed": len(summary["gates"]),
@@ -64,6 +65,7 @@ def collection_metrics(collection):
             "rollout/completion_rate": mean(row["completed"] for row in rows),
             "rollout/crash_rate": mean(row["crashed"] for row in rows),
             "rollout/stall_rate": mean(row["stalled"] for row in rows),
+            "rollout/track_limits_rate": mean(row["track_limits"] for row in rows),
             "rollout/invalid_episode_rate": mean(row["invalid_call_count"] for row in rows),
             "rollout/invalid_call_count": sum(row["invalid_call_count"] for row in rows),
             "rollout/tool_call_count": sum(row["tool_call_count"] for row in rows),
@@ -75,7 +77,14 @@ def collection_metrics(collection):
             values = [row[key] for row in rows if key in row]
             if values:
                 result[f"rollout/mean_{key}"] = mean(values)
+                result[f"rollout/median_{key}"] = median(values)
         result["rollout/completed_count"] = sum(row["completed"] for row in rows)
+    if collection.get("evaluation_only"):
+        # These sampled episodes are held out from optimizer updates. Keep their
+        # fixed-seed measurements separate from the changing training samples.
+        result = {("heldout/" + key[len("rollout/"):] if key.startswith("rollout/") else
+                   "heldout_greedy/" + key[len("eval/"):] if key.startswith("eval/") else key): value
+                  for key, value in result.items()}
     return result
 
 
@@ -93,7 +102,7 @@ class ExperimentTracker(AbstractContextManager):
             settings=wandb.Settings(disable_git=True, save_code=False, console="off"),
         )
         self.run.define_metric("generation")
-        for namespace in ("rollout", "eval", "update", "collection", "checkpoint"):
+        for namespace in ("rollout", "eval", "heldout", "heldout_greedy", "update", "collection", "checkpoint"):
             self.run.define_metric(namespace + "/*", step_metric="generation")
         self._history = (output / "metrics.jsonl").open("w")
         (output / "tracking.json").write_text(json.dumps({
@@ -139,6 +148,8 @@ def import_campaign(path, output, **tracking):
     if "final_evaluation" in manifest:
         row = manifest["final_evaluation"]
         events.append((row["generation"], 2, "collection", row))
+    for row in manifest.get("evaluations", []):
+        events.append((row["generation"], 3, "collection", row))
     with ExperimentTracker(output, manifest, **tracking) as tracker:
         for _, _, kind, value in sorted(events, key=lambda item: item[:2]):
             if kind == "collection":

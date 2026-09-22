@@ -12,13 +12,14 @@ from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from transformers import LlamaConfig, LlamaForCausalLM, PreTrainedTokenizerFast
 
-from train_full_lap_grpo import collect, save_checkpoint
+from train_full_lap_grpo import collect, collect_waves, save_checkpoint
 
 
 class FakeEpisode:
     instances = []
 
     def __init__(self, **kwargs):
+        self.kwargs = kwargs
         self.index = len(self.instances)
         self.instances.append(self)
         self.output = kwargs["output"]
@@ -78,6 +79,48 @@ class FullLapTests(unittest.TestCase):
             self.assertTrue(all(e.closed for e in FakeEpisode.instances))
             self.assertEqual(summary["evaluation"]["count"], 2)
             self.assertTrue((Path(directory) / "collection.json").exists())
+
+    def test_twelve_rollouts_use_four_bounded_waves_and_unique_metadata(self):
+        FakeEpisode.instances = []
+        with tempfile.TemporaryDirectory() as directory, patch("train_full_lap_grpo.LapEpisode", FakeEpisode):
+            policy = FakePolicy()
+            episodes, summary, _ = collect_waves(policy, None, SimpleNamespace(model="test", revision="test"),
+                "godot", Path(directory), "0" * 64, 4, 12, 1, 3)
+            self.assertEqual(len(episodes), 12)
+            self.assertEqual(len(summary["rollouts"]), 12)
+            self.assertEqual(len(summary["waves"]), 4)
+            self.assertTrue(all(len(prompts) == 4 for prompts, _ in policy.calls))
+            sampled = [e for e in FakeEpisode.instances if not e.kwargs["evaluation"]]
+            self.assertEqual([e.kwargs["rollout"] for e in sampled], list(range(1, 13)))
+            self.assertTrue(all(e.kwargs["rollout_count"] == 12 for e in sampled))
+            self.assertEqual(len({e.output for e in FakeEpisode.instances}), 16)
+            self.assertEqual([e["reward_components"]["total"] for e in episodes],
+                             [float(e.index) for e in sampled])
+
+    def test_heldout_is_repeatable_restores_rng_and_never_returns_training(self):
+        class RandomPolicy(FakePolicy):
+            def generate(self, prompts, greedy_indices=()):
+                self.draws.append(torch.rand(len(prompts)).tolist())
+                return super().generate(prompts, greedy_indices)
+
+        torch.manual_seed(73)
+        before = torch.random.get_rng_state().clone()
+        draws = []
+        with tempfile.TemporaryDirectory() as directory, patch("train_full_lap_grpo.LapEpisode", FakeEpisode):
+            for index in range(2):
+                FakeEpisode.instances = []
+                policy = RandomPolicy()
+                policy.draws = []
+                episodes, result, _ = collect_waves(policy, None, SimpleNamespace(model="test", revision="test"),
+                    "godot", Path(directory) / str(index), "0" * 64, index, 5, 1, 3, evaluation_seed=1073)
+                self.assertEqual(episodes, [])
+                self.assertTrue(result["evaluation_only"])
+                self.assertEqual(result["evaluation_seed"], 1073)
+                self.assertEqual(len(result["rollouts"]), 5)
+                self.assertTrue(all(e.kwargs["evaluation"] for e in FakeEpisode.instances))
+                self.assertTrue(torch.equal(before, torch.random.get_rng_state()))
+                draws.append(policy.draws)
+            self.assertEqual(draws[0], draws[1])
 
     def test_actual_peft_roundtrip_restores_trainable_parameters_and_optimizer_identity(self):
         torch.set_num_threads(1)
