@@ -26,6 +26,7 @@ from peft import PeftModel
 from smoke_grpo import MODEL, REVISION, worker
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from trl import GRPOConfig, GRPOTrainer
+from video_jobs import enqueue_video
 
 
 def checkpoint_hash(path):
@@ -472,6 +473,25 @@ def main():
                 },
             }
             request(client, {"op": "reset", "policy_id": "flush-finished-rollout"})
+            recordings = list(data.rglob(f"{episode}.jsonl"))
+            if len(recordings) != 1:
+                raise ValueError("Expected one closed rollout recording for video")
+            video_job = enqueue_video(
+                out,
+                recordings[0],
+                metadata={
+                    "kind": "evaluation" if first is None else "training",
+                    "policy_id": label,
+                    "adapter_sha256": current_hash,
+                    "model": MODEL,
+                    "revision": REVISION,
+                    "policy_display": display,
+                    "stop_reason": stop_reason,
+                    "reward": reward,
+                    "invalid_decision": decisions[-1] if invalid else None,
+                },
+            )
+            record["video_job"] = str(video_job.relative_to(out))
             record["recording_audit"] = audit_rollout(
                 data.rglob("*.jsonl"), record, road.track_sha256
             )

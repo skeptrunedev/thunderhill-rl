@@ -239,3 +239,38 @@ single optimizer step. A new cache is created after every weight update and for
 each baseline or final evaluation. Sampled first actions remain sampled, and
 every physics transition is executed and audited independently. Cache hit counts
 are recorded. No simulator states or rewards are cached.
+
+## Video archive for every attempt
+
+`train_lap_grpo.py` and `evaluate_lap.py` automatically publish a durable
+`video_jobs` entry for every finished policy episode, including invalid actions,
+track exits, and the before and after evaluations. The job preserves the complete
+recording hash, model revision, checkpoint, generation, rollout identity, and
+outcome. The existing recordings remain the authoritative state and control data.
+Video rendering plays those exact states back and never resimulates them.
+
+Run the renderer in a separate process with a working graphical display:
+
+```bash
+DISPLAY=:1 python3 tools/render_video_queue.py artifacts \
+  --godot /path/to/godot --ffmpeg /path/to/ffmpeg --watch
+```
+
+It renders every queued attempt to a full length MP4 at 30 frames per second,
+including the native model, generation, rollout, and live control overlay. Each
+video includes a final state hold of one second; a zero control attempt is a
+one second initial state video. Videos currently have no audio. Training remains
+headless, and the renderer can run separately after training to avoid GPU
+contention. For Modal, preserve the entire experiment directory on persistent
+storage and drain its queue on a rendering worker or locally after downloading.
+
+`videos/index.json` is the montage inventory. It retains failures as well as
+successes and includes each video's checkpoint and outcome. Pending jobs are not
+videos: an experiment's archive is ready only after a final queue drain reports
+`complete: true` and its queued count matches all policy episodes. Run the same
+command without `--watch` against a finished experiment to verify coverage and
+video hashes. Failed render attempts retain their logs and return a failure;
+inspect the cause, then use `--retry-failed` to create a new attempt without
+overwriting existing artifacts. A hard process kill before episode finalization
+can leave a raw recording without a job and requires recovery before declaring
+the archive complete. Historical experiments are not automatically backfilled.

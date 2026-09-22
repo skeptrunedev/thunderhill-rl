@@ -15,6 +15,7 @@ from lap_policy import RoadTelemetry, parse_action
 from peft import PeftModel
 from smoke_grpo import MODEL, REVISION, worker
 from transformers import AutoModelForCausalLM, AutoTokenizer, CompileConfig
+from video_jobs import enqueue_video
 
 
 def main():
@@ -178,6 +179,23 @@ def main():
         final = env._observation
         client.request({"op": "reset", "policy_id": "evaluation-finished"})
         decisions.flush()
+        recordings = list(data.rglob(f"{episode}.jsonl"))
+        if len(recordings) != 1:
+            raise ValueError("Expected one closed evaluation recording for video")
+        video_job = enqueue_video(
+            out,
+            recordings[0],
+            metadata={
+                "kind": "evaluation",
+                "adapter_sha256": adapter_hash,
+                "model": MODEL,
+                "revision": REVISION,
+                "policy_display": display,
+                "stop_reason": reason,
+                "sim_seconds": final["sim_time"],
+                "decisions": "decisions.jsonl",
+            },
+        )
         audit = audit_lap(
             data.rglob("*.jsonl"),
             episode_id=episode,
@@ -193,6 +211,7 @@ def main():
         summary = {
             "success": success,
             "reason": reason,
+            "video_job": str(video_job.relative_to(out)),
             "model": MODEL,
             "device": args.device,
             "compiled_inference": args.compile,

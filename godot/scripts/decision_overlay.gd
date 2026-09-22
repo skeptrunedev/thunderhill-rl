@@ -14,7 +14,7 @@ func _ready() -> void:
 
 
 func _process(_dt: float) -> void:
-	visible = game != null and not game.decision_feed.is_empty()
+	visible = game != null and (not game.decision_feed.is_empty() or not _identity().is_empty())
 	if visible:
 		queue_redraw()
 
@@ -48,15 +48,21 @@ func _style(color: Color, radius: int) -> StyleBoxFlat:
 	return style
 
 
-func _draw() -> void:
-	if game == null or game.decision_feed.is_empty():
-		return
-	var decision: Dictionary = game.decision_feed[0]
-	var controls: Dictionary = decision.get("controls", {})
-	var identity: Dictionary = game.policy_display
+func _identity() -> Dictionary:
 	if game.replay != null:
-		identity = game.replay.manifest.get("policy_display", {})
-	var seconds := float(decision.get("elapsed", float(decision.tick) * game.DT))
+		return game.replay.manifest.get("policy_display", {})
+	return game.policy_display
+
+
+func _draw() -> void:
+	if game == null:
+		return
+	var identity: Dictionary = _identity()
+	if game.decision_feed.is_empty() and identity.is_empty():
+		return
+	var decision: Dictionary = {} if game.decision_feed.is_empty() else game.decision_feed[0]
+	var controls: Dictionary = decision.get("controls", {})
+	var seconds := float(decision.get("elapsed", float(decision.get("tick", 0)) * game.DT))
 	var age := maxf(0, float(game.sim.elapsed) - seconds)
 	draw_style_box(_style(Color(0.018, 0.027, 0.036, 0.93), 9), Rect2(Vector2.ZERO, size))
 	# Pulse follows simulator time, so offline movie capture stays deterministic.
@@ -83,6 +89,10 @@ func _draw() -> void:
 			"Rollout %d of %d" % [int(identity.rollout_number), int(identity.rollout_count)]
 		)
 	_text(Vector2(18, 84), rollout_label, 17, MUTED)
+	if game.decision_feed.is_empty():
+		draw_line(Vector2(18, 104), Vector2(432, 104), Color("344147"))
+		_text(Vector2(18, 137), "No control applied", 20, MUTED)
+		return
 	# Leave room for rollout identity without changing the approved control layout.
 	draw_set_transform(Vector2(0, 26))
 	draw_line(Vector2(18, 78), Vector2(432, 78), Color("344147"))

@@ -291,6 +291,7 @@ func _ready() -> void:
 			get_tree().quit(2)
 			return
 		replay.apply_state(sim, replay.manifest.initial_state)
+		lap_time = sim.elapsed
 		paused = false
 	if not benchmark_path.is_empty():
 		benchmark = preload("res://scripts/control_benchmark.gd").new()
