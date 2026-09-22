@@ -3,6 +3,8 @@
 from dataclasses import replace
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -143,6 +145,58 @@ class ModelRuntimeTests(unittest.TestCase):
         _validate_loading_info(GEMMA4_SPEC, info)
         for key, expected in source.state_dict().items():
             self.assertTrue(torch.equal(expected, loaded.state_dict()[key]), key)
+
+    def test_bf16_accelerate_adapter_reload_preserves_logits(self):
+        # Accelerator precision is process global. A fresh interpreter prevents
+        # this CPU regression from changing the rest of the test suite's state.
+        result = subprocess.run(
+            [sys.executable, "-c", "from test_model_runtime import _check_bf16_reload; _check_bf16_reload()"],
+            cwd=Path(__file__).resolve().parent,
+            text=True, capture_output=True, timeout=90,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+def _check_bf16_reload():
+    import torch
+    from accelerate import Accelerator
+    from peft import LoraConfig, PeftModel, get_peft_model
+    from transformers import Gemma4ForCausalLM, Gemma4TextConfig
+    from model_runtime import inference_precision
+
+    torch.manual_seed(42)
+    config = Gemma4TextConfig(
+        vocab_size=32, hidden_size=16, intermediate_size=32, num_hidden_layers=2,
+        num_attention_heads=2, num_key_value_heads=1, head_dim=8, global_head_dim=8,
+        hidden_size_per_layer_input=4, vocab_size_per_layer_input=32,
+        layer_types=["sliding_attention", "full_attention"],
+    )
+    base = Gemma4ForCausalLM(config).to(torch.bfloat16)
+    original_weights = {key: value.clone() for key, value in base.state_dict().items()}
+    model = get_peft_model(base, LoraConfig(
+        r=2, lora_alpha=4, target_modules=["q_proj", "v_proj"], task_type="CAUSAL_LM",
+    ))
+    # Exercise actual nonzero adaptation, rather than the zero initialized B matrix.
+    for name, parameter in model.named_parameters():
+        if "lora_B" in name:
+            with torch.no_grad():
+                parameter.normal_(std=0.01)
+    accelerator = Accelerator(cpu=True, mixed_precision="bf16")
+    model = accelerator.prepare(model).eval()
+    inputs = torch.tensor([[2, 3, 4]])
+    with tempfile.TemporaryDirectory() as directory:
+        model.save_pretrained(directory)
+        restored_base = Gemma4ForCausalLM(config).to(torch.bfloat16)
+        restored_base.load_state_dict(original_weights)
+        reloaded = PeftModel.from_pretrained(restored_base, directory).eval()
+        with torch.inference_mode(), inference_precision(model):
+            expected = model(input_ids=inputs, logits_to_keep=1).logits
+        with torch.inference_mode(), inference_precision(reloaded):
+            actual = reloaded(input_ids=inputs, logits_to_keep=1).logits
+    assert expected.dtype == torch.float32
+    assert actual.dtype == torch.bfloat16
+    torch.testing.assert_close(expected.float(), actual.float(), rtol=1e-5, atol=1e-5)
+    assert (expected.float() - actual.float()).abs().max().item() == 0.0
 
 
 if __name__ == "__main__":

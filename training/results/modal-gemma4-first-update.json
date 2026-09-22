@@ -1,0 +1,37 @@
+{
+  "model": "google/gemma-4-E4B-it",
+  "revision": "ee0ef6023621cff504d758262d4e04895a5af4a2",
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "optimizer_steps": 1,
+  "sampled_rollouts": 16,
+  "max_adapter_delta": 9.999997928389348e-06,
+  "reloaded_logits_match": true,
+  "greedy_reward_before": 1.1518202400046818,
+  "greedy_reward_after": -9.64715912483336,
+  "greedy_return_improved": false,
+  "initial_adapter_sha256": "8cd93d5b931f874db226912c04ed2b4185dfb80890620a01a0411bb7bf8f25ca",
+  "current_adapter_sha256": "953b84e00e186acef8f91c565e8b4c2c9377072f9a4a66cbf218ac0294431439",
+  "all_recording_audits_passed": true,
+  "peak_cuda_allocated_bytes": 17287609856,
+  "versions": {
+    "torch": "2.14.0",
+    "transformers": "5.17.0",
+    "trl": "1.13.0",
+    "peft": "0.21.0"
+  },
+  "run_id": "gemma4-diagnostic-04",
+  "training_pipeline_verified": true,
+  "overall_diagnostic_passed": false,
+  "full_lap_completed": false,
+  "valid_sampled_rollouts": 7,
+  "after_evaluation": {
+    "actions": 8,
+    "sim_seconds": 0.8,
+    "reason": "invalid_model_action",
+    "success": false
+  },
+  "failure_completion": "control_bike 100 50 0",
+  "limitation": "One fixed moving segment, first action gradient only. An adapter update is not evidence of improved full lap driving.",
+  "source_summary": "artifacts/modal-gemma4-diagnostic-04-archive/gemma4-diagnostic-04/experiment/grpo/summary.json",
+  "source_summary_sha256": "4b80a98f5831bf2b3600468dcf54b4a67a1bdb5ef795afd1a9b17b074e71d329"
+}

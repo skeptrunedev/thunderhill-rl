@@ -1,5 +1,9 @@
 # Modal validation
 
+The first H100 trial completed one real TRL GRPO optimizer update with Gemma 4 E4B and 16 sampled rollouts. Seven sampled rollouts had no syntax or physical failure penalty. The learned adapter changed and passed a strict logits comparison after reload. However, the updated policy omitted a control argument after eight valid actions in its standing start evaluation. Its greedy segment reward decreased. This verifies the training pipeline, not improved driving or a completed lap. The overall diagnostic correctly failed. See [the recorded result](../training/results/modal-gemma4-first-update.json).
+
+Control format reliability must improve before a longer racing campaign. Each diagnostic attempt, including failed episodes, retains raw decisions, simulator recordings, and video jobs. The first trial used a fresh larger model adapter; it did not transfer the tiny model's learned driving behavior.
+
 The first cloud stage runs the larger Gemma diagnostic on one H100. It does not start a long training campaign or reuse the small model's adapter. The diagnostic must establish that the larger model can emit bike controls and perform an actual simulator rewarded update before scaling up.
 
 From the repository root:
@@ -27,7 +31,7 @@ Video jobs use relative recording paths, so they remain valid after downloading.
 
 ```bash
 python3 tools/render_video_queue.py \
-  artifacts/modal-gemma4-diagnostic-01 \
+  artifacts/modal-gemma4-diagnostic-01-archive \
   --godot /path/to/godot \
   --ffmpeg /path/to/ffmpeg
 ```
