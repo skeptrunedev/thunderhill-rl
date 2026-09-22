@@ -17,8 +17,11 @@ Artifacts live on the `thunderhill-runs-v2` Modal Volume, under the run ID. The 
 Inspect the run using the app URL printed by the CLI or `modal app logs` with its app ID. Download the entire run after completion, including failures:
 
 ```bash
-modal volume get thunderhill-runs-v2 gemma4-diagnostic-01 artifacts/modal-gemma4-diagnostic-01
+mkdir artifacts/modal-gemma4-diagnostic-01-archive
+modal volume get thunderhill-runs-v2 /gemma4-diagnostic-01 artifacts/modal-gemma4-diagnostic-01-archive
 ```
+
+Create the destination directory first. Modal CLI 1.5.4 maps entries incorrectly when downloading a directory into a destination that does not yet exist. The command above preserves the remote run directory inside the archive directory. Use a fresh archive destination when downloading again; do not overwrite prior artifacts.
 
 Video jobs use relative recording paths, so they remain valid after downloading. Render every queued episode locally using the existing archive command, supplying your Godot and FFmpeg executable paths:
 
