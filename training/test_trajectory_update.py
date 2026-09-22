@@ -14,6 +14,12 @@ from trajectory_update import TrajectoryConfig, TrajectoryUpdater
 
 class NativeTrajectoryTests(unittest.TestCase):
     def test_actual_native_generation_matches_trl_masked_likelihood_and_updates(self):
+        self.check_native_update(1.0)
+
+    def test_exploration_temperature_matches_native_training_likelihood(self):
+        self.check_native_update(3.0)
+
+    def check_native_update(self, temperature):
         from batched_policy import BatchedPolicy
         from model_runtime import GEMMA4_SPEC
         from native_tools import NativeBikeTools
@@ -30,19 +36,22 @@ class NativeTrajectoryTests(unittest.TestCase):
             max_position_embeddings=2048, attention_dropout=0.0,
             pad_token_id=tokenizer.pad_token_id, eos_token_id=50))
         constraint = NativeToolConstraint(tokenizer, len(tokenizer))
-        policy = BatchedPolicy(model, tokenizer, native_tools=native, constraints=constraint)
+        policy = BatchedPolicy(model, tokenizer, native_tools=native, constraints=constraint,
+                               temperature=temperature)
         decisions = policy.generate([native.prompt({"speed": 5}), native.prompt({"speed": 10})])
         episodes = [dict(reward=reward, decisions=[decision])
                     for reward, decision in zip((1.0, -1.0), decisions, strict=True)]
         with tempfile.TemporaryDirectory() as directory:
             updater = TrajectoryUpdater(model, tokenizer, directory,
-                TrajectoryConfig(max_actions=2, microbatch_size=2, max_completion_length=128),
+                TrajectoryConfig(max_actions=2, microbatch_size=2, max_completion_length=128,
+                                 temperature=temperature),
                 constraints=constraint)
             result = updater.update(episodes, generation=1)
         self.assertTrue(result["native_grammar_likelihoods"])
         self.assertLess(result["max_behavior_logp_difference"], 1e-5)
         self.assertGreater(result["parameter_delta_l1"], 0)
         self.assertEqual(result["eos_tokens"], 2)
+        self.assertEqual(result["temperature"], temperature)
 
 
 class TrajectoryTests(unittest.TestCase):
@@ -57,6 +66,12 @@ class TrajectoryTests(unittest.TestCase):
 
     def updater(self, model=None, batch=1):
         return TrajectoryUpdater(model or self.model, self.tokenizer, self.directory.name, TrajectoryConfig(max_actions=8, microbatch_size=batch))
+
+    def test_invalid_temperature_rejected(self):
+        for value in (0, -1, float("inf"), float("nan")):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "temperature"):
+                TrajectoryUpdater(self.model, self.tokenizer, self.directory.name,
+                                  TrajectoryConfig(max_actions=8, temperature=value))
 
     def decision(self, prompt, completion):
         self.model.eval()

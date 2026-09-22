@@ -133,6 +133,7 @@ def main():
     parser.add_argument("--time-budget-seconds", type=float, default=900)
     parser.add_argument("--batch-candidates", default="4,8,16,32,64")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--wandb-mode", choices=("offline", "online", "disabled"), default="offline")
     parser.add_argument("--wandb-project", default="thunderhill-rl")
     parser.add_argument("--wandb-entity")
@@ -142,6 +143,8 @@ def main():
     candidates = [int(v) for v in args.batch_candidates.split(",")]
     if not candidates or any(v < 3 for v in candidates):
         parser.error("Each batch needs one evaluation lane and at least two sampled rollouts")
+    if not math.isfinite(args.temperature) or args.temperature <= 0:
+        parser.error("Temperature must be finite and positive")
     args.output.mkdir(parents=True, exist_ok=False)
     set_seed(73)
     torch.set_num_threads(4)
@@ -168,18 +171,18 @@ def main():
     constraints = NativeToolConstraint(tokenizer, model.config.vocab_size, native_tools=road.native_tools)
     policy = BatchedPolicy(model, tokenizer, compile_inference=True,
                            compiled_prompt_length=1024, native_tools=road.native_tools,
-                           constraints=constraints)
+                           constraints=constraints, temperature=args.temperature)
     seconds = 20.0 if args.smoke else args.time_budget_seconds
     generations = 1 if args.smoke else args.generations
     updater = TrajectoryUpdater(model, tokenizer, args.output / "updates",
-                                TrajectoryConfig(max_actions=math.ceil(seconds * 10),
+                                TrajectoryConfig(max_actions=math.ceil(seconds * 10), temperature=args.temperature,
                                                  max_completion_length=road.native_tools.max_completion_length),
                                 constraints=constraints)
     current_hash = digest(args.adapter)
     manifest = {"model": spec.model, "revision": spec.revision, "initial_adapter_sha256": current_hash,
                 "training_method": "reinforcement_learning",
                 "initialization": "fresh_base_lora" if args.functiongemma else "existing_adapter",
-                "supervised_training_performed": False,
+                "supervised_training_performed": False, "temperature": args.temperature,
                 "generations_requested": generations, "time_budget_seconds": seconds,
                 "smoke_only": args.smoke, "generations": [], "complete": False,
                 "prompt_style": spec.prompt_style, "tools": road.native_tools.tools,

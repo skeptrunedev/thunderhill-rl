@@ -74,7 +74,10 @@ def cuda_graph_evidence(device):
 
 class BatchedPolicy:
     def __init__(self, model, tokenizer, *, compile_inference=False, compiled_prompt_length=None,
-                 native_tools=None, constraints=None):
+                 native_tools=None, constraints=None, temperature=1.0):
+        if not math.isfinite(temperature) or temperature <= 0:
+            raise ValueError("Sampling temperature must be finite and positive")
+        self.temperature = float(temperature)
         self.model = model
         self.tokenizer = tokenizer
         self.compile_inference = compile_inference
@@ -144,7 +147,7 @@ class BatchedPolicy:
             with torch.inference_mode(), inference_precision(self.model):
                 output = self.model.generate(
                     **inputs, max_new_tokens=self.max_completion_length, max_length=None, do_sample=True,
-                    temperature=1.0, top_p=1.0, top_k=0, repetition_penalty=1.0,
+                    temperature=self.temperature, top_p=1.0, top_k=0, repetition_penalty=1.0,
                     pad_token_id=tokenizer.pad_token_id, eos_token_id=self.stop_token_id,
                     use_cache=True, output_scores=True, return_dict_in_generate=True,
                     logits_processor=LogitsProcessorList(processors), **options,

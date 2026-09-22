@@ -25,6 +25,7 @@ class TrajectoryConfig:
     learning_rate: float = 1e-5
     max_completion_length: int = 32
     max_grad_norm: float = 1.0
+    temperature: float = 1.0
 
 
 class _TrajectoryLossTrainer(GRPOTrainer):
@@ -80,6 +81,8 @@ class TrajectoryUpdater:
             raise ValueError("Learning rate must be finite and positive")
         if not math.isfinite(config.max_grad_norm) or config.max_grad_norm <= 0:
             raise ValueError("Gradient norm limit must be finite and positive")
+        if not math.isfinite(config.temperature) or config.temperature <= 0:
+            raise ValueError("Training temperature must be finite and positive")
         self.model, self.tokenizer, self.config = model, tokenizer, config
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -95,7 +98,7 @@ class TrajectoryUpdater:
             gradient_accumulation_steps=1, steps_per_generation=1,
             max_completion_length=config.max_completion_length,
             loss_type="dr_grpo", scale_rewards="none", beta=0.0,
-            temperature=1.0, top_p=1.0, top_k=0,
+            temperature=config.temperature, top_p=1.0, top_k=0,
             gradient_checkpointing=False, bf16=False, fp16=False,
             use_cpu=model.device.type == "cpu", report_to="none",
             save_strategy="no", disable_dropout=True,
@@ -295,6 +298,7 @@ class TrajectoryUpdater:
             "method": "TRL Dr GRPO full episode stateless action replay",
             "trl_version": trl.__version__, "loss": loss_total,
             "native_grammar_likelihoods": self.trainer.native_constraints is not None,
+            "temperature": self.config.temperature,
             "episodes": len(episodes), "actions": len(rows), "generated_tokens": expected_tokens,
             "trained_tokens": tokens_seen, "later_actions": sum(r["action_index"] > 0 for r in rows),
             "eos_tokens": sum(r["completion_ids"][-1] == self.tokenizer.eos_token_id for r in rows),

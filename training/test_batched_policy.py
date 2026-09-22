@@ -56,6 +56,20 @@ class BatchedPolicyTests(unittest.TestCase):
         self.assertEqual(rows[0]["old_per_token_logps"], [0.0])
         self.assertTrue(all(v < 0 for v in rows[1]["old_per_token_logps"]))
 
+    def test_exploration_temperature_is_in_behavior_likelihood(self):
+        policy = BatchedPolicy(self.model, self.tokenizer, temperature=3.0)
+        row = policy.generate(["ride"])[0]
+        ids = row["completion_ids"]
+        with torch.no_grad():
+            logits = self.model(torch.tensor([row["prompt_ids"] + ids])).logits[0, :len(ids)]
+        expected = (logits / 3.0).log_softmax(-1).gather(1, torch.tensor(ids)[:, None])[:, 0]
+        torch.testing.assert_close(torch.tensor(row["old_per_token_logps"]), expected, atol=1e-5, rtol=1e-5)
+
+    def test_invalid_temperature_rejected(self):
+        for value in (0, -1, float("inf"), float("nan")):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "temperature"):
+                BatchedPolicy(self.model, self.tokenizer, temperature=value)
+
     def test_processor_leaves_sampled_row_unchanged_and_rejects_nonfinite(self):
         scores = torch.tensor([[1., 3., 2.], [5., 1., 2.]])
         actual = GreedyRows((0,))(torch.zeros(2, 1, dtype=torch.long), scores)

@@ -42,6 +42,7 @@ def parser():
     p.add_argument("--generations", type=int, default=3)
     p.add_argument("--time-budget-seconds", type=float, default=30)
     p.add_argument("--batch-candidates", default="4")
+    p.add_argument("--temperature", type=float, default=1.0)
     p.add_argument("--wandb-mode", choices=("offline", "online", "disabled"), default="online")
     p.add_argument("--wandb-project", default="thunderhill-rl")
     p.add_argument("--wandb-entity", default="skeptrune-org")
@@ -81,7 +82,8 @@ def run(args):
                    "--functiongemma", "--godot", args.godot, "--output", str(destination),
                    "--generations", str(args.generations), "--initial-generation", "0",
                    "--time-budget-seconds", str(args.time_budget_seconds),
-                   "--batch-candidates", args.batch_candidates, "--wandb-mode", args.wandb_mode,
+                   "--batch-candidates", args.batch_candidates, "--temperature", str(args.temperature),
+                   "--wandb-mode", args.wandb_mode,
                    "--wandb-project", args.wandb_project, "--wandb-entity", args.wandb_entity]
         log = logs / "rl.log"
         report.update(command=command, log=str(log), campaign_path=str(destination / "campaign.json"))
