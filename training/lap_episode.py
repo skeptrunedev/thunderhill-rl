@@ -79,8 +79,11 @@ class LapEpisode:
             if rollout < 1 or (rollout_count is not None and rollout_count < rollout):
                 raise ValueError("Rollout is one based and cannot exceed rollout_count")
             self.display.update(rollout_number=rollout, rollout_count=rollout_count or rollout)
+        self.parse_completion = getattr(road, "parse_completion", parse_action)
         self.worker_factory = worker_factory
         self.records = []
+        self._previous_completion = None
+        self._previous_features = None
         self.reason = None
         self.summary = None
         self._stack = ExitStack()
@@ -124,6 +127,16 @@ class LapEpisode:
     def prompt(self):
         if self.done:
             raise ValueError("Episode finished")
+        native = getattr(self.road, "native_tools", None)
+        if native is not None and self._previous_completion is not None:
+            # The receipt is an internal authorization detail attached by the
+            # harness. Everything else is actual tool output from the simulator.
+            response = {key: value for key, value in self.view.items()
+                        if key != "observation_token"}
+            return native.prompt(
+                self.view["road"], previous_completion=self._previous_completion,
+                previous_features=self._previous_features, tool_response=response,
+            )
         return self.road.prompt_features(self.view["road"])
 
     def apply(self, completion, completion_ids, prompt_ids, *, behavior_logprobs=None):
@@ -138,12 +151,15 @@ class LapEpisode:
                 raise ValueError("Behavior log probabilities must match completion tokens")
             row["behavior_logprobs"] = list(behavior_logprobs)
         try:
-            controls = parse_action(completion)
+            controls = self.parse_completion(completion)
         except ValueError as error:
             row["error"] = str(error)
             self.reason = "invalid_model_action"
         else:
+            before_features = self.view["road"]
             self.view = json.loads(self.env.control_bike(self.view["observation_token"], **controls))
+            self._previous_features = before_features
+            self._previous_completion = completion
             row.update(tick=self.observation["tick"], controls=controls)
             obs = self.observation
             if obs["terminated"] or obs["truncated"]:
@@ -181,7 +197,8 @@ class LapEpisode:
             audit = audit_lap(paths, episode_id=self.episode_id,
                               policy_id="interactive-step-" + self.policy_step,
                               track_sha256=self.road.track_sha256,
-                              final_observation=final, decisions=self.records)
+                              final_observation=final, decisions=self.records,
+                              parse_completion=self.parse_completion)
             summary.update(audit)
             if infrastructure_failure:
                 summary["infrastructure_failure"] = True

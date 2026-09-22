@@ -38,8 +38,30 @@ class _TrajectoryLossTrainer(GRPOTrainer):
         finally:
             self._trajectory_reference = None
 
-    def _get_per_token_logps_and_entropies(self, *args, **kwargs):
-        result = super()._get_per_token_logps_and_entropies(*args, **kwargs)
+    def _get_per_token_logps_and_entropies(self, model, input_ids, attention_mask,
+                                         logits_to_keep, **kwargs):
+        constraints = getattr(self, "native_constraints", None)
+        if constraints is None:
+            result = super()._get_per_token_logps_and_entropies(
+                model, input_ids, attention_mask, logits_to_keep, **kwargs)
+        else:
+            unsupported = {key: value for key, value in kwargs.items()
+                           if key not in ("compute_entropy", "compute_aux_loss", "batch_size")
+                           and value is not None}
+            if unsupported or kwargs.get("compute_aux_loss"):
+                raise ValueError("Native trajectory loss supports text only without auxiliary loss")
+            reference = getattr(self, "_trajectory_reference", None)
+            if reference is None:
+                raise ValueError("Native loss requires the original completion mask")
+            position_ids = attention_mask.long().cumsum(-1) - 1
+            position_ids.masked_fill_(attention_mask == 0, 1)
+            output = model(input_ids=input_ids, attention_mask=attention_mask, position_ids=position_ids,
+                           logits_to_keep=logits_to_keep + 1, use_cache=False)
+            logits = output.logits[:, :-1, :][:, -logits_to_keep:, :] / self.temperature
+            logps, entropy = constraints.log_probs(
+                logits, input_ids[:, -logits_to_keep:], reference[1],
+                compute_entropy=kwargs.get("compute_entropy", False))
+            result = logps, entropy, None
         reference = getattr(self, "_trajectory_reference", None)
         if reference is not None:
             old, mask = reference
@@ -49,7 +71,7 @@ class _TrajectoryLossTrainer(GRPOTrainer):
 
 
 class TrajectoryUpdater:
-    def __init__(self, model, tokenizer, output_dir, config: TrajectoryConfig):
+    def __init__(self, model, tokenizer, output_dir, config: TrajectoryConfig, *, constraints=None):
         if trl.__version__ != "1.13.0":
             raise RuntimeError("Trajectory loss integration requires TRL 1.13.0")
         if min(config.max_actions, config.microbatch_size, config.max_completion_length) < 1:
@@ -84,6 +106,7 @@ class TrajectoryUpdater:
             reward_funcs=lambda completions, **kwargs: [0.0] * len(completions),
         )
         self.trainer.current_gradient_accumulation_steps = 1
+        self.trainer.native_constraints = constraints
         self.optimizer = torch.optim.AdamW(self.parameters, lr=config.learning_rate, weight_decay=0.0)
 
     def rows(self, episodes):
@@ -271,6 +294,7 @@ class TrajectoryUpdater:
         return {
             "method": "TRL Dr GRPO full episode stateless action replay",
             "trl_version": trl.__version__, "loss": loss_total,
+            "native_grammar_likelihoods": self.trainer.native_constraints is not None,
             "episodes": len(episodes), "actions": len(rows), "generated_tokens": expected_tokens,
             "trained_tokens": tokens_seen, "later_actions": sum(r["action_index"] > 0 for r in rows),
             "eos_tokens": sum(r["completion_ids"][-1] == self.tokenizer.eos_token_id for r in rows),

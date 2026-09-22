@@ -16,7 +16,8 @@ from transformers import AutoTokenizer, set_seed
 
 from batched_policy import BatchedPolicy
 from lap_episode import LapEpisode
-from model_runtime import PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
+from model_runtime import GEMMA4_NATIVE_SPEC, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
+from native_constraints import NativeToolConstraint
 from trajectory_update import TrajectoryConfig, TrajectoryUpdater
 
 
@@ -67,6 +68,10 @@ def collect(policy, road, spec, godot, directory, adapter_hash, generation, coun
                 publish(directory / "progress.json", progress)
                 print(json.dumps(progress), flush=True)
         summaries = [episode.finish() for episode in episodes]
+        if getattr(road, "native_tools", None) is not None and any(
+            summary.get("reason") == "invalid_model_action" for summary in summaries
+        ):
+            raise ValueError("Native constrained generation produced an invalid tool call")
         training = []
         for episode, summary in zip(episodes[1:], summaries[1:], strict=True):
             if not summary["training_eligible"]:
@@ -125,21 +130,31 @@ def main():
     set_seed(73)
     torch.set_num_threads(4)
     spec = read_spec(args.adapter)
+    if spec != GEMMA4_NATIVE_SPEC:
+        raise ValueError("Full trajectory training requires a native tool adapter; migrate with train_lap_sft --native-tools first")
     tokenizer = AutoTokenizer.from_pretrained(args.adapter, padding_side="left")
     road = PolicyRoadTelemetry(spec, tokenizer)
     model = PeftModel.from_pretrained(load_base(spec), str(args.adapter), is_trainable=True)
     if any(p.requires_grad and ("lora_" not in n or p.dtype != torch.float32)
            for n, p in model.named_parameters()):
         raise ValueError("Only FP32 LoRA parameters may be trainable")
-    policy = BatchedPolicy(model, tokenizer, compile_inference=True)
+    constraints = NativeToolConstraint(tokenizer, model.config.vocab_size)
+    policy = BatchedPolicy(model, tokenizer, compile_inference=True,
+                           compiled_prompt_length=1024, native_tools=road.native_tools,
+                           constraints=constraints)
     seconds = 20.0 if args.smoke else args.time_budget_seconds
     generations = 1 if args.smoke else args.generations
     updater = TrajectoryUpdater(model, tokenizer, args.output / "updates",
-                                TrajectoryConfig(max_actions=math.ceil(seconds * 10)))
+                                TrajectoryConfig(max_actions=math.ceil(seconds * 10),
+                                                 max_completion_length=road.native_tools.max_completion_length),
+                                constraints=constraints)
     current_hash = digest(args.adapter)
     manifest = {"model": spec.model, "revision": spec.revision, "initial_adapter_sha256": current_hash,
                 "generations_requested": generations, "time_budget_seconds": seconds,
-                "smoke_only": args.smoke, "generations": [], "complete": False}
+                "smoke_only": args.smoke, "generations": [], "complete": False,
+                "prompt_style": spec.prompt_style, "tools": road.native_tools.tools,
+                "native_stop_token_id": road.native_tools.stop_token_id,
+                "constrained_sampling_and_training": True}
     publish(args.output / "campaign.json", manifest)
     # Obtain real prompt features from the identical simulator reset used below.
     # Even this short capacity probe is recorded and queued for video.

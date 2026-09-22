@@ -79,6 +79,22 @@ def main():
         comparison = compare_reference(model, tokenizer, args.reference_decisions, adapter_hash)
         (out / "precision-comparison.json").write_text(json.dumps(comparison, indent=2) + "\n")
         print(json.dumps({"precision_comparison": comparison}), flush=True)
+    if road.native_tools is not None:
+        from batched_policy import BatchedPolicy
+        from native_constraints import NativeToolConstraint
+        from train_full_lap_grpo import collect
+        policy = BatchedPolicy(model, tokenizer, compile_inference=args.compile,
+                               compiled_prompt_length=1024, native_tools=road.native_tools,
+                               constraints=NativeToolConstraint(tokenizer, model.config.vocab_size))
+        _, result, _ = collect(policy, road, spec, args.godot, out / "evaluation",
+                               adapter_hash, args.generation or 0, 0, args.max_actions / 10)
+        summary = {**result["evaluation"], "model": MODEL, "revision": REVISION,
+                   "adapter_sha256": adapter_hash, "inference_profile": args.inference_profile,
+                   "prompt_style": spec.prompt_style, "native_tools": True,
+                   "wall_seconds": result["elapsed_seconds"]}
+        (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+        print(json.dumps(summary), flush=True)
+        return
     stop_requested = False
 
     def request_stop(signum, frame):

@@ -17,6 +17,7 @@ def audit_lap(
     track_sha256,
     final_observation,
     decisions,
+    parse_completion=parse_action,
 ):
     """Raise on broken provenance; return success=False for an honestly failed lap.
 
@@ -70,13 +71,13 @@ def audit_lap(
                 "invalid completion was executed",
             )
             try:
-                parse_action(decision["completion"])
+                parse_completion(decision["completion"])
             except ValueError:
                 invalid_completion = True
             else:
                 require(False, "valid completion marked invalid")
             continue
-        controls = parse_action(decision["completion"])
+        controls = parse_completion(decision["completion"])
         require(
             controls == decision.get("controls"),
             "generated and submitted controls differ",

@@ -7,9 +7,42 @@ from unittest.mock import patch
 import torch
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
-from transformers import LlamaConfig, LlamaForCausalLM, PreTrainedTokenizerFast
+from transformers import AutoTokenizer, LlamaConfig, LlamaForCausalLM, PreTrainedTokenizerFast
 
 from trajectory_update import TrajectoryConfig, TrajectoryUpdater
+
+
+class NativeTrajectoryTests(unittest.TestCase):
+    def test_actual_native_generation_matches_trl_masked_likelihood_and_updates(self):
+        from batched_policy import BatchedPolicy
+        from model_runtime import GEMMA4_SPEC
+        from native_tools import NativeBikeTools
+        from native_constraints import NativeToolConstraint
+        torch.set_num_threads(1)
+        torch.manual_seed(8)
+        tokenizer = AutoTokenizer.from_pretrained(
+            GEMMA4_SPEC.model, revision=GEMMA4_SPEC.revision, local_files_only=True)
+        tokenizer.eos_token = "<|tool_response>"
+        native = NativeBikeTools(tokenizer)
+        model = LlamaForCausalLM(LlamaConfig(
+            vocab_size=len(tokenizer), hidden_size=8, intermediate_size=16,
+            num_hidden_layers=1, num_attention_heads=1, num_key_value_heads=1,
+            max_position_embeddings=2048, attention_dropout=0.0,
+            pad_token_id=tokenizer.pad_token_id, eos_token_id=50))
+        constraint = NativeToolConstraint(tokenizer, len(tokenizer))
+        policy = BatchedPolicy(model, tokenizer, native_tools=native, constraints=constraint)
+        decisions = policy.generate([native.prompt({"speed": 5}), native.prompt({"speed": 10})])
+        episodes = [dict(reward=reward, decisions=[decision])
+                    for reward, decision in zip((1.0, -1.0), decisions, strict=True)]
+        with tempfile.TemporaryDirectory() as directory:
+            updater = TrajectoryUpdater(model, tokenizer, directory,
+                TrajectoryConfig(max_actions=2, microbatch_size=2, max_completion_length=128),
+                constraints=constraint)
+            result = updater.update(episodes, generation=1)
+        self.assertTrue(result["native_grammar_likelihoods"])
+        self.assertLess(result["max_behavior_logp_difference"], 1e-5)
+        self.assertGreater(result["parameter_delta_l1"], 0)
+        self.assertEqual(result["eos_tokens"], 2)
 
 
 class TrajectoryTests(unittest.TestCase):

@@ -1,4 +1,50 @@
-# Local GPU validation
+# Training and GPU validation
+
+## Gemma 4 native tool calling
+
+New full trajectory campaigns require `gemma4_native_tools` adapters. The old
+compact text action protocol remains readable for historical artifacts, but
+`train_full_lap_grpo.py` refuses to train it. This migration follows Google's
+[native function calling protocol](https://ai.google.dev/gemma/docs/capabilities/text/function-calling-gemma4).
+
+`NativeBikeTools` passes a real `control_bike` function schema to Gemma's pinned
+chat template. The model generates `<|tool_call>call:control_bike{...}<tool_call|>`
+and hands execution to the simulator with `<|tool_response>` (token 50). Each
+subsequent decision receives the actual previous call and simulator tool result.
+Only the latest interaction is retained, keeping context bounded across laps.
+Road telemetry is privileged simulator information. No teacher controls or
+replacement actions are used during evaluation or rollouts.
+
+XGrammar constrains the four integer arguments and complete native envelope.
+The same allowed token distribution is used in sampling and differentiable TRL
+Dr GRPO likelihoods. Constrained validity is a property of decoding, not evidence
+that the unconstrained model has learned flawless syntax. Steering remains in
+thousandths and pedal inputs in percent, preserving the existing action space.
+The 128 token limit covers even character tokenization of the full call.
+All raw native completions, sampled token likelihoods, original prompts, simulator
+transitions and video jobs remain recorded.
+
+Migrate a preserved adapter, then validate actual native calls and one complete
+trajectory update on the H100:
+
+```sh
+modal run --detach training/modal_app.py \
+  --stage native-tools-validation \
+  --run-id gemma4-native-tools-validation-01 \
+  --source-run gemma4-full-lap-campaign-01 \
+  --source-checkpoint checkpoint-0003
+```
+
+This runs 100 supervised format migration steps, then short Godot rollouts and
+an actual RL update. It verifies source hashes, preserved demonstration controls,
+native completion labels, constrained training, and checkpoint reloads. It does
+not establish full lap driving quality. The resulting checkpoint is under
+`experiment/native-smoke/checkpoint-0001`. Later full campaigns can select it
+with `--source-checkpoint native-smoke/checkpoint-0001 --initial-generation 1`.
+Every launch requires a unique run ID. CUDA graphs and memory capacity are
+qualified again for the larger native prompts and completions.
+
+## Historical local GPU validation
 
 Use Hugging Face TRL as the primary training framework, with PEFT adapters.
 The interactive [bike harness](HARNESS.md) now uses `GRPOTrainer.environment_factory`.

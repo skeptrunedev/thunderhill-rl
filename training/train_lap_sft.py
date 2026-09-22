@@ -12,6 +12,8 @@ from peft import LoraConfig, PeftModel
 from lap_policy import RoadTelemetry, parse_action
 from model_runtime import (
     LEGACY_SPEC,
+    GEMMA4_SPEC,
+    GEMMA4_NATIVE_SPEC,
     PolicyRoadTelemetry,
     inference_precision,
     load_base,
@@ -44,8 +46,15 @@ def prepare_dataset(path, tokenizer, spec, max_length):
                     f"{path.name} row {index}: unrecognized telemetry prompt"
                 )
             prompt = road.prompt_features(features)
-        parse_action(row["completion"])
-        completion = row["completion"] + tokenizer.eos_token
+        controls = parse_action(row["completion"])
+        completion = (
+            road.native_tools.completion_from_controls(controls)
+            if spec.prompt_style == "gemma4_native_tools"
+            else row["completion"] + tokenizer.eos_token
+        )
+        if spec.prompt_style == "gemma4_native_tools":
+            if road.parse_completion(completion) != controls:
+                raise ValueError(f"{path.name} row {index}: native conversion changed controls")
         kwargs = {} if spec.prompt_style == "raw" else {"add_special_tokens": False}
         prompt_ids = tokenizer(prompt, **kwargs)["input_ids"]
         tokens = tokenizer(prompt + completion, **kwargs)["input_ids"]
@@ -90,6 +99,15 @@ def verify_completion_labels(trainer, source):
         raise ValueError("TRL collator altered supervised completion labels")
 
 
+def training_spec(adapter, native_tools):
+    source = read_spec(adapter) if adapter else LEGACY_SPEC
+    if native_tools:
+        if adapter is None or source not in (GEMMA4_SPEC, GEMMA4_NATIVE_SPEC):
+            raise ValueError("Native tool migration requires a pinned Gemma4 source adapter")
+        return GEMMA4_NATIVE_SPEC
+    return source
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dataset", type=Path, required=True)
@@ -100,19 +118,22 @@ def main():
     p.add_argument(
         "--adapter", type=Path, help="Continue supervised training from this adapter"
     )
+    p.add_argument("--native-tools", action="store_true",
+                   help="Migrate a Gemma4 adapter to its native tool calling format")
     args = p.parse_args()
+    spec = training_spec(args.adapter, args.native_tools)
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
     assert torch.cuda.is_available()
     set_seed(71)
     torch.cuda.reset_peak_memory_stats()
-    spec = read_spec(args.adapter) if args.adapter else LEGACY_SPEC
     tokenizer = AutoTokenizer.from_pretrained(spec.model, revision=spec.revision)
     tokenizer.padding_side = "right"
     model = load_base(spec)
     if args.adapter:
         model = PeftModel.from_pretrained(model, args.adapter, is_trainable=True)
-    max_length = 256 if spec.prompt_style == "raw" else 512
+    max_length = (1024 if spec.prompt_style == "gemma4_native_tools"
+                  else 256 if spec.prompt_style == "raw" else 512)
     train_data = prepare_dataset(
         args.dataset / "train.jsonl", tokenizer, spec, max_length
     )
@@ -182,6 +203,11 @@ def main():
         "method": "supervised warmstart, not RL",
         "model": spec.model,
         "revision": spec.revision,
+        "prompt_style": spec.prompt_style,
+        "source_prompt_style": read_spec(args.adapter).prompt_style if args.adapter else None,
+        "maximum_train_tokens": max(map(len, train_data["input_ids"])),
+        "maximum_eval_tokens": max(map(len, eval_data["input_ids"])),
+        "supervision_controls_preserved": True,
         "reloaded_logits_match": True,
         "completion_masks_verified": True,
         "max_length": max_length,

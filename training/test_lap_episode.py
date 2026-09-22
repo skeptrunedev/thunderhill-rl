@@ -44,6 +44,35 @@ class NativeEpisodeTests(unittest.TestCase):
                           model="collector-test", revision="test", generation=1, rollout=1,
                           time_budget_seconds=0.2)
 
+    def test_native_tool_feedback_uses_latest_actual_result(self):
+        from transformers import AutoTokenizer
+        from model_runtime import GEMMA4_NATIVE_SPEC, PolicyRoadTelemetry
+        tokenizer = AutoTokenizer.from_pretrained(GEMMA4_NATIVE_SPEC.model,
+            revision=GEMMA4_NATIVE_SPEC.revision, local_files_only=True)
+        road = PolicyRoadTelemetry(GEMMA4_NATIVE_SPEC, tokenizer)
+        root = Path(tempfile.mkdtemp(prefix="native-tool-collector-",
+            dir=Path(__file__).resolve().parents[1] / "artifacts"))
+        completion = road.native_tools.completion_from_controls(
+            {"steer": 0, "throttle": 0.3, "front_brake": 0, "rear_brake": 0})
+        ids = tokenizer(completion, add_special_tokens=False)["input_ids"]
+        with LapEpisode(godot=os.environ["THUNDERHILL_GODOT"], output=root / "episode",
+                        road=road, adapter_sha256="b" * 64, model="native-collector-test",
+                        revision="test", generation=1, rollout=1, time_budget_seconds=0.3) as episode:
+            self.assertNotIn("<|tool_response>", episode.prompt())
+            for index in range(3):
+                prompt = episode.prompt()
+                if index:
+                    self.assertEqual(prompt.count("<|tool_call>"), 1)
+                    self.assertEqual(prompt.count("<|tool_response>"), 1)
+                    self.assertIn(f"tick:{index * 12}", prompt)
+                    self.assertNotIn("observation_token", prompt)
+                    self.assertTrue(prompt.endswith("<tool_response|>"))
+                episode.apply(completion, ids, tokenizer(prompt, add_special_tokens=False)["input_ids"])
+            self.assertTrue(episode.done)
+        self.assertEqual(episode.summary["recorded_transitions"], 36)
+        self.assertTrue(episode.summary["training_eligible"])
+        self.assertEqual(len(list((root / "episode" / "video_jobs").glob("*.json"))), 1)
+
     def test_complete_budget_and_malformed_and_exception_are_archived(self):
         root = Path(tempfile.mkdtemp(prefix="lap-collector-native-", dir=Path(__file__).resolve().parents[1] / "artifacts"))
         with self.episode(root, "budget") as episode:

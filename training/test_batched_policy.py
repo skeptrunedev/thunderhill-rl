@@ -8,7 +8,7 @@ import torch
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
-from transformers import GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
+from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
 from batched_policy import BatchedPolicy, GreedyRows, cuda_graph_evidence
 
@@ -112,6 +112,45 @@ class BatchedPolicyTests(unittest.TestCase):
                 self.policy.generate(["ride"], greedy_indices=indices)
         with self.assertRaisesRegex(ValueError, "requires CUDA"):
             self.policy.profile(["ride"])
+
+
+class NativeBatchedPolicyTests(unittest.TestCase):
+    def test_actual_transformer_native_batch_and_fresh_matcher(self):
+        from model_runtime import GEMMA4_SPEC
+        from native_tools import NativeBikeTools
+        tokenizer = AutoTokenizer.from_pretrained(
+            GEMMA4_SPEC.model, revision=GEMMA4_SPEC.revision, local_files_only=True,
+        )
+        native = NativeBikeTools(tokenizer)
+        model = GPT2LMHeadModel(GPT2Config(
+            vocab_size=len(tokenizer), n_positions=2048, n_embd=8, n_layer=1, n_head=1,
+            bos_token_id=None, eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.pad_token_id, resid_pdrop=0, embd_pdrop=0, attn_pdrop=0,
+        )).eval()
+        policy = BatchedPolicy(model, tokenizer, native_tools=native)
+        self.assertEqual(policy.compiled_prompt_length, 1024)
+        self.assertEqual(policy.stop_token_id, 50)
+        self.assertEqual(policy.max_completion_length, 128)
+        # Random tiny weights exercise the constraint, including arbitrary
+        # subword splits. This is generation, not a mocked output string.
+        prompts = [native.prompt({"speed": 0}), native.prompt({"speed": 10, "lateral": 0})]
+        previous_threads = torch.get_num_threads()
+        torch.set_num_threads(1)
+        try:
+            rows = policy.generate(prompts, greedy_indices=(0,))
+            second = policy.generate(prompts[:1])
+        finally:
+            torch.set_num_threads(previous_threads)
+        for row in rows + second:
+            native.parse_completion(row["completion"])
+            self.assertEqual(row["completion_ids"][0], 48)
+            self.assertEqual(row["completion_ids"][-2:], [49, 50])
+            self.assertLessEqual(len(row["completion_ids"]), 128)
+            self.assertTrue(all(torch.isfinite(torch.tensor(row["old_per_token_logps"]))))
+            self.assertEqual(len(row["completion_ids"]), len(row["old_per_token_logps"]))
+        self.assertTrue(all(value == 0 for value in rows[0]["old_per_token_logps"]))
+        self.assertTrue(any(value < 0 for value in rows[1]["old_per_token_logps"]))
+        self.assertEqual(rows[0]["prompt_ids"], tokenizer.encode(prompts[0], add_special_tokens=False))
 
 
 if __name__ == "__main__":

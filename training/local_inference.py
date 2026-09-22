@@ -15,7 +15,7 @@ from peft import PeftModel
 from transformers import LogitsProcessor
 
 from lap_policy import parse_action
-from model_runtime import GEMMA4_SPEC, load_base
+from model_runtime import GEMMA4_NATIVE_SPEC, GEMMA4_SPEC, load_base
 
 
 class FiniteLogits(LogitsProcessor):
@@ -26,7 +26,7 @@ class FiniteLogits(LogitsProcessor):
 
 
 def load_local_policy(spec, adapter):
-    if spec != GEMMA4_SPEC:
+    if spec not in (GEMMA4_SPEC, GEMMA4_NATIVE_SPEC):
         raise ValueError("The local FP16 profile requires the pinned Gemma4 model")
     if not torch.cuda.is_available():
         raise ValueError("The local FP16 profile requires CUDA")
@@ -71,6 +71,12 @@ def compare_reference(model, tokenizer, path, adapter_hash, count=12):
                       for i in range(samples)}) if samples > 1 else [0]
     results = []
     started = time.monotonic()
+    native = tokenizer.eos_token_id == 50
+    if native:
+        from native_tools import NativeBikeTools
+        from native_constraints import NativeToolConstraint
+        tools = NativeBikeTools(tokenizer)
+        constraints = NativeToolConstraint(tokenizer, model.config.vocab_size)
     for index in indices:
         row = rows[index]
         inputs = tokenizer(row["prompt"], return_tensors="pt").to("cuda")
@@ -79,13 +85,14 @@ def compare_reference(model, tokenizer, path, adapter_hash, count=12):
             if not torch.isfinite(logits).all():
                 raise RuntimeError("Nonfinite logits in local inference")
             output = model.generate(
-                **inputs, max_new_tokens=32, max_length=None, do_sample=False,
+                **inputs, max_new_tokens=tools.max_completion_length if native else 32, max_length=None, do_sample=False,
                 pad_token_id=tokenizer.pad_token_id, eos_token_id=tokenizer.eos_token_id,
-                logits_processor=[FiniteLogits()],
+                logits_processor=[FiniteLogits(), constraints.logits_processor()] if native else [FiniteLogits()],
             )
-        text = tokenizer.decode(output[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-        controls = parse_action(text)
-        expected = parse_action(row["completion"])
+        text = tokenizer.decode(output[0, inputs["input_ids"].shape[1]:], skip_special_tokens=not native)
+        parse = tools.parse_completion if native else parse_action
+        controls = parse(text)
+        expected = parse(row["completion"])
         results.append({"source_action_index": row["action_index"],
                         "reference": row["completion"], "local": text,
                         "controls_match": controls == expected})

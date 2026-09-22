@@ -17,11 +17,12 @@ from model_runtime import inference_precision
 class GreedyRows(LogitsProcessor):
     """Validate raw logits, then constrain only explicitly excluded eval rows."""
 
-    def __init__(self, indices=()):
+    def __init__(self, indices=(), *, validate_raw=True):
         self.indices = tuple(indices)
+        self.validate_raw = validate_raw
 
     def __call__(self, input_ids, scores):
-        if not torch.isfinite(scores).all():
+        if self.validate_raw and not torch.isfinite(scores).all():
             raise FloatingPointError("Nonfinite batched model logits")
         if self.indices:
             rows = torch.tensor(self.indices, device=scores.device)
@@ -29,6 +30,15 @@ class GreedyRows(LogitsProcessor):
             scores = scores.clone()
             scores[rows] = -torch.inf
             scores[rows, chosen] = 0
+        return scores
+
+
+class FiniteModelScores(LogitsProcessor):
+    """Check model outputs before a grammar intentionally inserts negative inf."""
+
+    def __call__(self, input_ids, scores):
+        if not torch.isfinite(scores).all():
+            raise FloatingPointError("Nonfinite batched model logits")
         return scores
 
 
@@ -63,19 +73,32 @@ def cuda_graph_evidence(device):
 
 
 class BatchedPolicy:
-    def __init__(self, model, tokenizer, *, compile_inference=False, compiled_prompt_length=256):
+    def __init__(self, model, tokenizer, *, compile_inference=False, compiled_prompt_length=None,
+                 native_tools=None, constraints=None):
         self.model = model
         self.tokenizer = tokenizer
         self.compile_inference = compile_inference
         self.compile_qualified = False
-        self.compiled_prompt_length = compiled_prompt_length
+        self.native_tools = native_tools
+        if native_tools is not None and constraints is None:
+            from native_constraints import NativeToolConstraint
+            constraints = NativeToolConstraint(tokenizer, model.config.vocab_size)
+        if constraints is not None and native_tools is None:
+            raise ValueError("Native constraints require the native tool protocol")
+        self.constraints = constraints
+        self.max_completion_length = native_tools.max_completion_length if native_tools else 32
+        self.compiled_prompt_length = compiled_prompt_length if compiled_prompt_length is not None else (1024 if native_tools else 256)
         if tokenizer.pad_token_id is None or tokenizer.eos_token_id is None:
             raise ValueError("Explicit padding and EOS token IDs are required")
         if compile_inference and model.device.type != "cuda":
             raise ValueError("Compiled generation requires CUDA")
-        if compiled_prompt_length <= 0:
+        if self.compiled_prompt_length <= 0:
             raise ValueError("Compiled prompt length must be positive")
         tokenizer.padding_side = "left"
+
+    @property
+    def stop_token_id(self):
+        return self.native_tools.stop_token_id if self.native_tools else self.tokenizer.eos_token_id
 
     def _qualify_compilation(self, generated_steps):
         if not self.compile_inference or generated_steps <= 1:
@@ -96,28 +119,35 @@ class BatchedPolicy:
         ):
             raise ValueError("Greedy row indices must be unique and within the batch")
         tokenizer = self.tokenizer
-        inputs = tokenizer(prompts, padding=True, truncation=False, return_tensors="pt")
+        tokenize_options = {"add_special_tokens": False} if self.native_tools else {}
+        inputs = tokenizer(prompts, padding=True, truncation=False, return_tensors="pt", **tokenize_options)
         if self.compile_inference:
             if inputs["input_ids"].shape[1] > self.compiled_prompt_length:
                 raise ValueError("Prompt exceeds compiled width; prompts are never truncated")
             inputs = tokenizer(prompts, padding="max_length", max_length=self.compiled_prompt_length,
-                               truncation=False, return_tensors="pt")
+                               truncation=False, return_tensors="pt", **tokenize_options)
         inputs = inputs.to(self.model.device)
         width = inputs["input_ids"].shape[1]
         options = {}
         if self.compile_inference:
-            options = dict(cache_implementation="static", max_cache_len=width + 32,
+            options = dict(cache_implementation="static", max_cache_len=width + self.max_completion_length,
                            compile_config=CompileConfig(fullgraph=True, dynamic=True, mode="reduce-overhead"))
+        processors = [GreedyRows(greedy_indices)]
+        if self.constraints is not None:
+            # Finite checks inspect raw logits. The grammar then masks illegal
+            # choices, and greedy evaluation selects among legal choices only.
+            processors = [FiniteModelScores(), self.constraints.logits_processor(),
+                          GreedyRows(greedy_indices, validate_raw=False)]
         was_training = self.model.training
         self.model.eval()
         try:
             with torch.inference_mode(), inference_precision(self.model):
                 output = self.model.generate(
-                    **inputs, max_new_tokens=32, max_length=None, do_sample=True,
+                    **inputs, max_new_tokens=self.max_completion_length, max_length=None, do_sample=True,
                     temperature=1.0, top_p=1.0, top_k=0, repetition_penalty=1.0,
-                    pad_token_id=tokenizer.pad_token_id, eos_token_id=tokenizer.eos_token_id,
+                    pad_token_id=tokenizer.pad_token_id, eos_token_id=self.stop_token_id,
                     use_cache=True, output_scores=True, return_dict_in_generate=True,
-                    logits_processor=LogitsProcessorList([GreedyRows(greedy_indices)]), **options,
+                    logits_processor=LogitsProcessorList(processors), **options,
                 )
         finally:
             self.model.train(was_training)
@@ -134,15 +164,18 @@ class BatchedPolicy:
         result = []
         for row in range(len(prompts)):
             ids = tokens[row].tolist()
-            if tokenizer.eos_token_id in ids:
-                ids = ids[:ids.index(tokenizer.eos_token_id) + 1]
+            if self.stop_token_id in ids:
+                ids = ids[:ids.index(self.stop_token_id) + 1]
             likelihoods = [values[row] for values in logps[:len(ids)]]
             if not all(math.isfinite(value) for value in likelihoods):
                 raise FloatingPointError("Nonfinite selected behavior log probability")
+            completion = tokenizer.decode(ids, skip_special_tokens=self.native_tools is None)
+            if self.native_tools is not None:
+                self.native_tools.parse_completion(completion)
             result.append({
                 "prompt_ids": inputs["input_ids"][row][inputs["attention_mask"][row].bool()].tolist(),
                 "completion_ids": ids,
-                "completion": tokenizer.decode(ids, skip_special_tokens=True),
+                "completion": completion,
                 "old_per_token_logps": likelihoods,
             })
         return result
@@ -179,7 +212,7 @@ class BatchedPolicy:
                         for row in outputs:
                             tokens += len(row["completion_ids"])
                             try:
-                                parse_action(row["completion"])
+                                (self.native_tools.parse_completion if self.native_tools else parse_action)(row["completion"])
                                 valid += 1
                             except ValueError:
                                 pass

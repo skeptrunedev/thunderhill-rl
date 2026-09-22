@@ -27,6 +27,9 @@ GEMMA4_SPEC = ModelSpec(
     "bfloat16",
     "gemma4_chat",
 )
+GEMMA4_NATIVE_SPEC = ModelSpec(
+    GEMMA4_SPEC.model, GEMMA4_SPEC.revision, GEMMA4_SPEC.dtype, "gemma4_native_tools"
+)
 SPEC_FILENAME = "model_spec.json"
 GEMMA4_KEY_MAPPING = {r"^model\.language_model\.": "model."}
 GEMMA4_UNUSED_PREFIXES = (
@@ -47,7 +50,7 @@ LORA_TARGET_MODULES = (
 
 
 def _validate(spec: ModelSpec) -> ModelSpec:
-    if spec not in (LEGACY_SPEC, GEMMA4_SPEC):
+    if spec not in (LEGACY_SPEC, GEMMA4_SPEC, GEMMA4_NATIVE_SPEC):
         raise ValueError(f"Unsupported model specification: {spec}")
     return spec
 
@@ -91,8 +94,8 @@ def load_base(spec: ModelSpec, device: str = "cuda", *, dtype: str | None = None
     from transformers import AutoModelForCausalLM, Gemma4ForCausalLM
 
     _validate(spec)
-    loader = Gemma4ForCausalLM if spec == GEMMA4_SPEC else AutoModelForCausalLM
-    kwargs = {"key_mapping": GEMMA4_KEY_MAPPING} if spec == GEMMA4_SPEC else {}
+    loader = Gemma4ForCausalLM if spec in (GEMMA4_SPEC, GEMMA4_NATIVE_SPEC) else AutoModelForCausalLM
+    kwargs = {"key_mapping": GEMMA4_KEY_MAPPING} if spec in (GEMMA4_SPEC, GEMMA4_NATIVE_SPEC) else {}
     model, info = loader.from_pretrained(
         spec.model,
         revision=spec.revision,
@@ -108,7 +111,7 @@ def load_base(spec: ModelSpec, device: str = "cuda", *, dtype: str | None = None
 
 def _validate_loading_info(spec: ModelSpec, info: dict) -> None:
     unexpected = info.get("unexpected_keys", ())
-    if spec == GEMMA4_SPEC:
+    if spec in (GEMMA4_SPEC, GEMMA4_NATIVE_SPEC):
         unexpected = [
             key for key in unexpected if not key.startswith(GEMMA4_UNUSED_PREFIXES)
         ]
@@ -134,7 +137,12 @@ class PolicyRoadTelemetry(RoadTelemetry):
         super().__init__(**kwargs)
         self.spec = _validate(spec)
         self.tokenizer = tokenizer
-        if self.spec == GEMMA4_SPEC:
+        self.native_tools = None
+        if self.spec == GEMMA4_NATIVE_SPEC:
+            from native_tools import NativeBikeTools
+            self.native_tools = NativeBikeTools(tokenizer)
+            tokenizer.eos_token = "<|tool_response>"
+        elif self.spec == GEMMA4_SPEC:
             # The pinned chat template ends turns with <turn|> (106). Both
             # rollout generation and TRL completion masking use tokenizer EOS.
             # The base tokenizer's <eos> (1) alone does not end a chat answer.
@@ -143,6 +151,8 @@ class PolicyRoadTelemetry(RoadTelemetry):
             tokenizer.eos_token = "<turn|>"
 
     def prompt_features(self, features: dict) -> str:
+        if self.native_tools is not None:
+            return self.native_tools.prompt(features)
         raw = super().prompt_features(features)
         if self.spec.prompt_style == "raw":
             return raw
@@ -162,3 +172,9 @@ class PolicyRoadTelemetry(RoadTelemetry):
             add_generation_prompt=True,
             enable_thinking=False,
         )
+
+    def parse_completion(self, completion):
+        if self.native_tools is not None:
+            return self.native_tools.parse_completion(completion)
+        from lap_policy import parse_action
+        return parse_action(completion)
