@@ -30,6 +30,12 @@ GEMMA4_SPEC = ModelSpec(
 GEMMA4_NATIVE_SPEC = ModelSpec(
     GEMMA4_SPEC.model, GEMMA4_SPEC.revision, GEMMA4_SPEC.dtype, "gemma4_native_tools"
 )
+FUNCTIONGEMMA_SPEC = ModelSpec(
+    "google/functiongemma-270m-it",
+    "39eccb091651513a5dfb56892d3714c1b5b8276c",
+    "float32",
+    "functiongemma_native_tools",
+)
 SPEC_FILENAME = "model_spec.json"
 GEMMA4_KEY_MAPPING = {r"^model\.language_model\.": "model."}
 GEMMA4_UNUSED_PREFIXES = (
@@ -50,7 +56,7 @@ LORA_TARGET_MODULES = (
 
 
 def _validate(spec: ModelSpec) -> ModelSpec:
-    if spec not in (LEGACY_SPEC, GEMMA4_SPEC, GEMMA4_NATIVE_SPEC):
+    if spec not in (LEGACY_SPEC, GEMMA4_SPEC, GEMMA4_NATIVE_SPEC, FUNCTIONGEMMA_SPEC):
         raise ValueError(f"Unsupported model specification: {spec}")
     return spec
 
@@ -138,7 +144,11 @@ class PolicyRoadTelemetry(RoadTelemetry):
         self.spec = _validate(spec)
         self.tokenizer = tokenizer
         self.native_tools = None
-        if self.spec == GEMMA4_NATIVE_SPEC:
+        if self.spec == FUNCTIONGEMMA_SPEC:
+            from functiongemma_tools import FunctionGemmaBikeTools
+            self.native_tools = FunctionGemmaBikeTools(tokenizer)
+            tokenizer.eos_token = self.native_tools.tool_stop
+        elif self.spec == GEMMA4_NATIVE_SPEC:
             from native_tools import NativeBikeTools
             self.native_tools = NativeBikeTools(tokenizer)
             tokenizer.eos_token = "<|tool_response>"

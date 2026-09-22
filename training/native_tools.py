@@ -29,13 +29,19 @@ class NativeBikeTools:
     """
 
     max_completion_length = 128
+    tool_start = TOOL_START
+    tool_end = TOOL_END
+    tool_stop = TOOL_STOP
+    action_version = ACTION_VERSION
 
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
-        for token, expected in ((TOOL_START, 48), (TOOL_END, 49), (TOOL_STOP, 50)):
+        for token, expected in ((self.tool_start, 48), (self.tool_end, 49), (self.tool_stop, 50)):
             if tokenizer.convert_tokens_to_ids(token) != expected:
                 raise ValueError(f"Unexpected Gemma 4 native tool token: {token}")
-        self.stop_token_id = tokenizer.convert_tokens_to_ids(TOOL_STOP)
+        self.start_token_id = tokenizer.convert_tokens_to_ids(self.tool_start)
+        self.end_token_id = tokenizer.convert_tokens_to_ids(self.tool_end)
+        self.stop_token_id = tokenizer.convert_tokens_to_ids(self.tool_stop)
         descriptions = {
             "steer_milli": "Steering input, integer from -1000 to 1000. Balance assistance is enabled.",
             "throttle_percent": "Throttle, integer from 0 to 100 percent.",
@@ -99,16 +105,20 @@ class NativeBikeTools:
         json.dumps(tool_response, allow_nan=False)
         controls = self.parse_completion(previous_completion)
         messages = self.messages(previous_features)
-        messages.append(self.assistant_message(controls, tool_response))
+        messages.extend(self.feedback_messages(controls, tool_response))
         return self._render(messages, add_generation_prompt=True)
 
-    @staticmethod
-    def parse_completion(raw: str) -> dict:
+    def feedback_messages(self, controls: dict, response: dict) -> list[dict]:
+        return [self.assistant_message(controls, response)]
+
+    @classmethod
+    def parse_completion(cls, raw: str) -> dict:
         """Validate the whole native envelope before producing physical controls."""
         if not isinstance(raw, str):
             raise ValueError("Native tool completion must be text")
         match = re.fullmatch(
-            r"\s*<\|tool_call>call:control_bike\{([^{}]*)\}<tool_call\|><\|tool_response>\s*",
+            r"\s*" + re.escape(cls.tool_start) + r"call:control_bike\{([^{}]*)\}"
+            + re.escape(cls.tool_end + cls.tool_stop) + r"\s*",
             raw,
         )
         if match is None:

@@ -15,8 +15,8 @@ from native_tools import ARGUMENTS, NativeBikeTools
 
 
 class NativeToolConstraint:
-    def __init__(self, tokenizer, vocab_size):
-        self.tools = NativeBikeTools(tokenizer)
+    def __init__(self, tokenizer, vocab_size, *, native_tools=None):
+        self.tools = native_tools if native_tools is not None else NativeBikeTools(tokenizer)
         self.vocab_size = vocab_size
         # Keep the explicit integer grammar coupled to the dispatch schema.
         bounds = {name: (values[2], values[3]) for name, values in ARGUMENTS.items()}
@@ -28,9 +28,10 @@ class NativeToolConstraint:
         )
         # The handoff token is the grammar's stop token, not part of its body.
         # Token macros require the real reserved IDs rather than lookalike text.
-        grammar = '''root ::= Token(48) "call:control_bike{front_brake_percent:" pedal ",rear_brake_percent:" pedal ",steer_milli:" steer ",throttle_percent:" pedal "}" Token(49)
+        grammar = '''root ::= Token(START_ID) "call:control_bike{front_brake_percent:" pedal ",rear_brake_percent:" pedal ",steer_milli:" steer ",throttle_percent:" pedal "}" Token(END_ID)
 pedal ::= "0" | [1-9] [0-9]? | "100"
 steer ::= "0" | "-"? ([1-9] [0-9]? [0-9]? | "1000")'''
+        grammar = grammar.replace("START_ID", str(self.tools.start_token_id)).replace("END_ID", str(self.tools.end_token_id))
         self.compiled = xgr.GrammarCompiler(info).compile_grammar(grammar)
         # Bound retained prefixes for long campaigns. Each entry stores only
         # permitted IDs, not a dense vocabulary-sized mask.

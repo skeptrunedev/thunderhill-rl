@@ -82,7 +82,7 @@ class BatchedPolicy:
         self.native_tools = native_tools
         if native_tools is not None and constraints is None:
             from native_constraints import NativeToolConstraint
-            constraints = NativeToolConstraint(tokenizer, model.config.vocab_size)
+            constraints = NativeToolConstraint(tokenizer, model.config.vocab_size, native_tools=native_tools)
         if constraints is not None and native_tools is None:
             raise ValueError("Native constraints require the native tool protocol")
         self.constraints = constraints

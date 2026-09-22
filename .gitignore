@@ -1,6 +1,7 @@
 .venv/
 __pycache__/
 .pytest_cache/
+wandb/
 artifacts/
 godot/.godot/
 godot/builds/

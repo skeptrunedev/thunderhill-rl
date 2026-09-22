@@ -11,13 +11,13 @@ from pathlib import Path
 import time
 
 import torch
-from peft import PeftModel
+from peft import LoraConfig, PeftModel, get_peft_model
 from transformers import AutoTokenizer, set_seed
 
 from batched_policy import BatchedPolicy
 from lap_episode import LapEpisode
 from experiment_tracking import ExperimentTracker
-from model_runtime import GEMMA4_NATIVE_SPEC, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
+from model_runtime import FUNCTIONGEMMA_SPEC, GEMMA4_NATIVE_SPEC, LORA_TARGET_MODULES, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
 from native_constraints import NativeToolConstraint
 from trajectory_update import TrajectoryConfig, TrajectoryUpdater
 
@@ -101,7 +101,8 @@ def save_checkpoint(model, tokenizer, spec, updater, directory, prompt):
     write_spec(directory, spec)
     torch.save(updater.optimizer.state_dict(), directory / "optimizer.pt")
     model.eval()
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    tokenize_options = {"add_special_tokens": False} if spec and spec.prompt_style.endswith("native_tools") else {}
+    inputs = tokenizer(prompt, return_tensors="pt", **tokenize_options).to(model.device)
     with torch.inference_mode(), inference_precision(model):
         expected = model(**inputs, logits_to_keep=1).logits[:, -1].float().cpu()
     # A separately named adapter exercises PEFT's real deserializer, while keeping
@@ -122,7 +123,9 @@ def save_checkpoint(model, tokenizer, spec, updater, directory, prompt):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--adapter", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--adapter", type=Path)
+    source.add_argument("--functiongemma", action="store_true", help="Start native gameplay RL from the pinned base with a fresh LoRA")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--godot", required=True)
     parser.add_argument("--generations", type=int, default=3)
@@ -136,19 +139,33 @@ def main():
     args = parser.parse_args()
     if args.generations < 1 or args.time_budget_seconds <= 0:
         parser.error("Positive generation count and episode budget required")
+    candidates = [int(v) for v in args.batch_candidates.split(",")]
+    if not candidates or any(v < 3 for v in candidates):
+        parser.error("Each batch needs one evaluation lane and at least two sampled rollouts")
     args.output.mkdir(parents=True, exist_ok=False)
     set_seed(73)
     torch.set_num_threads(4)
-    spec = read_spec(args.adapter)
-    if spec != GEMMA4_NATIVE_SPEC:
-        raise ValueError("Full trajectory training requires a native tool adapter; migrate with train_lap_sft --native-tools first")
-    tokenizer = AutoTokenizer.from_pretrained(args.adapter, padding_side="left")
+    spec = FUNCTIONGEMMA_SPEC if args.functiongemma else read_spec(args.adapter)
+    if spec not in (GEMMA4_NATIVE_SPEC, FUNCTIONGEMMA_SPEC):
+        raise ValueError("Full trajectory training requires a native tool model specification")
+    tokenizer = AutoTokenizer.from_pretrained(
+        spec.model if args.functiongemma else args.adapter,
+        **({"revision": spec.revision} if args.functiongemma else {}), padding_side="left")
     road = PolicyRoadTelemetry(spec, tokenizer)
-    model = PeftModel.from_pretrained(load_base(spec), str(args.adapter), is_trainable=True)
+    if args.functiongemma:
+        model = get_peft_model(load_base(spec), LoraConfig(
+            r=16, lora_alpha=32, lora_dropout=0, task_type="CAUSAL_LM",
+            target_modules=list(LORA_TARGET_MODULES)))
+        args.adapter = args.output / "initial-adapter"
+        model.save_pretrained(args.adapter)
+        tokenizer.save_pretrained(args.adapter)
+        write_spec(args.adapter, spec)
+    else:
+        model = PeftModel.from_pretrained(load_base(spec), str(args.adapter), is_trainable=True)
     if any(p.requires_grad and ("lora_" not in n or p.dtype != torch.float32)
            for n, p in model.named_parameters()):
         raise ValueError("Only FP32 LoRA parameters may be trainable")
-    constraints = NativeToolConstraint(tokenizer, model.config.vocab_size)
+    constraints = NativeToolConstraint(tokenizer, model.config.vocab_size, native_tools=road.native_tools)
     policy = BatchedPolicy(model, tokenizer, compile_inference=True,
                            compiled_prompt_length=1024, native_tools=road.native_tools,
                            constraints=constraints)
@@ -160,9 +177,13 @@ def main():
                                 constraints=constraints)
     current_hash = digest(args.adapter)
     manifest = {"model": spec.model, "revision": spec.revision, "initial_adapter_sha256": current_hash,
+                "training_method": "reinforcement_learning",
+                "initialization": "fresh_base_lora" if args.functiongemma else "existing_adapter",
+                "supervised_training_performed": False,
                 "generations_requested": generations, "time_budget_seconds": seconds,
                 "smoke_only": args.smoke, "generations": [], "complete": False,
                 "prompt_style": spec.prompt_style, "tools": road.native_tools.tools,
+                "action_version": road.native_tools.action_version,
                 "native_stop_token_id": road.native_tools.stop_token_id,
                 "constrained_sampling_and_training": True}
     publish(args.output / "campaign.json", manifest)
@@ -174,9 +195,8 @@ def main():
                         adapter_sha256=current_hash, model=spec.model, revision=spec.revision,
                         generation=args.initial_generation, rollout=1, time_budget_seconds=.1) as probe:
             prompt = probe.prompt()
-            candidates = [int(v) for v in args.batch_candidates.split(",")]
             if args.smoke:
-                candidates = [4, 8]
+                candidates = [value for value in candidates if value <= 8]
             profile = policy.profile([prompt], candidates=candidates)
             publish(args.output / "inference-profile.json", profile)
             if profile["selected_batch_size"] is None:

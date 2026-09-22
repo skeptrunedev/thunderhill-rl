@@ -85,7 +85,8 @@ def main():
         from train_full_lap_grpo import collect
         policy = BatchedPolicy(model, tokenizer, compile_inference=args.compile,
                                compiled_prompt_length=1024, native_tools=road.native_tools,
-                               constraints=NativeToolConstraint(tokenizer, model.config.vocab_size))
+                               constraints=NativeToolConstraint(tokenizer, model.config.vocab_size,
+                                                                native_tools=road.native_tools))
         _, result, _ = collect(policy, road, spec, args.godot, out / "evaluation",
                                adapter_hash, args.generation or 0, 0, args.max_actions / 10)
         summary = {**result["evaluation"], "model": MODEL, "revision": REVISION,
