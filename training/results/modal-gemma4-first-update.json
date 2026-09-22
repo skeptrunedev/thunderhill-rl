@@ -33,5 +33,26 @@
   "failure_completion": "control_bike 100 50 0",
   "limitation": "One fixed moving segment, first action gradient only. An adapter update is not evidence of improved full lap driving.",
   "source_summary": "artifacts/modal-gemma4-diagnostic-04-archive/gemma4-diagnostic-04/experiment/grpo/summary.json",
-  "source_summary_sha256": "4b80a98f5831bf2b3600468dcf54b4a67a1bdb5ef795afd1a9b17b074e71d329"
+  "source_summary_sha256": "4b80a98f5831bf2b3600468dcf54b4a67a1bdb5ef795afd1a9b17b074e71d329",
+  "video_archive": {
+    "complete": true,
+    "episodes": 21,
+    "raw_recording_hashes_verified": 21,
+    "mp4_hashes_verified": 21,
+    "root": "artifacts/modal-gemma4-diagnostic-04-archive/gemma4-diagnostic-04",
+    "indexes": [
+      {
+        "path": "experiment/after/videos/index.json",
+        "sha256": "bf9eddd0a2485f215d92a189b0baf77a43207ebebf84b44b7eedf3fc22e1be24"
+      },
+      {
+        "path": "experiment/before/videos/index.json",
+        "sha256": "0bd2aa99a0c95445d50e7cee6975885f26872404563158a8b702e73277b3e923"
+      },
+      {
+        "path": "experiment/grpo/videos/index.json",
+        "sha256": "a4b53bf5d1fade10ccf881c9fc9c9f735d18fd642a54e69f9a46c5e26bb171cc"
+      }
+    ]
+  }
 }
