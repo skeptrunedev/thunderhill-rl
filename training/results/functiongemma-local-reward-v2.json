@@ -1,0 +1,423 @@
+{
+  "snapshot_utc": "2026-09-22T23:39:50.265091+00:00",
+  "status": "complete",
+  "campaign_complete": true,
+  "final_evaluation_status": "complete",
+  "source": "artifacts/functiongemma-local-rl-reward-v2-01/rl/campaign.json",
+  "model": "google/functiongemma-270m-it",
+  "revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+  "training_method": "reinforcement_learning",
+  "initialization": "fresh_base_lora",
+  "supervised_training_performed": false,
+  "temperature": 3.0,
+  "episode_budget_seconds": 30.0,
+  "sampled_rollouts_per_generation": 3,
+  "reward": {
+    "reward_version": "audited-legal-progress-v2",
+    "progress_meters_per_reward": 100.0,
+    "failure_penalty": 0.2
+  },
+  "comparison": {
+    "baseline": "artifacts/functiongemma-local-rl-02/rl/campaign.json",
+    "same_initial_adapter_sha256": "1c6c0caba036f994057bfd7674a8bfe3aaf2e99d8eb2838b715f57a63d299398",
+    "current_seed": 73,
+    "first_generation_sequences": [
+      {
+        "rollout": 0,
+        "evaluation": true,
+        "decisions": 300,
+        "native_completions_token_ids_controls_and_ticks_equal": true,
+        "sequence_sha256": "b83699fd05c31f6ed59d113678b2f89db6130064dd60c85142e96f35b61626b6"
+      },
+      {
+        "rollout": 1,
+        "evaluation": false,
+        "decisions": 88,
+        "native_completions_token_ids_controls_and_ticks_equal": true,
+        "sequence_sha256": "8674d93411473cce4f063ab8e2e662da3af4b240a82c6b55c1ef5446f8470e22"
+      },
+      {
+        "rollout": 2,
+        "evaluation": false,
+        "decisions": 44,
+        "native_completions_token_ids_controls_and_ticks_equal": true,
+        "sequence_sha256": "7a8db476d2ec397f80d2f727f4b4f133c4b583f5382e520dda969fc5f4f3ea14"
+      },
+      {
+        "rollout": 3,
+        "evaluation": false,
+        "decisions": 80,
+        "native_completions_token_ids_controls_and_ticks_equal": true,
+        "sequence_sha256": "262619661f1ca741e18c19aa25ff81ae5815b95745c8bbfec80b8c20c5bfbf70"
+      }
+    ],
+    "interpretation": "First generation gameplay is identical. Changed rewards alter subsequent optimizer updates and sampled trajectories; reward magnitudes across versions are not directly comparable."
+  },
+  "generations": [
+    {
+      "collection_generation": 0,
+      "updated_generation": 1,
+      "source": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0000/collection.json",
+      "sampled_rollouts": 3,
+      "mean_legal_progress_m": 29.08385303347801,
+      "best_legal_progress_m": 40.500529899052495,
+      "legal_progress_m": [
+        40.500529899052495,
+        17.03267222149622,
+        29.71835697988532
+      ],
+      "outcomes": {
+        "track_limits": 2,
+        "crash": 1
+      },
+      "completed_laps": 0,
+      "rewards": [
+        0.20500529899052494,
+        -0.02967327778503781,
+        0.09718356979885318
+      ],
+      "greedy_evaluation": {
+        "reason": "episode_tick_limit",
+        "success": false,
+        "actions": 300,
+        "legal_progress_m": -0.0008353232031187798
+      },
+      "update": {
+        "method": "TRL Dr GRPO full episode stateless action replay",
+        "trl_version": "1.13.0",
+        "loss": -0.001826390363930841,
+        "native_grammar_likelihoods": true,
+        "temperature": 3.0,
+        "episodes": 3,
+        "actions": 212,
+        "generated_tokens": 8611,
+        "trained_tokens": 8611,
+        "later_actions": 209,
+        "eos_tokens": 212,
+        "prompt_tokens_in_loss": 0,
+        "padding_tokens_in_loss": 0,
+        "fixed_normalizer": 115200,
+        "max_behavior_logp_difference": 8.440017700195312e-05,
+        "rewards": [
+          0.20500529899052494,
+          -0.02967327778503781,
+          0.09718356979885318
+        ],
+        "advantages": [
+          0.11416676865574484,
+          -0.12051180811981792,
+          0.006345039464073068
+        ],
+        "optimizer_steps": 1,
+        "generation": 1,
+        "gradient_norm": 0.0031204454135149717,
+        "parameter_delta_l1": 18.816471084952354
+      },
+      "checkpoint": "artifacts/functiongemma-local-rl-reward-v2-01/rl/checkpoint-0001",
+      "checkpoint_sha256": "631bb1b635002e0f157d63df85ae3cef8409ca458e681828988002d3bb40e4e6",
+      "checkpoint_reload_verified": true,
+      "baseline_mean_legal_progress_m": 29.08385303347801,
+      "baseline_best_legal_progress_m": 40.500529899052495,
+      "baseline_rewards": [
+        -0.9912067502834315,
+        -0.996301960972921,
+        -0.9935477156782492
+      ]
+    },
+    {
+      "collection_generation": 1,
+      "updated_generation": 2,
+      "source": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0001/collection.json",
+      "sampled_rollouts": 3,
+      "mean_legal_progress_m": 28.903334309993426,
+      "best_legal_progress_m": 32.71117396795537,
+      "legal_progress_m": [
+        32.491681901833815,
+        32.71117396795537,
+        21.507147060191098
+      ],
+      "outcomes": {
+        "track_limits": 3
+      },
+      "completed_laps": 0,
+      "rewards": [
+        0.12491681901833812,
+        0.1271117396795537,
+        0.015071470601910969
+      ],
+      "greedy_evaluation": {
+        "reason": "episode_tick_limit",
+        "success": false,
+        "actions": 300,
+        "legal_progress_m": -0.0038731352869634103
+      },
+      "update": {
+        "method": "TRL Dr GRPO full episode stateless action replay",
+        "trl_version": "1.13.0",
+        "loss": 0.002532737795263529,
+        "native_grammar_likelihoods": true,
+        "temperature": 3.0,
+        "episodes": 3,
+        "actions": 569,
+        "generated_tokens": 23695,
+        "trained_tokens": 23695,
+        "later_actions": 566,
+        "eos_tokens": 569,
+        "prompt_tokens_in_loss": 0,
+        "padding_tokens_in_loss": 0,
+        "fixed_normalizer": 115200,
+        "max_behavior_logp_difference": 8.630752563476562e-05,
+        "rewards": [
+          0.12491681901833812,
+          0.1271117396795537,
+          0.015071470601910969
+        ],
+        "advantages": [
+          0.03588347591840385,
+          0.03807839657961942,
+          -0.0739618724980233
+        ],
+        "optimizer_steps": 1,
+        "generation": 2,
+        "gradient_norm": 0.0020283085759729147,
+        "parameter_delta_l1": 13.54526869324036
+      },
+      "checkpoint": "artifacts/functiongemma-local-rl-reward-v2-01/rl/checkpoint-0002",
+      "checkpoint_sha256": "1550a7a11cb2af1f053e735ad22cd7f90cc8108ccd9fbf330b62016327690b58",
+      "checkpoint_reload_verified": true,
+      "baseline_mean_legal_progress_m": 37.817186096519016,
+      "baseline_best_legal_progress_m": 56.7234036628695,
+      "baseline_rewards": [
+        -0.9915565436898726,
+        0.012315469808038163,
+        -0.9961269549992583
+      ]
+    },
+    {
+      "collection_generation": 2,
+      "updated_generation": 3,
+      "source": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0002/collection.json",
+      "sampled_rollouts": 3,
+      "mean_legal_progress_m": 23.916720474151653,
+      "best_legal_progress_m": 27.474713355730287,
+      "legal_progress_m": [
+        17.35266768824555,
+        26.92278037847912,
+        27.474713355730287
+      ],
+      "outcomes": {
+        "track_limits": 3
+      },
+      "completed_laps": 0,
+      "rewards": [
+        -0.026473323117544523,
+        0.06922780378479121,
+        0.07474713355730284
+      ],
+      "greedy_evaluation": {
+        "reason": "episode_tick_limit",
+        "success": false,
+        "actions": 300,
+        "legal_progress_m": -1.9107194853368816
+      },
+      "update": {
+        "method": "TRL Dr GRPO full episode stateless action replay",
+        "trl_version": "1.13.0",
+        "loss": -0.0021748108065366978,
+        "native_grammar_likelihoods": true,
+        "temperature": 3.0,
+        "episodes": 3,
+        "actions": 454,
+        "generated_tokens": 18760,
+        "trained_tokens": 18760,
+        "later_actions": 451,
+        "eos_tokens": 454,
+        "prompt_tokens_in_loss": 0,
+        "padding_tokens_in_loss": 0,
+        "fixed_normalizer": 115200,
+        "max_behavior_logp_difference": 6.389617919921875e-05,
+        "rewards": [
+          -0.026473323117544523,
+          0.06922780378479121,
+          0.07474713355730284
+        ],
+        "advantages": [
+          -0.06564052785906102,
+          0.030060599043274704,
+          0.03557992881578633
+        ],
+        "optimizer_steps": 1,
+        "generation": 3,
+        "gradient_norm": 0.001402003224939108,
+        "parameter_delta_l1": 10.3930842326954
+      },
+      "checkpoint": "artifacts/functiongemma-local-rl-reward-v2-01/rl/checkpoint-0003",
+      "checkpoint_sha256": "08a59c3c340b8e1c32b20b7cc6a525268b8943a239e0f9286be36ebb442cf2a8",
+      "checkpoint_reload_verified": true,
+      "baseline_mean_legal_progress_m": 25.55313964306478,
+      "baseline_best_legal_progress_m": 32.885101264872844,
+      "baseline_rewards": [
+        0.007139830221911112,
+        -0.9945117816147286,
+        -0.9959841820836679
+      ]
+    }
+  ],
+  "totals": {
+    "optimizer_updates": 3,
+    "sampled_actions_trained": 1235,
+    "trained_tokens": 51066,
+    "verified_native_calls_in_completed_generation_collections": 2135,
+    "verified_native_calls_including_final_evaluation": 2435,
+    "invalid_native_calls": 0,
+    "verified_recordings_and_video_jobs_including_capacity_probe": 14
+  },
+  "wandb": {
+    "mode": "online",
+    "run_id": "hyh7nf1a",
+    "run_directory": "/home/skeptrune/git_projects/morph/thunderhill-rl/artifacts/functiongemma-local-rl-reward-v2-01/rl/tracking/wandb/run-20260922_160658-hyh7nf1a/files",
+    "project": "thunderhill-rl",
+    "entity": "skeptrune-org",
+    "url": "https://wandb.ai/skeptrune-org/thunderhill-rl/runs/hyh7nf1a",
+    "api_verified": true,
+    "api_state_at_verification": "finished"
+  },
+  "stall_termination": {
+    "applied_in_campaign": false,
+    "reason": "Training process started before stall cutoff implementation. Saved completed evaluations end at episode_tick_limit, not stalled.",
+    "separate_native_checkpoint_verification": {
+      "status": "passed",
+      "source": "artifacts/functiongemma-stall-evaluation-01/summary.json",
+      "reason": "stalled",
+      "actions": 100,
+      "physics_ticks": 1200,
+      "sim_seconds": 10.0000000000001,
+      "stall_config": {
+        "grace_ticks": 600,
+        "window_ticks": 600,
+        "minimum_progress_m": 1.0
+      },
+      "stall_diagnostic": {
+        "start_tick": 600,
+        "end_tick": 1200,
+        "window_ticks": 600,
+        "start_legal_distance_m": -0.243898139354537,
+        "end_legal_distance_m": -0.612062929853996,
+        "legal_progress_m": -0.36816479049945905,
+        "minimum_progress_m": 1.0,
+        "stalled": true
+      },
+      "recording_provenance_verified": true,
+      "video_source_hash_verified": true,
+      "training_eligible": true,
+      "additional_failure_penalty": 0,
+      "same_first_100_native_calls_as_uncut_evaluation": true,
+      "optimizer_updates": 0,
+      "wandb_url": "https://wandb.ai/skeptrune-org/thunderhill-rl/runs/7xy98uhp",
+      "wandb_metrics_verified": true,
+      "video": "artifacts/functiongemma-stall-evaluation-01/evaluation/rollout-0000/videos/11acd769bd255b05ebb521de128746662192c412c18a9e7112433bac9bf780ec/attempt-0001/run.mp4",
+      "video_sha256": "8b7980a56c9c950ae88b8c75966982430ad2a16f036cb818a74c05beab3eefe1",
+      "video_render_verified": true
+    }
+  },
+  "caveats": [
+    "No completed lap; no valid lap time or racing speed improvement claim.",
+    "Sampled mean progress declines across all three collections. Greedy final evaluation requests zero throttle and drifts backward. Reward changes alone have not established driving skill.",
+    "Only one seed and three sampled rollouts per generation; no robust comparative improvement claim.",
+    "All 14 source recordings and queued video jobs have verified hashes. Video rendering status is a snapshot; only completed receipts have verified movie hashes.",
+    "Campaign did not apply stall termination. Separate checkpoint evaluation of the new stall cutoff remains pending."
+  ],
+  "final_evaluation": {
+    "reason": "episode_tick_limit",
+    "success": false,
+    "actions": 300,
+    "recording_provenance_verified": true,
+    "legal_progress_m": -1.9107194853368816,
+    "reward": -0.019107194853368818,
+    "maximum_requested_throttle": 0.0,
+    "positive_throttle_action_count": 0,
+    "maximum_speed_m_s": 0.0756496197444646,
+    "maximum_absolute_longitudinal_velocity_m_s": 0.0756496197444646,
+    "decision_source": "artifacts/functiongemma-local-rl-reward-v2-01/rl/final-evaluation/rollout-0000/decisions.jsonl",
+    "physics_source": "/home/skeptrune/git_projects/morph/thunderhill-rl/artifacts/functiongemma-local-rl-reward-v2-01/rl/final-evaluation/rollout-0000/environment/data/godot/app_userdata/Thunderhill/runs/1790119763_3188910/1790119763_3188910_2.jsonl"
+  },
+  "videos": {
+    "snapshot_status_counts": {
+      "complete": 3,
+      "render_attempt_in_progress_or_incomplete": 1,
+      "pending": 10
+    },
+    "jobs": [
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/capacity-probe/video_jobs/09d57f0527b704ff834155d20c51fdc31850874fdc395b0aa4452f438e6d13cb.json",
+        "source_sha256_verified": true,
+        "status": "complete"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/final-evaluation/rollout-0000/video_jobs/b2d7b50149386ef53fff9a07b2bb6c671f151719ab3a411e71ab6ff7fa061b41.json",
+        "source_sha256_verified": true,
+        "status": "complete"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0000/rollout-0000/video_jobs/afefcda97e8fcfa3689bb08ac6000dc85293909e94f9a87b6e536a5897bedb4b.json",
+        "source_sha256_verified": true,
+        "status": "complete"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0000/rollout-0001/video_jobs/0831a1f157371f9bdf5245a1c5931fcb84ec7d227ebd7afbd639d546d36e1c76.json",
+        "source_sha256_verified": true,
+        "status": "render_attempt_in_progress_or_incomplete"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0000/rollout-0002/video_jobs/d636499989f867c660228871bcbeeddd3206961709195b56f925fc8b2e9b5ca5.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0000/rollout-0003/video_jobs/240504a6e404512de216d57b4df0fc4e3a7187655ba6706eb38836a357b74d77.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0001/rollout-0000/video_jobs/388ccea4a6bee984c2720c3e24d1085384e64818d4facedfa89e6f9c7a0f3380.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0001/rollout-0001/video_jobs/116ae3855faa93b6e5622a4703509595089eb2fa93074d4152f4083991b06efb.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0001/rollout-0002/video_jobs/ad818cc34a02749360495e882600233c0f155844fa9c87c0d4ed3bfb6c831862.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0001/rollout-0003/video_jobs/2bdd1611316a0b1c4c2e3a641dff4a9d135fabff62de952017752126b9a1d4fd.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0002/rollout-0000/video_jobs/fec1ae7a590fc62a2064bddc19b184225bbff86b8397fd0608d9da7831b951ce.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0002/rollout-0001/video_jobs/b6c8e60671c2b27012ec0df2307c963cb808f2839f4d98b460df1e8a5b054d9c.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0002/rollout-0002/video_jobs/ec45580a26960f664eef483efeac824d285cc2ad96a8e98dce56873c1ef5b873.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      },
+      {
+        "job": "artifacts/functiongemma-local-rl-reward-v2-01/rl/generation-0002/rollout-0003/video_jobs/67ad1f0ce09211e645e58a505e04e4a1918ce52ff3de164dd2221898fb157cc7.json",
+        "source_sha256_verified": true,
+        "status": "pending"
+      }
+    ]
+  }
+}
