@@ -1,8 +1,10 @@
 # Modal validation
 
+Gemma 4 E4B now completes 300 consecutive valid controls both after supervised warm starting and after one subsequent GRPO update on an H100. Both evaluations cover 30 simulator seconds with zero offtrack ticks. All 16 sampled rollouts in the moving segment RL update use valid controls. Both learned adapters pass a strict saved and reloaded logits comparison. This validates the tested control sequence, not general syntax guarantees or a full lap. See [the control reliability result](../training/results/modal-gemma4-control-reliability.json).
+
 The first H100 trial completed one real TRL GRPO optimizer update with Gemma 4 E4B and 16 sampled rollouts. Seven sampled rollouts had no syntax or physical failure penalty. The learned adapter changed and passed a strict logits comparison after reload. However, the updated policy omitted a control argument after eight valid actions in its standing start evaluation. Its greedy segment reward decreased. This verifies the training pipeline, not improved driving or a completed lap. The overall diagnostic correctly failed. See [the recorded result](../training/results/modal-gemma4-first-update.json).
 
-Control format reliability must improve before a longer racing campaign. Each diagnostic attempt, including failed episodes, retains raw decisions, simulator recordings, and video jobs. The first trial used a fresh larger model adapter; it did not transfer the tiny model's learned driving behavior.
+Each diagnostic attempt, including failed episodes, retains raw decisions, simulator recordings, and video jobs. The first trial used a fresh larger model adapter; it did not transfer the tiny model's learned driving behavior.
 
 The first cloud stage runs the larger Gemma diagnostic on one H100. It does not start a long training campaign or reuse the small model's adapter. The diagnostic must establish that the larger model can emit bike controls and perform an actual simulator rewarded update before scaling up.
 

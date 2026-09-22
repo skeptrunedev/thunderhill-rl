@@ -1,0 +1,125 @@
+{
+  "model": "google/gemma-4-E4B-it",
+  "revision": "ee0ef6023621cff504d758262d4e04895a5af4a2",
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "control_reliability_validation_passed": true,
+  "full_lap_completed": false,
+  "supervised_warmstart": {
+    "steps": 100,
+    "learning_rate": 0.0001,
+    "adapter_sha256": "04293286be759b3b9ab249752741e58ab4346c008ceaa4142f0278e0ea0f57cc",
+    "train_data_sha256": "9d6e50e66594ff5be8b01da9d1a4d84fb5c3e11786bd7834827d92a0f8f64154",
+    "eval_data_sha256": "2ca49419361c9ccb6ac0d058a231da46d369984e9c085c105ed458b1c09ffc40",
+    "manifest_sha256": "0f01cf6443acf567ce16ac56936a8a566588725d8770b103e271b86f617f8209",
+    "completion_masks_verified": true,
+    "reloaded_logits_match": true
+  },
+  "rl": {
+    "optimizer_steps": 1,
+    "sampled_rollouts": 16,
+    "max_adapter_delta": 1.0000541806221008e-05,
+    "initial_adapter_sha256": "04293286be759b3b9ab249752741e58ab4346c008ceaa4142f0278e0ea0f57cc",
+    "current_adapter_sha256": "d7f3fc08a7a02cd7841d5503678bee2453bb261f838dac12f1bf23ca75773ef3",
+    "reloaded_logits_match": true,
+    "greedy_reward_before": 7.694172323775099,
+    "greedy_reward_after": 7.701527171959688,
+    "greedy_reward_delta": 0.007354848184588647,
+    "all_recording_audits_passed": true,
+    "valid_sampled_rollouts": 16,
+    "unique_sampled_rewards": 5,
+    "prefix_actions": 200
+  },
+  "evaluations": {
+    "before_rl": {
+      "actions": 300,
+      "sim_seconds": 29.9999999999989,
+      "reason": "episode_tick_limit",
+      "offtrack_ticks": 0,
+      "gates": [
+        1
+      ],
+      "recorded_transitions": 3600,
+      "recording_provenance_verified": true,
+      "adapter_sha256": "04293286be759b3b9ab249752741e58ab4346c008ceaa4142f0278e0ea0f57cc",
+      "teacher_used_at_inference": false,
+      "independent_local_audit_passed": true,
+      "decisions_sha256": "cce67dec786b70aa1b544b0700ae1e123258ef4adaa8c83a84a82d7945a725e6",
+      "recording_sha256": "ef4186875a54b2af67d0b919958eb2308ea6268850ad044a720b58e5917c8fb0"
+    },
+    "after_rl": {
+      "actions": 300,
+      "sim_seconds": 29.9999999999989,
+      "reason": "episode_tick_limit",
+      "offtrack_ticks": 0,
+      "gates": [
+        1
+      ],
+      "recorded_transitions": 3600,
+      "recording_provenance_verified": true,
+      "adapter_sha256": "d7f3fc08a7a02cd7841d5503678bee2453bb261f838dac12f1bf23ca75773ef3",
+      "teacher_used_at_inference": false,
+      "independent_local_audit_passed": true,
+      "decisions_sha256": "7520cc3b2522ccba4208b164b75b8317aca1099956e5dd0b2cda404a25c94ff8",
+      "recording_sha256": "1eb561bf902fd738a0f7f87b32808595f923a48c23ae269ab71d0e7bb9eaf4ff"
+    }
+  },
+  "limitations": "Two deterministic 30 second standing start evaluations, one before and one after RL, with privileged road telemetry. One fixed moving segment and first action gradient only. No full lap or robust racing performance claim. Supervised demonstrations teach conservative behavior as well as control syntax.",
+  "discarded_probe": {
+    "run_id": "gemma4-warmstart-01",
+    "reason": "All 16 starting line samples had identical actions and rewards, so group advantages and optimizer delta were zero. Strict validation rejected this as an RL update.",
+    "sampled_action": "control_bike 0 65 0 0",
+    "sampled_reward": 3.6603853780172453
+  },
+  "sources": [
+    {
+      "path": "artifacts/modal-gemma4-warmstart-01-archive/gemma4-warmstart-01/experiment/warmstart/summary.json",
+      "sha256": "3585322d24ae318a55f611514a9a8b6481d9d6f91125636b08b14332432b5945"
+    },
+    {
+      "path": "artifacts/modal-gemma4-warmstart-rl-01-archive/gemma4-warmstart-rl-01/experiment/grpo/summary.json",
+      "sha256": "576ea7ebfed8c83a1ca9a76660563e78c91aa03e8157f8136b833dc73f57eb63"
+    },
+    {
+      "path": "artifacts/modal-gemma4-warmstart-rl-01-archive/gemma4-warmstart-rl-01/experiment/diagnostic.json",
+      "sha256": "2fc216a911052a5c70571dfbb98c3062491fc831904b4d124b921332dfb6b62d"
+    }
+  ],
+  "video_archives": [
+    {
+      "run_id": "gemma4-warmstart-01",
+      "root": "artifacts/modal-gemma4-warmstart-01-archive/gemma4-warmstart-01",
+      "complete": true,
+      "verified_video_count": 20,
+      "indexes": [
+        {
+          "path": "experiment/before/videos/index.json",
+          "sha256": "4bcd553e34e44f00223ad358c777f0ddc0dce192036ae8d7aa14f5adbc32ddb2"
+        },
+        {
+          "path": "experiment/grpo/videos/index.json",
+          "sha256": "163b708f31444f8e63d1142ecd17ae42840e21fe5b174e412fd2dbd22708d5c0"
+        },
+        {
+          "path": "experiment/warmstart-evaluation/videos/index.json",
+          "sha256": "f94fad6bbc5b769eca9ef70707c7e4ac728b53a37e5181cb486cbab915c6e819"
+        }
+      ]
+    },
+    {
+      "run_id": "gemma4-warmstart-rl-01",
+      "root": "artifacts/modal-gemma4-warmstart-rl-01-archive/gemma4-warmstart-rl-01",
+      "complete": true,
+      "verified_video_count": 19,
+      "indexes": [
+        {
+          "path": "experiment/after/videos/index.json",
+          "sha256": "585d5481efe475677ebd8ce8aa579ef7234845cb9bcdac641e012c64ae17c857"
+        },
+        {
+          "path": "experiment/grpo/videos/index.json",
+          "sha256": "d33b6bf8423cc221c9a98bd6a115fe3aaa974a74468eba502916bf7e387089a1"
+        }
+      ]
+    }
+  ]
+}
