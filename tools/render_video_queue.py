@@ -29,14 +29,26 @@ def write_json(path, value):
     temporary.replace(path)
 
 
-def process_queue(directory, *, godot, ffmpeg, fps=30, retry_failed=False):
+def acquire_renderer_lock(lock, *, wait=False):
+    """Wait only for an active renderer, never retry rendering failures."""
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if not wait:
+                raise
+            time.sleep(1)
+
+
+def process_queue(directory, *, godot, ffmpeg, fps=30, retry_failed=False, wait_for_lock=False):
     """Lock one experiment, resume verified results, and retain failed attempts."""
     directory = Path(directory).resolve()
     root = directory.parent
     videos = root / "videos"
     videos.mkdir(exist_ok=True)
     with (directory / ".renderer.lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        acquire_renderer_lock(lock, wait=wait_for_lock)
         entries, failures = [], []
         for job_path in sorted(directory.glob("*.json")):
             job = json.loads(job_path.read_text())
@@ -161,6 +173,8 @@ def main():
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--watch", action="store_true")
     parser.add_argument("--retry-failed", action="store_true")
+    parser.add_argument("--wait-for-lock", action="store_true",
+                        help="Wait for another renderer to finish this queue")
     args = parser.parse_args()
     if not args.root.is_dir():
         parser.error("Root must exist")
@@ -189,6 +203,7 @@ def main():
                     ffmpeg=args.ffmpeg,
                     fps=args.fps,
                     retry_failed=args.retry_failed,
+                    wait_for_lock=args.wait_for_lock,
                 )
                 failures += len(report["failures"])
                 if report["failures"]:

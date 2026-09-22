@@ -75,6 +75,9 @@ image = (
     .env(
         {
             "HF_HOME": "/model-cache",
+            # PyTorch validates version/GPU keys inside the persisted cache too.
+            "TORCHINDUCTOR_CACHE_DIR": "/model-cache/torchinductor/torch-2.14.0-h100",
+            "TORCHINDUCTOR_FX_GRAPH_CACHE": "1",
             "TOKENIZERS_PARALLELISM": "false",
             "PYTHONUNBUFFERED": "1",
         }

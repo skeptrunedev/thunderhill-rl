@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import json
 import math
 import time
 
@@ -130,9 +131,15 @@ class BatchedPolicy:
             for size in candidates:
                 batch = [prompts[i % len(prompts)] for i in range(size)]
                 record = {"batch_size": size, "repeats": 2}
+                print(json.dumps({"event": "batch_profile_start", "batch_size": size,
+                                  "compile_inference": self.compile_inference}), flush=True)
+                warmup_started = time.perf_counter()
                 try:
                     self.generate(batch)  # Warm kernels and the actual generation shape.
                     torch.cuda.synchronize(device)
+                    record["warmup_seconds"] = time.perf_counter() - warmup_started
+                    print(json.dumps({"event": "batch_profile_warmed", "batch_size": size,
+                                      "warmup_seconds": record["warmup_seconds"]}), flush=True)
                     torch.cuda.reset_peak_memory_stats(device)
                     started = time.perf_counter()
                     valid, tokens = 0, 0
@@ -166,10 +173,12 @@ class BatchedPolicy:
                 except torch.cuda.OutOfMemoryError:
                     record.update(error="cuda_out_of_memory", eligible=False)
                     records.append(record)
+                    print(json.dumps({"event": "batch_profile_result", **record}), flush=True)
                     gc.collect()
                     torch.cuda.empty_cache()
                     break
                 records.append(record)
+                print(json.dumps({"event": "batch_profile_result", **record}), flush=True)
         eligible = [r for r in records if r.get("eligible")]
         best = max(eligible, key=lambda r: r["valid_calls_per_second"], default=None)
         return {"selected_batch_size": best["batch_size"] if best else None,

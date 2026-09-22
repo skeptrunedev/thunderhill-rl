@@ -42,6 +42,28 @@ class VideoQueueRenderTests(unittest.TestCase):
         output.write_bytes(b"verified video fixture")
         return {"complete": True, "frames": 30}
 
+    def test_lock_contention_waits_only_when_requested(self):
+        with patch("render_video_queue.fcntl.flock", side_effect=[BlockingIOError(), None]) as lock, patch(
+            "render_video_queue.time.sleep"
+        ) as sleep, patch("render_video_queue.render_video", side_effect=self.render):
+            self.assertTrue(self.run_queue(wait_for_lock=True)["complete"])
+            self.assertEqual(lock.call_count, 2)
+            sleep.assert_called_once_with(1)
+        with patch("render_video_queue.fcntl.flock", side_effect=BlockingIOError()), patch(
+            "render_video_queue.time.sleep"
+        ) as sleep:
+            with self.assertRaises(BlockingIOError):
+                self.run_queue()
+            sleep.assert_not_called()
+
+    def test_waiting_does_not_hide_other_lock_errors(self):
+        with patch("render_video_queue.fcntl.flock", side_effect=PermissionError("denied")), patch(
+            "render_video_queue.time.sleep"
+        ) as sleep:
+            with self.assertRaises(PermissionError):
+                self.run_queue(wait_for_lock=True)
+            sleep.assert_not_called()
+
     def test_all_outcomes_indexed_and_completed_not_rendered_twice(self):
         with patch(
             "render_video_queue.render_video", side_effect=self.render
