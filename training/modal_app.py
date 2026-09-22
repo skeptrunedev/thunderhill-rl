@@ -65,6 +65,13 @@ image = (
     .run_commands(
         "/usr/local/bin/godot --headless --path /opt/thunderhill/godot --editor --import"
     )
+    .env(
+        {
+            "HF_HOME": "/model-cache",
+            "TOKENIZERS_PARALLELISM": "false",
+            "PYTHONUNBUFFERED": "1",
+        }
+    )
     .add_local_dir(
         str(ROOT / "tools"),
         "/opt/thunderhill/tools",
@@ -74,13 +81,6 @@ image = (
         str(ROOT / "training"),
         "/opt/thunderhill/training",
         ignore=[".venv", "__pycache__", "**/*.pyc"],
-    )
-    .env(
-        {
-            "HF_HOME": "/model-cache",
-            "TOKENIZERS_PARALLELISM": "false",
-            "PYTHONUNBUFFERED": "1",
-        }
     )
 )
 
