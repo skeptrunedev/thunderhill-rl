@@ -30,8 +30,12 @@ class ArchiveTests(unittest.TestCase):
             else:
                 data = [{"filename": "trial/status.json", "type": "file"}]
             return subprocess.CompletedProcess(command, 0, json.dumps(data))
-        if command[-1] == "-":
-            return subprocess.CompletedProcess(command, 0, json.dumps(self.status))
+        if command[4] == "trial/status.json":
+            destination = Path(command[-1])
+            self.assertTrue(destination.parent.is_dir())
+            self.assertFalse(destination.exists())
+            destination.write_text(json.dumps(self.status))
+            return subprocess.CompletedProcess(command, 0, "✓ Finished downloading files to local!\n")
         if command[:3] == ["modal", "volume", "get"]:
             destination = Path(command[-1])
             self.assertTrue(destination.is_dir())

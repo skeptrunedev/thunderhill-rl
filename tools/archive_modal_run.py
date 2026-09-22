@@ -26,7 +26,7 @@ def cli_json(arguments, *, execute=subprocess.run):
     return json.loads(result.stdout)
 
 
-def finished_status(run_id, *, execute=subprocess.run):
+def finished_status(run_id, *, staging_root, execute=subprocess.run):
     # List before get: absence is pending, but authentication/network/CLI errors
     # propagate rather than masquerading as a job that is still running.
     roots = cli_json(["ls", VOLUME, "/", "--json"], execute=execute)
@@ -35,7 +35,13 @@ def finished_status(run_id, *, execute=subprocess.run):
     entries = cli_json(["ls", VOLUME, run_id, "--json"], execute=execute)
     if not any(row["filename"].strip("/") == f"{run_id}/status.json" for row in entries):
         return None
-    status = cli_json(["get", VOLUME, f"{run_id}/status.json", "-"], execute=execute)
+    # The get command appends a human completion footer even when its target is
+    # stdout. Read the downloaded file instead of treating CLI output as JSON.
+    with tempfile.TemporaryDirectory(prefix="status-", dir=staging_root) as directory:
+        destination = Path(directory) / "status.json"
+        execute(["modal", "volume", "get", VOLUME, f"{run_id}/status.json", str(destination)],
+                check=True, capture_output=True, text=True, timeout=60)
+        status = json.loads(destination.read_text())
     if status.get("run_id") != run_id or not isinstance(status.get("ok"), bool):
         raise ValueError("Modal status identity or terminal schema mismatch")
     return status
@@ -62,7 +68,7 @@ def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
         if output.exists():
             raise FileExistsError(f"Archive already exists: {output}")
         while True:
-            status = finished_status(run_id, execute=execute)
+            status = finished_status(run_id, staging_root=staging_root, execute=execute)
             if status is not None:
                 break
             if not watch:
