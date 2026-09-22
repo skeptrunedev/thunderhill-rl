@@ -18,6 +18,8 @@ For the control reliability trial, use `--stage warmstart` with a fresh run ID. 
 
 The warm start uses the same pinned model, road telemetry, chat formatting, turn terminator, and BF16 compute policy as rollout inference. Only completion tokens receive supervised loss. Strict parsing remains active; a malformed model output is never repaired into an applied action. Every simulator episode, including a failed evaluation, keeps its video job.
 
+After warm starting, the RL probe branches after 200 verified model actions using the saved evaluation prefix. The starting line probe produced identical actions and rewards in all 16 samples, giving zero advantage and no update. Moving the branch uses a real model trajectory where steering and speed control can vary; it does not inject teacher actions. To reuse an already verified warm start without repeating supervised training, run `--stage warmstart-rl --source-run gemma4-warmstart-01` with a fresh `--run-id`.
+
 The image installs Python 3.12 and the exact dependencies in `training/uv.lock` with `uv sync --frozen`. It includes Godot 4.7.2, the game source, track data, and assets, and imports the project before launch. By default it reads the same Godot binary used locally from `~/.local/share/thunderhill-tools/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64`. Set `THUNDERHILL_GODOT` to that binary's location if different on the launch machine.
 
 Artifacts live on the `thunderhill-runs-v2` Modal Volume, under the run ID. The `launch.json`, `run.log`, and `status.json` describe the cloud invocation; `experiment/` contains the diagnostic's complete outputs. Model downloads are cached separately on `thunderhill-huggingface-v2`. Both use Volume v2 because publishing immutable video jobs requires hard links. Volumes commit in the background and explicitly at the end of the function.
@@ -30,6 +32,8 @@ modal volume get thunderhill-runs-v2 /gemma4-diagnostic-01 artifacts/modal-gemma
 ```
 
 Create the destination directory first. Modal CLI 1.5.4 maps entries incorrectly when downloading a directory into a destination that does not yet exist. The command above preserves the remote run directory inside the archive directory. Use a fresh archive destination when downloading again; do not overwrite prior artifacts.
+
+If the video watcher is running, download into a staging directory outside its watched `artifacts` tree, then move the completed archive into `artifacts` on the same filesystem. Otherwise the watcher can see a video job before its referenced recording finishes downloading and correctly reject its partial hash. For example, precreate `../thunderhill-downloads/RUN_ID`, download there, then move that completed directory to a fresh `artifacts/RUN_ID-archive` destination. Never expose partially downloaded recordings to the watcher.
 
 Video jobs use relative recording paths, so they remain valid after downloading. Render every queued episode locally using the existing archive command, supplying your Godot and FFmpeg executable paths:
 

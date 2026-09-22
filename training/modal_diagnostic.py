@@ -114,6 +114,7 @@ def main():
         training_adapter = initial
         evaluation_actions = 30
         start_generation = 0
+        prefix_arguments = []
         if args.warmstart_dataset:
             warm = out / "warmstart"
             stage(
@@ -139,6 +140,7 @@ def main():
             }
             if warm_result["actions"] != evaluation_actions or warm_result["reason"] != "episode_tick_limit":
                 raise RuntimeError("Warm started model failed the longer control evaluation")
+            prefix_arguments = ["--prefix-decisions", warm_eval / "decisions.jsonl"]
         trained = out / "grpo"
         stage(
             "train_lap_grpo.py",
@@ -150,7 +152,7 @@ def main():
                 "--output",
                 trained,
                 "--prefix-actions",
-                1,
+                200 if args.warmstart_dataset else 1,
                 "--continuation-actions",
                 9,
                 "--steps",
@@ -163,6 +165,7 @@ def main():
                 1e-5,
                 "--start-generation",
                 start_generation,
+                *prefix_arguments,
             ],
         )
         learning = json.loads((trained / "summary.json").read_text())

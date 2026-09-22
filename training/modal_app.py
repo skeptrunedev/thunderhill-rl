@@ -34,7 +34,11 @@ GODOT = "/usr/local/bin/godot"
 PYTHON = "/opt/thunderhill/training/.venv/bin/python"
 ARTIFACT_VOLUME = "thunderhill-runs-v2"
 CACHE_VOLUME = "thunderhill-huggingface-v2"
-STAGES = {"diagnostic": "modal_diagnostic.py", "warmstart": "modal_diagnostic.py"}
+STAGES = {
+    "diagnostic": "modal_diagnostic.py",
+    "warmstart": "modal_diagnostic.py",
+    "warmstart-rl": "modal_warmstart_rl.py",
+}
 WARMSTART_DATASET = ROOT / "artifacts/lap-policy-dataset-v5-recovery"
 
 app = modal.App("thunderhill-gemma-validation")
@@ -107,8 +111,12 @@ def validate_request(stage: str, run_id: str) -> str:
     retries=0,
     volumes={str(RUNS): artifacts, "/model-cache": cache},
 )
-def run(stage: str, run_id: str, source: dict) -> dict:
+def run(stage: str, run_id: str, source: dict, source_run: str = "") -> dict:
     script = validate_request(stage, run_id)
+    if stage == "warmstart-rl":
+        validate_request("warmstart", source_run)
+    elif source_run:
+        raise ValueError("Source run is only valid for warmstart-rl")
     artifacts.reload()
     # Reserve a unique parent, keeping the child's --output nonexistent as the
     # existing training CLIs require. Never replace an earlier run.
@@ -126,11 +134,14 @@ def run(stage: str, run_id: str, source: dict) -> dict:
     ]
     if stage == "warmstart":
         command.extend(["--warmstart-dataset", "/opt/thunderhill/warmstart-data"])
+    elif stage == "warmstart-rl":
+        command.extend(["--source", str(RUNS / source_run / "experiment")])
     manifest = {
         "stage": stage,
         "run_id": run_id,
         "command": command,
         "source": source,
+        "source_run": source_run or None,
         "gpu_requested": "H100",
         "function_timeout_seconds": 1800,
         "child_timeout_seconds": 1680,
@@ -204,8 +215,12 @@ def run(stage: str, run_id: str, source: dict) -> dict:
 
 
 @app.local_entrypoint()
-def main(run_id: str, stage: str = "diagnostic"):
+def main(run_id: str, stage: str = "diagnostic", source_run: str = ""):
     validate_request(stage, run_id)
+    if stage == "warmstart-rl":
+        validate_request("warmstart", source_run)
+    elif source_run:
+        raise ValueError("Source run is only valid for warmstart-rl")
     source = {
         "git_commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
@@ -214,4 +229,4 @@ def main(run_id: str, stage: str = "diagnostic"):
             ["git", "status", "--porcelain"], cwd=ROOT, text=True
         ),
     }
-    print(json.dumps(run.remote(stage, run_id, source), indent=2))
+    print(json.dumps(run.remote(stage, run_id, source, source_run), indent=2))
