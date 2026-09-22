@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from lap_policy import parse_action
+from lap_rollout import recorded_transitions
 
 
 def audit_lap(
@@ -96,9 +97,7 @@ def audit_lap(
     all_lap_valid = True
     with path.open() as source:
         next(source)
-        for line in source:
-            row = json.loads(line)
-            require(row.get("type") == "transition", "unexpected recording row")
+        for row in recorded_transitions(source):
             require(row.get("episode_id") == episode_id, "transition episode mismatch")
             require(row.get("policy_id") == policy_id, "transition policy mismatch")
             require(

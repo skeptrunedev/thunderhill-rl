@@ -116,6 +116,42 @@ class RolloutTests(unittest.TestCase):
         self.record["reset_snapshot"] = copy.deepcopy(self.record["branch_snapshot"])
         self.record["reward_components"] = rollout_reward(self.rows, 12)
 
+    def add_recording_metadata(self):
+        self.rows.insert(
+            0,
+            {
+                "type": "model_decision",
+                "tick": 0,
+                "controls": parse_action("control_bike 0 20 0 0"),
+            },
+        )
+        self.rows.insert(7, {"type": "camera_observation", "tick": 6})
+        self.rows.insert(14, {"type": "snapshot", "provenance": {}})
+        self.rows.insert(
+            15,
+            {
+                "type": "model_decision",
+                "tick": 12,
+                "controls": parse_action("control_bike 0 20 0 0"),
+            },
+        )
+
+    def test_metadata_does_not_count_as_transitions_or_hide_corrupt_controls(self):
+        self.add_recording_metadata()
+        self.assertEqual(self.audit()["transitions"], 24)
+        transition = next(row for row in self.rows if row.get("tick") == 14)
+        transition["requested_controls"]["steer"] = 1
+        with self.assertRaisesRegex(ValueError, "Transition provenance"):
+            self.audit()
+
+    def test_unknown_and_failure_records_are_not_silently_skipped(self):
+        for kind in ("unknown", "environment_failure", "episode"):
+            with self.subTest(kind=kind):
+                self.rows.insert(0, {"type": kind})
+                with self.assertRaisesRegex(ValueError, "Unexpected simulator"):
+                    self.audit()
+                self.rows.pop(0)
+
     def test_snapshot_branch_preserves_absolute_tick_and_excludes_prefix(self):
         self.make_snapshot_episode()
         self.assertTrue(self.audit()["reward_verified"])
@@ -152,6 +188,7 @@ class RolloutTests(unittest.TestCase):
         self.assertEqual(self.audit()["transitions"], 0)
 
     def test_saved_prefix_bound_to_recorded_model_controls_and_prompts(self):
+        self.add_recording_metadata()
         self.audit()
         decision_path = self.path.parent / "decisions.jsonl"
         decision = {
@@ -188,6 +225,15 @@ class RolloutTests(unittest.TestCase):
         prefix, provenance = load_prefix(decision_path, 1, "old", Road(), Tokenizer())
         self.assertEqual(prefix[0]["source_after_state"]["tick"], 12)
         self.assertTrue(provenance["all_source_controls_and_states_verified"])
+        transition = next(row for row in self.rows if row.get("tick") == 3)
+        transition["requested_controls"]["steer"] = 1
+        self.path.write_text(
+            "".join(json.dumps(row) + "\n" for row in [self.header, *self.rows])
+        )
+        with self.assertRaisesRegex(ValueError, "transition mismatch"):
+            load_prefix(decision_path, 1, "old", Road(), Tokenizer())
+        transition["requested_controls"]["steer"] = 0
+        self.audit()
         decision["controls"]["steer"] = 1
         decision_path.write_text(json.dumps(decision) + "\n")
         with self.assertRaisesRegex(ValueError, "controls differ"):

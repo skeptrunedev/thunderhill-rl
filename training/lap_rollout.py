@@ -11,6 +11,27 @@ FAILURE_PENALTY = -25.0
 SYNTAX_PENALTY = -10.0
 
 
+def recording_rows(source):
+    """Read episode contents without silently swallowing faults or unknown records."""
+    for line in source:
+        row = json.loads(line)
+        if not isinstance(row, dict) or row.get("type") not in {
+            "transition",
+            "model_decision",
+            "snapshot",
+            "camera_observation",
+        }:
+            raise ValueError("Unexpected simulator recording row")
+        yield row
+
+
+def recorded_transitions(source):
+    """Presentation and observation metadata never count as physics transitions."""
+    for row in recording_rows(source):
+        if row["type"] == "transition":
+            yield row
+
+
 def physical_snapshot(observation):
     """Ignore episode labels while retaining all observed physical state."""
     return {key: observation[key] for key in ("tick", "state", "track")}
@@ -83,8 +104,7 @@ def audit_rollout(paths, record, track_sha256):
                     continue
                 last_source = None
                 snapshot_recorded = False
-                for line in source:
-                    row = json.loads(line)
+                for row in recording_rows(source):
                     if row.get("type") == "transition":
                         last_source = row
                     elif (
@@ -123,7 +143,7 @@ def audit_rollout(paths, record, track_sha256):
         raise ValueError("Nonzero initial state requires snapshot provenance")
     with path.open() as source:
         next(source)
-        transitions = [json.loads(line) for line in source]
+        transitions = list(recorded_transitions(source))
     decisions = record["decisions"]
     cursor = initial_tick
     invalid_syntax = False

@@ -95,6 +95,28 @@ class LapAuditTests(unittest.TestCase):
         self.assertEqual(result["recorded_transitions"], 383)
         self.assertEqual(result["actions"], 32)
 
+    def test_metadata_keeps_full_lap_audit_strict(self):
+        self.rows.insert(
+            0, {"type": "model_decision", "tick": 0, "controls": self.controls}
+        )
+        self.rows.insert(7, {"type": "camera_observation", "tick": 6})
+        self.rows.insert(14, {"type": "snapshot", "provenance": {}})
+        result = self.audit()
+        self.assertTrue(result["success"])
+        self.assertEqual(result["recorded_transitions"], 383)
+        transition = next(row for row in self.rows if row.get("tick") == 24)
+        transition["requested_controls"]["steer"] = 0.7
+        with self.assertRaisesRegex(ValueError, "recorded controls"):
+            self.audit()
+
+    def test_unknown_or_failure_record_rejected(self):
+        for kind in ("environment_failure", "unknown"):
+            with self.subTest(kind=kind):
+                self.rows.insert(0, {"type": kind})
+                with self.assertRaisesRegex(ValueError, "Unexpected simulator"):
+                    self.audit()
+                self.rows.pop(0)
+
     def test_recorded_controls_must_match_generated_text(self):
         self.rows[23]["requested_controls"]["steer"] = 0.7
         with self.assertRaisesRegex(ValueError, "recorded controls"):

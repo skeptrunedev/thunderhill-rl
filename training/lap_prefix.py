@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from lap_policy import parse_action
+from lap_rollout import recorded_transitions
 
 
 def load_prefix(path, count, adapter_hash, road, tokenizer):
@@ -41,6 +42,7 @@ def load_prefix(path, count, adapter_hash, road, tokenizer):
         # Old episode headers do not contain the exact projected initial road
         # position. A start station of zero can project just across the wrap.
         # The first prompt is verified against a real reset during replay.
+        transitions = recorded_transitions(source)
         previous = None
         prefix = []
         tick = 0
@@ -68,10 +70,9 @@ def load_prefix(path, count, adapter_hash, road, tokenizer):
                 raise ValueError("Prefix source controls differ from generated text")
             before_tick = tick
             for _ in range(12):
-                line = source.readline()
-                if not line:
+                row = next(transitions, None)
+                if row is None:
                     raise ValueError("Prefix source recording ends early")
-                row = json.loads(line)
                 if (
                     row.get("type") != "transition"
                     or row["episode_id"] != header["episode_id"]

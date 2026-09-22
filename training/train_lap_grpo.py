@@ -123,6 +123,7 @@ def main():
     parser.add_argument("--adapter", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--steps", type=int, default=3)
+    parser.add_argument("--start-generation", type=int, default=0)
     parser.add_argument("--prefix-actions", type=int, default=40)
     parser.add_argument(
         "--prefix-decisions",
@@ -144,7 +145,8 @@ def main():
     )
     args = parser.parse_args()
     if (
-        min(args.steps, args.prefix_actions, args.continuation_actions) < 1
+        args.start_generation < 0
+        or min(args.steps, args.prefix_actions, args.continuation_actions) < 1
         or not math.isfinite(args.temperature)
         or args.temperature <= 0
         or not math.isfinite(args.learning_rate)
@@ -459,7 +461,9 @@ def main():
             )
             return record
 
-        baseline = run_candidate(0, "greedy-before", initial_hash, 0)
+        baseline = run_candidate(
+            0, "greedy-before", initial_hash, args.start_generation
+        )
 
         def game_reward(prompts, completions, completion_ids, trainer_state, **kwargs):
             if len(completions) != 4 or any(
@@ -488,7 +492,7 @@ def main():
                     index,
                     f"grpo-step-{step}-candidate-{index}",
                     current_hash,
-                    step,
+                    args.start_generation + step,
                     (text, ids),
                 )
                 record["optimizer_step"] = step
@@ -588,7 +592,12 @@ def main():
         trainer.save_model(str(checkpoint))
         tokenizer.save_pretrained(checkpoint)
         final_hash = checkpoint_hash(checkpoint)
-        after = run_candidate(0, "greedy-after", final_hash, trainer.state.global_step)
+        after = run_candidate(
+            0,
+            "greedy-after",
+            final_hash,
+            args.start_generation + trainer.state.global_step,
+        )
         model.eval()
         inputs = tokenizer(branch_prompt, return_tensors="pt").to("cuda")
         with torch.inference_mode():
