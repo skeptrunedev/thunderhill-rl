@@ -59,18 +59,31 @@ class ModelRuntimeTests(unittest.TestCase):
 
     def test_gemma4_uses_non_thinking_chat_with_exact_telemetry(self):
         tokenizer = Mock()
+        tokenizer.convert_tokens_to_ids.return_value = 106
         tokenizer.apply_chat_template.return_value = "formatted"
         features = {"speed": 8, "curves": [0, 0.1]}
         self.assertEqual(
             PolicyRoadTelemetry(GEMMA4_SPEC, tokenizer).prompt_features(features),
             "formatted",
         )
-        tokenizer.apply_chat_template.assert_called_once_with(
-            [{"role": "user", "content": RoadTelemetry().prompt_features(features)}],
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=False,
-        )
+        messages = tokenizer.apply_chat_template.call_args.args[0]
+        prompt = messages[0]["content"]
+        self.assertEqual(messages[0]["role"], "user")
+        self.assertIn("complete the lap as quickly as possible while staying on track", prompt)
+        self.assertIn("exactly four integers", prompt)
+        self.assertIn("Do not use decimal values or negative pedal values", prompt)
+        self.assertIn(json.dumps(features, separators=(",", ":")), prompt)
+        self.assertIn("control_bike STEER_MILLI THROTTLE_PERCENT FRONT_PERCENT REAR_PERCENT", prompt)
+        self.assertEqual(tokenizer.apply_chat_template.call_args.kwargs, {
+            "tokenize": False, "add_generation_prompt": True, "enable_thinking": False,
+        })
+        self.assertEqual(tokenizer.eos_token, "<turn|>")
+
+    def test_wrong_turn_terminator_rejected(self):
+        tokenizer = Mock()
+        tokenizer.convert_tokens_to_ids.return_value = 1
+        with self.assertRaisesRegex(ValueError, "turn terminator"):
+            PolicyRoadTelemetry(GEMMA4_SPEC, tokenizer)
 
     def test_loader_uses_text_class_and_pinned_dtype(self):
         import torch

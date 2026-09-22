@@ -117,11 +117,28 @@ class PolicyRoadTelemetry(RoadTelemetry):
         super().__init__(**kwargs)
         self.spec = _validate(spec)
         self.tokenizer = tokenizer
+        if self.spec == GEMMA4_SPEC:
+            # The pinned chat template ends turns with <turn|> (106). Both
+            # rollout generation and TRL completion masking use tokenizer EOS.
+            # The base tokenizer's <eos> (1) alone does not end a chat answer.
+            if tokenizer.convert_tokens_to_ids("<turn|>") != 106:
+                raise ValueError("Gemma4 tokenizer has an unexpected turn terminator")
+            tokenizer.eos_token = "<turn|>"
 
     def prompt_features(self, features: dict) -> str:
         raw = super().prompt_features(features)
         if self.spec.prompt_style == "raw":
             return raw
+        raw = raw.replace(
+            "Ride the track safely.",
+            "Race forward and complete the lap as quickly as possible while staying on track.",
+            1,
+        ).replace(
+            "Steer -1000..1000; pedals 0..100.",
+            "Use exactly four integers. Steer -1000..1000; pedals 0..100. "
+            "Do not use decimal values or negative pedal values.",
+            1,
+        )
         return self.tokenizer.apply_chat_template(
             [{"role": "user", "content": raw}],
             tokenize=False,
