@@ -1,0 +1,269 @@
+{
+  "snapshot_utc": "2026-09-22T22:30:54.077241+00:00",
+  "status": "complete",
+  "campaign_complete": true,
+  "final_evaluation_status": "complete",
+  "source": "artifacts/functiongemma-local-rl-02/rl/campaign.json",
+  "model": "google/functiongemma-270m-it",
+  "revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+  "training_method": "reinforcement_learning",
+  "initialization": "fresh_base_lora",
+  "supervised_training_performed": false,
+  "temperature": 3.0,
+  "episode_budget_seconds": 30.0,
+  "sampled_rollouts_per_generation": 3,
+  "generations": [
+    {
+      "collection_generation": 0,
+      "updated_generation": 1,
+      "source": "artifacts/functiongemma-local-rl-02/rl/generation-0000/collection.json",
+      "sampled_rollouts": 3,
+      "mean_legal_progress_m": 29.08385303347801,
+      "best_legal_progress_m": 40.500529899052495,
+      "legal_progress_m": [
+        40.500529899052495,
+        17.03267222149622,
+        29.71835697988532
+      ],
+      "outcomes": {
+        "track_limits": 2,
+        "crash": 1
+      },
+      "completed_laps": 0,
+      "greedy_evaluation": {
+        "reason": "episode_tick_limit",
+        "legal_progress_m": -0.0008353232031187798,
+        "completed": false
+      },
+      "update": {
+        "method": "TRL Dr GRPO full episode stateless action replay",
+        "trl_version": "1.13.0",
+        "loss": -3.965356822277499e-05,
+        "native_grammar_likelihoods": true,
+        "temperature": 3.0,
+        "episodes": 3,
+        "actions": 212,
+        "generated_tokens": 8611,
+        "trained_tokens": 8611,
+        "later_actions": 209,
+        "eos_tokens": 212,
+        "prompt_tokens_in_loss": 0,
+        "padding_tokens_in_loss": 0,
+        "fixed_normalizer": 115200,
+        "max_behavior_logp_difference": 8.440017700195312e-05,
+        "rewards": [
+          -0.9912067502834315,
+          -0.996301960972921,
+          -0.9935477156782492
+        ],
+        "advantages": [
+          0.002478725361435674,
+          -0.002616485328053808,
+          0.00013775996661802292
+        ],
+        "optimizer_steps": 1,
+        "generation": 1,
+        "gradient_norm": 6.774938810849562e-05,
+        "parameter_delta_l1": 10.14852338284254
+      },
+      "checkpoint": "artifacts/functiongemma-local-rl-02/rl/checkpoint-0001",
+      "checkpoint_sha256": "4978dd2e9c72baceea84293c3bd3c23576e3cff172d60a9487a8636b70718fd6",
+      "checkpoint_reload_verified": true
+    },
+    {
+      "collection_generation": 1,
+      "updated_generation": 2,
+      "source": "artifacts/functiongemma-local-rl-02/rl/generation-0001/collection.json",
+      "sampled_rollouts": 3,
+      "mean_legal_progress_m": 37.817186096519016,
+      "best_legal_progress_m": 56.7234036628695,
+      "legal_progress_m": [
+        38.88942834130141,
+        56.7234036628695,
+        17.83872628538614
+      ],
+      "outcomes": {
+        "track_limits": 2,
+        "episode_tick_limit": 1
+      },
+      "completed_laps": 0,
+      "greedy_evaluation": {
+        "reason": "episode_tick_limit",
+        "legal_progress_m": -0.0008353232031187798,
+        "completed": false
+      },
+      "update": {
+        "method": "TRL Dr GRPO full episode stateless action replay",
+        "trl_version": "1.13.0",
+        "loss": -0.035585749967140146,
+        "native_grammar_likelihoods": true,
+        "temperature": 3.0,
+        "episodes": 3,
+        "actions": 602,
+        "generated_tokens": 24730,
+        "trained_tokens": 24730,
+        "later_actions": 599,
+        "eos_tokens": 602,
+        "prompt_tokens_in_loss": 0,
+        "padding_tokens_in_loss": 0,
+        "fixed_normalizer": 115200,
+        "max_behavior_logp_difference": 0.00010287761688232422,
+        "rewards": [
+          -0.9915565436898726,
+          0.012315469808038163,
+          -0.9961269549992583
+        ],
+        "advantages": [
+          -0.3331005340628417,
+          0.6707714794350691,
+          -0.3376709453722274
+        ],
+        "optimizer_steps": 1,
+        "generation": 2,
+        "gradient_norm": 0.03223641216754913,
+        "parameter_delta_l1": 19.978003719821572
+      },
+      "checkpoint": "artifacts/functiongemma-local-rl-02/rl/checkpoint-0002",
+      "checkpoint_sha256": "c300ffceb99cc55341aff7507df3ce359e88b63928c45141edf5298ec89d931d",
+      "checkpoint_reload_verified": true
+    },
+    {
+      "collection_generation": 2,
+      "updated_generation": 3,
+      "source": "artifacts/functiongemma-local-rl-02/rl/generation-0002/collection.json",
+      "sampled_rollouts": 3,
+      "mean_legal_progress_m": 25.55313964306478,
+      "best_legal_progress_m": 32.885101264872844,
+      "legal_progress_m": [
+        32.885101264872844,
+        25.277998461296484,
+        18.496319203025017
+      ],
+      "outcomes": {
+        "episode_tick_limit": 1,
+        "track_limits": 2
+      },
+      "completed_laps": 0,
+      "greedy_evaluation": {
+        "reason": "episode_tick_limit",
+        "legal_progress_m": -0.0008353232031187798,
+        "completed": false
+      },
+      "update": {
+        "method": "TRL Dr GRPO full episode stateless action replay",
+        "trl_version": "1.13.0",
+        "loss": -0.02178847335744649,
+        "native_grammar_likelihoods": true,
+        "temperature": 3.0,
+        "episodes": 3,
+        "actions": 723,
+        "generated_tokens": 29813,
+        "trained_tokens": 29813,
+        "later_actions": 720,
+        "eos_tokens": 723,
+        "prompt_tokens_in_loss": 0,
+        "padding_tokens_in_loss": 0,
+        "fixed_normalizer": 115200,
+        "max_behavior_logp_difference": 0.00012242794036865234,
+        "rewards": [
+          0.007139830221911112,
+          -0.9945117816147286,
+          -0.9959841820836679
+        ],
+        "advantages": [
+          0.6682585413807396,
+          -0.33339307045590016,
+          -0.3348654709248394
+        ],
+        "optimizer_steps": 1,
+        "generation": 3,
+        "gradient_norm": 0.020539117977023125,
+        "parameter_delta_l1": 14.051716207526624
+      },
+      "checkpoint": "artifacts/functiongemma-local-rl-02/rl/checkpoint-0003",
+      "checkpoint_sha256": "1859afb5b683dee7432ff65f5aed5cdce2862aa0a4263dfd95436d70aceb6d45",
+      "checkpoint_reload_verified": true
+    }
+  ],
+  "totals": {
+    "optimizer_updates": 3,
+    "sampled_actions_trained": 1537,
+    "generated_tokens_trained": 63154,
+    "verified_native_calls_in_completed_generation_collections": 2437,
+    "invalid_native_calls": 0,
+    "verified_recordings_and_video_jobs_in_completed_generations": 12,
+    "max_behavior_logp_difference": 0.00012242794036865234,
+    "verified_native_calls_including_final_evaluation": 2737,
+    "verified_recordings_and_video_jobs_including_capacity_probe": 14
+  },
+  "native_protocol": {
+    "prompt_style": "functiongemma_native_tools",
+    "action_version": "functiongemma-native-bike-tools-v1",
+    "stop_token_id": 50,
+    "all_recorded_completions_reparsed_and_equal_executed_controls": true,
+    "sampling_and_training_grammar_likelihoods_verified": true
+  },
+  "compiled_inference": {
+    "qualified": true,
+    "cuda_graph_capture": {
+      "available": true,
+      "scope": "process_cumulative",
+      "captured_nodes": 3,
+      "cuda_graph_captured": true,
+      "skips": 0,
+      "path_state": "EXECUTION"
+    },
+    "selected_batch_size": 4
+  },
+  "wandb": {
+    "mode": "online",
+    "entity": "skeptrune-org",
+    "project": "thunderhill-rl",
+    "run_id": "6ib8oezw",
+    "url": "https://wandb.ai/skeptrune-org/thunderhill-rl/runs/6ib8oezw",
+    "metadata_source": "artifacts/functiongemma-local-rl-02/rl/tracking/tracking.json",
+    "gpu_metadata_source": "/home/skeptrune/git_projects/morph/thunderhill-rl/artifacts/functiongemma-local-rl-02/rl/tracking/wandb/run-20260922_150009-6ib8oezw/files/wandb-metadata.json"
+  },
+  "earlier_zero_exploration_attempt": {
+    "source": "artifacts/functiongemma-local-rl-01/rl/campaign.json",
+    "status": "interrupted_before_optimizer_update",
+    "optimizer_updates": 0,
+    "saved_updated_checkpoints": 0,
+    "rollout_rewards": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "group_advantages": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "sampled_actions_collected": 900,
+    "mean_legal_progress_m": -0.002080112638108205,
+    "evidence": "No saved update or checkpoint; empty campaign generations; trainer log ends in KeyboardInterrupt during gradient accumulation. Collected rollouts have identical zero rewards.",
+    "wandb_url": "https://wandb.ai/skeptrune-org/thunderhill-rl/runs/hak1s0hc"
+  },
+  "caveats": [
+    "Gameplay performance is nonmonotonic: batch best and mean progress improve in the second collection and decline in the third. Three updates do not establish reliable driving improvement.",
+    "No completed lap in these generation collections; no valid lap time or speed improvement claim.",
+    "Greedy evaluations stay near the starting position. Valid native syntax is not driving skill.",
+    "Failed sampled rollouts are legitimate RL experience. No lap qualification or supervised imitation was used.",
+    "Two CUDA allocator OOM warnings occurred during the third update. The allocator recovered sufficiently to finish that update and save a verified checkpoint; memory pressure remains a scaling concern.",
+    "All episode source recordings and queued video hashes verified. Best sampled episode video rendered and overlay visually checked; remaining video rendering is in progress."
+  ],
+  "allocator_warning_source": "artifacts/functiongemma-local-rl-02/logs/rl.log",
+  "final_evaluation": {
+    "reason": "episode_tick_limit",
+    "legal_progress_m": -0.005940857658208972,
+    "actions": 300,
+    "success": false,
+    "recording_provenance_verified": true
+  },
+  "videos": {
+    "best_sampled_rollout": "artifacts/functiongemma-local-rl-02/rl/generation-0001/rollout-0002/videos/2623c143f5d43e49fb740835100994e1c4d0017237fd1911a1c656ab3b1438d8/attempt-0001/run.mp4",
+    "all_remaining_jobs": "rendering",
+    "overlay_visually_verified": true
+  }
+}
