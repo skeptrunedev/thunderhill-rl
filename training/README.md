@@ -201,6 +201,16 @@ the last cycle. `--start-generation` preserves generation numbering across
 training calls. Successful completion ends this safety curriculum; speed
 experiments then use fixed duration sections and compare complete lap times.
 
+`compare_laps.py` independently audits both complete recordings and hashes the
+actual endpoint adapters before reporting any lap time improvement. It requires
+identical simulator conditions and standing starts, plus verified training
+summaries linking the baseline to the candidate. Pass `--baseline`, `--candidate`,
+`--baseline-adapter`, `--candidate-adapter`, `--training-summary`, and `--output`.
+Repeat `--training-summary` in chronological order for multiple training stages.
+A slower legal lap produces `improved: false` and exit status one. Output files
+are never overwritten. Intermediate checkpoint lineage is supported by training
+summaries; base model revision is not independently established by this check.
+
 
 ## Speed exploration and repeated controls
 
