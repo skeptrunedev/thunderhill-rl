@@ -658,6 +658,26 @@ def main():
         if not torch.isfinite(torch.tensor(deltas)).all() or max(deltas) <= 0:
             raise ValueError("No finite nonzero LoRA update")
         delta = max(deltas)
+        # Preserve the learned generation even if the subsequent experiment
+        # validation fails. A saved checkpoint alone never implies success.
+        checkpoint = out / "adapter"
+        trainer.save_model(str(checkpoint))
+        tokenizer.save_pretrained(checkpoint)
+        write_spec(checkpoint, spec)
+        final_hash = checkpoint_hash(checkpoint)
+        (out / "update.json").write_text(
+            json.dumps(
+                {
+                    "optimizer_steps": trainer.state.global_step,
+                    "max_adapter_delta": delta,
+                    "initial_adapter_sha256": initial_hash,
+                    "current_adapter_sha256": final_hash,
+                    "verification_complete": False,
+                },
+                indent=2,
+            )
+            + "\n"
+        )
         if not any(
             len(
                 {
@@ -672,11 +692,6 @@ def main():
             raise ValueError(
                 "No within group physical reward contrast among valid rollouts"
             )
-        checkpoint = out / "adapter"
-        trainer.save_model(str(checkpoint))
-        tokenizer.save_pretrained(checkpoint)
-        write_spec(checkpoint, spec)
-        final_hash = checkpoint_hash(checkpoint)
         after = run_candidate(
             0,
             "greedy-after",

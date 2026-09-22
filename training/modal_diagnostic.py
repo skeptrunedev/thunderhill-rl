@@ -127,7 +127,7 @@ def main():
                 "--steps",
                 1,
                 "--num-generations",
-                4,
+                16,
                 "--temperature",
                 1.0,
                 "--learning-rate",
