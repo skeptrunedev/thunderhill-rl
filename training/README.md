@@ -44,6 +44,16 @@ with `--source-checkpoint native-smoke/checkpoint-0001 --initial-generation 1`.
 Every launch requires a unique run ID. CUDA graphs and memory capacity are
 qualified again for the larger native prompts and completions.
 
+The [first H100 native validation](results/gemma4-native-tools-validation.json)
+completed with 662 recorded decisions and zero invalid calls. It performed a
+verified RL update, but **did not recover reliable driving**: greedy evaluation
+crashed after 170 metres before the update and 185 metres afterward. No native
+lap completed. Supervised examples used initial observations while subsequent
+rollout decisions used native tool response context. That confirmed context
+mismatch needs an isolated test before attributing the driving regression to it.
+The long campaign remains stopped. See [experiment tracking](../docs/experiment-tracking.md)
+for separate graphs of syntax errors, failed episodes, and valid lap times.
+
 ## Historical local GPU validation
 
 Use Hugging Face TRL as the primary training framework, with PEFT adapters.

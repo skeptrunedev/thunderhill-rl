@@ -28,3 +28,5 @@ The [Gemma 4 RL audit](docs/gemma4-rl-references.md) identifies exact E4B traini
 ## License
 
 Original project code and documentation use the [MIT license](LICENSE). Referenced projects, models, footage, maps, and assets retain their own licenses. The measurement databases explicitly marked as derived from OpenStreetMap use ODbL 1.0, with attribution to OpenStreetMap contributors, rather than MIT. Original USGS and USDA geodata is public domain. Third party game assets and video frames are not bundled here. Godot is [MIT licensed](https://godotengine.org/license/).
+
+See [experiment graphs](docs/experiment-tracking.md) for W&B scalar tracking and importing past campaigns.

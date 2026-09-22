@@ -16,6 +16,7 @@ from transformers import AutoTokenizer, set_seed
 
 from batched_policy import BatchedPolicy
 from lap_episode import LapEpisode
+from experiment_tracking import ExperimentTracker
 from model_runtime import GEMMA4_NATIVE_SPEC, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
 from native_constraints import NativeToolConstraint
 from trajectory_update import TrajectoryConfig, TrajectoryUpdater
@@ -32,7 +33,7 @@ def digest(adapter):
     return hashlib.sha256((Path(adapter) / "adapter_model.safetensors").read_bytes()).hexdigest()
 
 
-def collect(policy, road, spec, godot, directory, adapter_hash, generation, count, seconds):
+def collect(policy, road, spec, godot, directory, adapter_hash, generation, count, seconds, tracker=None):
     """Keep sampling weights frozen until every sampled and evaluation lane closes."""
     started = time.monotonic()
     with ExitStack() as stack:
@@ -67,7 +68,17 @@ def collect(policy, road, spec, godot, directory, adapter_hash, generation, coun
                                 simulation_seconds=[e.observation["sim_time"] for e in episodes])
                 publish(directory / "progress.json", progress)
                 print(json.dumps(progress), flush=True)
+                if tracker is not None:
+                    tracker.log({"generation": generation, "collection/decision_steps": step,
+                                 "collection/active_lanes": progress["active"],
+                                 "collection/elapsed_seconds": progress["elapsed_seconds"]})
         summaries = [episode.finish() for episode in episodes]
+        result = dict(generation=generation, adapter_sha256=adapter_hash,
+                      elapsed_seconds=time.monotonic() - started,
+                      evaluation=summaries[0], rollouts=summaries[1:])
+        publish(directory / "collection.json", result)
+        if tracker is not None:
+            tracker.collection(result)
         if getattr(road, "native_tools", None) is not None and any(
             summary.get("reason") == "invalid_model_action" for summary in summaries
         ):
@@ -79,10 +90,6 @@ def collect(policy, road, spec, godot, directory, adapter_hash, generation, coun
             training.append({"reward_components": summary["reward_components"], "decisions": [
                 {"prompt_ids": r["prompt_ids"], "completion_ids": r["completion_ids"],
                  "old_per_token_logps": r["behavior_logprobs"]} for r in episode.records]})
-        result = dict(generation=generation, adapter_sha256=adapter_hash,
-                      elapsed_seconds=time.monotonic() - started,
-                      evaluation=summaries[0], rollouts=summaries[1:])
-        publish(directory / "collection.json", result)
         return training, result, prompts[0]
 
 
@@ -123,6 +130,9 @@ def main():
     parser.add_argument("--time-budget-seconds", type=float, default=900)
     parser.add_argument("--batch-candidates", default="4,8,16,32,64")
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--wandb-mode", choices=("offline", "online", "disabled"), default="offline")
+    parser.add_argument("--wandb-project", default="thunderhill-rl")
+    parser.add_argument("--wandb-entity")
     args = parser.parse_args()
     if args.generations < 1 or args.time_budget_seconds <= 0:
         parser.error("Positive generation count and episode budget required")
@@ -156,47 +166,52 @@ def main():
                 "native_stop_token_id": road.native_tools.stop_token_id,
                 "constrained_sampling_and_training": True}
     publish(args.output / "campaign.json", manifest)
-    # Obtain real prompt features from the identical simulator reset used below.
-    # Even this short capacity probe is recorded and queued for video.
-    with LapEpisode(godot=args.godot, output=args.output / "capacity-probe", road=road,
-                    adapter_sha256=current_hash, model=spec.model, revision=spec.revision,
-                    generation=args.initial_generation, rollout=1, time_budget_seconds=.1) as probe:
-        prompt = probe.prompt()
-        candidates = [int(v) for v in args.batch_candidates.split(",")]
-        if args.smoke:
-            candidates = [4, 8]
-        profile = policy.profile([prompt], candidates=candidates)
-        publish(args.output / "inference-profile.json", profile)
-        if profile["selected_batch_size"] is None:
-            raise RuntimeError("No inference batch met validity and memory requirements")
-        row = policy.generate([prompt], greedy_indices=(0,))[0]
-        probe.apply(row["completion"], row["completion_ids"], row["prompt_ids"],
-                    behavior_logprobs=row["old_per_token_logps"])
-    # One lane evaluates greedily. All remaining lanes are sampled rollouts.
-    count = profile["selected_batch_size"] - 1
-    manifest["rollouts_per_generation"] = count
-    publish(args.output / "campaign.json", manifest)
-    print(json.dumps({"profile": profile, "rollouts_per_generation": count}), flush=True)
-    for offset in range(generations):
-        generation = args.initial_generation + offset
-        episodes, collection, prompt = collect(policy, road, spec, args.godot,
-            args.output / f"generation-{generation:04d}", current_hash, generation, count, seconds)
-        if offset == 0:
-            training_profile = updater.profile_microbatches(episodes)
-            publish(args.output / "training-profile.json", training_profile)
-        audit = updater.update(episodes, generation=generation + 1)
-        verification = save_checkpoint(model, tokenizer, spec, updater,
-            args.output / f"checkpoint-{generation + 1:04d}", prompt)
-        current_hash = verification["adapter_sha256"]
-        manifest["generations"].append({"generation": generation + 1, "collection": collection,
-                                        "update": audit, "verification": verification})
+    with ExperimentTracker(args.output / "tracking", manifest, mode=args.wandb_mode,
+                           project=args.wandb_project, entity=args.wandb_entity) as tracker:
+        # Obtain real prompt features from the identical simulator reset used below.
+        # Even this short capacity probe is recorded and queued for video.
+        with LapEpisode(godot=args.godot, output=args.output / "capacity-probe", road=road,
+                        adapter_sha256=current_hash, model=spec.model, revision=spec.revision,
+                        generation=args.initial_generation, rollout=1, time_budget_seconds=.1) as probe:
+            prompt = probe.prompt()
+            candidates = [int(v) for v in args.batch_candidates.split(",")]
+            if args.smoke:
+                candidates = [4, 8]
+            profile = policy.profile([prompt], candidates=candidates)
+            publish(args.output / "inference-profile.json", profile)
+            if profile["selected_batch_size"] is None:
+                raise RuntimeError("No inference batch met validity and memory requirements")
+            row = policy.generate([prompt], greedy_indices=(0,))[0]
+            probe.apply(row["completion"], row["completion_ids"], row["prompt_ids"],
+                        behavior_logprobs=row["old_per_token_logps"])
+        # One lane evaluates greedily. All remaining lanes are sampled rollouts.
+        count = profile["selected_batch_size"] - 1
+        manifest["rollouts_per_generation"] = count
+        tracker.run.config.update({"rollouts_per_generation": count})
         publish(args.output / "campaign.json", manifest)
-        print(json.dumps({"updated_generation": generation + 1, "audit": audit}), flush=True)
-    _, evaluation, _ = collect(policy, road, spec, args.godot,
-        args.output / "final-evaluation", current_hash,
-        args.initial_generation + generations, 0, seconds)
-    manifest.update(complete=True, final_evaluation=evaluation)
-    publish(args.output / "campaign.json", manifest)
+        print(json.dumps({"profile": profile, "rollouts_per_generation": count}), flush=True)
+        for offset in range(generations):
+            generation = args.initial_generation + offset
+            episodes, collection, prompt = collect(policy, road, spec, args.godot,
+                args.output / f"generation-{generation:04d}", current_hash, generation, count, seconds, tracker=tracker)
+            if offset == 0:
+                training_profile = updater.profile_microbatches(episodes)
+                publish(args.output / "training-profile.json", training_profile)
+            audit = updater.update(episodes, generation=generation + 1)
+            verification = save_checkpoint(model, tokenizer, spec, updater,
+                args.output / f"checkpoint-{generation + 1:04d}", prompt)
+            tracker.update(audit, verification)
+            current_hash = verification["adapter_sha256"]
+            manifest["generations"].append({"generation": generation + 1, "collection": collection,
+                                            "update": audit, "verification": verification})
+            publish(args.output / "campaign.json", manifest)
+            print(json.dumps({"updated_generation": generation + 1, "audit": audit}), flush=True)
+        _, evaluation, _ = collect(policy, road, spec, args.godot,
+            args.output / "final-evaluation", current_hash,
+            args.initial_generation + generations, 0, seconds, tracker=tracker)
+        manifest.update(complete=True, final_evaluation=evaluation)
+        publish(args.output / "campaign.json", manifest)
+        tracker.run.summary["campaign_complete"] = True
 
 
 if __name__ == "__main__":

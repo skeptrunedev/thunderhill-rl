@@ -8,4 +8,5 @@ dependencies = [
   "trl==1.13.0",
   "peft==0.21.0",
   "xgrammar==0.2.7",
+  "wandb==0.30.0",
 ]
