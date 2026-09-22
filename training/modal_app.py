@@ -38,6 +38,8 @@ STAGES = {
     "diagnostic": "modal_diagnostic.py",
     "warmstart": "modal_diagnostic.py",
     "warmstart-rl": "modal_warmstart_rl.py",
+    "full-lap-smoke": "train_full_lap_grpo.py",
+    "full-lap": "train_full_lap_grpo.py",
 }
 WARMSTART_DATASET = ROOT / "artifacts/lap-policy-dataset-v5-recovery"
 
@@ -102,24 +104,56 @@ def validate_request(stage: str, run_id: str) -> str:
 
 
 @app.function(
-    image=image,
-    gpu="H100",
-    cpu=8,
-    memory=65536,
-    timeout=1800,
-    max_containers=1,
-    retries=0,
+    image=image, gpu="H100", cpu=8, memory=65536, timeout=1800,
+    max_containers=1, retries=0,
     volumes={str(RUNS): artifacts, "/model-cache": cache},
 )
 def run(stage: str, run_id: str, source: dict, source_run: str = "") -> dict:
-    script = validate_request(stage, run_id)
-    if stage == "warmstart-rl":
+    if stage in ("full-lap", "full-lap-smoke"):
+        raise ValueError("Full lap stages require run_campaign")
+    return _execute_run(stage, run_id, source, source_run, 1800, 1680)
+
+
+@app.function(
+    image=image, gpu="H100", cpu=16, memory=131072, timeout=21600,
+    max_containers=1, retries=0,
+    volumes={str(RUNS): artifacts, "/model-cache": cache},
+)
+def run_campaign(stage: str, run_id: str, source: dict, source_run: str,
+                 batch_candidates: str = "4,8,16,32,64") -> dict:
+    if stage not in ("full-lap", "full-lap-smoke"):
+        raise ValueError("Campaign stage must be full-lap or full-lap-smoke")
+    return _execute_run(stage, run_id, source, source_run, 21600, 21480, batch_candidates)
+
+
+def validate_source(stage, source_run):
+    if stage in ("warmstart-rl", "full-lap", "full-lap-smoke"):
         validate_request("warmstart", source_run)
     elif source_run:
-        raise ValueError("Source run is only valid for warmstart-rl")
+        raise ValueError("Source run requires a stage that resumes a checkpoint")
+
+
+def validate_candidates(value):
+    if not re.fullmatch(r"[1-9][0-9]*(,[1-9][0-9]*)*", value):
+        raise ValueError("Batch candidates must be comma separated positive integers")
+    sizes = [int(x) for x in value.split(",")]
+    if len(sizes) != len(set(sizes)) or any(n > 64 for n in sizes):
+        raise ValueError("Batch candidates must be unique and no larger than 64")
+
+
+def _execute_run(stage, run_id, source, source_run, function_timeout, child_timeout,
+                 batch_candidates="4,8,16,32,64"):
+    script = validate_request(stage, run_id)
+    validate_source(stage, source_run)
+    validate_candidates(batch_candidates)
     artifacts.reload()
     # Reserve a unique parent, keeping the child's --output nonexistent as the
     # existing training CLIs require. Never replace an earlier run.
+    if stage in ("full-lap", "full-lap-smoke"):
+        adapter = RUNS / source_run / "experiment" / "grpo" / "adapter"
+        for filename in ("adapter_model.safetensors", "adapter_config.json", "model_spec.json"):
+            if not (adapter / filename).is_file():
+                raise FileNotFoundError(f"Source adapter is incomplete: {adapter / filename}")
     root = RUNS / run_id
     root.mkdir(exist_ok=False)
     output = root / "experiment"
@@ -136,6 +170,13 @@ def run(stage: str, run_id: str, source: dict, source_run: str = "") -> dict:
         command.extend(["--warmstart-dataset", "/opt/thunderhill/warmstart-data"])
     elif stage == "warmstart-rl":
         command.extend(["--source", str(RUNS / source_run / "experiment")])
+    elif stage in ("full-lap", "full-lap-smoke"):
+        command.extend([
+            "--adapter", str(adapter), "--generations", "3", "--initial-generation", "2",
+            "--time-budget-seconds", "900", "--batch-candidates", batch_candidates,
+        ])
+        if stage == "full-lap-smoke":
+            command.append("--smoke")
     manifest = {
         "stage": stage,
         "run_id": run_id,
@@ -143,8 +184,8 @@ def run(stage: str, run_id: str, source: dict, source_run: str = "") -> dict:
         "source": source,
         "source_run": source_run or None,
         "gpu_requested": "H100",
-        "function_timeout_seconds": 1800,
-        "child_timeout_seconds": 1680,
+        "function_timeout_seconds": function_timeout,
+        "child_timeout_seconds": child_timeout,
         "artifact_volume": ARTIFACT_VOLUME,
         "video_rendering": "Download the complete run and render its video_jobs locally",
     }
@@ -179,9 +220,22 @@ def run(stage: str, run_id: str, source: dict, source_run: str = "") -> dict:
             reader = threading.Thread(target=stream_output, daemon=True)
             reader.start()
             try:
-                returncode = process.wait(timeout=1680)
+                deadline = time.monotonic() + child_timeout
+                while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(command, child_timeout)
+                    try:
+                        returncode = process.wait(timeout=min(60, remaining))
+                        break
+                    except subprocess.TimeoutExpired:
+                        # Commit consistent filesystem snapshots while the child
+                        # keeps writing. Live logs may be partial; immutable video
+                        # jobs remain the authority for finished recordings.
+                        artifacts.commit()
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGINT)
+                # Keep Godot alive while the trainer flushes and audits episodes.
+                process.send_signal(signal.SIGINT)
                 try:
                     process.wait(timeout=30)
                 except subprocess.TimeoutExpired:
@@ -199,7 +253,7 @@ def run(stage: str, run_id: str, source: dict, source_run: str = "") -> dict:
         )
         if not status["ok"]:
             raise RuntimeError(
-                f"Diagnostic exited {returncode}; inspect {run_id}/run.log"
+                f"Stage {stage} exited {returncode}; inspect {run_id}/run.log"
             )
         return status
     except BaseException as error:
@@ -215,12 +269,11 @@ def run(stage: str, run_id: str, source: dict, source_run: str = "") -> dict:
 
 
 @app.local_entrypoint()
-def main(run_id: str, stage: str = "diagnostic", source_run: str = ""):
+def main(run_id: str, stage: str = "diagnostic", source_run: str = "",
+         batch_candidates: str = "4,8,16,32,64"):
     validate_request(stage, run_id)
-    if stage == "warmstart-rl":
-        validate_request("warmstart", source_run)
-    elif source_run:
-        raise ValueError("Source run is only valid for warmstart-rl")
+    validate_source(stage, source_run)
+    validate_candidates(batch_candidates)
     source = {
         "git_commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
@@ -229,4 +282,8 @@ def main(run_id: str, stage: str = "diagnostic", source_run: str = ""):
             ["git", "status", "--porcelain"], cwd=ROOT, text=True
         ),
     }
-    print(json.dumps(run.remote(stage, run_id, source, source_run), indent=2))
+    if stage in ("full-lap", "full-lap-smoke"):
+        result = run_campaign.remote(stage, run_id, source, source_run, batch_candidates)
+    else:
+        result = run.remote(stage, run_id, source, source_run)
+    print(json.dumps(result, indent=2))
