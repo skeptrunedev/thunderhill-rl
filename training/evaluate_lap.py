@@ -27,6 +27,9 @@ def main():
     p.add_argument("--max-actions", type=int, default=9000)
     p.add_argument("--generation", type=int, help="Known generation of this adapter")
     p.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
+    p.add_argument("--inference-profile", choices=("native", "local-fp16"), default="native")
+    p.add_argument("--reference-decisions", type=Path,
+                   help="Compare local FP16 outputs with decisions from this exact checkpoint")
     p.add_argument(
         "--compile", action="store_true", help="Compile CUDA decode with a static cache"
     )
@@ -35,6 +38,10 @@ def main():
         p.error("Generation must be nonnegative")
     if args.compile and args.device != "cuda":
         p.error("Compiled inference requires CUDA")
+    if args.inference_profile == "local-fp16" and (args.device != "cuda" or args.compile):
+        p.error("The local FP16 profile requires CUDA without static cache compilation")
+    if args.reference_decisions and args.inference_profile != "local-fp16":
+        p.error("Reference comparison is for the local FP16 profile")
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
     spec = read_spec(args.adapter)
@@ -43,6 +50,11 @@ def main():
     if args.compile:
         tokenizer.padding_side = "left"
     generation_options = {}
+    if args.device == "cuda":
+        torch.cuda.reset_peak_memory_stats()
+    if args.inference_profile == "local-fp16":
+        from local_inference import FiniteLogits
+        generation_options["logits_processor"] = [FiniteLogits()]
     if args.compile:
         generation_options = {
             "cache_implementation": "static",
@@ -51,14 +63,22 @@ def main():
                 fullgraph=True, dynamic=True, mode="reduce-overhead"
             ),
         }
-    model = PeftModel.from_pretrained(
-        load_base(spec, device=args.device),
-        str(args.adapter),
-    ).eval()
+    if args.inference_profile == "local-fp16":
+        from local_inference import load_local_policy
+        model = load_local_policy(spec, args.adapter)
+    else:
+        model = PeftModel.from_pretrained(
+            load_base(spec, device=args.device), str(args.adapter),
+        ).eval()
     adapter_hash = hashlib.sha256(
         (args.adapter / "adapter_model.safetensors").read_bytes()
     ).hexdigest()
     road = PolicyRoadTelemetry(spec, tokenizer)
+    if args.reference_decisions:
+        from local_inference import compare_reference
+        comparison = compare_reference(model, tokenizer, args.reference_decisions, adapter_hash)
+        (out / "precision-comparison.json").write_text(json.dumps(comparison, indent=2) + "\n")
+        print(json.dumps({"precision_comparison": comparison}), flush=True)
     stop_requested = False
 
     def request_stop(signum, frame):
@@ -124,16 +144,25 @@ def main():
             ).to(args.device)
             if args.compile and inputs["input_ids"].shape[1] != 256:
                 raise ValueError("Policy prompt exceeds the fixed compiled input size")
-            with torch.inference_mode(), inference_precision(model):
-                output = model.generate(
-                    **inputs,
-                    max_new_tokens=32,
-                    max_length=None,
-                    do_sample=False,
-                    pad_token_id=tokenizer.pad_token_id,
-                    eos_token_id=tokenizer.eos_token_id,
-                    **generation_options,
-                )
+            try:
+                with torch.inference_mode(), inference_precision(model):
+                    output = model.generate(
+                        **inputs,
+                        max_new_tokens=32,
+                        max_length=None,
+                        do_sample=False,
+                        pad_token_id=tokenizer.pad_token_id,
+                        eos_token_id=tokenizer.eos_token_id,
+                        **generation_options,
+                    )
+            except FloatingPointError as error:
+                decisions.write(json.dumps({
+                    "action_index": index, "episode_id": episode, "prompt": prompt,
+                    "completion": "", "completion_ids": [], "adapter_sha256": adapter_hash,
+                    "error": str(error),
+                }) + "\n")
+                reason = "nonfinite_model_logits"
+                break
             tokens = output[0, inputs["input_ids"].shape[1] :].tolist()
             text = tokenizer.decode(tokens, skip_special_tokens=True)
             row = {
@@ -219,6 +248,10 @@ def main():
             "video_job": str(video_job.relative_to(out)),
             "model": MODEL,
             "device": args.device,
+            "inference_profile": args.inference_profile,
+            "compute_dtype": str(model.dtype),
+            "gpu": torch.cuda.get_device_name() if args.device == "cuda" else None,
+            "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated() if args.device == "cuda" else None,
             "compiled_inference": args.compile,
             "adapter_merged_for_inference": merged,
             "revision": REVISION,

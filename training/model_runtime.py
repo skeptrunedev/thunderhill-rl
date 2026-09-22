@@ -85,7 +85,7 @@ def write_spec(adapter: Path, spec: ModelSpec) -> None:
     path.write_text(json.dumps(asdict(spec), indent=2) + "\n")
 
 
-def load_base(spec: ModelSpec, device: str = "cuda"):
+def load_base(spec: ModelSpec, device: str = "cuda", *, dtype: str | None = None):
     """Load only the text model, retaining SDPA and the model's normal KV cache."""
     import torch
     from transformers import AutoModelForCausalLM, Gemma4ForCausalLM
@@ -96,7 +96,7 @@ def load_base(spec: ModelSpec, device: str = "cuda"):
     model, info = loader.from_pretrained(
         spec.model,
         revision=spec.revision,
-        dtype=getattr(torch, spec.dtype),
+        dtype=getattr(torch, dtype or spec.dtype),
         attn_implementation="sdpa",
         device_map={"": device},
         output_loading_info=True,
