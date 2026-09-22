@@ -16,15 +16,17 @@ from video_jobs import enqueue_video
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from check_parallel import worker
 
-REWARD_VERSION = "audited-full-lap-v1"
+REWARD_VERSION = "audited-legal-progress-v2"
+PROGRESS_METERS_PER_REWARD = 100.0
+FAILURE_PENALTY = 0.2
 
 
 def episode_reward(*, legal_progress_m, track_length_m, sim_seconds,
                    time_budget_seconds, success, failed=False, invalid_syntax=False):
-    """Bounded progress and strictly dominant valid completion with time reward.
+    """Signed legal progress with a failure cost equivalent to twenty meters.
 
     Success must come from audit_lap, never an unaudited model or simulator flag.
-    Incomplete attempts earn at most one; valid completions earn at least three.
+    Progress is capped at one track length; valid completion adds a bonus.
     Progress is signed net legal distance so reversing cannot farm rewards.
     """
     values = (legal_progress_m, track_length_m, sim_seconds, time_budget_seconds)
@@ -34,21 +36,22 @@ def episode_reward(*, legal_progress_m, track_length_m, sim_seconds,
         raise ValueError("Invalid episode reward dimensions")
     if success and (failed or invalid_syntax or sim_seconds > time_budget_seconds + 1e-6):
         raise ValueError("Successful lap conflicts with failure or budget")
-    progress = 1.0 if success else min(1.0, max(0.0, legal_progress_m / track_length_m))
+    progress_m = track_length_m if success else min(track_length_m, max(-track_length_m, legal_progress_m))
     result = {
         "version": REWARD_VERSION,
         "legal_progress_m": legal_progress_m,
         "track_length_m": track_length_m,
         "sim_seconds": sim_seconds,
         "time_budget_seconds": time_budget_seconds,
-        "progress_fraction": progress,
+        "progress_fraction": progress_m / track_length_m,
+        "progress_reward": progress_m / PROGRESS_METERS_PER_REWARD,
         "completion_bonus": 2.0 if success else 0.0,
         "speed_bonus": max(0.0, 1.0 - sim_seconds / time_budget_seconds) if success else 0.0,
-        "failure_penalty": -1.0 if failed else 0.0,
+        "failure_penalty": -FAILURE_PENALTY if failed else 0.0,
         "syntax_penalty": -1.0 if invalid_syntax else 0.0,
     }
     result["total"] = sum(result[k] for k in (
-        "progress_fraction", "completion_bonus", "speed_bonus", "failure_penalty", "syntax_penalty"))
+        "progress_reward", "completion_bonus", "speed_bonus", "failure_penalty", "syntax_penalty"))
     return result
 
 

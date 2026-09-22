@@ -18,6 +18,8 @@ CONFIG_KEYS = (
     "model", "revision", "initial_adapter_sha256", "generations_requested",
     "time_budget_seconds", "smoke_only", "prompt_style", "native_stop_token_id",
     "constrained_sampling_and_training", "rollouts_per_generation",
+    "reward_version", "progress_meters_per_reward", "failure_penalty", "seed", "temperature",
+    "training_method", "initialization", "supervised_training_performed",
 )
 UPDATE_KEYS = (
     "loss", "episodes", "actions", "generated_tokens", "trained_tokens", "later_actions",

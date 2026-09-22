@@ -243,7 +243,8 @@
     "sampled_actions_collected": 900,
     "mean_legal_progress_m": -0.002080112638108205,
     "evidence": "No saved update or checkpoint; empty campaign generations; trainer log ends in KeyboardInterrupt during gradient accumulation. Collected rollouts have identical zero rewards.",
-    "wandb_url": "https://wandb.ai/skeptrune-org/thunderhill-rl/runs/hak1s0hc"
+    "wandb_url": "https://wandb.ai/skeptrune-org/thunderhill-rl/runs/hak1s0hc",
+    "verified_rendered_videos": 5
   },
   "caveats": [
     "Gameplay performance is nonmonotonic: batch best and mean progress improve in the second collection and decline in the third. Three updates do not establish reliable driving improvement.",
@@ -251,7 +252,7 @@
     "Greedy evaluations stay near the starting position. Valid native syntax is not driving skill.",
     "Failed sampled rollouts are legitimate RL experience. No lap qualification or supervised imitation was used.",
     "Two CUDA allocator OOM warnings occurred during the third update. The allocator recovered sufficiently to finish that update and save a verified checkpoint; memory pressure remains a scaling concern.",
-    "All episode source recordings and queued video hashes verified. Best sampled episode video rendered and overlay visually checked; remaining video rendering is in progress."
+    "All 14 campaign episode videos and all five videos from the earlier zero exploration attempt are rendered with verified file hashes."
   ],
   "allocator_warning_source": "artifacts/functiongemma-local-rl-02/logs/rl.log",
   "final_evaluation": {
@@ -263,7 +264,8 @@
   },
   "videos": {
     "best_sampled_rollout": "artifacts/functiongemma-local-rl-02/rl/generation-0001/rollout-0002/videos/2623c143f5d43e49fb740835100994e1c4d0017237fd1911a1c656ab3b1438d8/attempt-0001/run.mp4",
-    "all_remaining_jobs": "rendering",
-    "overlay_visually_verified": true
+    "all_remaining_jobs": "complete",
+    "overlay_visually_verified": true,
+    "verified_rendered_videos": 14
   }
 }

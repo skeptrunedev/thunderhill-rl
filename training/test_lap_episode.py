@@ -24,10 +24,33 @@ class EpisodeRewardTests(unittest.TestCase):
 
     def test_net_progress_and_failure_penalties(self):
         self.assertGreater(self.reward()["total"], self.reward(legal_progress_m=500)["total"])
-        self.assertEqual(self.reward(legal_progress_m=-100)["total"], 0)
-        self.assertEqual(self.reward(failed=True)["total"], self.reward()["total"] - 1)
+        self.assertEqual(self.reward(legal_progress_m=-100)["total"], -1)
+        self.assertEqual(self.reward(failed=True)["total"], self.reward()["total"] - 0.2)
         self.assertEqual(self.reward(invalid_syntax=True)["total"], self.reward()["total"] - 1)
         self.assertEqual(self.reward(failed=True)["completion_bonus"], 0)
+
+    def test_exploration_beats_inactivity_but_clean_progress_is_better(self):
+        idle = self.reward(legal_progress_m=0)["total"]
+        crashed = self.reward(legal_progress_m=40, failed=True)["total"]
+        clean = self.reward(legal_progress_m=40)["total"]
+        self.assertEqual(idle, 0)
+        self.assertAlmostEqual(crashed, 0.2)
+        self.assertAlmostEqual(clean, 0.4)
+        self.assertGreater(crashed, idle)
+        self.assertGreater(clean, crashed)
+        self.assertAlmostEqual(self.reward(legal_progress_m=57)["total"], 0.57)
+
+    def test_early_crash_cannot_escape_penalty_or_gain_time_bonus(self):
+        early = self.reward(legal_progress_m=0, failed=True, sim_seconds=1)
+        late = self.reward(legal_progress_m=0, failed=True, sim_seconds=500)
+        self.assertEqual(early["total"], late["total"])
+        self.assertLess(early["total"], self.reward(legal_progress_m=0)["total"])
+        self.assertEqual(early["speed_bonus"], 0)
+
+    def test_signed_progress_does_not_reward_retracing(self):
+        self.assertEqual(self.reward(legal_progress_m=sum([40, -40]))["total"], 0)
+        self.assertLess(self.reward(legal_progress_m=-40)["total"], 0)
+        self.assertAlmostEqual(self.reward(legal_progress_m=40)["progress_fraction"], 40 / 4800)
 
     def test_reject_invalid_success_or_nonfinite(self):
         for kwargs in ({"success": True, "failed": True}, {"success": True, "invalid_syntax": True},

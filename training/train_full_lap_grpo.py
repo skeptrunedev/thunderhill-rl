@@ -15,7 +15,7 @@ from peft import LoraConfig, PeftModel, get_peft_model
 from transformers import AutoTokenizer, set_seed
 
 from batched_policy import BatchedPolicy
-from lap_episode import LapEpisode
+from lap_episode import FAILURE_PENALTY, PROGRESS_METERS_PER_REWARD, REWARD_VERSION, LapEpisode
 from experiment_tracking import ExperimentTracker
 from model_runtime import FUNCTIONGEMMA_SPEC, GEMMA4_NATIVE_SPEC, LORA_TARGET_MODULES, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
 from native_constraints import NativeToolConstraint
@@ -181,6 +181,8 @@ def main():
     current_hash = digest(args.adapter)
     manifest = {"model": spec.model, "revision": spec.revision, "initial_adapter_sha256": current_hash,
                 "training_method": "reinforcement_learning",
+                "reward_version": REWARD_VERSION, "progress_meters_per_reward": PROGRESS_METERS_PER_REWARD,
+                "failure_penalty": FAILURE_PENALTY, "seed": 73,
                 "initialization": "fresh_base_lora" if args.functiongemma else "existing_adapter",
                 "supervised_training_performed": False, "temperature": args.temperature,
                 "generations_requested": generations, "time_budget_seconds": seconds,
@@ -217,8 +219,11 @@ def main():
             generation = args.initial_generation + offset
             episodes, collection, prompt = collect(policy, road, spec, args.godot,
                 args.output / f"generation-{generation:04d}", current_hash, generation, count, seconds, tracker=tracker)
+            # New rollout lengths and retained CUDA graphs change memory demand.
+            # Requalify against each actual generation, allowing batches to grow or shrink.
+            training_profile = updater.profile_microbatches(episodes)
+            publish(args.output / f"generation-{generation:04d}" / "training-profile.json", training_profile)
             if offset == 0:
-                training_profile = updater.profile_microbatches(episodes)
                 publish(args.output / "training-profile.json", training_profile)
             audit = updater.update(episodes, generation=generation + 1)
             verification = save_checkpoint(model, tokenizer, spec, updater,
