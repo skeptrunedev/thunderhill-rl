@@ -214,6 +214,15 @@ summaries; base model revision is not independently established by this check.
 
 ## Speed exploration and repeated controls
 
+[Generation 20 completed a faster legal lap](results/rtx2080ti-gemma-faster-lap.json)
+in 599.983 seconds, compared with generation 10 at 600.925 seconds. Ten additional
+GRPO steps using 320 sampled rollouts improved the full lap by 0.942 seconds
+(0.157 percent). Both recordings independently passed all gate, control,
+checkpoint provenance, and zero off track checks under identical simulator
+conditions and standing starts. The learned adapter was saved and reloaded.
+This is a small improvement from one deterministic evaluation per checkpoint on
+the training circuit, not evidence of robust or competitive racing performance.
+
 The first speed batch repeated the same action four times and produced zero
 reward variance and zero gradient. It was stopped rather than counted as
 improvement. [A sampling probe](results/rtx2080ti-gemma-speed-sampling.json)
