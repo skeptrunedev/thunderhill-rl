@@ -20,6 +20,7 @@ CONFIG_KEYS = (
     "constrained_sampling_and_training", "rollouts_per_generation",
     "reward_version", "progress_meters_per_reward", "failure_penalty", "seed", "temperature",
     "training_method", "initialization", "supervised_training_performed",
+    "stall_config",
 )
 UPDATE_KEYS = (
     "loss", "episodes", "actions", "generated_tokens", "trained_tokens", "later_actions",
@@ -37,6 +38,7 @@ def episode_metrics(summary):
     actions = summary["actions"]
     metrics = {
         "completed": int(success), "crashed": int(obs["state"]["crashed"]),
+        "stalled": int(summary["reason"] == "stalled"),
         "invalid_call_count": int(invalid), "tool_call_count": actions + int(invalid),
         "episode_seconds": obs["sim_time"], "actions": actions,
         "offtrack_ticks": summary["offtrack_ticks"], "gates_passed": len(summary["gates"]),
@@ -61,6 +63,7 @@ def collection_metrics(collection):
         result.update({
             "rollout/completion_rate": mean(row["completed"] for row in rows),
             "rollout/crash_rate": mean(row["crashed"] for row in rows),
+            "rollout/stall_rate": mean(row["stalled"] for row in rows),
             "rollout/invalid_episode_rate": mean(row["invalid_call_count"] for row in rows),
             "rollout/invalid_call_count": sum(row["invalid_call_count"] for row in rows),
             "rollout/tool_call_count": sum(row["tool_call_count"] for row in rows),

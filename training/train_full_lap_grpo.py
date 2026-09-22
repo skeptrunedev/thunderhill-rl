@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
+from dataclasses import asdict
 import hashlib
 import json
 import math
@@ -15,7 +16,7 @@ from peft import LoraConfig, PeftModel, get_peft_model
 from transformers import AutoTokenizer, set_seed
 
 from batched_policy import BatchedPolicy
-from lap_episode import FAILURE_PENALTY, PROGRESS_METERS_PER_REWARD, REWARD_VERSION, LapEpisode
+from lap_episode import DEFAULT_STALL_CONFIG, FAILURE_PENALTY, PROGRESS_METERS_PER_REWARD, REWARD_VERSION, LapEpisode
 from experiment_tracking import ExperimentTracker
 from model_runtime import FUNCTIONGEMMA_SPEC, GEMMA4_NATIVE_SPEC, LORA_TARGET_MODULES, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
 from native_constraints import NativeToolConstraint
@@ -183,6 +184,7 @@ def main():
                 "training_method": "reinforcement_learning",
                 "reward_version": REWARD_VERSION, "progress_meters_per_reward": PROGRESS_METERS_PER_REWARD,
                 "failure_penalty": FAILURE_PENALTY, "seed": 73,
+                "stall_config": asdict(DEFAULT_STALL_CONFIG),
                 "initialization": "fresh_base_lora" if args.functiongemma else "existing_adapter",
                 "supervised_training_performed": False, "temperature": args.temperature,
                 "generations_requested": generations, "time_budget_seconds": seconds,

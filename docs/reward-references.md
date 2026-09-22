@@ -47,3 +47,9 @@ At a fixed episode budget, more legal distance rewards higher average useful spe
 The current group relative trainer subtracts the group mean. A constant episode penalty shared by every rollout cancels. A penalty proportional to actual elapsed time does not necessarily cancel because failures can end episodes early, but it can favor early failure if poorly weighted. We are not adding that extra incentive in this experiment.
 
 Evaluate legal distance, crashes, completion rate and valid lap times alongside reward. Higher reward alone is not evidence of better racing.
+
+## Stalled attempt cutoff
+
+New collector processes allow five seconds to launch, then require at least one meter of signed legal progress in each rolling five second window. The first possible stall is at ten simulated seconds. Reverse movement and retracing do not count as new progress. The cutoff uses physics ticks, not wall clock inference time. Simulator termination, invalid track limits, and the configured episode budget take precedence.
+
+A stalled attempt remains eligible for RL, retains its earned progress reward, and is logged separately from a crash. Its recording and video job include the stop reason, window bounds, measured progress, and cutoff configuration. Native tool checkpoint evaluation uses the same collector. Processes already running retain the rules they loaded at launch.

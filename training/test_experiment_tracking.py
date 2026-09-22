@@ -21,6 +21,15 @@ def collection(rollouts):
 
 
 class TrackingTests(unittest.TestCase):
+    def test_stall_is_distinct_from_crash_and_keeps_earned_reward(self):
+        stalled = episode("stalled")
+        stalled["reward_components"]["total"] = 0.12
+        metrics = collection_metrics(collection([stalled, episode("crash")]))
+        self.assertEqual(metrics["rollout/stall_rate"], 0.5)
+        self.assertEqual(metrics["rollout/crash_rate"], 0.5)
+        self.assertEqual(episode_metrics(stalled)["reward"], 0.12)
+        self.assertNotIn("lap_seconds", episode_metrics(stalled))
+
     def test_failed_duration_is_not_lap_time(self):
         row = episode_metrics(episode())
         self.assertNotIn("lap_seconds", row)

@@ -4,7 +4,9 @@ from __future__ import annotations
 import json
 import math
 import sys
+from collections import deque
 from contextlib import ExitStack
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from agent_harness import ThunderhillEnv
@@ -20,6 +22,62 @@ REWARD_VERSION = "audited-legal-progress-v2"
 PROGRESS_METERS_PER_REWARD = 100.0
 FAILURE_PENALTY = 0.2
 
+
+
+@dataclass(frozen=True)
+class StallConfig:
+    """Integer physics tick windows; a stopped attempt remains RL experience."""
+    grace_ticks: int = 600
+    window_ticks: int = 600
+    minimum_progress_m: float = 1.0
+
+    def __post_init__(self):
+        if (type(self.grace_ticks) is not int or self.grace_ticks < 0
+                or type(self.window_ticks) is not int or self.window_ticks <= 0
+                or not math.isfinite(self.minimum_progress_m) or self.minimum_progress_m <= 0):
+            raise ValueError("Invalid stall monitor configuration")
+
+
+DEFAULT_STALL_CONFIG = StallConfig()
+
+
+class StallMonitor:
+    """Check signed net legal progress after a complete post grace window.
+
+    Retain the observation at or immediately before the window boundary. Normal
+    twelve tick actions land exactly on the default six hundred tick boundary.
+    For other cadences the diagnostic records the actual, slightly longer window.
+    """
+    def __init__(self, config=DEFAULT_STALL_CONFIG):
+        self.config = config
+        self.samples = deque()
+        self.diagnostic = None
+
+    def observe(self, tick, legal_distance):
+        if (type(tick) is not int or tick < 0 or not math.isfinite(legal_distance)
+                or (self.samples and tick <= self.samples[-1][0])):
+            raise ValueError("Stall observations require increasing integer ticks and finite distance")
+        self.samples.append((tick, legal_distance))
+        cutoff = tick - self.config.window_ticks
+        while len(self.samples) > 1 and self.samples[1][0] <= cutoff:
+            self.samples.popleft()
+        start_tick, start_distance = self.samples[0]
+        if (tick < self.config.grace_ticks + self.config.window_ticks
+                or start_tick < self.config.grace_ticks or start_tick > cutoff):
+            return False
+        gain = legal_distance - start_distance
+        stalled = gain < self.config.minimum_progress_m and not math.isclose(
+            gain, self.config.minimum_progress_m, rel_tol=0, abs_tol=1e-9)
+        self.diagnostic = {
+            "start_tick": start_tick, "end_tick": tick,
+            "window_ticks": tick - start_tick,
+            "start_legal_distance_m": start_distance,
+            "end_legal_distance_m": legal_distance,
+            "legal_progress_m": gain,
+            "minimum_progress_m": self.config.minimum_progress_m,
+            "stalled": stalled,
+        }
+        return stalled
 
 def episode_reward(*, legal_progress_m, track_length_m, sim_seconds,
                    time_budget_seconds, success, failed=False, invalid_syntax=False):
@@ -65,7 +123,7 @@ class LapEpisode:
     """
     def __init__(self, *, godot, output, road, adapter_sha256, model, revision,
                  generation, rollout, time_budget_seconds=900, evaluation=False, rollout_count=None,
-                 worker_factory=worker):
+                 worker_factory=worker, stall_config=DEFAULT_STALL_CONFIG):
         if len(adapter_sha256) != 64 or any(c not in "0123456789abcdef" for c in adapter_sha256):
             raise ValueError("Expected SHA256 adapter identity")
         ticks = round(time_budget_seconds * 120)
@@ -84,6 +142,7 @@ class LapEpisode:
             self.display.update(rollout_number=rollout, rollout_count=rollout_count or rollout)
         self.parse_completion = getattr(road, "parse_completion", parse_action)
         self.worker_factory = worker_factory
+        self.stall_monitor = StallMonitor(stall_config)
         self.records = []
         self._previous_completion = None
         self._previous_features = None
@@ -110,6 +169,7 @@ class LapEpisode:
             self.view = json.loads(self.env.observe())
             if self.env._observation["tick"] != 0 or self.env._observation["state"]["speed"] != 0:
                 raise ValueError("Full lap requires standing start at tick zero")
+            self.stall_monitor.observe(0, self.observation["track"]["legal_distance"])
             return self
         except BaseException:
             try:
@@ -169,6 +229,9 @@ class LapEpisode:
                 self.reason = obs.get("termination_reason") or obs.get("truncation_reason") or "finished"
             elif not obs["track"]["lap_valid"]:
                 self.reason = "track_limits"
+            elif self.stall_monitor.observe(obs["tick"], obs["track"]["legal_distance"]):
+                self.reason = "stalled"
+                row["stall_diagnostic"] = self.stall_monitor.diagnostic
         self.records.append(row)
         self.decisions.write(json.dumps(row, allow_nan=False) + "\n")
         self.decisions.flush()
@@ -189,13 +252,17 @@ class LapEpisode:
             "kind": "full_lap_evaluation" if self.display.get("evaluation", False) else "full_lap_rollout",
             "adapter_sha256": self.adapter_sha256, "model": self.model, "revision": self.revision,
             "policy_display": self.display, "stop_reason": self.reason,
-            "sim_seconds": final["sim_time"], "decisions": "decisions.jsonl"})
+            "sim_seconds": final["sim_time"], "decisions": "decisions.jsonl",
+            "stall_config": asdict(self.stall_monitor.config),
+            "stall_diagnostic": self.stall_monitor.diagnostic})
         summary = {"episode_id": self.episode_id, "reason": self.reason,
                    "model": self.model, "revision": self.revision,
                    "generation": self.generation, "rollout": self.rollout,
                    "adapter_sha256": self.adapter_sha256,
                    "video_job": str(video.relative_to(self.output)),
-                   "final_observation": final, "training_eligible": False}
+                   "final_observation": final, "training_eligible": False,
+                   "stall_config": asdict(self.stall_monitor.config),
+                   "stall_diagnostic": self.stall_monitor.diagnostic}
         try:
             audit = audit_lap(paths, episode_id=self.episode_id,
                               policy_id="interactive-step-" + self.policy_step,
@@ -216,7 +283,7 @@ class LapEpisode:
                     success=audit["success"], failed=final["state"]["crashed"] or not final["track"]["lap_valid"],
                     invalid_syntax=self.reason == "invalid_model_action")
                 summary["training_eligible"] = self.reason in {
-                    "lap_completed", "crash", "episode_tick_limit", "track_limits", "invalid_model_action"}
+                    "lap_completed", "crash", "episode_tick_limit", "track_limits", "invalid_model_action", "stalled"}
         except BaseException as error:
             summary["audit_error"] = str(error)
             raise

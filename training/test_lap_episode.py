@@ -1,11 +1,13 @@
 """Full episode reward boundaries and real simulator collector lifecycle."""
+import io
 import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
-from lap_episode import LapEpisode, episode_reward
+from lap_episode import LapEpisode, StallConfig, StallMonitor, episode_reward
 from lap_policy import RoadTelemetry
 
 
@@ -59,6 +61,95 @@ class EpisodeRewardTests(unittest.TestCase):
                 self.reward(**kwargs)
 
 
+
+class StallMonitorTests(unittest.TestCase):
+    def run_monitor(self, distance, last_tick=1200):
+        monitor = StallMonitor()
+        stopped = None
+        for tick in range(0, last_tick + 1, 12):
+            if monitor.observe(tick, distance(tick)):
+                stopped = tick
+                break
+        return monitor, stopped
+
+    def test_idle_stops_at_ten_seconds_not_during_grace(self):
+        monitor, stopped = self.run_monitor(lambda tick: 0)
+        self.assertEqual(stopped, 1200)
+        self.assertEqual(monitor.diagnostic["start_tick"], 600)
+        self.assertEqual(monitor.diagnostic["window_ticks"], 600)
+        self.assertEqual(monitor.diagnostic["legal_progress_m"], 0)
+
+    def test_launch_during_grace_and_slow_legal_progress_survive(self):
+        for distance in (lambda tick: max(0, tick - 480) / 300,
+                         lambda tick: tick / 600):
+            with self.subTest(distance=distance):
+                monitor, stopped = self.run_monitor(distance, 3600)
+                self.assertIsNone(stopped)
+                self.assertGreaterEqual(monitor.diagnostic["legal_progress_m"], 1)
+
+    def test_signed_reverse_and_retracing_cannot_avoid_stop(self):
+        for distance in (lambda tick: -tick / 100,
+                         lambda tick: (tick % 600) / 100):
+            with self.subTest(distance=distance):
+                monitor, stopped = self.run_monitor(distance)
+                self.assertEqual(stopped, 1200)
+                self.assertLessEqual(monitor.diagnostic["legal_progress_m"], 0)
+
+    def test_late_stall_uses_rolling_progress_not_total_distance(self):
+        monitor, stopped = self.run_monitor(lambda tick: min(tick, 1800) / 120, 3000)
+        self.assertEqual(stopped, 2292)
+        self.assertEqual(monitor.diagnostic["window_ticks"], 600)
+        self.assertGreater(monitor.diagnostic["end_legal_distance_m"], 1)
+        self.assertLess(monitor.diagnostic["legal_progress_m"], 1)
+
+    def test_exact_meter_boundary_tolerates_float_roundoff(self):
+        _, stopped = self.run_monitor(lambda tick: tick / 600 - (1e-12 if tick >= 1200 else 0))
+        self.assertIsNone(stopped)
+        _, stopped = self.run_monitor(lambda tick: tick * 0.999 / 600)
+        self.assertEqual(stopped, 1200)
+
+    def test_simulator_endings_take_precedence_at_stall_boundary(self):
+        endings = (
+            (True, False, "crash", "", False, "crash"),
+            (True, False, "lap_completed", "", True, "lap_completed"),
+            (False, True, "", "episode_tick_limit", True, "episode_tick_limit"),
+            (False, False, "", "", False, "track_limits"),
+        )
+        for terminated, truncated, termination, truncation, valid, expected in endings:
+            with self.subTest(reason=expected):
+                road = SimpleNamespace(prompt_features=lambda features: "observed road")
+                episode = LapEpisode(godot="unused", output="unused", road=road,
+                    adapter_sha256="a" * 64, model="test", revision="test", generation=1, rollout=1)
+                episode.episode_id = "test"
+                episode.decisions = io.StringIO()
+                episode.view = {"road": {}, "observation_token": "receipt"}
+                episode.env = SimpleNamespace(_observation={"tick": 1188})
+                episode.stall_monitor.observe(600, 0)
+                episode.stall_monitor.observe(1188, 0)
+
+                def control_bike(*args, **kwargs):
+                    episode.env._observation = {
+                        "tick": 1200, "terminated": terminated, "truncated": truncated,
+                        "termination_reason": termination, "truncation_reason": truncation,
+                        "track": {"lap_valid": valid, "legal_distance": 0}}
+                    return json.dumps({"road": {}, "observation_token": "next"})
+
+                episode.env.control_bike = control_bike
+                episode.apply("control_bike 0 0 100 0", [2], [1])
+                self.assertEqual(episode.reason, expected)
+                self.assertNotIn("stall_diagnostic", episode.records[-1])
+
+    def test_observations_and_configuration_fail_on_invalid_inputs(self):
+        for kwargs in ({"grace_ticks": -1}, {"window_ticks": 0}, {"window_ticks": 1.5},
+                       {"minimum_progress_m": float("nan")}):
+            with self.assertRaises(ValueError):
+                StallConfig(**kwargs)
+        monitor = StallMonitor()
+        monitor.observe(0, 0)
+        for tick, distance in ((0, 0), (1.5, 0), (12, float("nan"))):
+            with self.assertRaises(ValueError):
+                monitor.observe(tick, distance)
+
 @unittest.skipUnless(os.environ.get("THUNDERHILL_GODOT"), "Set THUNDERHILL_GODOT for native collector verification")
 class NativeEpisodeTests(unittest.TestCase):
     def episode(self, root, name):
@@ -66,6 +157,46 @@ class NativeEpisodeTests(unittest.TestCase):
                           road=RoadTelemetry(), adapter_sha256="a" * 64,
                           model="collector-test", revision="test", generation=1, rollout=1,
                           time_budget_seconds=0.2)
+
+    def test_stalled_idle_is_archived_and_training_eligible(self):
+        root = Path(tempfile.mkdtemp(prefix="stall-collector-native-",
+            dir=Path(__file__).resolve().parents[1] / "artifacts"))
+        with LapEpisode(godot=os.environ["THUNDERHILL_GODOT"], output=root / "idle",
+                        road=RoadTelemetry(), adapter_sha256="c" * 64,
+                        model="stall-lifecycle-test", revision="test", generation=1, rollout=1,
+                        time_budget_seconds=30) as episode:
+            while not episode.done:
+                episode.apply("control_bike 0 0 100 0", [2], [1])
+            self.assertEqual(episode.reason, "stalled")
+            self.assertEqual(episode.observation["tick"], 1200)
+            self.assertFalse(episode.observation["state"]["crashed"])
+        summary = episode.summary
+        self.assertEqual(summary["recorded_transitions"], 1200)
+        self.assertTrue(summary["training_eligible"])
+        self.assertTrue(summary["recording_provenance_verified"])
+        self.assertFalse(summary["success"])
+        self.assertEqual(summary["reward_components"]["failure_penalty"], 0)
+        self.assertAlmostEqual(summary["reward_components"]["total"],
+                               summary["reward_components"]["legal_progress_m"] / 100)
+        self.assertEqual(summary["stall_diagnostic"]["window_ticks"], 600)
+        self.assertEqual(episode.records[-1]["stall_diagnostic"], summary["stall_diagnostic"])
+        video = json.loads((episode.output / summary["video_job"]).read_text())
+        self.assertEqual(video["metadata"]["stop_reason"], "stalled")
+        self.assertEqual(video["metadata"]["stall_diagnostic"], summary["stall_diagnostic"])
+        self.assertTrue((episode.output / video["source"]).is_file())
+
+    def test_time_budget_takes_precedence_over_stall(self):
+        root = Path(tempfile.mkdtemp(prefix="stall-budget-native-",
+            dir=Path(__file__).resolve().parents[1] / "artifacts"))
+        with LapEpisode(godot=os.environ["THUNDERHILL_GODOT"], output=root / "budget",
+                        road=RoadTelemetry(), adapter_sha256="d" * 64,
+                        model="stall-budget-test", revision="test", generation=1, rollout=1,
+                        time_budget_seconds=10) as episode:
+            while not episode.done:
+                episode.apply("control_bike 0 0 100 0", [2], [1])
+            self.assertEqual(episode.reason, "episode_tick_limit")
+            self.assertEqual(episode.observation["tick"], 1200)
+        self.assertTrue(episode.summary["training_eligible"])
 
     def test_native_tool_feedback_uses_latest_actual_result(self):
         from transformers import AutoTokenizer
