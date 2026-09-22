@@ -11,10 +11,11 @@ from pathlib import Path
 import torch
 from agent_harness import ThunderhillEnv
 from lap_audit import audit_lap
-from lap_policy import RoadTelemetry, parse_action
+from lap_policy import parse_action
 from peft import PeftModel
-from smoke_grpo import MODEL, REVISION, worker
-from transformers import AutoModelForCausalLM, AutoTokenizer, CompileConfig
+from smoke_grpo import worker
+from transformers import AutoTokenizer, CompileConfig
+from model_runtime import PolicyRoadTelemetry, load_base, read_spec
 from video_jobs import enqueue_video
 
 
@@ -36,6 +37,8 @@ def main():
         p.error("Compiled inference requires CUDA")
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
+    spec = read_spec(args.adapter)
+    MODEL, REVISION = spec.model, spec.revision
     tokenizer = AutoTokenizer.from_pretrained(args.adapter)
     if args.compile:
         tokenizer.padding_side = "left"
@@ -49,15 +52,13 @@ def main():
             ),
         }
     model = PeftModel.from_pretrained(
-        AutoModelForCausalLM.from_pretrained(
-            MODEL, revision=REVISION, dtype=torch.float32, attn_implementation="sdpa"
-        ).to(args.device),
+        load_base(spec, device=args.device),
         str(args.adapter),
     ).eval()
     adapter_hash = hashlib.sha256(
         (args.adapter / "adapter_model.safetensors").read_bytes()
     ).hexdigest()
-    road = RoadTelemetry()
+    road = PolicyRoadTelemetry(spec, tokenizer)
     stop_requested = False
 
     def request_stop(signum, frame):
@@ -89,19 +90,23 @@ def main():
             display["generation"] = args.generation
         env.reset(policy_display=display)
         view = json.loads(env.observe())
-        # Merge LoRA once to avoid separate adapter kernels on every decoded token.
-        # Check numerical equivalence on the actual initial observation first.
-        probe = tokenizer(road.prompt_features(view["road"]), return_tensors="pt").to(
-            args.device
-        )
-        with torch.inference_mode():
-            before_merge = model(**probe, logits_to_keep=1).logits.detach().clone()
-            model = model.merge_and_unload(safe_merge=True).eval()
-            after_merge = model(**probe, logits_to_keep=1).logits
-            merge_error = (before_merge - after_merge).abs().max().item()
-            if not torch.allclose(before_merge, after_merge, atol=1e-4, rtol=1e-4):
-                raise RuntimeError(f"Adapter merge changed logits: {merge_error}")
-        del before_merge, after_merge, probe
+        # The proven FP32 path merges LoRA after an equivalence check. Retain
+        # BF16 adapters for validation to avoid rounding their small updates
+        # into the lower precision base weights before comparing behavior.
+        merged = spec.dtype == "float32"
+        merge_error = None
+        if merged:
+            probe = tokenizer(
+                road.prompt_features(view["road"]), return_tensors="pt"
+            ).to(args.device)
+            with torch.inference_mode():
+                before_merge = model(**probe, logits_to_keep=1).logits.detach().clone()
+                model = model.merge_and_unload(safe_merge=True).eval()
+                after_merge = model(**probe, logits_to_keep=1).logits
+                merge_error = (before_merge - after_merge).abs().max().item()
+                if not torch.allclose(before_merge, after_merge, atol=1e-4, rtol=1e-4):
+                    raise RuntimeError(f"Adapter merge changed logits: {merge_error}")
+            del before_merge, after_merge, probe
         episode = env._observation["episode_id"]
         reason = "action_budget"
         actions = 0
@@ -215,7 +220,8 @@ def main():
             "model": MODEL,
             "device": args.device,
             "compiled_inference": args.compile,
-            "adapter_merged_for_inference": True,
+            "adapter_merged_for_inference": merged,
+            "revision": REVISION,
             "merge_max_logit_error": merge_error,
             "adapter_sha256": adapter_hash,
             "teacher_used_at_inference": False,

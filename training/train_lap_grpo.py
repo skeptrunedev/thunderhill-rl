@@ -19,12 +19,13 @@ from pathlib import Path
 import torch
 from datasets import Dataset
 from greedy_cache import GreedyGenerationCache
-from lap_policy import RoadTelemetry, parse_action
+from lap_policy import parse_action
 from lap_prefix import load_prefix
 from lap_rollout import REWARD_VERSION, audit_rollout, physical_snapshot, rollout_reward
 from peft import PeftModel
-from smoke_grpo import MODEL, REVISION, worker
-from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
+from smoke_grpo import worker
+from transformers import AutoTokenizer, set_seed
+from model_runtime import PolicyRoadTelemetry, load_base, read_spec, write_spec
 from trl import GRPOConfig, GRPOTrainer
 from video_jobs import enqueue_video
 
@@ -174,7 +175,8 @@ def main():
     if not args.validate_prefix_only:
         torch.cuda.reset_peak_memory_stats()
     started = time.monotonic()
-    road = RoadTelemetry()
+    spec = read_spec(args.adapter)
+    MODEL, REVISION = spec.model, spec.revision
     initial_hash = checkpoint_hash(args.adapter)
     prefix_hash = (
         checkpoint_hash(args.prefix_adapter) if args.prefix_adapter else initial_hash
@@ -182,6 +184,7 @@ def main():
     if args.prefix_adapter and not args.prefix_decisions:
         parser.error("--prefix-adapter requires --prefix-decisions")
     tokenizer = AutoTokenizer.from_pretrained(args.adapter, padding_side="left")
+    road = PolicyRoadTelemetry(spec, tokenizer)
     source_prefix, source_provenance = (
         load_prefix(
             args.prefix_decisions, args.prefix_actions, prefix_hash, road, tokenizer
@@ -193,12 +196,7 @@ def main():
         None
         if args.validate_prefix_only
         else PeftModel.from_pretrained(
-            AutoModelForCausalLM.from_pretrained(
-                MODEL,
-                revision=REVISION,
-                dtype=torch.float32,
-                attn_implementation="sdpa",
-            ).cuda(),
+            load_base(spec),
             str(args.adapter),
             is_trainable=True,
         )
@@ -289,7 +287,16 @@ def main():
         else:
             client, _ = workers[0]
             observation = request(
-                client, {"op": "reset", "policy_id": "frozen-model-prefix"}
+                client,
+                {
+                    "op": "reset",
+                    "policy_id": "frozen-model-prefix",
+                    "policy_display": {
+                        "model_name": MODEL,
+                        "generation": args.start_generation,
+                        "evaluation": True,
+                    },
+                },
             )
             reset_snapshot = physical_snapshot(observation)
             prefix = []
@@ -316,6 +323,24 @@ def main():
                         f"Frozen model prefix failed after {index + 1} controls"
                     )
         branch_snapshot = physical_snapshot(observation)
+        if source_prefix is None:
+            request(client, {"op": "reset", "policy_id": "flush-model-prefix"})
+            prefix_recordings = list(
+                workers[0][1].rglob(f"{observation['episode_id']}.jsonl")
+            )
+            if len(prefix_recordings) != 1:
+                raise ValueError("Expected one model prefix recording")
+            enqueue_video(
+                out,
+                prefix_recordings[0],
+                metadata={
+                    "kind": "prefix",
+                    "model": MODEL,
+                    "revision": REVISION,
+                    "adapter_sha256": prefix_hash,
+                    "stop_reason": "prefix_action_horizon",
+                },
+            )
         if observation["state"]["speed"] <= 0:
             raise RuntimeError("Model prefix did not reach a moving state")
         prefix_tick = observation["tick"]
@@ -525,6 +550,7 @@ def main():
             snapshot_path = out / f"sampled-policy-step-{step}"
             model.save_pretrained(snapshot_path)
             tokenizer.save_pretrained(snapshot_path)
+            write_spec(snapshot_path, spec)
             current_hash = checkpoint_hash(snapshot_path)
             group = []
             # Parameters do not change during this reward call. Never reuse this
@@ -569,7 +595,7 @@ def main():
             temperature=args.temperature,
             top_p=1.0,
             top_k=0,
-            bf16=False,
+            bf16=spec.dtype == "bfloat16",
             fp16=False,
             gradient_checkpointing=False,
             use_vllm=False,
@@ -649,6 +675,7 @@ def main():
         checkpoint = out / "adapter"
         trainer.save_model(str(checkpoint))
         tokenizer.save_pretrained(checkpoint)
+        write_spec(checkpoint, spec)
         final_hash = checkpoint_hash(checkpoint)
         after = run_candidate(
             0,
@@ -664,12 +691,7 @@ def main():
             )
         model.cpu()
         reloaded = PeftModel.from_pretrained(
-            AutoModelForCausalLM.from_pretrained(
-                MODEL,
-                revision=REVISION,
-                dtype=torch.float32,
-                attn_implementation="sdpa",
-            ).cuda(),
+            load_base(spec),
             str(checkpoint),
         ).eval()
         with torch.inference_mode():
