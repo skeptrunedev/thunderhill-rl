@@ -23,7 +23,7 @@ from lap_episode import DEFAULT_STALL_CONFIG, FAILURE_PENALTY, PROGRESS_METERS_P
 from lap_audit import audit_lap
 from lap_rollout import recorded_transitions
 from experiment_tracking import ExperimentTracker
-from model_runtime import FUNCTIONGEMMA_SPEC, GEMMA4_NATIVE_SPEC, LORA_TARGET_MODULES, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
+from model_runtime import FUNCTIONGEMMA_SPEC, GEMMA4_NATIVE_SPEC, QWEN27B_SPEC, QWEN_LORA_TARGET_MODULES, LORA_TARGET_MODULES, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
 from native_constraints import NativeToolConstraint
 from trajectory_update import TrajectoryConfig, TrajectoryUpdater
 
@@ -284,6 +284,7 @@ def main():
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--adapter", type=Path)
     source.add_argument("--functiongemma", action="store_true", help="Start native gameplay RL from the pinned base with a fresh LoRA")
+    source.add_argument("--qwen27b", action="store_true", help="Fresh Qwen27B LoRA trained only from native gameplay rewards")
     source.add_argument("--resume-campaign", type=Path, help="Continue an interrupted campaign in place from its verified model and optimizer")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--godot", required=True)
@@ -329,12 +330,13 @@ def main():
         args.output.mkdir(parents=True, exist_ok=False)
     set_seed(73)
     torch.set_num_threads(4)
-    spec = FUNCTIONGEMMA_SPEC if args.functiongemma else read_spec(args.adapter)
-    if spec not in (GEMMA4_NATIVE_SPEC, FUNCTIONGEMMA_SPEC):
+    fresh_base = args.functiongemma or args.qwen27b
+    spec = QWEN27B_SPEC if args.qwen27b else FUNCTIONGEMMA_SPEC if args.functiongemma else read_spec(args.adapter)
+    if spec not in (GEMMA4_NATIVE_SPEC, FUNCTIONGEMMA_SPEC, QWEN27B_SPEC):
         raise ValueError("Full trajectory training requires a native tool model specification")
     tokenizer = AutoTokenizer.from_pretrained(
-        spec.model if args.functiongemma else args.adapter,
-        **({"revision": spec.revision} if args.functiongemma else {}), padding_side="left")
+        spec.model if fresh_base else args.adapter,
+        **({"revision": spec.revision} if fresh_base else {}), padding_side="left")
     road = PolicyRoadTelemetry(spec, tokenizer)
     if resumed is not None:
         for key, expected in {"model": spec.model, "revision": spec.revision,
@@ -344,10 +346,10 @@ def main():
                               "constrained_sampling_and_training": True}.items():
             if resumed.get(key) != expected:
                 raise ValueError(f"Resume model or native tool configuration mismatch: {key}")
-    if args.functiongemma:
+    if fresh_base:
         model = get_peft_model(load_base(spec), LoraConfig(
             r=16, lora_alpha=32, lora_dropout=0, task_type="CAUSAL_LM",
-            target_modules=list(LORA_TARGET_MODULES)))
+            target_modules=list(QWEN_LORA_TARGET_MODULES if spec == QWEN27B_SPEC else LORA_TARGET_MODULES)))
         args.adapter = args.output / "initial-adapter"
         model.save_pretrained(args.adapter)
         tokenizer.save_pretrained(args.adapter)
@@ -359,13 +361,14 @@ def main():
         raise ValueError("Only FP32 LoRA parameters may be trainable")
     constraints = NativeToolConstraint(tokenizer, model.config.vocab_size, native_tools=road.native_tools)
     policy = BatchedPolicy(model, tokenizer, compile_inference=True,
-                           compiled_prompt_length=1024, native_tools=road.native_tools,
+                           compiled_prompt_length=1536 if spec == QWEN27B_SPEC else 1024, native_tools=road.native_tools,
                            constraints=constraints, temperature=args.temperature)
     seconds = 20.0 if args.smoke else args.time_budget_seconds
     generations = 1 if args.smoke else args.generations
     updater = TrajectoryUpdater(model, tokenizer, args.output / "updates",
                                 TrajectoryConfig(max_actions=math.ceil(seconds * 10), temperature=args.temperature,
-                                                 max_completion_length=road.native_tools.max_completion_length),
+                                                 max_completion_length=road.native_tools.max_completion_length,
+                                                 gradient_checkpointing=spec == QWEN27B_SPEC),
                                 constraints=constraints)
     current_hash = digest(args.adapter)
     manifest = {"model": spec.model, "revision": spec.revision, "initial_adapter_sha256": current_hash,
@@ -375,8 +378,10 @@ def main():
                 "stall_config": asdict(DEFAULT_STALL_CONFIG),
                 "evaluation_interval": args.evaluation_interval, "evaluation_rollouts": args.evaluation_rollouts,
                 "evaluation_seed": args.evaluation_seed, "evaluations": [],
-                "initialization": "fresh_base_lora" if args.functiongemma else "existing_adapter",
+                "initialization": "fresh_base_lora" if fresh_base else "existing_adapter",
                 "supervised_training_performed": False, "temperature": args.temperature,
+                "gradient_checkpointing": spec == QWEN27B_SPEC,
+                "lora_target_modules": list(QWEN_LORA_TARGET_MODULES if spec == QWEN27B_SPEC else LORA_TARGET_MODULES),
                 "initial_generation": args.initial_generation, "generations_requested": generations, "time_budget_seconds": seconds,
                 "smoke_only": args.smoke, "generations": [], "complete": False,
                 "prompt_style": spec.prompt_style, "tools": road.native_tools.tools,

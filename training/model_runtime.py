@@ -36,6 +36,13 @@ FUNCTIONGEMMA_SPEC = ModelSpec(
     "float32",
     "functiongemma_native_tools",
 )
+QWEN27B_SPEC = ModelSpec(
+    "Qwen/Qwen3.8-27B",
+    "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "bfloat16",
+    "qwen_native_tools",
+)
+QWEN_KEY_MAPPING = {r"^model\.language_model\.": "model."}
 SPEC_FILENAME = "model_spec.json"
 GEMMA4_KEY_MAPPING = {r"^model\.language_model\.": "model."}
 GEMMA4_UNUSED_PREFIXES = (
@@ -55,8 +62,13 @@ LORA_TARGET_MODULES = (
 )
 
 
+QWEN_LORA_TARGET_MODULES = LORA_TARGET_MODULES + (
+    "in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a", "out_proj",
+)
+
+
 def _validate(spec: ModelSpec) -> ModelSpec:
-    if spec not in (LEGACY_SPEC, GEMMA4_SPEC, GEMMA4_NATIVE_SPEC, FUNCTIONGEMMA_SPEC):
+    if spec not in (LEGACY_SPEC, GEMMA4_SPEC, GEMMA4_NATIVE_SPEC, FUNCTIONGEMMA_SPEC, QWEN27B_SPEC):
         raise ValueError(f"Unsupported model specification: {spec}")
     return spec
 
@@ -97,11 +109,17 @@ def write_spec(adapter: Path, spec: ModelSpec) -> None:
 def load_base(spec: ModelSpec, device: str = "cuda", *, dtype: str | None = None):
     """Load only the text model, retaining SDPA and the model's normal KV cache."""
     import torch
-    from transformers import AutoModelForCausalLM, Gemma4ForCausalLM
+    from transformers import AutoConfig, AutoModelForCausalLM, Gemma4ForCausalLM, Qwen3_5ForCausalLM
 
     _validate(spec)
     loader = Gemma4ForCausalLM if spec in (GEMMA4_SPEC, GEMMA4_NATIVE_SPEC) else AutoModelForCausalLM
     kwargs = {"key_mapping": GEMMA4_KEY_MAPPING} if spec in (GEMMA4_SPEC, GEMMA4_NATIVE_SPEC) else {}
+    if spec == QWEN27B_SPEC:
+        loader = Qwen3_5ForCausalLM
+        config = AutoConfig.from_pretrained(spec.model, revision=spec.revision).text_config
+        kwargs = {"key_mapping": QWEN_KEY_MAPPING, "config": config}
+        if str(device).startswith("cuda"):
+            print(json.dumps({"qwen_fast_kernels": require_qwen_fast_kernels()}), flush=True)
     model, info = loader.from_pretrained(
         spec.model,
         revision=spec.revision,
@@ -121,10 +139,41 @@ def _validate_loading_info(spec: ModelSpec, info: dict) -> None:
         unexpected = [
             key for key in unexpected if not key.startswith(GEMMA4_UNUSED_PREFIXES)
         ]
+    if spec == QWEN27B_SPEC:
+        unexpected = [key for key in unexpected if not key.startswith(("model.visual.", "mtp."))]
     if unexpected or any(
         info.get(key) for key in ("missing_keys", "mismatched_keys", "error_msgs")
     ):
         raise ValueError(f"Pretrained model weights did not load completely: {info}")
+
+
+def require_qwen_fast_kernels():
+    """Fail before allocating weights if Transformers selected reference kernels."""
+    from transformers.models.qwen3_5 import modeling_qwen3_5 as module
+    expected = {
+        "causal_conv1d_fn": "causal_conv1d",
+        "causal_conv1d_update": "causal_conv1d",
+        "torch_chunk_gated_delta_rule": "fla",
+        "torch_recurrent_gated_delta_rule": "fla",
+    }
+    import inspect
+    evidence = {}
+    for name, package in expected.items():
+        function = getattr(module, name)
+        seen = set()
+        implementations = []
+        while callable(function) and id(function) not in seen:
+            seen.add(id(function))
+            if inspect.isfunction(function):
+                implementation = inspect.getclosurevars(function).nonlocals.get("implementation")
+                if implementation is not None:
+                    implementations.append(implementation)
+            function = getattr(function, "__wrapped__", None)
+        selected = next((f for f in implementations if getattr(f, "__module__", "").startswith(package)), None)
+        if selected is None:
+            raise RuntimeError(f"Qwen optimized kernel unavailable: {name}; install compatible {package}")
+        evidence[name] = selected.__module__ + "." + selected.__name__
+    return evidence
 
 
 def inference_precision(model):
@@ -144,7 +193,11 @@ class PolicyRoadTelemetry(RoadTelemetry):
         self.spec = _validate(spec)
         self.tokenizer = tokenizer
         self.native_tools = None
-        if self.spec == FUNCTIONGEMMA_SPEC:
+        if self.spec == QWEN27B_SPEC:
+            from qwen_tools import QwenBikeTools
+            self.native_tools = QwenBikeTools(tokenizer)
+            tokenizer.eos_token = self.native_tools.tool_stop
+        elif self.spec == FUNCTIONGEMMA_SPEC:
             from functiongemma_tools import FunctionGemmaBikeTools
             self.native_tools = FunctionGemmaBikeTools(tokenizer)
             tokenizer.eos_token = self.native_tools.tool_stop

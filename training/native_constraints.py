@@ -1,4 +1,4 @@
-"""One native Gemma tool grammar shared by sampling and policy gradients.
+"""One native model tool grammar shared by sampling and policy gradients.
 
 XGrammar's token masks run outside the model forward and do not change its
 SDPA, cache or CUDA graph behavior. Training gathers the allowed logits into
@@ -32,6 +32,7 @@ class NativeToolConstraint:
 pedal ::= "0" | [1-9] [0-9]? | "100"
 steer ::= "0" | "-"? ([1-9] [0-9]? [0-9]? | "1000")'''
         grammar = grammar.replace("START_ID", str(self.tools.start_token_id)).replace("END_ID", str(self.tools.end_token_id))
+        grammar = getattr(self.tools, "grammar", grammar)
         self.compiled = xgr.GrammarCompiler(info).compile_grammar(grammar)
         # Bound retained prefixes for long campaigns. Each entry stores only
         # permitted IDs, not a dense vocabulary-sized mask.

@@ -27,6 +27,7 @@ class TrajectoryConfig:
     max_completion_length: int = 32
     max_grad_norm: float = 1.0
     temperature: float = 1.0
+    gradient_checkpointing: bool = False
 
 
 class _TrajectoryLossTrainer(GRPOTrainer):
@@ -100,7 +101,8 @@ class TrajectoryUpdater:
             max_completion_length=config.max_completion_length,
             loss_type="dr_grpo", scale_rewards="none", beta=0.0,
             temperature=config.temperature, top_p=1.0, top_k=0,
-            gradient_checkpointing=False, bf16=False, fp16=False,
+            gradient_checkpointing=config.gradient_checkpointing,
+            gradient_checkpointing_kwargs={"use_reentrant": False}, bf16=False, fp16=False,
             use_cpu=model.device.type == "cpu", report_to="none",
             save_strategy="no", disable_dropout=True,
         )
@@ -109,6 +111,8 @@ class TrajectoryUpdater:
             train_dataset=Dataset.from_dict({"prompt": ["unused", "unused"]}),
             reward_funcs=lambda completions, **kwargs: [0.0] * len(completions),
         )
+        if config.gradient_checkpointing:
+            model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         self.trainer.current_gradient_accumulation_steps = 1
         self.trainer.native_constraints = constraints
         self.optimizer = torch.optim.AdamW(self.parameters, lr=config.learning_rate, weight_decay=0.0)
