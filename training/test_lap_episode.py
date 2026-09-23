@@ -12,6 +12,17 @@ from lap_policy import RoadTelemetry
 
 
 class EpisodeRewardTests(unittest.TestCase):
+    def test_remote_policy_identity_requires_evaluation(self):
+        options = dict(godot="unused", output="unused", road=RoadTelemetry(),
+                       adapter_sha256="a" * 64, model="remote", revision="unverified",
+                       generation=0, rollout=1)
+        with self.assertRaisesRegex(ValueError, "evaluation only"):
+            LapEpisode(**options, policy_identity_kind="api_request_config_sha256")
+        with self.assertRaisesRegex(ValueError, "identity kind"):
+            LapEpisode(**options, policy_identity_kind="unknown")
+        episode = LapEpisode(**options, evaluation=True, policy_identity_kind="api_request_config_sha256")
+        self.assertEqual(episode.policy_identity_kind, "api_request_config_sha256")
+
     def reward(self, **kwargs):
         return episode_reward(**dict({"legal_progress_m": 3000, "track_length_m": 4800,
             "sim_seconds": 500, "time_budget_seconds": 900, "success": False}, **kwargs))

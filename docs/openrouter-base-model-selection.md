@@ -1,6 +1,6 @@
 # Starting checkpoint selection
 
-Catalogue checked on 2026-09-23 using the [OpenRouter models API](https://openrouter.ai/api/v1/models). This is a research shortlist, not a measured driving ranking. No authenticated OpenRouter driving calls have been made.
+Catalogue checked on 2026-09-23 using the [OpenRouter models API](https://openrouter.ai/api/v1/models). This is a research shortlist, not a measured driving ranking. Authenticated gameplay screening is implemented in `training/openrouter_benchmark.py`; the shortlist itself is not a measured ranking.
 
 The objective is an instruction tuned checkpoint that already makes useful decisions with road telemetry and native tools. RL should improve its own driving through simulator rewards. Existing FunctionGemma experiments already adapt pretrained weights through LoRA; they do not train a language model from scratch. Supervised imitation remains prohibited.
 
@@ -27,4 +27,8 @@ If stronger models also fail to make useful progress before training, investigat
 
 The existing `LapEpisode` implementation can supply reward auditing, stalled attempt termination, recording and video provenance. A remote adapter should consume real API `tool_calls` and retain the most recent assistant call plus actual tool response. It must identify a remote request configuration hash separately from a verified local weight hash. It must not fabricate Gemma token delimiters or behavior log probabilities for API outputs. See [OpenRouter native tool documentation](https://openrouter.ai/docs/guides/features/tool-calling).
 
-Authenticated driving evaluation requires an OpenRouter credential. `OPENROUTER_API_KEY` was not present in the current process environment during this review. Credentials must never appear in prompts, recordings, committed files or logs.
+Authenticated driving evaluation accepts `OPENROUTER_API_KEY` or a private file through `--key-file`. Credentials must never appear in prompts, recordings, committed files or logs.
+
+The benchmark queries each model's endpoint catalogue before gameplay. Model catalogue capabilities are a union across providers, so they do not prove that one provider supports the requested combination. The benchmark requires the full parameter intersection, pins the endpoint, and uses either forced `control_bike` or required tool choice according to advertised support. API failures are archived separately from driving failures. No controls are repaired and no provider fallback is allowed.
+
+Run two screening attempts per model with `--episodes 2 --seconds 30 --temperature 0.6 --reasoning disabled`, supplying the selected model IDs, output directory, Godot executable and private credential path. Every completed attempt updates `campaign.json` and each model's aggregate ledger. Raw API responses, decision latency, effective settings, simulator recordings and video jobs are retained. These hosted evaluations are explicitly ineligible for training, and their configuration fingerprints do not claim to identify hosted weights.

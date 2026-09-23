@@ -53,11 +53,17 @@ def audit_lap(
     actions = []
     invalid_completion = False
     adapter_hash = None
+    identity_kind = None
     previous_tick = 0
     for index, decision in enumerate(decisions):
         require(decision.get("episode_id") == episode_id, "decision episode mismatch")
         require(decision.get("action_index") == index, "decision order mismatch")
         digest = decision.get("adapter_sha256")
+        kind = decision.get("policy_identity_kind", "adapter_weights_sha256")
+        require(kind in {"adapter_weights_sha256", "api_request_config_sha256"}, "unknown policy identity kind")
+        if identity_kind is None:
+            identity_kind = kind
+        require(kind == identity_kind, "policy identity kind changed during episode")
         require(
             isinstance(digest, str) and len(digest) == 64, "missing adapter fingerprint"
         )

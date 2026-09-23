@@ -123,9 +123,15 @@ class LapEpisode:
     """
     def __init__(self, *, godot, output, road, adapter_sha256, model, revision,
                  generation, rollout, time_budget_seconds=900, evaluation=False, rollout_count=None,
-                 worker_factory=worker, stall_config=DEFAULT_STALL_CONFIG):
+                 worker_factory=worker, stall_config=DEFAULT_STALL_CONFIG,
+                 policy_identity_kind="adapter_weights_sha256"):
+        if policy_identity_kind not in {"adapter_weights_sha256", "api_request_config_sha256"}:
+            raise ValueError("Unsupported policy identity kind")
+        if policy_identity_kind == "api_request_config_sha256" and not evaluation:
+            raise ValueError("Remote API policies are evaluation only")
+        self.policy_identity_kind = policy_identity_kind
         if len(adapter_sha256) != 64 or any(c not in "0123456789abcdef" for c in adapter_sha256):
-            raise ValueError("Expected SHA256 adapter identity")
+            raise ValueError("Expected SHA256 policy identity")
         ticks = round(time_budget_seconds * 120)
         if time_budget_seconds <= 0 or abs(ticks / 120 - time_budget_seconds) > 1e-8:
             raise ValueError("Episode budget must be positive whole physics ticks")
@@ -209,6 +215,9 @@ class LapEpisode:
                "prompt": self.prompt(), "prompt_ids": list(prompt_ids),
                "completion": completion, "completion_ids": list(completion_ids),
                "adapter_sha256": self.adapter_sha256, "before_tick": self.observation["tick"]}
+        # adapter_sha256 remains the legacy audit identity field. Remote runs
+        # explicitly identify a request configuration, never verified weights.
+        row["policy_identity_kind"] = self.policy_identity_kind
         if behavior_logprobs is not None:
             if len(behavior_logprobs) != len(completion_ids) or not all(math.isfinite(x) for x in behavior_logprobs):
                 raise ValueError("Behavior log probabilities must match completion tokens")
@@ -251,6 +260,7 @@ class LapEpisode:
         video = enqueue_video(self.output, paths[0], metadata={
             "kind": "full_lap_evaluation" if self.display.get("evaluation", False) else "full_lap_rollout",
             "adapter_sha256": self.adapter_sha256, "model": self.model, "revision": self.revision,
+            "policy_identity_kind": self.policy_identity_kind,
             "policy_display": self.display, "stop_reason": self.reason,
             "sim_seconds": final["sim_time"], "decisions": "decisions.jsonl",
             "stall_config": asdict(self.stall_monitor.config),
@@ -259,6 +269,7 @@ class LapEpisode:
                    "model": self.model, "revision": self.revision,
                    "generation": self.generation, "rollout": self.rollout,
                    "adapter_sha256": self.adapter_sha256,
+                   "policy_identity_kind": self.policy_identity_kind,
                    "video_job": str(video.relative_to(self.output)),
                    "final_observation": final, "training_eligible": False,
                    "stall_config": asdict(self.stall_monitor.config),
@@ -282,7 +293,7 @@ class LapEpisode:
                     sim_seconds=final["sim_time"], time_budget_seconds=self.time_budget_seconds,
                     success=audit["success"], failed=final["state"]["crashed"] or not final["track"]["lap_valid"],
                     invalid_syntax=self.reason == "invalid_model_action")
-                summary["training_eligible"] = self.reason in {
+                summary["training_eligible"] = self.policy_identity_kind == "adapter_weights_sha256" and self.reason in {
                     "lap_completed", "crash", "episode_tick_limit", "track_limits", "invalid_model_action", "stalled"}
         except BaseException as error:
             summary["audit_error"] = str(error)
