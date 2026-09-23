@@ -39,6 +39,26 @@ TRAINING_FILES = (
 )
 TOOL_FILES = ('check_agent.py', 'check_parallel.py')
 
+
+def build_kernel_extensions():
+    """Compile pinned kernels with live compiler output and explicit resources."""
+    import subprocess
+
+    python = '/opt/thunderhill/training/.venv/bin/python'
+    commands = [
+        ['uv', 'pip', 'install', '--python', python,
+         'ninja==1.13.2', 'setuptools==84.0.0', 'wheel==0.48.0'],
+        ['uv', 'pip', 'install', '--verbose', '--python', python, '--no-build-isolation',
+         'torch==2.14.0', 'causal-conv1d==1.7.0', 'flash-linear-attention==0.5.2'],
+        [python, '-c', 'import causal_conv1d; from fla.ops.gated_delta_rule import '
+         'chunk_gated_delta_rule, fused_recurrent_gated_delta_rule'],
+    ]
+    for command in commands:
+        print('Kernel build command: ' + ' '.join(command), flush=True)
+        # Inherit the builder streams. UV verbose mode exposes ninja/NVCC progress.
+        subprocess.run(command, check=True)
+
+
 app = modal.App('thunderhill-qwen-gameplay-rl')
 artifacts = modal.Volume.from_name(ARTIFACT_VOLUME, create_if_missing=True, version=2)
 cache = modal.Volume.from_name(CACHE_VOLUME, create_if_missing=True, version=2)
@@ -50,17 +70,16 @@ image = (
     .add_local_file(str(ROOT / 'training/uv.lock'), str(REMOTE_ROOT / 'training/uv.lock'), copy=True)
     .run_commands('uv sync --frozen --project /opt/thunderhill/training --no-dev')
     # Compile the convolution extension against the pinned CUDA 13 PyTorch wheel.
-    .env({'CUDA_HOME': '/usr/local/cuda', 'TORCH_CUDA_ARCH_LIST': '9.0',
+    # Upstream causal-conv1d 1.7.0 explicitly targets multiple architectures.
+    # Its setup ignores TORCH_CUDA_ARCH_LIST; allocate for the real compile work.
+    .env({'CUDA_HOME': '/usr/local/cuda',
           'CAUSAL_CONV1D_FORCE_BUILD': 'TRUE', 'MAX_JOBS': '4',
-          'CC': '/usr/bin/gcc', 'CXX': '/usr/bin/g++', 'CUDAHOSTCXX': '/usr/bin/g++'})
-    .run_commands(
-        'uv pip install --python /opt/thunderhill/training/.venv/bin/python '
-        'ninja==1.13.2 setuptools==84.0.0 wheel==0.48.0',
-        'uv pip install --python /opt/thunderhill/training/.venv/bin/python '
-        '--no-build-isolation torch==2.14.0 causal-conv1d==1.7.0 flash-linear-attention==0.5.2',
-        '/opt/thunderhill/training/.venv/bin/python -c "import causal_conv1d; '
-        'from fla.ops.gated_delta_rule import chunk_gated_delta_rule, fused_recurrent_gated_delta_rule"',
-    )
+          'CC': '/usr/bin/gcc', 'CXX': '/usr/bin/g++', 'CUDAHOSTCXX': '/usr/bin/g++',
+          'PYTHONPATH': '/opt/thunderhill/training', 'PYTHONUNBUFFERED': '1'})
+    # Make only this module importable by the build function, not the repository.
+    .add_local_file(str(Path(__file__)), str(REMOTE_ROOT / 'training/modal_qwen_rl.py'), copy=True)
+    .run_function(build_kernel_extensions, cpu=16, memory=65536, timeout=3600,
+                  include_source=False)
     .add_local_file(str(GODOT_SOURCE), GODOT, copy=True)
     .run_commands('chmod 755 /usr/local/bin/godot', '/usr/local/bin/godot --headless --version')
     .add_local_dir(str(ROOT / 'godot'), str(REMOTE_ROOT / 'godot'), copy=True,
@@ -75,7 +94,6 @@ for filename in TRAINING_FILES:
     image = image.add_local_file(str(ROOT / 'training' / filename), str(REMOTE_ROOT / 'training' / filename))
 for filename in TOOL_FILES:
     image = image.add_local_file(str(ROOT / 'tools' / filename), str(REMOTE_ROOT / 'tools' / filename))
-image = image.add_local_file(str(Path(__file__)), str(REMOTE_ROOT / 'training/modal_qwen_rl.py'))
 
 
 def validate_run_id(run_id):

@@ -19,6 +19,22 @@ except ModuleNotFoundError as error:
 
 @unittest.skipUnless(runner, 'Modal SDK is not installed in this interpreter')
 class QwenLauncherTests(unittest.TestCase):
+    def test_kernel_build_streams_verbose_and_checks_failures(self):
+        with patch.object(subprocess, 'run') as run:
+            runner.build_kernel_extensions()
+        self.assertEqual(run.call_count, 3)
+        compile_command = run.call_args_list[1].args[0]
+        self.assertIn('--verbose', compile_command)
+        self.assertIn('--no-build-isolation', compile_command)
+        self.assertIn('torch==2.14.0', compile_command)
+        self.assertIn('causal-conv1d==1.7.0', compile_command)
+        for call in run.call_args_list:
+            self.assertEqual(call.kwargs, {'check': True})
+        with patch.object(subprocess, 'run', side_effect=subprocess.CalledProcessError(1, 'uv')) as run:
+            with self.assertRaises(subprocess.CalledProcessError):
+                runner.build_kernel_extensions()
+            self.assertEqual(run.call_count, 1)
+
     def test_only_fresh_gameplay_training_is_launched(self):
         command = runner.training_command('/runs/test/experiment')
         self.assertIn('--qwen27b', command)
