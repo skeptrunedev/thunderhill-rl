@@ -23,6 +23,10 @@ uv run --project training python -u training/local_native_validation.py \
 
 Judge sustained changes in the separate evaluation distribution rather than the best training attempt. Twenty generations is a diagnostic budget, not a promise of learning. A second training seed is needed before claiming reproducible improvement.
 
+An interrupted campaign can continue in place with `train_full_lap_grpo.py --resume-campaign CAMPAIGN_DIRECTORY --godot GODOT_PATH --batch-candidates 4 --wandb-mode online --wandb-entity skeptrune-org`. Resume restores the verified adapter and Adam optimizer moments, preserves the same W&B run, and reaudits completed on policy collections before using them for an interrupted update. It never substitutes demonstrations or discards collected attempts. An incomplete checkpoint must be reconciled explicitly before continuation.
+
+New collections and checkpoints save sampling RNG state. Older checkpoints without it record an explicit RNG discontinuity and a deterministic continuation seed. Their model and optimizer still resume exactly; future sampled trajectories cannot be claimed identical to an uninterrupted run.
+
 Inference and backward microbatches are measured separately. Inference requires compiled static cache generation; silent eager fallback fails qualification. The campaign selects measured valid control throughput with 15 percent device memory headroom. Backward probes reserve future AdamW state memory. At most 64 simulator lanes are considered for the 16 CPU, 128 GiB host. One lane provides greedy evaluation and is excluded from training.
 
 Each generation saves an adapter, optimizer state, loss coverage audit, all simulator recordings, decision traces and video jobs. A second adapter load verifies saved checkpoint logits. A final greedy episode evaluates the last update. Recordings must be downloaded completely outside the local video watcher root, then atomically published there for rendering with `tools/render_video_queue.py`.

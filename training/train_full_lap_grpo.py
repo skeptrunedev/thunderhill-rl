@@ -8,6 +8,9 @@ from dataclasses import asdict
 import hashlib
 import json
 import math
+import random
+
+import numpy as np
 from pathlib import Path
 import time
 
@@ -16,7 +19,9 @@ from peft import LoraConfig, PeftModel, get_peft_model
 from transformers import AutoTokenizer, set_seed
 
 from batched_policy import BatchedPolicy
-from lap_episode import DEFAULT_STALL_CONFIG, FAILURE_PENALTY, PROGRESS_METERS_PER_REWARD, REWARD_VERSION, LapEpisode
+from lap_episode import DEFAULT_STALL_CONFIG, FAILURE_PENALTY, PROGRESS_METERS_PER_REWARD, REWARD_VERSION, LapEpisode, episode_reward
+from lap_audit import audit_lap
+from lap_rollout import recorded_transitions
 from experiment_tracking import ExperimentTracker
 from model_runtime import FUNCTIONGEMMA_SPEC, GEMMA4_NATIVE_SPEC, LORA_TARGET_MODULES, PolicyRoadTelemetry, inference_precision, load_base, read_spec, write_spec
 from native_constraints import NativeToolConstraint
@@ -133,6 +138,117 @@ def collect_waves(policy, road, spec, godot, directory, adapter_hash, generation
     return training, collection, prompt
 
 
+def save_rng(directory):
+    """Persist all sampling RNG streams without pickled numpy objects."""
+    numpy_state = np.random.get_state()
+    state = {"python": random.getstate(), "torch": torch.random.get_rng_state(),
+             "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
+             "numpy": (numpy_state[0], numpy_state[1].tolist(), *numpy_state[2:])}
+    path = Path(directory) / "rng.pt"
+    temporary = path.with_suffix(".pending")
+    torch.save(state, temporary)
+    temporary.replace(path)
+
+
+def restore_rng(path):
+    state = torch.load(path, map_location="cpu", weights_only=True)
+    random.setstate(state["python"])
+    numpy_state = state["numpy"]
+    np.random.set_state((numpy_state[0], np.asarray(numpy_state[1], dtype=np.uint32), *numpy_state[2:]))
+    torch.random.set_rng_state(state["torch"])
+    if state["cuda"]:
+        if len(state["cuda"]) != torch.cuda.device_count():
+            raise ValueError("Resume requires the same CUDA RNG device count")
+        torch.cuda.set_rng_state_all(state["cuda"])
+
+
+def resume_manifest(directory):
+    """Resolve only fully published updates, rejecting ambiguous partial commits."""
+    directory = Path(directory)
+    manifest = json.loads((directory / "campaign.json").read_text())
+    if manifest["complete"]:
+        raise ValueError("Campaign is already complete")
+    expected = {"reward_version": REWARD_VERSION, "progress_meters_per_reward": PROGRESS_METERS_PER_REWARD,
+                "failure_penalty": FAILURE_PENALTY, "stall_config": asdict(DEFAULT_STALL_CONFIG),
+                "supervised_training_performed": False, "training_method": "reinforcement_learning"}
+    for key, value in expected.items():
+        if manifest.get(key) != value:
+            raise ValueError(f"Resume campaign configuration mismatch: {key}")
+    updates = manifest["generations"]
+    initial = manifest.get("initial_generation", updates[0]["generation"] - 1 if updates else 0)
+    if [row["generation"] for row in updates] != list(range(initial + 1, initial + len(updates) + 1)):
+        raise ValueError("Resume requires contiguous committed generations")
+    generation = initial + len(updates)
+    checkpoint = directory / f"checkpoint-{generation:04d}" if updates else directory / "initial-adapter"
+    actual = digest(checkpoint)
+    expected_hash = updates[-1]["verification"]["adapter_sha256"] if updates else manifest["initial_adapter_sha256"]
+    if actual != expected_hash:
+        raise ValueError("Resume checkpoint hash mismatch")
+    if updates:
+        verification = json.loads((checkpoint / "verification.json").read_text())
+        if verification.get("adapter_sha256") != actual or not verification.get("reloaded_logits_match"):
+            raise ValueError("Resume checkpoint verification missing or invalid")
+        if not (checkpoint / "optimizer.pt").is_file():
+            raise ValueError("Resume requires persisted optimizer state")
+    if (directory / f"checkpoint-{generation + 1:04d}").exists():
+        raise ValueError("Uncommitted checkpoint exists; reconcile it before resuming")
+    return manifest, checkpoint, initial
+
+
+def load_collected_group(directory, adapter_hash, generation, count, road):
+    """Reuse only frozen on policy trajectories backed by original recordings."""
+    directory = Path(directory)
+    collection = json.loads((directory / "collection.json").read_text())
+    if collection.get("evaluation_only") or collection["adapter_sha256"] != adapter_hash or collection["generation"] != generation:
+        raise ValueError("Collected group policy or generation mismatch")
+    summaries, training, prompt = [], [], None
+    for wave_index, wave in enumerate(collection["waves"]):
+        if wave["adapter_sha256"] != adapter_hash or wave["generation"] != generation:
+            raise ValueError("Collected wave policy or generation mismatch")
+        for lane, summary in enumerate(wave["rollouts"], start=1):
+            folder = directory / f"wave-{wave_index:04d}" / f"rollout-{lane:04d}"
+            if json.loads((folder / "summary.json").read_text()) != summary:
+                raise ValueError("Collected summary differs from persisted group")
+            if not summary.get("training_eligible") or not summary.get("recording_provenance_verified"):
+                raise ValueError("Collected episode not eligible for training")
+            if summary["adapter_sha256"] != adapter_hash or summary["generation"] != generation:
+                raise ValueError("Collected episode policy mismatch")
+            job = json.loads((folder / summary["video_job"]).read_text())
+            recording = folder / job["source"]
+            if hashlib.sha256(recording.read_bytes()).hexdigest() != job["source_sha256"]:
+                raise ValueError("Collected recording hash mismatch")
+            rows = [json.loads(line) for line in (folder / "decisions.jsonl").read_text().splitlines()]
+            if len(rows) != summary["actions"] or not rows:
+                raise ValueError("Collected decision count mismatch")
+            for row in rows:
+                logps = row.get("behavior_logprobs", [])
+                if (row["adapter_sha256"] != adapter_hash or not row["prompt_ids"] or
+                    len(logps) != len(row["completion_ids"]) or not logps or
+                    any(not math.isfinite(value) or value > 1e-5 for value in logps)):
+                    raise ValueError("Collected behavior log probabilities or policy invalid")
+            final = summary["final_observation"]
+            audit = audit_lap([recording], episode_id=summary["episode_id"],
+                              policy_id=final["policy_id"], track_sha256=road.track_sha256,
+                              final_observation=final, decisions=rows, parse_completion=road.parse_completion)
+            with recording.open() as stream:
+                next(stream)
+                progress = sum(row["reward_components"]["legal_progress_m"] for row in recorded_transitions(stream))
+            reward = episode_reward(legal_progress_m=progress, track_length_m=road.length,
+                sim_seconds=final["sim_time"], time_budget_seconds=summary["reward_components"]["time_budget_seconds"],
+                success=audit["success"], failed=final["state"]["crashed"] or not final["track"]["lap_valid"],
+                invalid_syntax=summary["reason"] == "invalid_model_action")
+            if reward != summary["reward_components"]:
+                raise ValueError("Collected reward differs from recording audit")
+            training.append({"reward_components": reward, "decisions": [
+                {"prompt_ids": row["prompt_ids"], "completion_ids": row["completion_ids"],
+                 "old_per_token_logps": row["behavior_logprobs"]} for row in rows]})
+            summaries.append(summary)
+            prompt = rows[-1]["prompt"]
+    if summaries != collection["rollouts"] or len(training) != count:
+        raise ValueError("Collected group rollout count or ordering mismatch")
+    return training, collection, prompt
+
+
 def save_checkpoint(model, tokenizer, spec, updater, directory, prompt):
     """Round trip actual saved LoRA tensors and compare logits on the same base."""
     directory.mkdir(parents=True, exist_ok=False)
@@ -158,6 +274,7 @@ def save_checkpoint(model, tokenizer, spec, updater, directory, prompt):
         model.delete_adapter("roundtrip")
     result = {"adapter_sha256": digest(directory), "reloaded_logits_match": True}
     publish(directory / "verification.json", result)
+    save_rng(directory)
     return result
 
 
@@ -166,7 +283,8 @@ def main():
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--adapter", type=Path)
     source.add_argument("--functiongemma", action="store_true", help="Start native gameplay RL from the pinned base with a fresh LoRA")
-    parser.add_argument("--output", type=Path, required=True)
+    source.add_argument("--resume-campaign", type=Path, help="Continue an interrupted campaign in place from its verified model and optimizer")
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--godot", required=True)
     parser.add_argument("--generations", type=int, default=3)
     parser.add_argument("--initial-generation", type=int, default=2)
@@ -182,6 +300,19 @@ def main():
     parser.add_argument("--wandb-project", default="thunderhill-rl")
     parser.add_argument("--wandb-entity")
     args = parser.parse_args()
+    resumed = None
+    if args.resume_campaign:
+        if args.output is not None and args.output.resolve() != args.resume_campaign.resolve():
+            parser.error("Resume output must be the original campaign directory")
+        args.output = args.resume_campaign
+        resumed, args.adapter, args.initial_generation = resume_manifest(args.output)
+        for option, key in (("generations", "generations_requested"), ("temperature", "temperature"),
+                            ("time_budget_seconds", "time_budget_seconds"), ("rollouts_per_generation", "rollouts_per_generation"),
+                            ("evaluation_interval", "evaluation_interval"), ("evaluation_rollouts", "evaluation_rollouts"),
+                            ("evaluation_seed", "evaluation_seed"), ("smoke", "smoke_only")):
+            setattr(args, option, resumed[key])
+    elif args.output is None:
+        parser.error("--output is required for a new campaign")
     if args.generations < 1 or args.time_budget_seconds <= 0:
         parser.error("Positive generation count and episode budget required")
     if args.rollouts_per_generation is not None and args.rollouts_per_generation < 2:
@@ -193,7 +324,8 @@ def main():
         parser.error("Each batch needs one evaluation lane and at least two sampled rollouts")
     if not math.isfinite(args.temperature) or args.temperature <= 0:
         parser.error("Temperature must be finite and positive")
-    args.output.mkdir(parents=True, exist_ok=False)
+    if resumed is None:
+        args.output.mkdir(parents=True, exist_ok=False)
     set_seed(73)
     torch.set_num_threads(4)
     spec = FUNCTIONGEMMA_SPEC if args.functiongemma else read_spec(args.adapter)
@@ -203,6 +335,14 @@ def main():
         spec.model if args.functiongemma else args.adapter,
         **({"revision": spec.revision} if args.functiongemma else {}), padding_side="left")
     road = PolicyRoadTelemetry(spec, tokenizer)
+    if resumed is not None:
+        for key, expected in {"model": spec.model, "revision": spec.revision,
+                              "prompt_style": spec.prompt_style, "tools": road.native_tools.tools,
+                              "action_version": road.native_tools.action_version,
+                              "native_stop_token_id": road.native_tools.stop_token_id,
+                              "constrained_sampling_and_training": True}.items():
+            if resumed.get(key) != expected:
+                raise ValueError(f"Resume model or native tool configuration mismatch: {key}")
     if args.functiongemma:
         model = get_peft_model(load_base(spec), LoraConfig(
             r=16, lora_alpha=32, lora_dropout=0, task_type="CAUSAL_LM",
@@ -236,30 +376,54 @@ def main():
                 "evaluation_seed": args.evaluation_seed, "evaluations": [],
                 "initialization": "fresh_base_lora" if args.functiongemma else "existing_adapter",
                 "supervised_training_performed": False, "temperature": args.temperature,
-                "generations_requested": generations, "time_budget_seconds": seconds,
+                "initial_generation": args.initial_generation, "generations_requested": generations, "time_budget_seconds": seconds,
                 "smoke_only": args.smoke, "generations": [], "complete": False,
                 "prompt_style": spec.prompt_style, "tools": road.native_tools.tools,
                 "action_version": road.native_tools.action_version,
                 "native_stop_token_id": road.native_tools.stop_token_id,
                 "constrained_sampling_and_training": True}
+    completed = 0
+    resume_directory = None
+    if resumed is not None:
+        manifest = resumed
+        completed = len(manifest["generations"])
+        if completed:
+            updater.optimizer.load_state_dict(torch.load(args.adapter / "optimizer.pt", map_location=model.device, weights_only=True))
+        resume_directory = args.output / f"resume-{len(manifest.get('resumptions', [])) + 1:04d}"
+        resume_directory.mkdir(exist_ok=False)
+        next_collection = args.output / f"generation-{args.initial_generation + completed:04d}"
+        rng_path = next_collection / "rng.pt" if (next_collection / "collection.json").exists() else args.adapter / "rng.pt"
+        rng_present = rng_path.is_file()
+        restart_seed = manifest["seed"] + 100000 + completed
+        manifest.setdefault("resumptions", []).append({"completed_updates": completed,
+            "checkpoint": str(args.adapter), "adapter_sha256": current_hash,
+            "optimizer_restored": bool(completed), "rng_restored": rng_present,
+            "rng_discontinuity": not rng_present, "restart_seed": None if rng_present else restart_seed,
+            "rng_source": str(rng_path) if rng_present else None,
+            "reused_collection": str(next_collection) if (next_collection / "collection.json").exists() else None})
     publish(args.output / "campaign.json", manifest)
     with ExperimentTracker(args.output / "tracking", manifest, mode=args.wandb_mode,
-                           project=args.wandb_project, entity=args.wandb_entity) as tracker:
+                           project=args.wandb_project, entity=args.wandb_entity, resume=resumed is not None) as tracker:
         # Obtain real prompt features from the identical simulator reset used below.
         # Even this short capacity probe is recorded and queued for video.
-        with LapEpisode(godot=args.godot, output=args.output / "capacity-probe", road=road,
+        with LapEpisode(godot=args.godot, output=(resume_directory or args.output) / "capacity-probe", road=road,
                         adapter_sha256=current_hash, model=spec.model, revision=spec.revision,
-                        generation=args.initial_generation, rollout=1, time_budget_seconds=.1) as probe:
+                        generation=args.initial_generation + completed, rollout=1, time_budget_seconds=.1) as probe:
             prompt = probe.prompt()
             if args.smoke:
                 candidates = [value for value in candidates if value <= 8]
             profile = policy.profile([prompt], candidates=candidates)
-            publish(args.output / "inference-profile.json", profile)
+            publish((resume_directory or args.output) / "inference-profile.json", profile)
             if profile["selected_batch_size"] is None:
                 raise RuntimeError("No inference batch met validity and memory requirements")
             row = policy.generate([prompt], greedy_indices=(0,))[0]
             probe.apply(row["completion"], row["completion_ids"], row["prompt_ids"],
                         behavior_logprobs=row["old_per_token_logps"])
+        if resumed is not None:
+            if rng_present:
+                restore_rng(rng_path)
+            else:
+                set_seed(restart_seed)
         # One lane evaluates greedily. All remaining lanes are sampled rollouts.
         capacity = profile["selected_batch_size"] - 1
         count = args.rollouts_per_generation or capacity
@@ -276,12 +440,19 @@ def main():
             publish(args.output / "campaign.json", manifest)
 
         if args.evaluation_interval:
-            evaluate(args.initial_generation)
-        for offset in range(generations):
+            due = args.initial_generation + completed
+            recorded = {row["generation"] for row in manifest["evaluations"]}
+            if (completed % args.evaluation_interval == 0 or completed == generations) and due not in recorded:
+                evaluate(due)
+        for offset in range(completed, generations):
             generation = args.initial_generation + offset
-            episodes, collection, prompt = collect_waves(policy, road, spec, args.godot,
-                args.output / f"generation-{generation:04d}", current_hash, generation, count, seconds,
-                capacity, tracker=tracker)
+            generation_directory = args.output / f"generation-{generation:04d}"
+            if resumed is not None and (generation_directory / "collection.json").exists():
+                episodes, collection, prompt = load_collected_group(generation_directory, current_hash, generation, count, road)
+            else:
+                episodes, collection, prompt = collect_waves(policy, road, spec, args.godot,
+                    generation_directory, current_hash, generation, count, seconds, capacity, tracker=tracker)
+            save_rng(generation_directory)
             # New rollout lengths and retained CUDA graphs change memory demand.
             # Requalify against each actual generation, allowing batches to grow or shrink.
             training_profile = updater.profile_microbatches(episodes)

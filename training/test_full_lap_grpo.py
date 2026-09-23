@@ -1,5 +1,9 @@
 """Orchestrator isolation and actual PEFT checkpoint roundtrip regression tests."""
 import json
+import random
+import hashlib
+
+import numpy as np
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -12,7 +16,9 @@ from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from transformers import LlamaConfig, LlamaForCausalLM, PreTrainedTokenizerFast
 
-from train_full_lap_grpo import collect, collect_waves, save_checkpoint
+from train_full_lap_grpo import collect, collect_waves, save_checkpoint, save_rng, restore_rng, resume_manifest, load_collected_group
+from lap_episode import DEFAULT_STALL_CONFIG, REWARD_VERSION
+from dataclasses import asdict
 
 
 class FakeEpisode:
@@ -122,6 +128,58 @@ class FullLapTests(unittest.TestCase):
                 draws.append(policy.draws)
             self.assertEqual(draws[0], draws[1])
 
+    def test_rng_roundtrip_restores_python_numpy_and_torch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            save_rng(directory)
+            expected = (random.random(), np.random.random(), torch.rand(4))
+            restore_rng(Path(directory) / "rng.pt")
+            actual = (random.random(), np.random.random(), torch.rand(4))
+            self.assertEqual(expected[:2], actual[:2])
+            torch.testing.assert_close(expected[2], actual[2], rtol=0, atol=0)
+
+    def test_resume_preserves_original_schedule_and_rejects_checkpoint_corruption(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checkpoint = root / "checkpoint-0008"
+            checkpoint.mkdir()
+            payload = b"saved LoRA"
+            (checkpoint / "adapter_model.safetensors").write_bytes(payload)
+            sha = hashlib.sha256(payload).hexdigest()
+            verification = {"adapter_sha256": sha, "reloaded_logits_match": True}
+            (checkpoint / "verification.json").write_text(json.dumps(verification))
+            torch.save({}, checkpoint / "optimizer.pt")
+            campaign = dict(complete=False, generations_requested=20, evaluations=[{"generation": 0}, {"generation": 5}],
+                generations=[{"generation": n, "verification": verification} for n in range(1, 9)],
+                reward_version=REWARD_VERSION, progress_meters_per_reward=100.0, failure_penalty=.2,
+                stall_config=asdict(DEFAULT_STALL_CONFIG), supervised_training_performed=False,
+                training_method="reinforcement_learning")
+            (root / "campaign.json").write_text(json.dumps(campaign))
+            restored, adapter, initial = resume_manifest(root)
+            self.assertEqual(restored, campaign)
+            self.assertEqual(adapter, checkpoint)
+            self.assertEqual(initial, 0)
+            self.assertEqual(restored["generations_requested"] - len(restored["generations"]), 12)
+            (checkpoint / "adapter_model.safetensors").write_bytes(b"wrong weights")
+            with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                resume_manifest(root)
+
+    def test_collected_resume_rejects_stale_policy_and_ineligible_episode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stale = dict(adapter_sha256="old", generation=8, waves=[])
+            (root / "collection.json").write_text(json.dumps(stale))
+            with self.assertRaisesRegex(ValueError, "policy or generation"):
+                load_collected_group(root, "new", 8, 12, None)
+            summary = dict(training_eligible=False)
+            folder = root / "wave-0000" / "rollout-0001"
+            folder.mkdir(parents=True)
+            (folder / "summary.json").write_text(json.dumps(summary))
+            group = dict(adapter_sha256="new", generation=8,
+                waves=[dict(adapter_sha256="new", generation=8, rollouts=[summary])])
+            (root / "collection.json").write_text(json.dumps(group))
+            with self.assertRaisesRegex(ValueError, "not eligible"):
+                load_collected_group(root, "new", 8, 12, None)
+
     def test_actual_peft_roundtrip_restores_trainable_parameters_and_optimizer_identity(self):
         torch.set_num_threads(1)
         torch.manual_seed(4)
@@ -137,6 +195,9 @@ class FullLapTests(unittest.TestCase):
             pad_token="<pad>", eos_token="<eos>", unk_token="<unk>")
         trainable = {name: parameter for name, parameter in model.named_parameters() if parameter.requires_grad}
         optimizer = torch.optim.AdamW(list(trainable.values()), lr=1e-3)
+        model(torch.tensor([[3, 4]])).logits.sum().backward()
+        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
         with tempfile.TemporaryDirectory() as directory, patch("train_full_lap_grpo.write_spec"):
             result = save_checkpoint(model, tokenizer, None, SimpleNamespace(optimizer=optimizer),
                                      Path(directory) / "checkpoint", "hello")
@@ -152,6 +213,15 @@ class FullLapTests(unittest.TestCase):
             self.assertTrue(all(p.grad is not None and torch.isfinite(p.grad).all() for p in after.values()))
             self.assertTrue(any(p.grad.abs().sum() > 0 for p in after.values()))
             self.assertTrue((Path(directory) / "checkpoint" / "optimizer.pt").exists())
+            self.assertTrue((Path(directory) / "checkpoint" / "rng.pt").exists())
+            restored_optimizer = torch.optim.AdamW(list(after.values()), lr=99)
+            restored_optimizer.load_state_dict(torch.load(Path(directory) / "checkpoint" / "optimizer.pt", weights_only=True))
+            self.assertEqual(restored_optimizer.param_groups[0]["lr"], 1e-3)
+            for parameter in after.values():
+                for key in ("step", "exp_avg", "exp_avg_sq"):
+                    torch.testing.assert_close(restored_optimizer.state[parameter][key], optimizer.state[parameter][key])
+                self.assertEqual(float(restored_optimizer.state[parameter]["step"]), 1)
+
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from experiment_tracking import collection_metrics, episode_metrics, import_campaign
+from experiment_tracking import ExperimentTracker, collection_metrics, episode_metrics, import_campaign
 
 
 def episode(reason="crash", success=False, actions=4):
@@ -21,6 +21,20 @@ def collection(rollouts):
 
 
 class TrackingTests(unittest.TestCase):
+    def test_online_resume_preserves_run_identity_and_local_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "tracking.json").write_text(json.dumps(dict(mode="online", project="test", entity="team", run_id="existing")))
+            (root / "metrics.jsonl").write_text('{"generation": 8}\n')
+            with patch("wandb.init") as initialize:
+                run = initialize.return_value
+                run.id, run.dir = "existing", str(root)
+                with ExperimentTracker(root, {}, mode="online", project="test", entity="team", resume=True) as tracker:
+                    tracker.log({"generation": 9})
+                self.assertEqual(initialize.call_args.kwargs["id"], "existing")
+                self.assertEqual(initialize.call_args.kwargs["resume"], "must")
+            self.assertEqual([json.loads(line)["generation"] for line in (root / "metrics.jsonl").read_text().splitlines()], [8, 9])
+
     def test_heldout_samples_have_separate_metrics_and_median(self):
         samples = [episode("stalled"), episode("track_limits"), episode("crash")]
         for sample, distance in zip(samples, (0, 20, 100), strict=True):

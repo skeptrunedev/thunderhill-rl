@@ -89,22 +89,32 @@ def collection_metrics(collection):
 
 
 class ExperimentTracker(AbstractContextManager):
-    def __init__(self, output, manifest, *, mode="offline", project="thunderhill-rl", entity=None, name=None):
+    def __init__(self, output, manifest, *, mode="offline", project="thunderhill-rl", entity=None, name=None,
+                 resume=False):
         if mode not in {"offline", "online", "disabled"}:
             raise ValueError("Tracking mode must be offline, online, or disabled")
         import wandb
         output = Path(output)
         output.mkdir(parents=True, exist_ok=True)
         self.output = output
+        resume_options = {}
+        if resume:
+            previous = json.loads((output / "tracking.json").read_text())
+            if mode != "online" or previous["mode"] != "online":
+                raise ValueError("Tracking resume requires an existing online run")
+            if previous["project"] != project or previous["entity"] != entity:
+                raise ValueError("Tracking resume cannot change project or entity")
+            resume_options = {"id": previous["run_id"], "resume": "must"}
         self.run = wandb.init(
             project=project, entity=entity, name=name or output.parent.name, mode=mode, dir=str(output),
             config={key: manifest[key] for key in CONFIG_KEYS if key in manifest},
             settings=wandb.Settings(disable_git=True, save_code=False, console="off"),
+            **resume_options,
         )
         self.run.define_metric("generation")
         for namespace in ("rollout", "eval", "heldout", "heldout_greedy", "update", "collection", "checkpoint"):
             self.run.define_metric(namespace + "/*", step_metric="generation")
-        self._history = (output / "metrics.jsonl").open("w")
+        self._history = (output / "metrics.jsonl").open("a" if resume else "w")
         (output / "tracking.json").write_text(json.dumps({
             "mode": mode, "run_id": self.run.id, "run_directory": self.run.dir,
             "project": project, "entity": entity,
