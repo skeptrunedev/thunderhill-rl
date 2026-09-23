@@ -1,0 +1,718 @@
+{
+  "snapshot_utc": "2026-09-23T17:35:21.747520+00:00",
+  "status": "complete",
+  "source": "artifacts/functiongemma-local-20gen-01/rl/campaign.json",
+  "wandb_url": "https://wandb.ai/skeptrune-org/thunderhill-rl/runs/3704gblw",
+  "model": "google/functiongemma-270m-it",
+  "revision": "39eccb091651513a5dfb56892d3714c1b5b8276c",
+  "training_method": "reinforcement_learning",
+  "supervised_training_performed": false,
+  "initialization": "fresh_base_lora",
+  "temperature": 3.0,
+  "episode_budget_seconds": 30.0,
+  "reward": {
+    "reward_version": "audited-legal-progress-v2",
+    "progress_meters_per_reward": 100.0,
+    "failure_penalty": 0.2,
+    "stall_config": {
+      "grace_ticks": 600,
+      "window_ticks": 600,
+      "minimum_progress_m": 1.0
+    }
+  },
+  "generations_completed": 20,
+  "optimizer_updates": 20,
+  "sampled_training_attempts": 240,
+  "trained_actions": 33022,
+  "trained_tokens": 1335529,
+  "native_calls_all_recorded_attempts": 51681,
+  "invalid_call_attempts": 0,
+  "checkpoint_hashes_and_update_files_verified": true,
+  "updates": [
+    {
+      "generation": 1,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0001",
+      "adapter_sha256": "22f64edc2d6bbe2b7fa2d3973f009101f812e4571e1ecce19e33296649493b12",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1217,
+      "trained_tokens": 49829,
+      "gradient_norm": 0.005673094652593136,
+      "parameter_delta_l1": 19.201868794858456,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.11127629990792624,
+        "median_reward": 0.028378337227269256,
+        "mean_legal_progress_m": 26.127629990792624,
+        "median_legal_progress_m": 20.522695943648117,
+        "best_legal_progress_m": 66.77971439646782,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 7,
+          "crash": 2,
+          "stalled": 3
+        }
+      }
+    },
+    {
+      "generation": 2,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0002",
+      "adapter_sha256": "3d492552130dbb941905a06f216aa6f710da6df84330d6ebc013ffc912e01cba",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1552,
+      "trained_tokens": 63782,
+      "gradient_norm": 0.005876739509403706,
+      "parameter_delta_l1": 17.772295038215816,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.1075397846480812,
+        "median_reward": 0.041288530460440245,
+        "mean_legal_progress_m": 27.42064513147479,
+        "median_legal_progress_m": 24.12885304604403,
+        "best_legal_progress_m": 90.09914709905057,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 9,
+          "stalled": 2,
+          "crash": 1
+        }
+      }
+    },
+    {
+      "generation": 3,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0003",
+      "adapter_sha256": "2962ef6384d660b92a93708105076246a574c61e0e8388d2d914e058296ea9b2",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1404,
+      "trained_tokens": 57807,
+      "gradient_norm": 0.0028280611149966717,
+      "parameter_delta_l1": 13.735586931696162,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.09149202318103937,
+        "median_reward": 0.05671539604775812,
+        "mean_legal_progress_m": 25.815868984770603,
+        "median_legal_progress_m": 24.58594329035767,
+        "best_legal_progress_m": 60.5891211864019,
+        "completed_laps": 0,
+        "outcomes": {
+          "stalled": 2,
+          "track_limits": 9,
+          "crash": 1
+        }
+      }
+    },
+    {
+      "generation": 4,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0004",
+      "adapter_sha256": "b2b9df4ccb57f0ec4126e851e856672ef3bb5a5c2daa3ace5739dbb2aed83c51",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1577,
+      "trained_tokens": 64058,
+      "gradient_norm": 0.00512648094445467,
+      "parameter_delta_l1": 9.842673761537299,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.2587507594690721,
+        "median_reward": 0.16370841945257483,
+        "mean_legal_progress_m": 44.208409280240545,
+        "median_legal_progress_m": 34.192900643011704,
+        "best_legal_progress_m": 92.49034058004975,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 9,
+          "crash": 2,
+          "stalled": 1
+        }
+      }
+    },
+    {
+      "generation": 5,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0005",
+      "adapter_sha256": "850636a6dd8f5e1ca985d5e1757c931561aeaf2f89dbd93916930dc8467c73d3",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1195,
+      "trained_tokens": 48335,
+      "gradient_norm": 0.0019916461315006018,
+      "parameter_delta_l1": 8.813017582753673,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.10108110110534073,
+        "median_reward": 0.062560544642957,
+        "mean_legal_progress_m": 28.441443443867406,
+        "median_legal_progress_m": 24.6121045163763,
+        "best_legal_progress_m": 58.923019692656645,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 9,
+          "stalled": 1,
+          "crash": 2
+        }
+      }
+    },
+    {
+      "generation": 6,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0006",
+      "adapter_sha256": "00b8284fddd88a3b8dbbd047eaf234bf46ba4049eb3bcb8dd5349ab972d0a9b6",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 2066,
+      "trained_tokens": 83761,
+      "gradient_norm": 0.014318110421299934,
+      "parameter_delta_l1": 11.269647283945233,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.4065462992731892,
+        "median_reward": 0.16289452266170407,
+        "mean_legal_progress_m": 53.98796326065226,
+        "median_legal_progress_m": 33.89187140767158,
+        "best_legal_progress_m": 199.83000969601122,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 7,
+          "crash": 1,
+          "episode_tick_limit": 1,
+          "stalled": 3
+        }
+      }
+    },
+    {
+      "generation": 7,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0007",
+      "adapter_sha256": "adc0c1bad74c43f95578f021bd000bb544945d3c1016b57859aab7efa2442311",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1534,
+      "trained_tokens": 61852,
+      "gradient_norm": 0.0033973869867622852,
+      "parameter_delta_l1": 10.412152363918722,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.1285058770737409,
+        "median_reward": 0.06457930664416686,
+        "mean_legal_progress_m": 24.517254374040757,
+        "median_legal_progress_m": 17.733929025041174,
+        "best_legal_progress_m": 74.7629550889363,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 5,
+          "crash": 2,
+          "stalled": 5
+        }
+      }
+    },
+    {
+      "generation": 8,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0008",
+      "adapter_sha256": "68c5fb8469d0e8d4092e13210ae38072f5db2b23dfb1deddac93eeeac06481e0",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1620,
+      "trained_tokens": 65257,
+      "gradient_norm": 0.006178689654916525,
+      "parameter_delta_l1": 10.087422309909016,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.41138177161087297,
+        "median_reward": 0.26166425871698573,
+        "mean_legal_progress_m": 59.47151049442063,
+        "median_legal_progress_m": 46.16642587169857,
+        "best_legal_progress_m": 167.109377114187,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 9,
+          "stalled": 1,
+          "crash": 2
+        }
+      }
+    },
+    {
+      "generation": 9,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0009",
+      "adapter_sha256": "537b182c485fd7c2a36810580adc27c5b28376f8c2213358acc8bdcda7e56708",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1433,
+      "trained_tokens": 58004,
+      "gradient_norm": 0.003501319559291005,
+      "parameter_delta_l1": 9.699613875243813,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.34813033954900235,
+        "median_reward": 0.3040378812196048,
+        "mean_legal_progress_m": 51.479700621566906,
+        "median_legal_progress_m": 50.40378812196048,
+        "best_legal_progress_m": 124.283712831363,
+        "completed_laps": 0,
+        "outcomes": {
+          "crash": 6,
+          "stalled": 2,
+          "track_limits": 4
+        }
+      }
+    },
+    {
+      "generation": 10,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0010",
+      "adapter_sha256": "d400c392dfcd721a0bd744e2888bdb9c3d4c08349c9e97e0b2f1c0770a0434a4",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1828,
+      "trained_tokens": 73353,
+      "gradient_norm": 0.006768540013581514,
+      "parameter_delta_l1": 9.882486566901207,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.2914802298853446,
+        "median_reward": 0.08643747222730812,
+        "mean_legal_progress_m": 39.148022988534464,
+        "median_legal_progress_m": 22.99479498114605,
+        "best_legal_progress_m": 128.80092789393692,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 4,
+          "crash": 2,
+          "stalled": 6
+        }
+      }
+    },
+    {
+      "generation": 11,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0011",
+      "adapter_sha256": "e0112edda567c8c9867903265d9deef014eb079ec49ca476ef93d5ee93ced9cd",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1939,
+      "trained_tokens": 77733,
+      "gradient_norm": 0.008241151459515095,
+      "parameter_delta_l1": 10.318612375762314,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.4909267972040181,
+        "median_reward": 0.38814053868378845,
+        "mean_legal_progress_m": 64.0926797204018,
+        "median_legal_progress_m": 54.63868153089179,
+        "best_legal_progress_m": 181.67884126293848,
+        "completed_laps": 0,
+        "outcomes": {
+          "crash": 4,
+          "track_limits": 5,
+          "stalled": 3
+        }
+      }
+    },
+    {
+      "generation": 12,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0012",
+      "adapter_sha256": "1613defe86444e4e6a2582e3d3bc76fffdc7bb06a448c3826bcab0a75d861609",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1474,
+      "trained_tokens": 59536,
+      "gradient_norm": 0.014648555777966976,
+      "parameter_delta_l1": 10.93064707890153,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.953413423677655,
+        "median_reward": 0.6035869752381515,
+        "mean_legal_progress_m": 112.00800903443216,
+        "median_legal_progress_m": 80.35869752381515,
+        "best_legal_progress_m": 324.1075942078185,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 6,
+          "crash": 4,
+          "stalled": 2
+        }
+      }
+    },
+    {
+      "generation": 13,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0013",
+      "adapter_sha256": "2ccd04274df83d2c6472f48d3c58a47f69a319869ef8ca5f284c0374f366dc7a",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1496,
+      "trained_tokens": 59767,
+      "gradient_norm": 0.024934371933341026,
+      "parameter_delta_l1": 12.463465026579797,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.7009496284829172,
+        "median_reward": 0.02117387226608724,
+        "mean_legal_progress_m": 76.76162951495839,
+        "median_legal_progress_m": 2.1173872266087237,
+        "best_legal_progress_m": 478.17842021370103,
+        "completed_laps": 0,
+        "outcomes": {
+          "stalled": 8,
+          "track_limits": 3,
+          "crash": 1
+        }
+      }
+    },
+    {
+      "generation": 14,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0014",
+      "adapter_sha256": "ccb5d59526f279cbe45ca02c88d5cdfe6403d784d25a5979aaed7883784cf278",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1475,
+      "trained_tokens": 59158,
+      "gradient_norm": 0.020237764343619347,
+      "parameter_delta_l1": 12.060028326697648,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.6626940143566449,
+        "median_reward": 0.10879195584028442,
+        "mean_legal_progress_m": 76.26940143566448,
+        "median_legal_progress_m": 20.87919558402844,
+        "best_legal_progress_m": 511.2028124172314,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 4,
+          "stalled": 6,
+          "crash": 2
+        }
+      }
+    },
+    {
+      "generation": 15,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0015",
+      "adapter_sha256": "284b1957ddc604c11164dc534e55098fbe92fc67ed1c76dd0c31c1a83ac6c422",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1590,
+      "trained_tokens": 63764,
+      "gradient_norm": 0.03413856774568558,
+      "parameter_delta_l1": 12.951481025665998,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.995077240331982,
+        "median_reward": 0.13680202766306382,
+        "mean_legal_progress_m": 111.17439069986486,
+        "median_legal_progress_m": 33.68020276630638,
+        "best_legal_progress_m": 564.9054580235221,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 4,
+          "stalled": 5,
+          "crash": 3
+        }
+      }
+    },
+    {
+      "generation": 16,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0016",
+      "adapter_sha256": "2f93917e68fb9ee7e742b2020ad0a0fdf25d75b0275a99dbd04f7dbf56acaf68",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1955,
+      "trained_tokens": 78774,
+      "gradient_norm": 0.029912078753113747,
+      "parameter_delta_l1": 13.578642584383488,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 1.8469390663010998,
+        "median_reward": 0.8311861434982524,
+        "mean_legal_progress_m": 199.69390663010998,
+        "median_legal_progress_m": 103.11861434982524,
+        "best_legal_progress_m": 621.6185117908931,
+        "completed_laps": 0,
+        "outcomes": {
+          "stalled": 2,
+          "crash": 5,
+          "track_limits": 4,
+          "episode_tick_limit": 1
+        }
+      }
+    },
+    {
+      "generation": 17,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0017",
+      "adapter_sha256": "fd445183cdd1ee0dc742fb675de06b68215452957a1151eea9e3bff48e0b349b",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1361,
+      "trained_tokens": 54673,
+      "gradient_norm": 0.006860300432890654,
+      "parameter_delta_l1": 12.863294460810721,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 0.30428124388306843,
+        "median_reward": 0.0020069712323385874,
+        "mean_legal_progress_m": 37.09479105497351,
+        "median_legal_progress_m": 0.20069712323385874,
+        "best_legal_progress_m": 257.22032816564763,
+        "completed_laps": 0,
+        "outcomes": {
+          "stalled": 8,
+          "track_limits": 4
+        }
+      }
+    },
+    {
+      "generation": 18,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0018",
+      "adapter_sha256": "9659ac68814ffe1f07ea4bd1b8504ce3b34481a251519d7ae674181b1105f07d",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1992,
+      "trained_tokens": 80432,
+      "gradient_norm": 0.017697887495160103,
+      "parameter_delta_l1": 13.304332518950105,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 1.243439183706463,
+        "median_reward": 0.5305426759500248,
+        "mean_legal_progress_m": 137.6772517039796,
+        "median_legal_progress_m": 73.05426759500249,
+        "best_legal_progress_m": 355.9007646883837,
+        "completed_laps": 0,
+        "outcomes": {
+          "stalled": 4,
+          "crash": 3,
+          "track_limits": 5
+        }
+      }
+    },
+    {
+      "generation": 19,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0019",
+      "adapter_sha256": "3f8ffc9b361c9cf941a39ead7e8a716f1e0c37f3223486d0864dd69111f26944",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 1862,
+      "trained_tokens": 76061,
+      "gradient_norm": 0.03135763853788376,
+      "parameter_delta_l1": 14.131623865105212,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 1.6347103703279489,
+        "median_reward": 1.147418003636103,
+        "mean_legal_progress_m": 176.8043703661282,
+        "median_legal_progress_m": 124.7418003636103,
+        "best_legal_progress_m": 659.9000483464931,
+        "completed_laps": 0,
+        "outcomes": {
+          "crash": 4,
+          "episode_tick_limit": 1,
+          "track_limits": 4,
+          "stalled": 3
+        }
+      }
+    },
+    {
+      "generation": 20,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0020",
+      "adapter_sha256": "1021029bd39d35c96851dd0c737781b4b0435d4d0fd102bd988d844b8f33f087",
+      "reloaded_logits_match": true,
+      "optimizer_steps": 1,
+      "actions": 2452,
+      "trained_tokens": 99593,
+      "gradient_norm": 0.043174512684345245,
+      "parameter_delta_l1": 15.527972648851573,
+      "training_metrics": {
+        "attempts": 12,
+        "mean_reward": 3.3770333247439206,
+        "median_reward": 3.4156137192904334,
+        "mean_legal_progress_m": 349.36999914105877,
+        "median_legal_progress_m": 361.4814505130496,
+        "best_legal_progress_m": 679.3376157905541,
+        "completed_laps": 0,
+        "outcomes": {
+          "stalled": 4,
+          "track_limits": 6,
+          "episode_tick_limit": 1,
+          "crash": 1
+        }
+      }
+    }
+  ],
+  "evaluations": [
+    {
+      "generation": 0,
+      "source": "artifacts/functiongemma-local-20gen-01/rl/evaluation-0000/collection.json",
+      "adapter_sha256": "1c6c0caba036f994057bfd7674a8bfe3aaf2e99d8eb2838b715f57a63d299398",
+      "evaluation_seed": 1073,
+      "sampled": {
+        "attempts": 12,
+        "mean_reward": 0.0865647565691421,
+        "median_reward": 0.0479142668543452,
+        "mean_legal_progress_m": 23.65647565691421,
+        "median_legal_progress_m": 22.485531062531958,
+        "best_legal_progress_m": 51.07000768616926,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 9,
+          "stalled": 3
+        }
+      },
+      "greedy_reason": "stalled",
+      "greedy_legal_progress_m": -0.0008353232031187798
+    },
+    {
+      "generation": 5,
+      "source": "artifacts/functiongemma-local-20gen-01/rl/evaluation-0005/collection.json",
+      "adapter_sha256": "850636a6dd8f5e1ca985d5e1757c931561aeaf2f89dbd93916930dc8467c73d3",
+      "evaluation_seed": 1073,
+      "sampled": {
+        "attempts": 12,
+        "mean_reward": 0.3139744784367169,
+        "median_reward": 0.04709356343587863,
+        "mean_legal_progress_m": 48.06411451033836,
+        "median_legal_progress_m": 24.709356343587864,
+        "best_legal_progress_m": 160.37976193339563,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 8,
+          "crash": 2,
+          "stalled": 1,
+          "episode_tick_limit": 1
+        }
+      },
+      "greedy_reason": "stalled",
+      "greedy_legal_progress_m": -0.6120629298539934
+    },
+    {
+      "generation": 10,
+      "source": "artifacts/functiongemma-local-20gen-01/rl/evaluation-0010/collection.json",
+      "adapter_sha256": "d400c392dfcd721a0bd744e2888bdb9c3d4c08349c9e97e0b2f1c0770a0434a4",
+      "evaluation_seed": 1073,
+      "sampled": {
+        "attempts": 12,
+        "mean_reward": 0.9662150194277701,
+        "median_reward": 0.48443617470814526,
+        "mean_legal_progress_m": 106.62150194277702,
+        "median_legal_progress_m": 58.44361747081453,
+        "best_legal_progress_m": 533.1027495344044,
+        "completed_laps": 0,
+        "outcomes": {
+          "crash": 1,
+          "stalled": 5,
+          "track_limits": 5,
+          "episode_tick_limit": 1
+        }
+      },
+      "greedy_reason": "stalled",
+      "greedy_legal_progress_m": -0.6120629298539934
+    },
+    {
+      "generation": 15,
+      "source": "artifacts/functiongemma-local-20gen-01/rl/evaluation-0015/collection.json",
+      "adapter_sha256": "284b1957ddc604c11164dc534e55098fbe92fc67ed1c76dd0c31c1a83ac6c422",
+      "evaluation_seed": 1073,
+      "sampled": {
+        "attempts": 12,
+        "mean_reward": 0.3758339819945372,
+        "median_reward": 0.023921392211598246,
+        "mean_legal_progress_m": 44.25006486612039,
+        "median_legal_progress_m": 4.822643289449118,
+        "best_legal_progress_m": 265.3032172580444,
+        "completed_laps": 0,
+        "outcomes": {
+          "track_limits": 2,
+          "stalled": 8,
+          "crash": 2
+        }
+      },
+      "greedy_reason": "stalled",
+      "greedy_legal_progress_m": -0.6120629298539934
+    },
+    {
+      "generation": 20,
+      "source": "artifacts/functiongemma-local-20gen-01/rl/evaluation-0020/collection.json",
+      "adapter_sha256": "1021029bd39d35c96851dd0c737781b4b0435d4d0fd102bd988d844b8f33f087",
+      "evaluation_seed": 1073,
+      "sampled": {
+        "attempts": 12,
+        "mean_reward": 1.35675314562901,
+        "median_reward": 0.4316150393612758,
+        "mean_legal_progress_m": 142.34198122956766,
+        "median_legal_progress_m": 53.16150393612758,
+        "best_legal_progress_m": 483.4516437352064,
+        "completed_laps": 0,
+        "outcomes": {
+          "stalled": 5,
+          "crash": 1,
+          "track_limits": 3,
+          "episode_tick_limit": 3
+        }
+      },
+      "greedy_reason": "stalled",
+      "greedy_legal_progress_m": -0.6120629298539934
+    }
+  ],
+  "best_evaluated_checkpoint_by_mean_reward": 20,
+  "best_evaluated_checkpoint_by_median_reward": 10,
+  "final_greedy_evaluation": {
+    "reason": "stalled",
+    "actions": 100,
+    "success": false,
+    "reward_components": {
+      "version": "audited-legal-progress-v2",
+      "legal_progress_m": -0.6120629298539934,
+      "track_length_m": 4605.866,
+      "sim_seconds": 10.0000000000001,
+      "time_budget_seconds": 30.0,
+      "progress_fraction": -0.00013288769796038213,
+      "progress_reward": -0.006120629298539934,
+      "completion_bonus": 0.0,
+      "speed_bonus": 0.0,
+      "failure_penalty": 0.0,
+      "syntax_penalty": 0.0,
+      "total": -0.006120629298539934
+    }
+  },
+  "resumptions": [
+    {
+      "completed_updates": 8,
+      "checkpoint": "artifacts/functiongemma-local-20gen-01/rl/checkpoint-0008",
+      "adapter_sha256": "68c5fb8469d0e8d4092e13210ae38072f5db2b23dfb1deddac93eeeac06481e0",
+      "optimizer_restored": true,
+      "rng_restored": false,
+      "rng_discontinuity": true,
+      "restart_seed": 100081,
+      "rng_source": null,
+      "reused_collection": "artifacts/functiongemma-local-20gen-01/rl/generation-0008"
+    },
+    {
+      "completed_updates": 18,
+      "checkpoint": "/home/skeptrune/git_projects/morph/thunderhill-rl/artifacts/functiongemma-local-20gen-01/rl/checkpoint-0018",
+      "adapter_sha256": "9659ac68814ffe1f07ea4bd1b8504ce3b34481a251519d7ae674181b1105f07d",
+      "optimizer_restored": true,
+      "rng_restored": true,
+      "rng_discontinuity": false,
+      "restart_seed": null,
+      "rng_source": "/home/skeptrune/git_projects/morph/thunderhill-rl/artifacts/functiongemma-local-20gen-01/rl/generation-0018/rng.pt",
+      "reused_collection": "/home/skeptrune/git_projects/morph/thunderhill-rl/artifacts/functiongemma-local-20gen-01/rl/generation-0018"
+    }
+  ],
+  "memory_capacity_failures": [
+    {
+      "after_completed_updates": 8,
+      "source": "artifacts/functiongemma-local-20gen-01/logs/rl.log",
+      "error": "No training microbatch fits with required GPU headroom"
+    },
+    {
+      "after_completed_updates": 18,
+      "source": "artifacts/functiongemma-local-20gen-01-resume-01.log",
+      "diagnostic": "artifacts/functiongemma-local-20gen-01/rl/updates/training-profile-failed-1790149309312240222.json",
+      "error": "No training microbatch fits with required GPU headroom"
+    }
+  ],
+  "video_status": {
+    "jobs": 404,
+    "recorded_episodes": 404,
+    "recording_sources_sha256_verified": 404,
+    "render_failures": 0,
+    "rendered_videos_sha256_verified": 404,
+    "pending": 0,
+    "pending_jobs": []
+  },
+  "interpretation": "Sampled heldout mean reward and distance improved from baseline to update 20, but learning was not monotonic. Checkpoint 10 retains the highest evaluated median reward. No laps completed, five of twelve final sampled attempts stalled, and greedy control still stalls. Twelve evaluation attempts per checkpoint and one training seed provide preliminary evidence only. The 30 second budget does not test complete lap capability. First resume preserves model and optimizer but changes RNG stream; second restores persisted RNG."
+}
