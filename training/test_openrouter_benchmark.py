@@ -10,7 +10,7 @@ import unittest
 from urllib.error import HTTPError, URLError
 
 from openrouter_benchmark import (APIError, APINativeTools, OpenRouterClient, aggregate,
-                                 canonical, configuration, run_episode, strict_json,
+                                 automatic_routing, canonical, configuration, run_episode, strict_json,
                                  select_endpoint, validate_models)
 
 
@@ -211,6 +211,25 @@ class EpisodeTests(unittest.TestCase):
             self.assertFalse(result["training_eligible"])
             self.assertEqual(aggregate([result])["stalls"], 1)
             self.assertTrue((Path(directory) / "episode/benchmark.json").is_file())
+
+    def test_automatic_routing_allows_provider_changes_without_filters(self):
+        bodies = []
+        def opener(request, timeout):
+            bodies.append(strict_json(request.data.decode()))
+            return io.BytesIO(canonical(response(provider="first" if len(bodies) == 1 else "second")).encode())
+        config = automatic_routing(configuration("test/model", ENTRY, seconds=30,
+            temperature=.6, seed=1073, max_tokens=512))
+        with tempfile.TemporaryDirectory() as directory:
+            result = run_episode(OpenRouterClient("test-secret", opener=opener), model="test/model",
+                config=config, godot="unused", output=Path(directory) / "episode",
+                rollout=1, provider="previous episode provider", episode_factory=FakeEpisode)
+        self.assertIsNone(result["infrastructure_error"])
+        self.assertEqual(result["providers_seen"], ["first", "second"])
+        for body in bodies:
+            self.assertNotIn("provider", body)
+            self.assertNotIn("seed", body)
+            self.assertEqual(body["model"], "test/model")
+            self.assertEqual(body["tool_choice"], "auto")
 
     def test_provider_change_is_infrastructure_failure(self):
         calls = []

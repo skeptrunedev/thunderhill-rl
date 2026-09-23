@@ -224,6 +224,13 @@ def select_endpoint(config, response):
             "provider": {**config["provider"], "only": [endpoint["tag"]]}}
 
 
+def automatic_routing(config):
+    """Let OpenRouter choose providers without endpoint or parameter filters."""
+    return {**config, "routing_mode": "auto", "provider": None,
+            "tool_choice": "auto", "seed": None,
+            "seed_note": "No sampling seed sent with automatic provider routing"}
+
+
 def configuration(model, catalog_entry, *, seconds, temperature, seed, max_tokens, reasoning=None):
     return {"model": model, "time_budget_seconds": seconds, "temperature": temperature,
             "seed": seed if "seed" in catalog_entry["supported_parameters"] else None,
@@ -250,6 +257,8 @@ def run_episode(client, *, model, config, godot, output, rollout, rollout_count=
     resolved_model = None
     failure = None
     failure_details = None
+    auto_routing = config.get("routing_mode") == "auto"
+    providers_seen = []
     expected_provider = config.get("selected_endpoint", {}).get("provider_name") or provider
     try:
         with episode_factory(godot=godot, output=output, road=road, adapter_sha256=digest,
@@ -258,13 +267,14 @@ def run_episode(client, *, model, config, godot, output, rollout, rollout_count=
                 evaluation=True, time_budget_seconds=config["time_budget_seconds"]) as episode:
             with (Path(output) / "api_responses.jsonl").open("w") as log:
                 while not episode.done:
-                    routing = dict(config["provider"])
-                    if provider and "only" not in routing:
-                        routing["only"] = [provider]
                     body = {"model": model, "messages": strict_json(episode.prompt()),
                             "tools": road.native_tools.tools, "tool_choice": config["tool_choice"],
-                            "temperature": config["temperature"], "max_tokens": config["max_tokens"],
-                            "provider": routing}
+                            "temperature": config["temperature"], "max_tokens": config["max_tokens"]}
+                    if not auto_routing:
+                        routing = dict(config["provider"])
+                        if provider and "only" not in routing:
+                            routing["only"] = [provider]
+                        body["provider"] = routing
                     if config["seed"] is not None:
                         body["seed"] = config["seed"] + requests
                     if config.get("reasoning") is not None:
@@ -280,8 +290,10 @@ def run_episode(client, *, model, config, godot, output, rollout, rollout_count=
                     actual_provider, actual_model = response.get("provider"), response.get("model")
                     if not isinstance(actual_provider, str) or not actual_provider:
                         raise APIError("OpenRouter omitted provider identity")
-                    if expected_provider is not None and expected_provider != actual_provider:
+                    if not auto_routing and expected_provider is not None and expected_provider != actual_provider:
                         raise APIError("OpenRouter provider changed during benchmark")
+                    if actual_provider not in providers_seen:
+                        providers_seen.append(actual_provider)
                     provider = actual_provider
                     expected_provider = actual_provider
                     if not isinstance(actual_model, str) or not actual_model:
@@ -301,6 +313,7 @@ def run_episode(client, *, model, config, godot, output, rollout, rollout_count=
         failure_details = client.redact(getattr(error, "details", None))
     summary = episode.summary if episode is not None else None
     result = {"model": model, "resolved_model": resolved_model, "provider": provider,
+              "providers_seen": providers_seen, "routing_mode": config.get("routing_mode", "pinned"),
               "rollout": rollout, "policy_identity_kind": IDENTITY_KIND,
               "request_config_sha256": digest, "configuration": config,
               "summary": summary, "api_requests": requests,
@@ -345,6 +358,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--godot", required=True)
     parser.add_argument("--key-file", type=Path)
+    parser.add_argument("--routing", choices=("auto", "pinned"), default="auto")
     args = parser.parse_args()
     models = [model.strip() for model in args.models.split(",")]
     if (not all(models) or len(set(models)) != len(models) or args.episodes < 1
@@ -355,10 +369,14 @@ def main():
     key = args.key_file.read_text().strip() if args.key_file else os.environ.get("OPENROUTER_API_KEY", "")
     client = OpenRouterClient(key)
     catalog = validate_models(client.request("/models"), models)
-    endpoint_catalog = {model: client.request("/models/" + model + "/endpoints") for model in models}
-    selected_configs = {model: select_endpoint(configuration(model, catalog[model], seconds=args.seconds,
-        temperature=args.temperature, seed=args.seed, max_tokens=args.max_tokens, reasoning=args.reasoning),
-        endpoint_catalog[model]) for model in models}
+    endpoint_catalog = ({model: client.request("/models/" + model + "/endpoints") for model in models}
+                        if args.routing == "pinned" else {})
+    selected_configs = {}
+    for model in models:
+        config = configuration(model, catalog[model], seconds=args.seconds,
+            temperature=args.temperature, seed=args.seed, max_tokens=args.max_tokens, reasoning=args.reasoning)
+        selected_configs[model] = (automatic_routing(config) if args.routing == "auto"
+                                   else select_endpoint(config, endpoint_catalog[model]))
     args.output.mkdir(parents=True, exist_ok=False)
     campaign = {"planned_models": models, "episodes_per_model": args.episodes,
                 "catalog": catalog, "endpoint_catalog": endpoint_catalog,
