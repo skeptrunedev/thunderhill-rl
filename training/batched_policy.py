@@ -5,6 +5,9 @@ from __future__ import annotations
 import gc
 import json
 import math
+import os
+import shutil
+import subprocess
 import time
 
 import torch
@@ -70,6 +73,40 @@ def cuda_graph_evidence(device):
         }
     except (ImportError, AttributeError) as error:
         return {"available": False, "error": f"{type(error).__name__}: {error}"}
+
+
+def cuda_memory_evidence(device):
+    """Separate allocator memory from driver allocations and other processes.
+
+    External bytes include both other processes and nonallocator allocations in
+    this process; they must not be attributed to a leak without process evidence.
+    This is diagnostic only and never resets compiled graphs or allocator state.
+    """
+    if device.type != "cuda":
+        return {"available": False, "reason": "non_cuda_device"}
+    free, total = torch.cuda.mem_get_info(device)
+    reserved = torch.cuda.memory_reserved(device)
+    report = dict(
+        available=True, pid=os.getpid(), free_bytes=free, total_bytes=total,
+        allocated_bytes=torch.cuda.memory_allocated(device), reserved_bytes=reserved,
+        nonallocator_device_bytes=max(0, total - free - reserved),
+        cuda_graph_evidence=cuda_graph_evidence(device),
+    )
+    executable = shutil.which("nvidia-smi")
+    if executable is None:
+        report["process_memory_error"] = "nvidia-smi is unavailable"
+    else:
+        try:
+            result = subprocess.run(
+                [executable, "--query-compute-apps=pid,used_gpu_memory",
+                 "--format=csv,noheader,nounits"], capture_output=True, text=True,
+                timeout=10, check=True,
+            )
+            report["compute_process_memory_columns"] = ["pid", "used_gpu_memory_mib"]
+            report["compute_process_memory_csv"] = result.stdout.strip()
+        except (OSError, subprocess.SubprocessError) as error:
+            report["process_memory_error"] = f"{type(error).__name__}: {error}"
+    return report
 
 
 class BatchedPolicy:

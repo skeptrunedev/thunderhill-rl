@@ -2,6 +2,7 @@
 import copy
 import tempfile
 import unittest
+import json
 from unittest.mock import patch
 
 import torch
@@ -180,6 +181,13 @@ class TrajectoryTests(unittest.TestCase):
                 updater.profile_microbatches(episodes)
         self.assertFalse(self.model.training)
         self.assertTrue(all(p.grad is None for p in updater.parameters))
+        failures = list(updater.output_dir.glob("training-profile-failed-*.json"))
+        self.assertEqual(len(failures), 1)
+        report = json.loads(failures[0].read_text())
+        self.assertIsNone(report["selected_microbatch_size"])
+        self.assertEqual(report["optimizer_steps"], 0)
+        self.assertEqual(report["probes"][0]["error_message"], "test")
+        self.assertFalse(report["memory_before"]["available"])
 
     def test_reject_missing_behavior_tokens_and_after_eos(self):
         updater = self.updater()

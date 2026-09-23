@@ -18,7 +18,7 @@ import torch
 from peft import LoraConfig, PeftModel, get_peft_model
 from transformers import AutoTokenizer, set_seed
 
-from batched_policy import BatchedPolicy
+from batched_policy import BatchedPolicy, cuda_memory_evidence
 from lap_episode import DEFAULT_STALL_CONFIG, FAILURE_PENALTY, PROGRESS_METERS_PER_REWARD, REWARD_VERSION, LapEpisode, episode_reward
 from lap_audit import audit_lap
 from lap_rollout import recorded_transitions
@@ -73,7 +73,8 @@ def collect(policy, road, spec, godot, directory, adapter_hash, generation, coun
                 progress = dict(generation=generation, decision_steps=step,
                                 active=sum(not e.done for e in episodes),
                                 elapsed_seconds=time.monotonic() - started,
-                                simulation_seconds=[e.observation["sim_time"] for e in episodes])
+                                simulation_seconds=[e.observation["sim_time"] for e in episodes],
+                                memory=cuda_memory_evidence(policy.model.device))
                 publish(directory / "progress.json", progress)
                 print(json.dumps(progress), flush=True)
                 if tracker is not None:

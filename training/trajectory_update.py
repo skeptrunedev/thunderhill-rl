@@ -16,6 +16,7 @@ from datasets import Dataset
 from trl import GRPOConfig, GRPOTrainer
 
 from model_runtime import inference_precision
+from batched_policy import cuda_memory_evidence
 
 
 @dataclass(frozen=True)
@@ -184,6 +185,7 @@ class TrajectoryUpdater:
         longest_prompt = max(rows, key=lambda row: len(row["prompt_ids"]))
         longest_completion = max(rows, key=lambda row: len(row["completion_ids"]))
         results = []
+        memory_before = cuda_memory_evidence(device)
         try:
             self.model.train()
             for size in sorted(set(candidates)):
@@ -239,7 +241,9 @@ class TrajectoryUpdater:
                     if not safe:
                         break
                 except torch.cuda.OutOfMemoryError as error:
-                    results.append(dict(microbatch_size=size, fits_with_headroom=False, error=type(error).__name__))
+                    results.append(dict(microbatch_size=size, fits_with_headroom=False,
+                                        error=type(error).__name__, error_message=str(error),
+                                        memory_at_failure=cuda_memory_evidence(device)))
                     break
                 finally:
                     loss, batch = None, None
@@ -248,13 +252,25 @@ class TrajectoryUpdater:
                         torch.cuda.empty_cache()
             safe_results = [r for r in results if r["fits_with_headroom"]]
             if not safe_results:
-                raise RuntimeError("No training microbatch fits with required GPU headroom")
+                failure_path = self.output_dir / f"training-profile-failed-{time.time_ns()}.json"
+                failure_report = dict(
+                    selected_microbatch_size=None, headroom_fraction=0.15,
+                    optimizer_state_reserve_bytes=optimizer_reserve, probes=results,
+                    optimizer_steps=0, sampled_rows=len(rows),
+                    memory_before=memory_before, memory_after=cuda_memory_evidence(device),
+                )
+                with failure_path.open("x") as stream:
+                    json.dump(failure_report, stream, indent=2)
+                    stream.write("\n")
+                raise RuntimeError(
+                    f"No training microbatch fits with required GPU headroom; profile: {failure_path}")
             best = max(safe_results, key=lambda row: row["actions_per_second"])
             self.config = replace(self.config, microbatch_size=best["microbatch_size"])
             report = dict(
                 selected_microbatch_size=best["microbatch_size"], headroom_fraction=0.15,
                 optimizer_state_reserve_bytes=optimizer_reserve,
                 probes=results, optimizer_steps=0,
+                memory_before=memory_before, memory_after=cuda_memory_evidence(device),
                 sampled_rows=len(rows), repeated_actual_rows_for_capacity=True,
             )
             return report
@@ -287,6 +303,8 @@ class TrajectoryUpdater:
                 progress = dict(event="training_progress", actions_trained=offset + len(chunk),
                                 actions_total=len(rows), tokens_trained=tokens_seen,
                                 elapsed_seconds=time.monotonic() - started)
+                if self.model.device.type == "cuda":
+                    progress["memory"] = cuda_memory_evidence(self.model.device)
                 temporary = self.output_dir / "progress.pending"
                 temporary.write_text(json.dumps(progress) + "\n")
                 temporary.replace(self.output_dir / "progress.json")

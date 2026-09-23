@@ -62,6 +62,7 @@ class FakeEpisode:
 class FakePolicy:
     def __init__(self):
         self.calls = []
+        self.model = SimpleNamespace(device=torch.device("cpu"))
 
     def generate(self, prompts, greedy_indices=()):
         self.calls.append((list(prompts), greedy_indices))
