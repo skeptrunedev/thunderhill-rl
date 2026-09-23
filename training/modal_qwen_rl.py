@@ -51,7 +51,8 @@ image = (
     .run_commands('uv sync --frozen --project /opt/thunderhill/training --no-dev')
     # Compile the convolution extension against the pinned CUDA 13 PyTorch wheel.
     .env({'CUDA_HOME': '/usr/local/cuda', 'TORCH_CUDA_ARCH_LIST': '9.0',
-          'CAUSAL_CONV1D_FORCE_BUILD': 'TRUE', 'MAX_JOBS': '4'})
+          'CAUSAL_CONV1D_FORCE_BUILD': 'TRUE', 'MAX_JOBS': '4',
+          'CC': '/usr/bin/gcc', 'CXX': '/usr/bin/g++', 'CUDAHOSTCXX': '/usr/bin/g++'})
     .run_commands(
         'uv pip install --python /opt/thunderhill/training/.venv/bin/python '
         'ninja==1.13.2 setuptools==84.0.0 wheel==0.48.0',
