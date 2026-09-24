@@ -53,3 +53,39 @@ available without it. One RTX PRO 6000 is capped at 5400 seconds of child execut
 with no retries. Hardware camera preflight is included in that budget. The normal
 HF_TOKEN environment is preserved because the credential override is scoped to
 this subprocess. Model weights are prepared on CPU before allocating the GPU.
+
+## Observed result
+
+Run `alpamayo-diagnostic-20260924T024801Z` completed all four baseline attempts and
+stopped at the gate. No training generation or optimizer update was performed.
+Child execution took 204.76 seconds. The app is stopped with no remaining tasks
+or containers. All four complete videos passed hash and frame count verification.
+
+| Scenario | Seed | Model controlled progress | Final speed | Outcome |
+| :--- | ---: | ---: | ---: | :--- |
+| Standing | 1073 | negative 0.143 m | 0.014 m/s | Stalled |
+| Standing | 2073 | 0.094 m | 0.089 m/s | Stalled |
+| Moving | 1073 | 3.723 m | 0.008 m/s | Stalled |
+| Moving | 2073 | 3.441 m | 0.083 m/s | Stalled |
+
+Each received 10 seconds of model control before the stall stop. Moving history
+was real, but it was decelerating: the setup coast reduced speed from 5 to 2.680
+metres per second before model control began. The first predicted segment speeds
+then decreased from 2.630 to 2.162 metres per second for seed 1073, and from 2.604
+to 1.987 for seed 2073, over five control steps. Executed speeds tracked these
+slowing targets. The model did not request fast forward driving that the controller
+subsequently failed to deliver.
+
+This is a negative result for the present configuration, not a conclusive test of
+the model's capabilities. The decelerating history is a confound: it may encourage
+continuing to slow down. Source inspection also confirms that the fixed controller
+has proportional speed feedback without compensation for engine braking and
+rolling resistance. Before another paid training run, validate steady speed
+history and constant speed trajectory tracking. Do not extrapolate these four
+failed baselines into a claim that more generations would necessarily work or
+that Alpamayo can never drive this simulator.
+
+See [machine readable results](alpamayo-staged-diagnostic-result.json) and
+[W&B](https://wandb.ai/skeptrune-org/thunderhill-rl/runs/y14b3mt3).
+Recordings and videos are archived under
+`artifacts/modal-alpamayo-diagnostic-20260924T024801Z/`.

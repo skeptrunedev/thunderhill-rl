@@ -92,7 +92,8 @@ def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
         finally:
             os.close(directory)
         print(json.dumps({"archive": str(output), "run_id": run_id,
-                          "training_ok": status["ok"]}), flush=True)
+                          "execution_ok": status["ok"],
+                          "outcome": status.get("outcome", "validation")}), flush=True)
         if not status['ok'] and not (output / run_id / 'experiment').exists():
             print(json.dumps({'run_id': run_id, 'video_status': 'no_training_attempt_started'}),
                   flush=True)
