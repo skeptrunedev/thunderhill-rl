@@ -1,106 +1,56 @@
-# Bike agent harness
+# Camera and trajectory racing harness
 
-`ThunderhillEnv` in `agent_harness.py` is the initial TRL environment adapter.
-It exposes rider inputs, not simulator administration. Each environment instance
-owns a separate Godot process and user data directory, provisioned by the trainer.
+Alpamayo receives four camera frames and sixteen measured ego poses. The policy
+predicts future positions in metres in its current ego frame, with X forward,
+Y left and Z up, at 0.1 second intervals. At a stationary reset, missing history
+is padded with the stationary initial observation. Image hashes and simulator
+observation identity bind camera inputs to the recorded physics state.
 
-## Agent tools
+`DrivingEpisode` executes each sampled plan through `TrajectoryTracker`. The
+controller uses only the predicted trajectory, current speed and current lean.
+It does not read the centerline, choose an optimal racing line or supply training
+labels. Motion between replans is approximated from speed and lean; banking and
+slip can make that estimate inaccurate. Godot steer and lean are positive right,
+so the conversion reverses the model's leftward turn sign.
 
-| Tool | Inputs | Output |
-| --- | --- | --- |
-| `observe()` | None | Last authoritative telemetry and current observation token, without advancing time |
-| `control_bike(...)` | Current observation token, throttle, steering, front brake, rear brake, gear change | Telemetry after the fixed action interval and a fresh observation token |
+The model action is the sampled trajectory. The resulting steering, throttle
+and brake commands are deterministic controller outputs, not native language
+tool calls. Their likelihood must not be substituted for the trajectory's
+sampling probability during RL.
 
-Throttle and brake fractions lie between zero and one. Steering lies between
-minus one and one. Gear change is minus one, zero or one. Steering remains the
-simulator's assisted input, not validated physical handlebar torque. Automatic
-shifting and assistance are fixed by the environment. The agent cannot change
-those settings, choose extra physics ticks, reset its episode, set its reward,
-or select the checkpoint identity.
+## Simulator execution
 
-Every control call advances the server's fixed 12 ticks, or 0.1 simulated seconds,
-and may stop sooner at an episode boundary. A token from the latest observation
-is mandatory. Successful advancement replaces it with a fresh unpredictable
-token. A second action queued before its observation arrives therefore cannot
-reuse the old token. Stale or invalid actions execute no physics and are recorded.
-The token is a sequencing receipt, not an authentication credential.
+`ThunderhillEnv` retains the audited control transport:
 
-The initial launch diagnostic allowlist includes tick, speed, gear, lean, done
-and the observation token. Road telemetry is the standard input for lap training.
-Passing `road_telemetry=RoadTelemetry()` to the harness adds a `road` object to
-every observation and control result. `lap_policy.py` derives current lateral
-position, angle and distance to the lookahead center, and upcoming centerline
-curvature from the authoritative state at that observation tick. The evaluator
-formats these surfaced features for Gemma and passes the surfaced receipt back
-with each model action. The launch probe intentionally omits the provider to
-preserve its existing observation contract and reproducibility. This is privileged
-geometry, not camera perception or a recommended action. Teacher controls appear only in
-offline training examples. Godot records full state for verification.
-Receipts vary between candidates; initial physical state remains identical. This
-is not a claim that all prompt tokens or sampled trajectories are identical.
+| Operation | Purpose |
+| --- | --- |
+| `observe()` | Return current state and sequencing receipt without advancing time |
+| `control_bike(...)` | Apply bounded controls using the latest receipt and return the resulting state |
 
-## Trainer authority and failure handling
+Each control advances at most twelve physics ticks, or 0.1 simulated seconds.
+Stale receipts and malformed controls execute no physics. The trainer owns reset,
+episode duration, policy identity and reward collection. The policy cannot change
+its rewards or silently reset an unsuccessful attempt. Assistance and automatic
+shifting remain fixed by the environment.
 
-TRL treats `reset()` and `get_reward()` as lifecycle methods and does not expose
-them as tools. Reset assigns the trainer's policy step identifier and creates a
-new episode. Reward comes from actual recorded progress after the actions. The
-current `interactive-launch-v1` reward is only a short launch diagnostic; it must
-be replaced by a versioned, adversarially tested racing objective before lap
-optimization.
+Road telemetry remains available to the shared lifecycle and diagnostic records.
+The Alpamayo policy input and trajectory controller do not use that privileged
+track geometry. Reward audits independently inspect the recorded simulator
+transitions and confirm that submitted controls actually executed.
 
-Transport errors and malformed simulator responses persist an infrastructure
-failure. They make `get_reward()` raise, aborting the training update. This matters
-because TRL catches exceptions raised by tools and normally returns them to the
-model. A broken simulator must not silently become a poor driving score.
+## Learning and recording
 
-The adapter records reset observations, requested controls, before and after
-telemetry, episode identity, policy step and reward. Godot independently records
-every physical transition. The validation trainer saves exact completion token
-IDs, completion masks, tool masks, advantages and episode identities. It audits
-observation before action ordering and excludes intermediate tool observations
-from the policy loss.
+The trainer groups gameplay attempts by generation and updates the policy from
+those attempts' simulator rewards. Stalls, crashes and track limit failures are
+valid outcomes when the recording audit passes. Infrastructure failures are
+reported separately and must not be presented as successful training.
 
-## Reproduce the interactive check
+Each attempt retains camera observation identities, model trajectory decisions,
+executed controls, reward components, generation and rollout identity, plus an
+immutable simulator recording and queued video job. Evaluation uses identified
+checkpoints separately from training collection. W&B tracking provides reward
+and driving outcome graphs; a higher reward in one generation alone is not proof
+of a lasting improvement.
 
-From the repository root:
-
-```sh
-python3 training/test_agent_harness.py
-uv run --project training python training/interactive_trl.py \
-  --godot /absolute/path/to/godot \
-  --output artifacts/a-new-interactive-check
-```
-
-The script uses TRL `GRPOTrainer.environment_factory`, four isolated workers,
-eight total rollouts and two optimization steps. Every rollout must complete two
-observed control actions. The local model is Qwen3 0.6B because its native chat
-template passes TRL's tool support check. The previously tested Gemma 3 270M
-template does not. This validates the framework and harness, not Gemma 4 support.
-
-## Remaining work
-
-Road telemetry is the selected observation mode; camera input is not required.
-Add a versioned telemetry experiment specification, longer budgets,
-an invalid command budget, and a racing reward covering lap validity and timing.
-Harbor integration should wrap this same environment and independently verify its
-recordings. Checkpoint reload and evaluation must be validated for the interactive
-model. The earlier Gemma launch probe validates reload for that separate setup.
-Longer control horizons and rollout throughput need measurements on target
-hardware. None of these are implied by a two action smoke test.
-
-## Verified local result
-
-The [committed result](results/rtx2080ti-trl-interactive.json) records a passing
-run on the RTX 2080 Ti with TRL 1.13.0. Four workers completed eight rollouts,
-each with two sequential observed control actions, for 192 physics transitions.
-Two GRPO updates produced finite nonzero adapter changes. The transcript audit
-verified that the intermediate observation precedes the next action, that its
-tokens are excluded from policy loss, and that each episode's tick sequence,
-policy identifier and reward agree with Godot's independent recording. The run
-excluded 1,219 environment tokens. Peak PyTorch allocation was 6,382,137,856 bytes,
-about 5.94 GiB, not total GPU memory use. Full artifacts are retained under
-`artifacts/interactive-trl-03/`.
-
-Six independent harness tests cover read only observations, causal road features,
-stale receipts, control bounds, transport failure invalidation and policy authority limits.
-The adapter was saved; this interactive test does not claim a reload check.
+No supervised imitation or scripted driving demonstrations are part of this
+training workflow.

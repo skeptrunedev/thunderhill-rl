@@ -1,3 +1,9 @@
+# Historical experiment
+
+The Qwen launcher described below was removed during the Alpamayo migration.
+These commands document an earlier experiment and are not current instructions.
+See [Alpamayo validation](alpamayo-validation.md) for the active work.
+
 # Qwen 27B gameplay RL validation
 
 This path starts from the published Qwen/Qwen3.8-27B instruction checkpoint at revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` with fresh LoRA adapters. It performs only simulator reward driven RL through the existing TRL Dr GRPO trajectory loss. It does not use OpenRouter outputs, demonstrations, supervised datasets or prior Gemma adapters as training targets.

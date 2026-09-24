@@ -1,332 +1,54 @@
-# Training and GPU validation
+# Alpamayo gameplay reinforcement learning
 
-## Gemma 4 native tool calling
+The active training pipeline uses NVIDIA Alpamayo 1.5 to sample future driving
+trajectories from simulator camera frames and measured motion history. A fixed
+motorcycle controller executes those trajectories. Actual Godot progress,
+completion, crashes, track limits and stalls determine episode rewards.
 
-New full trajectory campaigns require `gemma4_native_tools` adapters. The old
-compact text action protocol remains readable for historical artifacts, but
-`train_full_lap_grpo.py` refuses to train it. This migration follows Google's
-[native function calling protocol](https://ai.google.dev/gemma/docs/capabilities/text/function-calling-gemma4).
+There is no supervised imitation, demonstration dataset, scripted teacher or
+language tool formatting migration in this pipeline. The sampled action is a
+trajectory. Serialized `control_bike` messages are controller outputs used to
+execute and audit the action, not sampled model tokens.
 
-`NativeBikeTools` passes a real `control_bike` function schema to Gemma's pinned
-chat template. The model generates `<|tool_call>call:control_bike{...}<tool_call|>`
-and hands execution to the simulator with `<|tool_response>` (token 50). Each
-subsequent decision receives the actual previous call and simulator tool result.
-Only the latest interaction is retained, keeping context bounded across laps.
-Road telemetry is privileged simulator information. No teacher controls or
-replacement actions are used during evaluation or rollouts.
+## Environment and entry points
 
-XGrammar constrains the four integer arguments and complete native envelope.
-The same allowed token distribution is used in sampling and differentiable TRL
-Dr GRPO likelihoods. Constrained validity is a property of decoding, not evidence
-that the unconstrained model has learned flawless syntax. Steering remains in
-thousandths and pedal inputs in percent, preserving the existing action space.
-The 128 token limit covers even character tokenization of the full call.
-All raw native completions, sampled token likelihoods, original prompts, simulator
-transitions and video jobs remain recorded.
+The isolated environment is defined in [alpamayo/pyproject.toml](alpamayo/pyproject.toml).
+The previous Gemma and Qwen launchers, training environments and imitation code
+have been removed. Historical result reports remain in [results](results).
 
-Migrate a preserved adapter, then validate actual native calls and one complete
-trajectory update on the H100:
+* [modal_alpamayo_rl.py](modal_alpamayo_rl.py) provisions the bounded cloud validation.
+* [train_alpamayo_rl.py](train_alpamayo_rl.py) collects game episodes, performs one
+  generation of policy updates and evaluates the resulting checkpoint.
+* [alpamayo_policy.py](alpamayo_policy.py) loads the driving policy and implements
+  likelihood evaluation and RL updates using the upstream action distribution.
+* [driving_episode.py](driving_episode.py) captures images and motion history and
+  maintains the existing audited episode and video lifecycle.
+* [driving_trajectory.py](driving_trajectory.py) converts predicted trajectories
+  to motorcycle controls without reading track geometry.
 
-```sh
-modal run --detach training/modal_app.py \
-  --stage native-tools-validation \
-  --run-id gemma4-native-tools-validation-01 \
-  --source-run gemma4-full-lap-campaign-01 \
-  --source-checkpoint checkpoint-0003
-```
+Inspect each entry point's arguments before launching paid compute. A successful
+build or local unit test does not establish that a cloud generation completed.
+Completion requires audited gameplay, a verified optimizer update, saved model
+state and its evaluation and recordings.
 
-This runs 100 supervised format migration steps, then short Godot rollouts and
-an actual RL update. It verifies source hashes, preserved demonstration controls,
-native completion labels, constrained training, and checkpoint reloads. It does
-not establish full lap driving quality. The resulting checkpoint is under
-`experiment/native-smoke/checkpoint-0001`. Later full campaigns can select it
-with `--source-checkpoint native-smoke/checkpoint-0001 --initial-generation 1`.
-Every launch requires a unique run ID. CUDA graphs and memory capacity are
-qualified again for the larger native prompts and completions.
+## Local verification
 
-The [first H100 native validation](results/gemma4-native-tools-validation.json)
-completed with 662 recorded decisions and zero invalid calls. It performed a
-verified RL update, but **did not recover reliable driving**: greedy evaluation
-crashed after 170 metres before the update and 185 metres afterward. No native
-lap completed. Supervised examples used initial observations while subsequent
-rollout decisions used native tool response context. That confirmed context
-mismatch needs an isolated test before attributing the driving regression to it.
-The long campaign remains stopped. See [experiment tracking](../docs/experiment-tracking.md)
-for separate graphs of syntax errors, failed episodes, and valid lap times.
-
-## Historical local GPU validation
-
-Use Hugging Face TRL as the primary training framework, with PEFT adapters.
-The interactive [bike harness](HARNESS.md) now uses `GRPOTrainer.environment_factory`.
-The launch probe here deliberately uses the simpler reward callback to first
-verify the chain from model sampling to actual Godot outcomes to GPU updates.
-That original launch probe does not implement repeated observations and decisions
-within an episode. The separate interactive harness does. Harbor integration,
-camera training and Gemma 4 E4B training remain unverified.
-
-Run from the repository root:
+The generic unit tests require no model weights or paid compute:
 
 ```sh
-uv sync --project training --locked
-uv run --project training python training/smoke_grpo.py \
-  --godot /absolute/path/to/godot \
-  --output artifacts/my-new-training-check
+PYTHONPATH=training:tools uv run --project training/alpamayo python -m unittest \
+  test_agent_harness test_driving_trajectory test_lap_audit test_lap_episode \
+  test_lap_policy test_lap_rollout test_video_jobs test_experiment_tracking
 ```
 
-The output directory must be new. It retains the adapter, tokenizer, trainer logs,
-model token outputs, episode identifiers and real Godot episode recordings.
-Dependencies are pinned in `uv.lock`. Model files are downloaded from the pinned
-`unsloth/gemma-3-270m-it` revision. They are not included in this repository;
-their Gemma terms remain separate from this repository's code license.
+Set `THUNDERHILL_GODOT` to a Godot executable to include actual simulator
+lifecycle tests. The policy distribution tests in `test_alpamayo_policy.py` also
+require the pinned NVIDIA source checkout via `ALPAMAYO_SOURCE_ROOT`. Small
+random test heads validate arithmetic, not driving competence.
 
-The test uses a neutral A/B exploration prompt. A coasts and B applies throttle
-0.6 for one simulated second, starting from the same stationary reset. Valid
-actions receive the sum of measured legal progress from actual game transitions.
-Invalid output receives an explicit minus 0.1 syntax penalty and executes no
-physics. This is the diagnostic `launch-probe-v1` reward, not a racing reward.
-The full vocabulary remains available to generation; actions are not forced.
-Single token completions are intentional; their length cutoff remains eligible
-for training rather than being masked as an incomplete answer.
-
-Three GRPO steps sample eight candidates each. The test requires both valid
-actions to produce distinct rewards within a candidate group, finite nonzero LoRA
-changes, changed policy logits, saved and reloaded logit agreement, and persisted
-recordings for every episode. Only LoRA parameters may be trainable. FP32 and
-Transformers generation keep this small compatibility test straightforward on
-Turing; this configuration is not the proposed high throughput E4B deployment.
-No model or training data is uploaded to an external tracking service.
-
-## Framework selection
-
-[TRL](https://github.com/huggingface/trl) has an Apache 2.0 license and about
-19,000 GitHub stars at the September 21, 2026 check. Its
-[agent interface](https://huggingface.co/docs/trl/grpo_trainer#agent-training)
-supports separate environment instances, action tools, observations and episode
-rewards. The current docs list Gemma 4 E2B among tested models; exact E4B
-compatibility still requires a run. The
-[Harbor adapter](https://huggingface.co/docs/trl/main/en/harbor)
-provides a path to the project's intended harness.
-
-Read these concrete references at upstream commit
-`ccdaa0065cee4174d2b4eb60f1856c51e51232ed`:
-
-* [Gemma CARLA](https://github.com/huggingface/trl/blob/ccdaa0065cee4174d2b4eb60f1856c51e51232ed/examples/grpo_carla/carla_vlm_gemma.py)
-  for repeated driving actions, camera observations and environment rewards.
-* [Catch](https://github.com/huggingface/trl/blob/ccdaa0065cee4174d2b4eb60f1856c51e51232ed/examples/grpo_catch/grpo_catch.py)
-  for grouped interactive rollouts and colocated vLLM generation.
-
-[Unsloth](https://github.com/unslothai/unsloth) remains a candidate for reducing
-E4B memory use with TRL. Its [Gemma guide](https://unsloth.ai/docs/models/gemma-4/train)
-distinguishes quantized and ordinary LoRA requirements; advertised minimums are
-not evidence that our camera and rollout workload fits. [verl](https://github.com/verl-project/verl)
-has a real interactive agent loop, but its distributed infrastructure adds
-complexity that is unnecessary for this first local test.
-
-The local GPU is an RTX 2080 Ti with 11 GB, compute capability 7.5. The official
-[E4B checkpoint](https://huggingface.co/google/gemma-4-E4B-it) is publicly
-accessible as of this check. E4B denotes effective computation, not total resident
-parameters. Roughly eight billion total parameters mean ordinary two byte weights
-alone exceed this GPU's capacity. Quantized E4B training, longer trajectories,
-vision observations and target RTX PRO throughput remain separate tests. A small
-Gemma success establishes working training machinery, not racing competence.
-
-## Verified local result
-
-The September 21 run passed, using the pinned dependencies above. The compact
-[measured result](results/rtx2080ti-gemma270m.json) is committed; complete artifacts
-are in `artifacts/training-smoke-04/`.
-
-* Three GRPO steps sampled 24 completions, including 23 valid actions.
-* Four coast actions produced about minus 0.017 metres of signed progress;
-  nineteen throttle actions produced about 2.896 metres. One invalid C output
-  received the explicit syntax penalty. Every valid action executed 120 ticks.
-* All 2,760 transitions and all episode identities were found in isolated Godot
-  recordings. Reward variation included both valid actions within a group.
-* The 368,640 trainable adapter parameters changed, with maximum absolute change
-  0.000193. Policy logits changed and matched after checkpoint reload.
-* At sampling temperature 1.5, the prompt's throttle token probability increased
-  from 0.5465 to 0.8804. This measures the trained launch probe, not held out
-  generalization, lap completion or improved racing skill.
-* Peak PyTorch allocated memory was 2,198,125,056 bytes (about 2.05 GiB), including
-  the reload check. This is not total system GPU use or an E4B memory estimate.
-
-Earlier runs correctly failed the nonzero update gate when every candidate chose
-the same action. Another run found a relative user data path error after a valid
-update; the final harness resolves its artifact directory before starting Godot
-and verifies the episode records explicitly. Those runs are not counted as passes.
-
-## Road telemetry lap policy
-
-Road telemetry is the standard observation mode for the lap policy. It includes
-speed, lean, lateral position, angle and distance to a lookahead centerline point,
-and upcoming curvature. Geometry is simulator supplied and explicitly privileged.
-The model generates steering, throttle and both brake commands; no teacher
-controller supplies or substitutes actions during evaluation.
-
-`lap_policy.py` builds causally paired supervised examples from an audited driver
-recording. Each target uses the observation before the action. A contiguous
-holdout and excluded boundary rows keep adjacent augmented examples out of the
-holdout. This is still one recorded lap, not an independent generalization test.
-`train_lap_sft.py` uses TRL SFTTrainer to warm start the small Gemma adapter. It
-checks prompt token boundaries and rejects examples that would be truncated.
-This stage is imitation learning, not a policy gradient update. Recovery augmentation
-adds balanced low speed, cruising and braking examples with heading and lateral
-perturbations; the source lap alone is dominated by steady cruising. An existing
-adapter can continue supervised training with `--adapter /path/to/adapter`.
-
-```sh
-python3 training/lap_policy.py \
-  --driver /absolute/driver.jsonl --episode /absolute/episode.jsonl \
-  --output artifacts/new-lap-dataset --augment 2 --max-speed 8 --recovery-grid
-uv run --project training python training/train_lap_sft.py \
-  --dataset artifacts/new-lap-dataset --output artifacts/new-lap-sft \
-  --steps 600 --batch 2
-uv run --project training python training/evaluate_lap.py \
-  --adapter artifacts/new-lap-sft/adapter --godot /absolute/path/to/godot \
-  --output artifacts/new-lap-evaluation
-```
-
-The evaluator reloads the saved adapter into a new process and obtains fresh
-telemetry after each control interval. It saves exact generated tokens, prompts,
-parsed controls, adapter identity, harness events and authoritative Godot state
-recordings. Malformed commands stop evaluation rather than triggering a fallback.
-A completed lap must pass ordered gates, track validity and recording checks.
-Training loss alone is not evidence of a successful lap.
-
-
-For a long local CUDA evaluation, add `--compile` to `evaluate_lap.py`. The
-compiled mode pads prompts on the left to 256 tokens and uses a 288 token static
-cache. Full graph compilation uses `dynamic=True` because Gemma's sliding cache
-increments a Python position counter during generation. Making that counter
-static forces recompilation at each token. Compilation failures are not hidden.
-
-The [measured inference check](results/rtx2080ti-gemma-inference.json) compared 24
-generations over 12 held out prompts. Compiled outputs matched eager tokens
-exactly, with average control generation falling from 310 to 128 milliseconds.
-These timings include another lap evaluator sharing the GPU. A separate profiler
-check verified 12 CUDA graph launches during one 13 token control generation.
-The evaluator also checks adapter merge logit equivalence on its initial state.
-
-```sh
-TORCH_LOGS=perf_hints uv run --project training python training/benchmark_lap_inference.py \
-  --adapter /absolute/adapter --prompts /absolute/eval.jsonl \
-  --output artifacts/new-inference-check --samples 12 --repeats 2 --profile
-```
-
-`--device cpu` supports independent checks while GPU training is running. It is
-not the recommended throughput path. All optimizer checkpoints are retained by
-new training runs so their generated driving episodes can be compared later.
-
-
-## Initial moving segment RL result
-
-`train_lap_grpo.py` performs actual TRL GRPO updates from Godot outcomes, starting
-from a supervised adapter. A frozen model generated prefix puts all candidates
-into the same moving state. Four sampled first controls are followed by greedy
-controls from the current model. Only the sampled first command receives a
-policy gradient; neither the prefix nor continuation tokens enter the loss.
-Progress after the prefix supplies reward, with separately recorded syntax and
-invalid lap penalties. This is a limited Monte Carlo first decision experiment,
-not full trajectory optimization.
-
-The [measured run](results/rtx2080ti-gemma-road-grpo.json) passed three updates and
-12 sampled rollouts, independent recording and loss mask audits, finite adapter
-changes and checkpoint reload. Its tiny reward change on an easy straight is not
-meaningful evidence of better driving. The supervised lap baseline reached about
-40 percent before leaving the track in a tight corner. The subsequent corner
-training result below supersedes that failed baseline.
-
-
-## First verified learned lap
-
-[Generation 10 completed a full lap](results/rtx2080ti-gemma-first-lap.json) in
-600.925 simulated seconds after ten corner GRPO updates (forty sampled rollouts).
-The reloaded checkpoint generated all 6,010 controls from road telemetry, with
-no teacher or fallback controller. Independent audit verified all 32 gates in
-order, 72,111 contiguous physics transitions, and zero off track ticks.
-
-This is a slow baseline on the training track, not evidence of general racing
-ability or improved lap time. Subsequent speed training must beat this complete
-legal lap under the same standing start and simulator conditions. Checkpoint
-`5618108d3ad901be680fb7e745dc3a753c4a651821a07698daa4c2768f0bd8b6`
-is retained unchanged for comparison.
-
-`train_lap_curriculum.py` can alternate compiled full lap evaluation with
-training on audited failures. Every trained checkpoint is evaluated, including
-the last cycle. `--start-generation` preserves generation numbering across
-training calls. Successful completion ends this safety curriculum; speed
-experiments then use fixed duration sections and compare complete lap times.
-
-`compare_laps.py` independently audits both complete recordings and hashes the
-actual endpoint adapters before reporting any lap time improvement. It requires
-identical simulator conditions and standing starts, plus verified training
-summaries linking the baseline to the candidate. Pass `--baseline`, `--candidate`,
-`--baseline-adapter`, `--candidate-adapter`, `--training-summary`, and `--output`.
-Repeat `--training-summary` in chronological order for multiple training stages.
-A slower legal lap produces `improved: false` and exit status one. Output files
-are never overwritten. Intermediate checkpoint lineage is supported by training
-summaries; base model revision is not independently established by this check.
-
-
-## Speed exploration and repeated controls
-
-[Generation 20 completed a faster legal lap](results/rtx2080ti-gemma-faster-lap.json)
-in 599.983 seconds, compared with generation 10 at 600.925 seconds. Ten additional
-GRPO steps using 320 sampled rollouts improved the full lap by 0.942 seconds
-(0.157 percent). Both recordings independently passed all gate, control,
-checkpoint provenance, and zero off track checks under identical simulator
-conditions and standing starts. The learned adapter was saved and reloaded.
-This is a small improvement from one deterministic evaluation per checkpoint on
-the training circuit, not evidence of robust or competitive racing performance.
-
-The first speed batch repeated the same action four times and produced zero
-reward variance and zero gradient. It was stopped rather than counted as
-improvement. [A sampling probe](results/rtx2080ti-gemma-speed-sampling.json)
-found that larger batches at temperature 1.4 contain valid throttle alternatives;
-higher temperatures mainly generate malformed commands.
-
-`probe_action_sampling.py` measures valid control diversity on an actual saved
-policy prompt before expensive simulator rollouts. `train_lap_grpo.py` accepts
-`--num-generations` (default four); larger groups reuse the same four isolated
-snapshot workers. Recorded rollout numbers use the actual group size.
-
-Greedy continuation text and token IDs are memoized by exact prompt within a
-single optimizer step. A new cache is created after every weight update and for
-each baseline or final evaluation. Sampled first actions remain sampled, and
-every physics transition is executed and audited independently. Cache hit counts
-are recorded. No simulator states or rewards are cached.
-
-## Video archive for every attempt
-
-`train_lap_grpo.py` and `evaluate_lap.py` automatically publish a durable
-`video_jobs` entry for every finished policy episode, including invalid actions,
-track exits, and the before and after evaluations. The job preserves the complete
-recording hash, model revision, checkpoint, generation, rollout identity, and
-outcome. The existing recordings remain the authoritative state and control data.
-Video rendering plays those exact states back and never resimulates them.
-
-Run the renderer in a separate process with a working graphical display:
-
-```bash
-DISPLAY=:1 python3 tools/render_video_queue.py artifacts \
-  --godot /path/to/godot --ffmpeg /path/to/ffmpeg --watch
-```
-
-It renders every queued attempt to a full length MP4 at 30 frames per second,
-including the native model, generation, rollout, and live control overlay. Each
-video includes a final state hold of one second; a zero control attempt is a
-one second initial state video. Videos currently have no audio. Training remains
-headless, and the renderer can run separately after training to avoid GPU
-contention. For Modal, preserve the entire experiment directory on persistent
-storage and drain its queue on a rendering worker or locally after downloading.
-
-`videos/index.json` is the montage inventory. It retains failures as well as
-successes and includes each video's checkpoint and outcome. Pending jobs are not
-videos: an experiment's archive is ready only after a final queue drain reports
-`complete: true` and its queued count matches all policy episodes. Run the same
-command without `--watch` against a finished experiment to verify coverage and
-video hashes. Failed render attempts retain their logs and return a failure;
-inspect the cause, then use `--retry-failed` to create a new attempt without
-overwriting existing artifacts. A hard process kill before episode finalization
-can leave a raw recording without a job and requires recovery before declaring
-the archive complete. Historical experiments are not automatically backfilled.
+Every actual rollout keeps its model identity, generation, rollout number,
+trajectory decisions, executed controls and authoritative simulator recording.
+Each trajectory also retains its tokenized inputs, diffusion samples, timesteps
+and behavior density in a hashed replay artifact for reproducing the RL update.
+Video jobs are queued from those recordings. W&B metrics distinguish collection,
+optimizer updates and evaluation. See [HARNESS.md](HARNESS.md) for the interface.

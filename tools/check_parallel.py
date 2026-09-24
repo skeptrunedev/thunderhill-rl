@@ -25,7 +25,7 @@ from check_agent import ROOT, Client
 
 
 @contextmanager
-def worker(godot, directory, timeout, extra_args=()):
+def worker(godot, directory, timeout, extra_args=(), *, rendered=False):
     directory.mkdir()
     data = directory / "data"
     log = directory / "godot.log"
@@ -38,7 +38,9 @@ def worker(godot, directory, timeout, extra_args=()):
         process = subprocess.Popen(
             [
                 godot,
-                "--headless",
+                *(["--rendering-method", "gl_compatibility", "--rendering-driver", "opengl3",
+                   "--audio-driver", "Dummy", "--resolution", "640x360", "--max-fps", "30"]
+                  if rendered else ["--headless"]),
                 "--path",
                 str(ROOT / "godot"),
                 "--",
@@ -65,7 +67,7 @@ def worker(godot, directory, timeout, extra_args=()):
                     time.sleep(0.1)
             if connection is None:
                 raise TimeoutError(f"Worker did not start: {log.read_text()}")
-            connection.settimeout(15)
+            connection.settimeout(60 if rendered else 15)
             client = Client(connection)
             yield client, data
         finally:

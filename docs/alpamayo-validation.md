@@ -25,5 +25,12 @@ a saved reloadable checkpoint, evaluation of that checkpoint, complete video
 coverage, and confirmation that the cloud job has terminated. One generation is
 a pipeline validation, not statistical evidence of improved lap performance.
 
-Existing local camera, episode, reward and recording checks passed before this
-integration. They do not validate Alpamayo's model input or training loss.
+Local validation now covers real rendered camera capture, trajectory execution,
+reward auditing, recording queues and persisted replay artifacts. CPU tests of
+NVIDIA's stochastic sampler verify replay density and policy gradient arithmetic
+using a tiny test head, not a driving checkpoint.
+
+The actual processor test remains gated by access to `nvidia/Cosmos-Reason2-8B`.
+The full Alpamayo model has not completed a gameplay or optimizer validation.
+Neither local integration tests nor the CPU arithmetic tests establish that the
+complete model trains successfully on the planned GPU.

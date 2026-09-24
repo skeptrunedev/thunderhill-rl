@@ -1,3 +1,8 @@
+# Historical experiment
+
+The Gemma training commands below document earlier runs. Their implementations
+were removed during the Alpamayo migration. See [current training](../training/README.md).
+
 # Full lap training
 
 `training/train_full_lap_grpo.py` samples independent standing start episodes from a frozen Gemma policy. Each episode ends on lap completion, crash, track violation, malformed control, or its simulation time budget. Every action retains its original stateless road telemetry prompt, generated token IDs and behavior log probabilities. No teacher controls enter collection.
