@@ -67,17 +67,44 @@ def download_volume_run(volume, run_id, stage, *, workers=4):
         if not destination.resolve().is_relative_to(stage):
             raise ValueError(f'Volume path escapes staging: {entry.path}')
         kind = int(entry.type)
-        if kind not in (1, 2):
+        if kind not in (1, 2, 3):
             raise ValueError(f'Unsupported volume entry type: {entry.path}')
         if entry.size < 0:
             raise ValueError(f'Invalid volume file size: {entry.path}')
-        inventory.append(dict(path=str(relative), type=kind, size=entry.size))
+        inventory.append(dict(path=str(relative), type=kind, size=entry.size,
+                              mtime=getattr(entry, 'mtime', None)))
     if not inventory:
         raise ValueError('Volume run inventory is empty')
+    # Modal's public FileEntry exposes no link target. Do not dereference links.
+    # W&B's three convenience aliases are redundant with concrete run logs;
+    # retain their listing metadata and make the omission explicit in the receipt.
+    wandb_root = PurePosixPath(run_id) / 'experiment' / 'wandb'
+    for entry in inventory:
+        if entry['type'] != 3:
+            continue
+        path = PurePosixPath(entry['path'])
+        if path.parent != wandb_root or path.name not in ('debug.log', 'debug-internal.log', 'latest-run'):
+            raise ValueError(f"Unsupported volume symlink: {entry['path']}")
+        concrete = []
+        for candidate in inventory:
+            other = PurePosixPath(candidate['path'])
+            if candidate['type'] != 1 or not other.is_relative_to(wandb_root):
+                continue
+            components = other.relative_to(wandb_root).parts
+            if not components or not components[0].startswith(('run-', 'offline-run-')):
+                continue
+            if path.name == 'latest-run' or components[1:] == ('logs', path.name):
+                concrete.append(candidate['path'])
+        if not concrete:
+            raise ValueError(f"W&B alias has no concrete archived log files: {entry['path']}")
+        entry.update(archive_action='metadata_only_wandb_convenience_symlink',
+                     target_available=False, concrete_run_files=concrete)
     with (stage / 'download-inventory.json').open('x') as receipt:
         json.dump(inventory, receipt, indent=2)
     for entry in inventory:
         destination = stage / entry['path']
+        if entry['type'] == 3:
+            continue
         if entry['type'] == 2:
             destination.mkdir(parents=True, exist_ok=True)
         else:
@@ -108,7 +135,8 @@ def download_volume_run(volume, run_id, stage, *, workers=4):
     finally:
         pool.shutdown(wait=True, cancel_futures=True)
     print(json.dumps({'downloaded_files': len(sizes), 'downloaded_bytes': sum(sizes),
-                      'download_workers': workers}), flush=True)
+                      'download_workers': workers,
+                      'wandb_aliases_metadata_only': sum(item['type'] == 3 for item in inventory)}), flush=True)
 
 
 def download_with_sdk(run_id, stage, *, modal_python, execute=subprocess.run):
