@@ -13,12 +13,17 @@ import json
 import math
 import os
 import signal
+import shutil
 from pathlib import Path
 import subprocess
 import sys
 import time
 
-from training.alpagym_metrics import REWARD_SCALES, REWARD_VERSION, validate_reward_terms
+from training.alpagym_metrics import (
+    REWARD_SCALES,
+    REWARD_VERSION,
+    validate_reward_terms,
+)
 
 ALPAGYM_REVISION = "972d160eed0e23d388497851504a3a233fec5879"
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +60,9 @@ def prepare(
     episode_seconds: float = 30,
     concurrency: int = 1,
     max_wall_seconds: float = 3600,
+    model_name: str | None = None,
+    ffmpeg: str = "ffmpeg",
+    max_video_seconds: float = 3600,
 ) -> Path:
     if max_steps < 1 or rollouts < 2 or concurrency < 1:
         raise ValueError(
@@ -64,6 +72,8 @@ def prepare(
         raise ValueError("Episode duration must be finite and positive")
     if not math.isfinite(max_wall_seconds) or max_wall_seconds <= 0:
         raise ValueError("Wall time budget must be finite and positive")
+    if not math.isfinite(max_video_seconds) or max_video_seconds <= 0:
+        raise ValueError("Video time budget must be finite and positive")
     if abs(round(episode_seconds * 10) - episode_seconds * 10) > 1e-8:
         raise ValueError("Episode duration must use whole 0.1 second samples")
     source = load_upstream(source)
@@ -88,7 +98,8 @@ def prepare(
             config_name="default",
             overrides=[
                 f"hydra.searchpath=[file://{policy_configs}]",
-                "experiment=alpamayo_1_5_local_2gpu_smoke",
+                "policy=alpamayo_r1",
+                "topology=local_disaggregated_2gpu",
                 "transport=nccl",
                 "reward=metrics",
             ],
@@ -100,6 +111,7 @@ def prepare(
     config.dataset.scene_ids = ["thunderhill-east-standing"]
     # No prerecorded driving or ground truth actions are used for warmup/reward.
     config.alpasim.wizard_args.force_gt_duration_us = 0
+    config.alpasim.wizard_args.control_timestep_us = 200_000
     config.alpasim.wizard_args.n_sim_steps = config.expected_valid_steps
     config.reward.terms = [
         RewardTermConfig(kind="metric", metric_name=name, scale=scale)
@@ -112,6 +124,8 @@ def prepare(
     # NVIDIA owns advantage computation, minibatching and each optimizer step.
     config.cosmos.train.train_batch_per_replica = rollouts
     config.cosmos.rollout.backend = "thunderhill_alpagym_rollout"
+    # Recording identity is published around each explicit generation call.
+    config.cosmos.rollout.prefetch_rollout = False
     config.cosmos.logging.logger = ["console", "wandb"]
     config.cosmos.logging.project_name = "thunderhill-rl"
     config.cosmos.logging.experiment_name = "thunderhill-alpagym"
@@ -123,25 +137,33 @@ def prepare(
     )
     game = {
         "godot_binary": godot,
+        "ffmpeg_binary": ffmpeg,
         "project_path": str(REPO_ROOT / "godot"),
         "episode_seconds": episode_seconds,
         "concurrency": concurrency,
         "recording_root": str(paths.run_dir / "recordings"),
+        "model_name": model_name or model.resolve().name,
+        "model_path": str(model.resolve()),
+        "training_scope": "trajectory_expert_rl_frozen_language_and_vision",
     }
     (paths.run_dir / "game_config.json").write_text(json.dumps(game, indent=2) + "\n")
     (paths.run_dir / "launch_manifest.json").write_text(
         json.dumps(
             {
                 "alpagym_source": str(source),
+                "run_id": paths.run_dir.name,
                 "alpagym_revision": ALPAGYM_REVISION,
                 "status": "prepared_only",
                 "max_wall_seconds": max_wall_seconds,
+                "max_video_seconds": max_video_seconds,
                 "gpu_training_verified": False,
                 "reward_version": REWARD_VERSION,
                 "topology": "local_disaggregated_2gpu",
                 "minimum_gpus": 2,
                 "upstream_recommended_vram_gb_per_gpu": 40,
                 "trainer": "alpagym_runtime.cosmos.trainer.AlpagymGRPOTrainer",
+                "configuration_profile": "upstream_default_alpamayo_r1",
+                "training_scope": game["training_scope"],
                 "simulator": "Godot through the AlpaSim gRPC protocol",
             },
             indent=2,
@@ -149,6 +171,100 @@ def prepare(
         + "\n"
     )
     return paths.run_dir
+
+
+def validate_runtime_files(source: Path, config, game: dict) -> None:
+    """Check local installation and assets before starting distributed workers."""
+    seconds = float(game["episode_seconds"])
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise ValueError("Game episode duration must be finite and positive")
+    if math.ceil(seconds / 0.2) != config.expected_valid_steps:
+        raise ValueError(
+            "Game episode duration disagrees with NVIDIA replay step budget"
+        )
+    if Path(game["model_path"]).resolve() != Path(config.policy.model.path).resolve():
+        raise ValueError("Recording model identity disagrees with NVIDIA checkpoint")
+    python = source / ".venv/bin/python"
+    if not python.is_file():
+        raise FileNotFoundError(
+            f"Official NVIDIA runtime missing at {python}; run tools/setup_alpagym.py"
+        )
+    for executable in (
+        "uv",
+        "redis-server",
+        game["godot_binary"],
+        game["ffmpeg_binary"],
+    ):
+        if shutil.which(executable) is None:
+            raise FileNotFoundError(f"Required executable unavailable: {executable}")
+    project = Path(game["project_path"]) / "project.godot"
+    if not project.is_file():
+        raise FileNotFoundError(f"Godot project missing: {project}")
+    checkpoint = Path(config.policy.model.path)
+    for name in ("config.json", "tokenizer.json", "tokenizer_config.json"):
+        if not (checkpoint / name).is_file():
+            raise FileNotFoundError(
+                f"Converted NVIDIA checkpoint missing {checkpoint / name}"
+            )
+    model_config = json.loads((checkpoint / "config.json").read_text())
+    if model_config.get("model_type") != "alpamayo_reasoning_vla_expert":
+        raise ValueError("Use NVIDIA's converted Alpamayo expert checkpoint")
+    index = checkpoint / "model.safetensors.index.json"
+    if index.is_file():
+        weights = set(json.loads(index.read_text())["weight_map"].values())
+    else:
+        weights = {"model.safetensors"}
+    if not weights:
+        raise ValueError("Checkpoint weight index is empty")
+    for name in weights:
+        weight = checkpoint / name
+        if not weight.is_file() or weight.stat().st_size == 0:
+            raise FileNotFoundError(f"Checkpoint weight missing or empty: {weight}")
+    subprocess.run(
+        [game["godot_binary"], "--headless", "--version"], check=True, timeout=15
+    )
+    subprocess.run(
+        [game["ffmpeg_binary"], "-version"],
+        check=True,
+        timeout=15,
+        stdout=subprocess.DEVNULL,
+    )
+
+
+def validate_godot_run_config(config) -> None:
+    """Use NVIDIA's training checks without AlpaSim Wizard's GT warmup requirement.
+
+    These validators are pinned together with the upstream checkout. The public
+    host validator also validates deployment of AlpaSim, which we do not launch.
+    """
+    from alpagym_host.config_validation import (
+        _validate_training_policy_config,
+        _validate_cosmos_grpo_batch_geometry,
+        _validate_transport_config,
+        _validate_policy_model_path,
+        _validate_cosmos_mode,
+        _validate_nccl_test_model,
+    )
+
+    if str(config.execution.backend) != "local_process":
+        raise ValueError("Godot launcher supports only local_process deployment")
+    if config.execution.slurm.autoresume:
+        raise ValueError("Godot launcher does not support Slurm autoresume")
+    if config.alpasim.wizard_args.force_gt_duration_us != 0:
+        raise ValueError("Godot episodes must not use recorded ground truth warmup")
+    if config.alpasim.wizard_args.control_timestep_us != 200_000:
+        raise ValueError("Godot bridge requires 0.2 second replanning")
+    if (
+        list(config.dataset.scene_ids or []) != ["thunderhill-east-standing"]
+        or config.dataset.test_suite_id
+    ):
+        raise ValueError("Godot launcher requires the supported Thunderhill scene")
+    _validate_training_policy_config(config)
+    _validate_cosmos_grpo_batch_geometry(config.cosmos)
+    _validate_transport_config(config)
+    _validate_policy_model_path(config)
+    _validate_cosmos_mode(config)
+    _validate_nccl_test_model(config)
 
 
 def cosmos_command(source: Path, config) -> list[str]:
@@ -237,8 +353,9 @@ def owned_subreaper():
     }
     if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
         raise OSError(ctypes.get_errno(), "Cannot enable child subreaper")
+    cleanup_state = {"completed": False}
     try:
-        yield
+        yield cleanup_state
     finally:
         try:
             # Run process groups have already stopped. Daemons have reparented to
@@ -257,12 +374,15 @@ def owned_subreaper():
                     child.kill()
                 except psutil.NoSuchProcess:
                     pass
-            psutil.wait_procs(alive, timeout=5)
+            _, survivors = psutil.wait_procs(alive, timeout=5)
+            if survivors:
+                raise RuntimeError("Run descendants remain alive after cleanup")
         finally:
             if libc.prctl(36, previous.value, 0, 0, 0) != 0:
                 raise OSError(
                     ctypes.get_errno(), "Cannot restore child subreaper state"
                 )
+        cleanup_state["completed"] = True
 
 
 def stop_bridge(process: subprocess.Popen) -> None:
@@ -278,6 +398,7 @@ def stop_bridge(process: subprocess.Popen) -> None:
 
 def write_status(run_dir: Path, state: str, **details) -> None:
     status = {
+        "run_id": run_dir.name,
         "state": state,
         "updated_at_unix": time.time(),
         "optimizer_updates_verified": False,
@@ -304,9 +425,94 @@ def wait_process(
         raise subprocess.CalledProcessError(process.returncode, process.args)
 
 
+def render_finished_run(run_dir: Path) -> None:
+    """Render preserved attempts after training processes release the GPU."""
+    game = json.loads((run_dir / "game_config.json").read_text())
+    manifest = json.loads((run_dir / "launch_manifest.json").read_text())
+    budget = float(manifest["max_video_seconds"])
+    if not math.isfinite(budget) or budget <= 0:
+        raise ValueError("Prepared video time budget must be finite and positive")
+    deadline = time.monotonic() + budget
+    status_path = run_dir / "video_status.json"
+
+    def report(state, **details):
+        pending = status_path.with_suffix(".pending")
+        pending.write_text(
+            json.dumps(dict(state=state, max_video_seconds=budget, **details), indent=2)
+            + "\n"
+        )
+        pending.replace(status_path)
+
+    report("rendering")
+    try:
+        with owned_subreaper(), (run_dir / "logs/video-render.log").open("w") as log:
+            renderer = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(REPO_ROOT / "tools/render_video_queue.py"),
+                    str(run_dir),
+                    "--godot",
+                    game["godot_binary"],
+                    "--ffmpeg",
+                    game["ffmpeg_binary"],
+                    "--workers",
+                    "1",
+                    "--recover-interrupted",
+                ],
+                cwd=REPO_ROOT,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            try:
+                wait_process(renderer, deadline)
+            finally:
+                stop_process_tree(renderer)
+        indexes = sorted(run_dir.rglob("videos/index.json"))
+        count = sum(len(json.loads(path.read_text())["videos"]) for path in indexes)
+        report(
+            "completed" if count else "no_recordings",
+            videos=count,
+            indexes=[str(path.relative_to(run_dir)) for path in indexes],
+        )
+    except BaseException as error:
+        report("failed", error_type=type(error).__name__, error=str(error))
+        raise
+
+
 def run(run_dir: Path) -> None:
-    with owned_subreaper():
-        _run_owned(run_dir)
+    run_dir = run_dir.resolve()
+    if (run_dir / "run_status.json").exists():
+        raise ValueError("Run already attempted; prepare a new run")
+    cleanup = None
+    try:
+        with owned_subreaper() as cleanup:
+            _run_owned(run_dir)
+    finally:
+        path = run_dir / "run_status.json"
+        if path.is_file():
+            status = json.loads(path.read_text())
+            if status.get("state") == "stopping":
+                if cleanup is None or not cleanup["completed"]:
+                    write_status(run_dir, "cleanup_failed", runtime_stopped=False)
+                    raise RuntimeError(
+                        "Cleanup did not finish; recording recovery is blocked"
+                    )
+                outcome = status.pop("outcome")
+                status.pop("state")
+                status.pop("updated_at_unix", None)
+                write_status(run_dir, outcome, **status, runtime_stopped=True)
+                # Preserve the original training error if video rendering also fails.
+                training_failed = sys.exc_info()[0] is not None
+                try:
+                    render_finished_run(run_dir)
+                except BaseException:
+                    if not training_failed:
+                        raise
+                    print(
+                        f"Video rendering failed; inspect {run_dir / 'video_status.json'}",
+                        file=sys.stderr,
+                    )
 
 
 def _run_owned(run_dir: Path) -> None:
@@ -327,15 +533,18 @@ def _run_owned(run_dir: Path) -> None:
     try:
         source = load_upstream(Path(manifest["alpagym_source"]))
         from alpagym_host.config import load_run_config
-        from alpagym_host.config_validation import validate_run_config
         from alpagym_host.endpoint_registry import FileTopologyRegistry
         from alpagym_host.transport_env import apply_transport_env_vars
 
         config = load_run_config(run_dir / "resolved_config.yaml")
         if manifest.get("reward_version") != REWARD_VERSION:
-            raise ValueError("Reward contract changed; prepare a fresh normalized reward run")
+            raise ValueError(
+                "Reward contract changed; prepare a fresh normalized reward run"
+            )
         validate_reward_terms(config.reward.terms)
-        validate_run_config(config, "run")
+        validate_godot_run_config(config)
+        game = json.loads((run_dir / "game_config.json").read_text())
+        validate_runtime_files(source, config, game)
         registry = FileTopologyRegistry(config.artifact_paths.topology_registry_dir)
         if config.artifact_paths.topology_registry_dir.exists():
             raise ValueError("Run already has runtime state; prepare a fresh run")
@@ -353,7 +562,11 @@ def _run_owned(run_dir: Path) -> None:
             runtime
             + [
                 "-c",
-                "import torch; assert torch.cuda.device_count() >= 2, 'The official topology requires two CUDA GPUs'",
+                "import torch; import alpagym_runtime.cosmos.entrypoint; "
+                "from alpagym_alpamayo_r1.bundle import install_alpamayo_r1_runtime_bridge; "
+                "install_alpamayo_r1_runtime_bridge(); "
+                "assert torch.cuda.is_available(), 'CUDA unavailable'; "
+                "assert torch.cuda.device_count() >= 2, 'The official topology requires two CUDA GPUs'",
             ],
             start_new_session=True,
         )
@@ -409,13 +622,18 @@ def _run_owned(run_dir: Path) -> None:
             wait_process(cosmos, deadline, companion=bridge)
     except BaseException as error:
         write_status(
-            run_dir, "failed", error_type=type(error).__name__, error=str(error)
+            run_dir,
+            "stopping",
+            outcome="failed",
+            error_type=type(error).__name__,
+            error=str(error),
         )
         raise
     else:
         write_status(
             run_dir,
-            "completed",
+            "stopping",
+            outcome="completed",
             launcher_exit_code=0,
             note="Launcher exited successfully. Verify saved checkpoints and optimizer metrics separately.",
         )
@@ -442,6 +660,12 @@ def main(argv: list[str] | None = None) -> None:
         help="Official converted Alpamayo checkpoint directory",
     )
     prep.add_argument("--godot", default="godot")
+    prep.add_argument(
+        "--ffmpeg", default="ffmpeg", help="Required encoder, checked before training"
+    )
+    prep.add_argument(
+        "--model-name", help="Recording label; defaults to checkpoint directory name"
+    )
     prep.add_argument("--max-steps", type=int, default=1)
     prep.add_argument(
         "--rollouts",
@@ -452,6 +676,12 @@ def main(argv: list[str] | None = None) -> None:
     prep.add_argument("--episode-seconds", type=float, default=30)
     prep.add_argument("--concurrency", type=int, default=1)
     prep.add_argument("--max-wall-seconds", type=float, default=3600)
+    prep.add_argument(
+        "--max-video-seconds",
+        type=float,
+        default=3600,
+        help="Separate post-training video rendering budget",
+    )
     launch = commands.add_parser(
         "run", help="Run the prepared configuration using the installed NVIDIA stack"
     )
@@ -469,6 +699,9 @@ def main(argv: list[str] | None = None) -> None:
                 episode_seconds=args.episode_seconds,
                 concurrency=args.concurrency,
                 max_wall_seconds=args.max_wall_seconds,
+                model_name=args.model_name,
+                ffmpeg=args.ffmpeg,
+                max_video_seconds=args.max_video_seconds,
             )
         )
     else:

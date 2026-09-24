@@ -39,7 +39,7 @@ func _run() -> void:
 		if reason == "empty_image":
 			camera.frame = null
 		else:
-			var size := Vector2i(640, 360) if reason == "all_black" else Vector2i(8, 8)
+			var size := Vector2i(AgentCamera.WIDTH, AgentCamera.HEIGHT) if reason == "all_black" else Vector2i(8, 8)
 			camera.frame = Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
 			camera.frame.fill(Color.BLACK if reason == "all_black" else Color.RED)
 		var request := {"episode_id": game.episode_id, "expected_tick": 0}

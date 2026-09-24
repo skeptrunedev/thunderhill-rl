@@ -1,48 +1,19 @@
 # Experiment graphs
 
-Full trajectory training records W&B scalar history locally by default. It does
-not require an account or contact W&B until online mode or sync is explicitly
-selected. Recordings and model weights stay in the existing artifact archive.
+The current launcher enables NVIDIA Cosmos RL's console and W&B loggers. Prepared configuration uses project `thunderhill-rl` and experiment name `thunderhill-alpagym`. The native trainer owns metric names, update steps and logging. The previous custom trainer's flags, token metrics and generation axis are not the contract for this stack.
 
-Graphs use `generation` as their horizontal axis. Evaluation is greedy and
-separate from sampled rollouts. Completion rate and crash rate are per episode;
-invalid call rate divides rejected calls by all attempted calls, including the
-rejected call. `episode_seconds` measures every attempt. `lap_seconds` is present
-**only for independently audited, successful laps**. Short crashes cannot appear
-as fast laps. Training graphs include reward, progress, loss, gradient norm,
-trained actions and tokens. Model revision and adapter SHA256 identify the policy.
-
-The trainer accepts `--wandb-mode offline` (default), `online`, or `disabled`,
-plus `--wandb-project` and `--wandb-entity`. Offline files survive a training
-exception and can be synced later. `tracking/metrics.jsonl` provides the same
-scalar events in readable form. Live collection progress is logged every 100
-control decisions; aggregate outcomes are logged after collection and updates.
-
-Import a historical campaign without running the simulator or uploading assets:
+Use the same upstream Python environment as [training](../training/README.md) to authenticate:
 
 ```sh
-uv run --project training python training/experiment_tracking.py \
-  path/to/experiment/campaign.json \
-  --output artifacts/tracking/my-campaign \
-  --name my-campaign
+/path/to/alpagym/.venv/bin/python -m wandb login
 ```
 
-The importer also includes completed generation collections whose optimizer
-update was interrupted. It does not invent a completed update for those attempts.
-Use a fresh output directory for each import. Reimporting creates a separate run.
+Select the owning account with the supported W&B environment configuration, including `WANDB_ENTITY` when needed. Keep credentials out of repository files and command arguments. For local logging without hosted uploads, set `WANDB_MODE=offline` before launching the prepared run. Set `WANDB_MODE=online` when hosted graphs are desired. Preparation alone does not start a W&B training run.
 
-Once a W&B account and project are selected, authenticate interactively and sync
-only the desired offline run directory printed by the importer:
+The authoritative experiment settings are the prepared resolved configuration and native worker logs. Inspect reward, policy loss, gradient behavior and optimizer steps alongside the simulator's episode summaries. A lower loss alone does not establish improved riding. Legal progress, crashes, offroad events, completion and legal lap times remain the gameplay measures that matter.
 
-```sh
-uv run --project training wandb login
-uv run --project training wandb sync path/to/wandb/offline-run-TIMESTAMP-ID
-```
+Each rollout worker also writes a separate gameplay diagnostics W&B run, grouped by the prepared run directory name. These charts report total reward, metric values and weighted reward components against actual policy version, with rollout and evaluation namespaces separated. Immutable batch reports are stored under `rollout_metrics` before the optional W&B write. This does not change NVIDIA's training reward, replay or native trainer logger.
 
-Alternatively pass `--mode online --entity YOUR_ENTITY` to a historical import,
-or `--wandb-mode online --wandb-entity YOUR_ENTITY` to the trainer. Online mode
-requires credentials; never put an API key in the repository or command arguments.
+Video generations identify Cosmos's actual policy weight version. This need not equal a dashboard row or optimizer minibatch number. Session identity joins the rollout's observations, trajectories, controls, reward summary and recording. Recordings and checkpoints remain separate artifacts; enabling scalar graphs does not by itself upload every video.
 
-The SDK is pinned in `training/pyproject.toml`. See the official
-[offline tracking documentation](https://docs.wandb.ai/models/track/environment-variables)
-and [SDK release](https://pypi.org/project/wandb/0.30.0/).
+Full native model optimization and its hosted graph output still require a real GPU validation. See the official [W&B environment variable reference](https://docs.wandb.ai/models/track/environment-variables) for authentication and offline logging behavior.

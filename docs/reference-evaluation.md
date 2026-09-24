@@ -18,19 +18,19 @@ Godot is the selected engine because the project must not require buying an engi
 
 [Sportbike Sim](https://github.com/strong-ery/sportbike-sim) is a presentation and audio reference only at this stage. Source in `MotorcycleBalanceController.cs` adds steering assistance forces and cornering downforce. The README describes assisted handling and incomplete falling behavior. These must not silently become physical assumptions in our simulator.
 
-## Language model training
+## Current training integration
 
-[MindDrive](https://github.com/xiaomi-mlab/MindDrive) releases online PPO training of a language decision model through CARLA. A separate action expert translates language decisions into trajectories. It establishes a relevant training reference, not motorcycle racing capability.
+[NVIDIA AlpaGym](https://github.com/NVlabs/alpagym/tree/972d160eed0e23d388497851504a3a233fec5879) supplies the native Alpamayo and Cosmos RL implementation used by this project. Our Godot adapter replaces the simulator boundary. The trajectory expert is trained from gameplay rewards while the vision language backbone remains frozen. This is not the earlier language tool calling approach.
 
-[TRL Harbor integration](https://github.com/huggingface/trl/blob/main/docs/source/harbor.md) documents an external agent harness where the trainer owns generation and retains token probabilities. Implement the game interface within this pattern. Verify image observation support with the chosen model and integration; do not assume text tool output automatically supplies vision inputs. Preserve the LLM's control responsibility and document any rider assistance.
+See [the current training instructions](../training/README.md) for setup, actual verification scope and simulator differences. Native model and optimizer code does not establish parity of motorcycle dynamics, camera appearance, reward geometry or achieved driving behavior.
 
 ## Track evidence
 
 * [Speed Secrets map](https://speedsecrets.com/wp-content/uploads/2018/12/Thunderhill-East.pdf): visually inspected. Useful for layout and turn naming. It shows alternative geometry around Turn 5 and does not supply measured elevation or camber.
-* [User POV](https://www.youtube.com/watch?v=yVjzZqYbKuM): title verified as First Laps on Thunderhill East's New Surface (POV), by Ken Moto. Full visual lap inspection remains pending.
+* [User POV](https://www.youtube.com/watch?v=yVjzZqYbKuM): Ken Moto's reference footage. Inspected portions and recovered video provenance are documented in [reference readiness](reference-readiness.md) and [camera registration](reference-camera-registration.md).
 * [Aprilia RS660 lap](https://www.youtube.com/watch?v=LjmP603avMQ): title verified as Thunderhill East Repave Aprilia RS660 2:03 Lap. Full visual inspection remains pending.
 * [BMW S1000RR footage](https://www.youtube.com/watch?v=JJHtjdlzL2Q): title verified as BMW S1000RR at Thunderhill East, First Weekend on New Pavement. Full visual inspection remains pending.
 * [Official reconstruction report](https://www.thunderhill.com/news-from-the-hill-1/inside-the-thunderhill-repave-the-engineering-behind-the-new-surface): preserves overall grade and camber while changing curbing and usable width around Turns 3 to 4, 6 to 7, and 10 to 11.
-* [USGS elevation access](https://www.usgs.gov/the-national-map-data-delivery/gis-data-download): candidate terrain source. Local coverage, acquisition date, and resolution have not yet been established.
+* [USGS elevation access](https://www.usgs.gov/the-national-map-data-delivery/gis-data-download): acquired terrain and lidar provenance is recorded in [geometry sources](geometry-sources.md) and [lidar measurements](lidar-measurements.md).
 
-Footage can establish visual correspondence. It cannot by itself establish tire parameters or precise track banking. Confirm the intended Turn 5 route and motorcycle before finalizing geometry or dynamics parameters.
+Footage can establish visual correspondence. It cannot by itself establish tire parameters or precise track banking. The selected route uses the Cyclone and the selected motorcycle is the Streetfighter V4 S. Published dimensions do not establish calibrated dynamics.

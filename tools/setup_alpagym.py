@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 import subprocess
+import shutil
 
 ALPAGYM_REVISION = "972d160eed0e23d388497851504a3a233fec5879"
 ALPAGYM_URL = "https://github.com/NVlabs/alpagym.git"
@@ -42,12 +43,27 @@ def main():
     checkout = args.checkout.resolve()
     checkout_source(checkout)
     if not args.source_only:
+        for executable in ("uv", "redis-server"):
+            if shutil.which(executable) is None:
+                raise FileNotFoundError(
+                    f"Install required NVIDIA runtime tool: {executable}"
+                )
         subprocess.run(
             ["uv", "sync", "--frozen", "--all-packages", "--project", str(checkout)],
             check=True,
         )
+        subprocess.run(
+            ["uv", "pip", "check", "--python", str(checkout / ".venv/bin/python")],
+            check=True,
+        )
     print(f"NVIDIA source: {checkout} at {ALPAGYM_REVISION}")
-    print(f"Runtime Python: {checkout / '.venv/bin/python'}")
+    if args.source_only:
+        print("Source verified only; GPU runtime installation was not requested")
+    else:
+        print(f"Runtime Python: {checkout / '.venv/bin/python'}")
+        print(
+            "Dependencies checked; CUDA execution is validated by the training launcher"
+        )
 
 
 if __name__ == "__main__":

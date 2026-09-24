@@ -1,12 +1,12 @@
 # Thunderhill motorcycle RL
 
-A new Godot motorcycle racing environment for training a language model on Thunderhill East after the 2026 repave. No paid engine license is required.
+A Godot motorcycle racing environment for gameplay reinforcement learning on Thunderhill East. The track uses documented historical geometry with appearance informed by recent footage. No paid engine license is required.
 
 ## Acceptance criteria
 
 1. Motorcycle dynamics are evaluated against published models and measured behavior. Steering, tire forces, lean, braking, suspension, and rider movement must have explicit physical assumptions.
 2. The track uses documented geometry, elevation, camber, and current surface references. Unknown measurements remain marked as unknown.
-3. Harbor exposes the simulation to a trainer that updates the language model itself from racing rewards.
+3. NVIDIA AlpaGym and Cosmos RL train Alpamayo's trajectory expert from simulator rewards. The vision language backbone remains frozen. No supervised imitation is used.
 4. Simulation time advances explicitly in fixed steps. Model inference time does not advance the world.
 5. Evaluation compares legal laps, completion rate, crashes, and lap times under identical conditions.
 6. Model checkpoints and state trajectories support recordings of training progress from consistent camera views.
@@ -17,16 +17,12 @@ The motorcycle references the 2026 Ducati Streetfighter V4S. The [reference read
 
 The [dimension register](docs/dimension-register.md) records measured aerial widths, raw lidar grades and cross slopes, bike dimensions, and the existing simulator geometry audit.
 
-See [reference evaluation](docs/reference-evaluation.md) and [build sequence](docs/build-sequence.md).
+See [reference evaluation](docs/reference-evaluation.md) for dynamics and simulator source references, and [playable status](docs/playable-status.md) for game controls and verification commands.
 
 The [RL game design contract](docs/rl-game-contract.md) defines the information the simulator and trainer must capture, action and reward semantics, isolated rollouts, and checkpoint replay requirements.
-
-The [small language model reference audit](docs/small-model-references.md) covers RobotxR1, MindDrive, and the limits of existing racing examples.
-
-The [Gemma 4 RL audit](docs/gemma4-rl-references.md) identifies exact E4B training code and the closest game and environment integration references.
 
 ## License
 
 Original project code and documentation use the [MIT license](LICENSE). Referenced projects, models, footage, maps, and assets retain their own licenses. The measurement databases explicitly marked as derived from OpenStreetMap use ODbL 1.0, with attribution to OpenStreetMap contributors, rather than MIT. Original USGS and USDA geodata is public domain. Third party game assets and video frames are not bundled here. Godot is [MIT licensed](https://godotengine.org/license/).
 
-See [experiment graphs](docs/experiment-tracking.md) for W&B scalar tracking and importing past campaigns.
+See [experiment graphs](docs/experiment-tracking.md) for W&B tracking in the current worker stack.

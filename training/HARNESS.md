@@ -7,8 +7,9 @@ an isolated Godot process, then calls the unchanged NVIDIA driver:
 1. `start_session` with actual camera calibration and a reproducible episode seed.
 2. `submit_image_observation` and `submit_egomotion_observation` with recorded
    measurements at 10 Hz. A measured stationary warmup supplies initial history.
-3. `submit_route` with track geometry. This is navigation input, not a
-   demonstration of controls or an optimal racing line.
+3. `submit_route` with track geometry to satisfy the native policy buffer
+   contract. The pinned Alpamayo R1 adapter does not consume this route in its
+   model input preparation. It is not an optimal racing line.
 4. `drive` every 0.2 simulated seconds. NVIDIA assembles observation buffers,
    constructs model inputs and samples its native trajectory distribution.
 5. Execute the returned trajectory with the fixed motorcycle controller.
@@ -16,13 +17,18 @@ an isolated Godot process, then calls the unchanged NVIDIA driver:
    and queue the attempt for video rendering.
 
 Rig axes are X forward, Y left and Z up. Sensor poses preserve measured pitch and
-roll. Driver responses are timestamped world poses; the bridge converts future
-poses into the current rig frame before execution. The controller uses trajectory,
-speed and lean, without reading route geometry.
+roll. Driver responses are timestamped world poses. The controller follows native
+world XYZ using measured current position and forward direction. Steering uses
+horizontal pure pursuit and target speed uses 3D waypoint distance. Sensor history
+retains the measured banked rig pose independently. The controller reads no route
+geometry. The policy camera is 512 by 320 with a 120 degree horizontal field of view.
 
 The policy action is a trajectory. `control_bike` records are controller outputs,
 not language tool tokens. NVIDIA records native action replay and performs its own
-GRPO update. No local likelihood or advantage implementation is substituted.
+GRPO update of its trajectory expert. The vision language backbone is frozen.
+No local likelihood or advantage implementation is substituted. Supplying
+correct camera calibration does not remove the visual domain difference: native
+model inputs do not include camera calibration tensors.
 
 Simulation pauses during inference. Each control advances twelve physics ticks,
 or 0.1 seconds. Stale receipts cannot advance simulation. Driving failure is valid
@@ -37,10 +43,15 @@ entire rollout to NVIDIA. The simulator snapshots the identity when it starts.
 Missing or inactive identity fails rather than guessing a generation. Prefetch
 is disabled so episodes cannot start outside this versioned call. Training,
 sampling, inference batching and NCCL transport are unchanged.
+The same wrapper persists immutable batch gameplay metrics and writes a separate
+W&B diagnostics run per rollout worker, grouped by prepared run. NVIDIA's trainer
+logger and reward computation remain unchanged.
 
 Simulator recordings are immutable. Camera receipts and hashes bind images to
 ticks; trajectory logs bind predictions to controls. Video work items are consumed
-by `tools/render_video_queue.py`. Historic runs retain their original provenance
+by `tools/render_video_queue.py` automatically and serially after workers stop,
+including after a failed training attempt. Rendering status is separate in
+`video_status.json`. Historic runs retain their original provenance
 and are not relabeled as runs from the replacement stack.
 
 Reward metrics use full circuit normalized legal progress, excluding warmup.

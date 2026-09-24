@@ -13,7 +13,7 @@ from driving_trajectory import (
 
 @unittest.skipUnless(os.environ.get('THUNDERHILL_GODOT'), 'Native Godot required')
 class NativeSpeedControllerTests(unittest.TestCase):
-    def exercise(self, name, initial_speed, targets):
+    def exercise(self, name, initial_speed, targets, curvature=0.0):
         from lap_episode import LapEpisode
         from lap_policy import RoadTelemetry
         root = Path(tempfile.mkdtemp(prefix='speed-controller-' + name + '-',
@@ -33,13 +33,20 @@ class NativeSpeedControllerTests(unittest.TestCase):
                 position = [-z, -x, y]
                 heading = state['heading']
                 forward = [math.cos(heading), -math.sin(heading), 0]
-                if index % 5 == 0:
-                    tracker.replan([[p + f * target * .1 * i for p, f in zip(position, forward)]
-                                    for i in range(1, 6)], origin=position)
+                if index % 2 == 0:
+                    points = []
+                    for i in range(1, 65):
+                        distance = target * .1 * i
+                        x = math.sin(curvature * distance) / curvature if curvature else distance
+                        y = (1 - math.cos(curvature * distance)) / curvature if curvature else 0
+                        points.append([position[0] + forward[0] * x - forward[1] * y,
+                                       position[1] + forward[1] * x + forward[0] * y, position[2]])
+                    tracker.replan(points, origin=position)
                 controls, diagnostics = tracker.next_controls(state['speed'], position=position, forward=forward)
                 episode.apply(encode_controller_controls(controls), [], [])
                 rows.append(dict(tick=episode.observation['tick'], target=target,
                                  speed=episode.observation['state']['speed'],
+                                 lean=episode.observation['state']['lean'],
                                  controls=controls, diagnostics=diagnostics))
                 if episode.done:
                     break
@@ -51,6 +58,14 @@ class NativeSpeedControllerTests(unittest.TestCase):
         self.assertEqual(len(rows), len(targets))
         print('Native speed controller artifacts:', root)
         return rows
+
+    def test_measured_world_pose_tracks_mirrored_curves(self):
+        for curvature in (-0.02, 0.02):
+            rows = self.exercise('curve', 10, [10] * 12, curvature=curvature)
+            self.assertTrue(all(row['diagnostics']['feedback'] == 'measured_world_pose' for row in rows))
+            self.assertGreater(abs(rows[-1]['lean']), .03)
+            self.assertLess(rows[-1]['lean'] * curvature, 0)
+            self.assertLess(abs(rows[-1]['speed'] - 10), .5)
 
     def test_constant_speed_holds_through_replans(self):
         rows = self.exercise('constant', 5, [5] * 100)

@@ -2,12 +2,15 @@
 
 Training delegates to the pinned NVIDIA AlpaGym and Cosmos RL implementation.
 The previous custom Alpamayo optimizer, prompt builder, episode collector, adapter
-loader and Modal launcher have been removed. Historical recordings and result
-reports remain intact. This migration does not establish improved driving.
+loader and Modal launcher have been removed. Historical recordings remain in
+their artifact archives. Obsolete runbooks and result reports were removed.
+This migration does not establish improved driving.
 
 NVIDIA owns model loading, observation preprocessing, diffusion sampling, replay
 packing, GRPO optimization, checkpoints, weight synchronization and W&B logging.
-Our code supplies Godot through NVIDIA's AlpaSim gRPC protocol.
+Our code supplies Godot through NVIDIA's AlpaSim gRPC protocol. The native
+configuration trains the trajectory expert, with the vision language backbone
+frozen. It does not optimize language tool tokens or update the whole model.
 There is no supervised imitation, ground truth trajectory reward or teacher.
 
 ## Components
@@ -15,8 +18,8 @@ There is no supervised imitation, ground truth trajectory reward or teacher.
 * `nvidia_alpagym.py` prepares NVIDIA configuration and launches its worker stack.
 * `alpagym_bridge.py` supplies measured images, full poses and route geometry,
   executes returned trajectories, reports metrics and records attempts.
-* `alpagym_worker.py` delegates to NVIDIA's worker and rollout backend. Its sole
-  rollout override preserves Cosmos's actual weight version for videos.
+* `alpagym_worker.py` delegates to NVIDIA's worker and rollout backend, preserves
+  policy version identity, and records separate gameplay diagnostics.
 * `driving_trajectory.py` converts trajectories into motorcycle controls. It has
   no optimizer, learned policy, racing line or demonstration labels.
 
@@ -48,6 +51,7 @@ From this repository, using the upstream environment:
   --source /path/to/alpagym \
   --model /path/to/converted/checkpoint \
   --godot /path/to/godot \
+  --ffmpeg /path/to/ffmpeg \
   --max-steps 1 --rollouts 2 --episode-seconds 30
 
 /path/to/alpagym/.venv/bin/python -m training.nvidia_alpagym run /path/to/prepared/run
@@ -57,7 +61,9 @@ Preparation does not allocate compute or run training. `run` explicitly starts
 the prepared experiment, bounded by `--max-wall-seconds` (default 3600).
 The topology uses one training GPU and one rollout GPU, with NVIDIA's NCCL
 transport. NVIDIA recommends at least 40 GB per GPU for this setup. Our local
-11 GB GPU cannot validate full model optimization.
+RTX 2080 Ti with 11 GB cannot validate this native two GPU topology. Installation
+on this machine also stopped at the missing `redis-server` prerequisite; it could
+not be installed without administrator access. Full GPU training remains unverified.
 
 `--rollouts` is the number of sibling attempts per scene. `--max-steps` bounds
 NVIDIA training steps. A step can contain several optimizer minibatches; it is
@@ -68,14 +74,31 @@ Cosmos policy weight version, not an invented batch counter.
 
 The official training and model code remains unchanged. The environment is our
 Godot motorcycle game, not NVIDIA's car simulator. The adapter exposes one real
-forward camera, measured stationary warmup and track centerline route geometry.
+forward camera at 512 by 320 pixels with a true 120 degree horizontal field of
+view, measured stationary warmup and track centerline route geometry. Its image
+aspect ratio matches native preprocessing. One view remains different from the
+upstream multiple camera configuration.
+The route reaches the native policy buffer, but the pinned Alpamayo R1 model
+adapter does not consume it when preparing the checkpoint's model inputs. It
+must not be described as steering guidance that this policy actually sees.
+Camera calibration is recorded but is not supplied as a model input tensor;
+matching protocol metadata does not correct the camera appearance difference.
 It does not fabricate additional camera views or recorded expert motion.
 The control period is 0.2 seconds, sensor cadence 0.1 seconds. Rewards use actual
-progress, collision and offroad metrics, excluding warmup progress.
+progress, collision and offroad metrics, excluding warmup progress. NVIDIA's
+car controller is replaced by our motorcycle controller and physics. Sensor
+protocol compatibility is not complete simulator or driving distribution parity.
+The controller follows native world XYZ using measured current position and
+forward direction, horizontal pure pursuit steering and 3D waypoint speed. Model
+motion history retains full measured roll and pitch.
 
 Every attempt has session identity, policy version, sampled trajectories, executed
 controls, observation receipts, simulator recordings and an immutable video job,
-including failed attempts. Render them using `tools/render_video_queue.py`.
+including failed attempts. After training workers stop, the launcher renders
+queued recordings serially, including recordings from failed runs. FFmpeg is
+checked before launch; `--ffmpeg` defaults to `ffmpeg`. `video_status.json` reports
+rendering separately from `run_status.json`, so a training failure is not hidden
+by video work. `tools/render_video_queue.py` also supports manual recovery.
 Rendering is playback of recorded states, not a second gameplay rollout.
 
 ## Verification
