@@ -2,9 +2,9 @@ class_name AgentCamera
 extends Node
 ## Observation camera, independent of presentation cameras and UI canvases.
 
-const VERSION := "rider-rgb-v1"
-const WIDTH := 640
-const HEIGHT := 360
+const VERSION := "rider-rgb-v2"
+const WIDTH := 512
+const HEIGHT := 320
 const RIDER_LAYER := 1 << 19
 const RIDER_LIMB_LAYER := 1 << 18
 const EYE_HEIGHT_M := 1.23
@@ -27,7 +27,7 @@ func configure(world: World3D, offscreen: bool = false) -> void:
 	add_child(viewport)
 	camera = Camera3D.new()
 	camera.name = "PolicyRiderCamera"
-	camera.fov = 74.0
+	camera.fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(120.0) * 0.5) * HEIGHT / WIDTH))
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
 	camera.near = 0.06
 	camera.far = 3000.0

@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import io
+import math
 import json
 import os
 from pathlib import Path
@@ -110,11 +111,11 @@ def validate_capture(response: dict, output: Path, label: str, episode: str, tic
     digest = hashlib.sha256(png).hexdigest()
     assert digest == image["sha256"]
     decoded = Image.open(io.BytesIO(png))
-    assert decoded.size == (image["width"], image["height"]) == (640, 360)
+    assert decoded.size == (image["width"], image["height"]) == (512, 320)
     assert decoded.convert("RGB").entropy() > 3.0, "Observation appears blank"
     assert response["camera"]["hud_visible"] is False
     assert response["camera"]["rider_mesh_visible"] is False
-    assert response["camera"]["vertical_fov_degrees"] == 74
+    assert math.isclose(response["camera"]["vertical_fov_degrees"], math.degrees(2 * math.atan(math.tan(math.radians(60)) * 320 / 512)), abs_tol=1e-4)
     assert len(response["camera"]["pose"]["position"]) == 3
     assert response["camera"]["intrinsics"]["fx"] > 0
     artifacts = list((output / "userdata").rglob(digest + ".png"))
@@ -204,7 +205,7 @@ def main() -> None:
     observations = [row for row in records if row.get("type") == "camera_observation"]
     assert len(observations) == 5, len(observations)
     assert all("base64" not in row["image"] for row in observations)
-    summary = {"ok": True, "renderer": first["camera"]["renderer"], "camera_observations_recorded": len(observations), "dimensions": [640, 360],
+    summary = {"ok": True, "renderer": first["camera"]["renderer"], "camera_observations_recorded": len(observations), "dimensions": [512, 320],
                "idle_rerender_max_channel_change": idle_max_channel_change,
                "idle_image_stability": idle_stability, "idle_image_limits": IDLE_IMAGE_LIMITS,
                "checks": ["real_png", "sha256", "immutable_artifact", "deterministic_idle_pose",

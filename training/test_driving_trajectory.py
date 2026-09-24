@@ -1,3 +1,4 @@
+import math
 import os
 import json
 import tempfile
@@ -27,10 +28,15 @@ class NativeSpeedControllerTests(unittest.TestCase):
                 time_budget_seconds=len(targets) * .1) as episode:
             for index, target in enumerate(targets):
                 # Reset the trajectory frame repeatedly, as inference does.
-                if index % 5 == 0:
-                    tracker.replan([(target * .1 * i, 0, 0) for i in range(1, 6)])
                 state = episode.observation['state']
-                controls, diagnostics = tracker.next_controls(state['speed'], state['lean'])
+                x, y, z = state['position']
+                position = [-z, -x, y]
+                heading = state['heading']
+                forward = [math.cos(heading), -math.sin(heading), 0]
+                if index % 5 == 0:
+                    tracker.replan([[p + f * target * .1 * i for p, f in zip(position, forward)]
+                                    for i in range(1, 6)], origin=position)
+                controls, diagnostics = tracker.next_controls(state['speed'], position=position, forward=forward)
                 episode.apply(encode_controller_controls(controls), [], [])
                 rows.append(dict(tick=episode.observation['tick'], target=target,
                                  speed=episode.observation['state']['speed'],

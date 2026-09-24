@@ -130,6 +130,8 @@ def camera_calibration(capture, position, rotation):
 class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
     def __init__(self, game, identity_root, *, identity_provider=None):
         self.game = dict(game)
+        if not isinstance(game.get("model_name"), str) or not game["model_name"].strip():
+            raise ValueError("Game configuration requires the actual model label")
         if Path(game["project_path"]).resolve() != ROOT / "godot":
             raise ValueError("Game project_path must match this checkout")
         seconds = game["episode_seconds"]
@@ -145,7 +147,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
         self.identity_root = Path(identity_root)
         self.identity_provider = identity_provider
         self.road = RoadTelemetry()
-        self._counter = 0
+        self._counter = {}
         self._lock = threading.Lock()
         self.shutdown = threading.Event()
 
@@ -248,8 +250,9 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
     def _run(self, spec, session, address, identity):
         with self.slots:
             with self._lock:
-                self._counter += 1
-                rollout = self._counter
+                version = identity["policy_version"]
+                self._counter[version] = self._counter.get(version, 0) + 1
+                rollout = self._counter[version]
             output = Path(self.game["recording_root"]) / session
             output.mkdir(parents=True, exist_ok=False)
             provenance = dict(
@@ -262,6 +265,10 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 sensor_period_seconds=0.1,
                 warmup_seconds=1.5,
                 action_semantics="native_trajectory_with_fixed_motorcycle_controller",
+                model_name=self.game["model_name"],
+                model_path=self.game.get("model_path"),
+                navigation_conditioning=False,
+                training_scope="trajectory_expert_frozen_vlm",
             )
             _write_json(output / "provenance.json", provenance)
             result = runtime.SimulationReturn.RolloutReturn(
@@ -281,7 +288,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
 
     def _episode(self, output, session, address, provenance):
         display = dict(
-            model_name="nvidia/Alpamayo-1.5-10B",
+            model_name=self.game["model_name"],
             generation=provenance["policy_version"],
         )
         if provenance["is_validation"]:
@@ -549,7 +556,10 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                         reason = "driver_terminated"
                         break
                     xyz = future_in_rig(response, now, position, rotation)
-                    tracker.replan(xyz)
+                    tracker.replan(
+                        (np.asarray(xyz) @ rotation.T + position).tolist(),
+                        origin=position.tolist(),
+                    )
                     model_decisions += 1
                     plans.write(
                         json.dumps(
@@ -568,7 +578,9 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     for _ in range(CONTROL_SAMPLES):
                         state = env._observation["state"]
                         controls, diagnostic = tracker.next_controls(
-                            state["speed"], state["lean"]
+                            state["speed"],
+                            position=captures[-1][1].tolist(),
+                            forward=captures[-1][2][:, 0].tolist(),
                         )
                         advance(controls, "model_trajectory_controller", diagnostic)
                         capture_and_submit()
@@ -584,6 +596,9 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     obs = env._observation
                     if reason == "stalled":
                         break
+                    if obs["state"]["crashed"]:
+                        reason = "crash"
+                        break
                     if not obs["track"]["lap_valid"]:
                         reason = "track_limits"
                         break
@@ -595,6 +610,18 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                         )
                 final = env._observation
                 metrics = reward_metrics.values()
+                elapsed = (final["tick"] - WARMUP_TICKS) / 120.0
+                completed = reason == "lap_completed" and final["track"]["lap_valid"]
+                metrics.update(
+                    sim_seconds=elapsed,
+                    legal_progress_m=reward_metrics.distance,
+                    mean_progress_speed_m_s=reward_metrics.distance / max(elapsed, 1 / 120),
+                    lap_completed=float(completed),
+                    stalled=float(reason == "stalled"),
+                    crashed=float(final["state"]["crashed"]),
+                )
+                if completed:
+                    metrics["lap_time_seconds"] = elapsed
                 _write_json(
                     output / "summary.json",
                     dict(

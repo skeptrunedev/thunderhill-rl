@@ -102,6 +102,7 @@ class RealGameTests(unittest.TestCase):
         service = GodotRuntime(
             dict(
                 godot_binary=os.environ["THUNDERHILL_GODOT"],
+                model_name="synthetic protocol fixture",
                 project_path=str(ROOT / "godot"),
                 episode_seconds=seconds,
                 concurrency=1,
@@ -153,7 +154,9 @@ class RealGameTests(unittest.TestCase):
         self.assertTrue(result.success, result.error)
         self.assertEqual(
             set(result.aggregated_metrics),
-            {"progress", "collision_any", "offroad", "fall_without_collision"},
+            {"progress", "collision_any", "offroad", "fall_without_collision",
+             "sim_seconds", "legal_progress_m", "mean_progress_speed_m_s",
+             "lap_completed", "stalled", "crashed"},
         )
         self.assertGreater(result.aggregated_metrics["progress"], 0)
         self.assertEqual(fixture.drive_times, [1_500_000, 1_700_000, 1_900_000])

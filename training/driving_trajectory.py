@@ -96,55 +96,49 @@ def godot_history_to_ego(positions, headings):
 
 
 class TrajectoryTracker:
-    """Fixed 10Hz follower for model waypoints at t=0.1,0.2,... seconds.
+    """Track native world waypoints with measured pose feedback at 10 Hz.
 
-    Call next_controls once per actual simulator advance. Replan resets the
-    origin to the bike's current ego pose. Between replans, position and yaw
-    are dead reckoned from speed and lean using a flat-road bicycle estimate.
-    This approximation is intentionally explicit: it is not track following
-    and cannot correct banking or tire slip from these two inputs alone.
-    No plan, exhausted plans and malformed data raise instead of driving on.
+    World axes are AlpaSim X/Y horizontal and Z up. Never interpret a banked
+    rider frame as a level plane. Steering uses horizontal world geometry;
+    target speed uses full spatial displacement. This is a motorcycle actuator
+    adapter, not NVIDIA's car MPC and not a source of training demonstrations.
     """
 
     def __init__(self):
         self.points = None
         self.step = 0
-        self.x = self.y = self.yaw = 0.0
         self.speed_integral = 0.0
 
-    def replan(self, xyz):
+    def replan(self, xyz, *, origin):
         points = _xyz(xyz)
-        self.points = [(0.0, 0.0, 0.0), *points]
+        self.points = [*_xyz([origin]), *points]
         # Only the geometric frame resets. Speed feedback belongs to the bike.
         self.step = 0
-        self.x = self.y = self.yaw = 0.0
 
-    def next_controls(self, speed: float, lean: float):
-        speed, lean = _finite(speed), _finite(lean)
-        if speed < 0 or abs(lean) >= math.pi / 2:
-            raise ValueError("Expected nonnegative speed and upright bike lean")
+    def next_controls(self, speed: float, *, position, forward):
+        speed = _finite(speed)
+        position, forward = _xyz([position, forward])
+        if speed < 0:
+            raise ValueError("Expected nonnegative speed")
+        horizontal = math.hypot(forward[0], forward[1])
+        if horizontal < 1e-6:
+            raise ValueError("Measured heading cannot be vertical")
+        fx, fy = forward[0] / horizontal, forward[1] / horizontal
         if self.points is None or self.step >= len(self.points) - 1:
             raise ValueError("A fresh unexhausted trajectory is required")
-        # Observe motion since the preceding call, before selecting this action.
-        if self.step:
-            yaw_delta = -GRAVITY * math.tan(lean) / max(speed, 1.0) * DT
-            mid_yaw = self.yaw + yaw_delta / 2
-            self.x += speed * math.cos(mid_yaw) * DT
-            self.y += speed * math.sin(mid_yaw) * DT
-            self.yaw += yaw_delta
         start, end = self.points[self.step:self.step + 2]
-        target_speed = math.dist(start[:2], end[:2]) / DT
+        target_speed = math.dist(start, end) / DT
         # Reverse plans cannot be executed by this forward-only motorcycle.
-        if end[0] < start[0]:
+        if (end[0] - start[0]) * fx + (end[1] - start[1]) * fy < 0:
             target_speed = 0.0
         lookahead = max(2.0, speed * 0.7)
         target = self.points[-1]
         for candidate in self.points[self.step + 1:]:
             target = candidate
-            if math.hypot(candidate[0] - self.x, candidate[1] - self.y) >= lookahead:
+            if math.hypot(candidate[0] - position[0], candidate[1] - position[1]) >= lookahead:
                 break
-        dx, dy = target[0] - self.x, target[1] - self.y
-        lateral = -math.sin(self.yaw) * dx + math.cos(self.yaw) * dy
+        dx, dy = target[0] - position[0], target[1] - position[1]
+        lateral = -fy * dx + fx * dy
         curvature = 2.0 * lateral / max(dx * dx + dy * dy, 1.0)
         # Model left is negative Godot steer. Assisted steer requests lean.
         requested_lean = -math.atan(speed * speed * curvature / GRAVITY)
@@ -170,10 +164,11 @@ class TrajectoryTracker:
         controls = {"steer": steer, "throttle": throttle,
                     "front_brake": front_brake, "rear_brake": front_brake * 0.18,
                     "assist_enabled": True, "auto_shift": True}
-        diagnostics = {"controller": "model_trajectory_pure_pursuit_pi_v2",
+        diagnostics = {"controller": "model_trajectory_world_pose_pi_v3",
                        "speed_error_m_s": error,
                        "speed_integral_throttle": self.speed_integral,
                        "privileged_track_inputs": False,
+                       "feedback": "measured_world_pose",
                        "plan_step": self.step, "plan_time_s": self.step * DT,
                        "target_speed_m_s": target_speed, "target_lean_rad": requested_lean,
                        "curvature_left_m_inv": curvature,
