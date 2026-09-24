@@ -21,12 +21,14 @@ class DrivingEpisodeTests(unittest.TestCase):
                 revision='not a model', generation=0, rollout=1, evaluation=True,
                 initial_speed_m_s=5.0, time_budget_seconds=0.5) as run:
             observation = run.model_input()
-            self.assertEqual(observation['tick'], 180)
+            self.assertEqual(observation['tick'], 600)
             self.assertEqual(observation['images'].shape, (4, 360, 640, 3))
             self.assertEqual(len(set(run.image_ids)), 4)
             self.assertGreater(np.linalg.norm(observation['ego_history_xyz'][0]), 1)
-            self.assertEqual(len(run.episode.records), 15)
+            self.assertEqual(len(run.episode.records), 50)
             self.assertTrue(all(row['action_source'] == 'scenario_setup' for row in run.episode.records))
+            self.assertLess(run.setup_speed_metrics['max_m_s'] - run.setup_speed_metrics['min_m_s'], .15)
+            self.assertAlmostEqual(run.setup_speed_metrics['final_m_s'], 5., delta=.15)
             start_progress = run.episode.observation['track']['legal_distance']
             self.assertGreater(start_progress, 1)
             plan = np.zeros((64, 3))
@@ -35,8 +37,8 @@ class DrivingEpisodeTests(unittest.TestCase):
             summary = run.finish()
             summary['training_eligible'] = False
             (run.episode.output / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
-            self.assertEqual(summary['recorded_transitions'], 240)
-            self.assertEqual(summary['model_control_start_tick'], 180)
+            self.assertEqual(summary['recorded_transitions'], 660)
+            self.assertEqual(summary['model_control_start_tick'], 600)
             self.assertAlmostEqual(summary['reward_components']['sim_seconds'], .5)
             self.assertAlmostEqual(summary['reward_components']['legal_progress_m'],
                                    summary['final_observation']['track']['legal_distance'] - start_progress)

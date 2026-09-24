@@ -30,7 +30,7 @@ class DrivingEpisode:
     def __init__(self, **kwargs):
         self.initial_speed_m_s = kwargs.get("initial_speed_m_s", 0.0)
         self.episode = LapEpisode(
-            scenario_setup_ticks=180 if self.initial_speed_m_s > 0 else 0,
+            scenario_setup_ticks=600 if self.initial_speed_m_s > 0 else 0, scenario_setup_kind="speed_hold",
             road=RoadTelemetry(), worker_factory=rendered_worker,
             action_parser=decode_controller_controls, **kwargs)
         self.images = deque(maxlen=4)
@@ -46,14 +46,22 @@ class DrivingEpisode:
             self.plans = (self.episode.output / 'trajectory_decisions.jsonl').open('w')
             self.capture(pad=self.initial_speed_m_s == 0)
             if self.initial_speed_m_s > 0:
-                # Actual neutral coasting supplies history, never training targets.
-                neutral = encode_controller_controls(dict(
-                    steer=0., throttle=0., front_brake=0., rear_brake=0., shift=0))
-                for _ in range(15):
-                    self.episode.apply(neutral, [], [], scenario_setup=True)
+                # Recorded scenario initialization only, excluded from policy replay/reward.
+                speeds = deque(maxlen=16)
+                speeds.append(self.episode.observation['state']['speed'])
+                for _ in range(self.episode.scenario_setup_ticks // 12):
+                    self.tracker.replan([[(i + 1) * .1 * self.initial_speed_m_s, 0., 0.] for i in range(64)])
+                    state = self.episode.observation['state']
+                    controls, _ = self.tracker.next_controls(state['speed'], state['lean'])
+                    self.episode.apply(encode_controller_controls(controls), [], [], scenario_setup=True)
                     self.capture(pad=False)
+                    speeds.append(self.episode.observation['state']['speed'])
                     if self.episode.done:
                         raise RuntimeError("Moving scenario terminated during recorded history setup")
+                self.setup_speed_metrics = dict(min_m_s=min(speeds), max_m_s=max(speeds),
+                                               final_m_s=speeds[-1], target_m_s=self.initial_speed_m_s)
+                if max(speeds) - min(speeds) > .15 or abs(speeds[-1] - self.initial_speed_m_s) > .15:
+                    raise RuntimeError(f"Moving history failed steady speed check: {self.setup_speed_metrics}")
                 self.episode.begin_model_control()
         except BaseException as error:
             import sys
@@ -146,5 +154,6 @@ class DrivingEpisode:
         summary = self.episode.finish()
         summary['action_semantics'] = 'sampled_trajectory_with_fixed_motorcycle_controller'
         summary['trajectory_decisions'] = len(self.replays)
+        summary['setup_speed_metrics'] = getattr(self, 'setup_speed_metrics', None)
         (self.episode.output / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
         return summary

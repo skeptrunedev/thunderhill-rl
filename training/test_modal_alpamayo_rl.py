@@ -83,11 +83,11 @@ class DiagnosticCompletionTests(unittest.TestCase):
 
     def test_success_requires_all_generations_and_evaluations(self):
         value = dict(diagnostic_complete=True, complete=True, generations=[{}] * 3,
-                     evaluations=[{}] * 16, baseline_gate={'passed': True},
+                     evaluations=[{}] * 16, baseline_gate={'passed': False}, training_readiness={'passed': True},
                      stop_reason='generations_completed')
         launcher.validate_diagnostic_result(value)
         for changed in (dict(generations=[{}]), dict(evaluations=[{}] * 4),
-                        dict(baseline_gate={'passed': False}), dict(diagnostic_complete=False)):
+                        dict(training_readiness={'passed': False}), dict(diagnostic_complete=False)):
             with self.assertRaises(RuntimeError):
                 launcher.validate_diagnostic_result({**value, **changed})
 

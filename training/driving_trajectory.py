@@ -14,6 +14,8 @@ from collections.abc import Sequence
 
 DT = 0.1
 GRAVITY = 9.81
+SPEED_KP = 0.25  # throttle fraction per m/s speed error
+SPEED_KI = 0.20  # throttle fraction per metre of accumulated speed error
 MAX_LEAN = 0.88  # godot/scripts/motorcycle.gd rider_max_lean_rad
 
 CONTROL_FIELDS = ('steer', 'throttle', 'front_brake', 'rear_brake')
@@ -108,10 +110,12 @@ class TrajectoryTracker:
         self.points = None
         self.step = 0
         self.x = self.y = self.yaw = 0.0
+        self.speed_integral = 0.0
 
     def replan(self, xyz):
         points = _xyz(xyz)
         self.points = [(0.0, 0.0, 0.0), *points]
+        # Only the geometric frame resets. Speed feedback belongs to the bike.
         self.step = 0
         self.x = self.y = self.yaw = 0.0
 
@@ -146,12 +150,29 @@ class TrajectoryTracker:
         requested_lean = -math.atan(speed * speed * curvature / GRAVITY)
         steer = max(-1.0, min(1.0, requested_lean / MAX_LEAN))
         error = target_speed - speed
-        throttle = max(0.0, min(1.0, 0.14 * error))
-        front_brake = max(0.0, min(1.0, -0.15 * error))
+        # A constant velocity requires nonzero engine torque to balance engine
+        # braking, rolling resistance and drag. Integral feedback learns that
+        # balance from measured speed alone and persists across trajectory replans.
+        # Conditional integration prevents saturation from winding up the state.
+        if target_speed == 0.0:
+            self.speed_integral = 0.0
+            effort = -SPEED_KP * speed
+        else:
+            candidate = self.speed_integral + SPEED_KI * error * DT
+            candidate_effort = SPEED_KP * error + candidate
+            if (-1.0 <= candidate_effort <= 1.0
+                    or (candidate_effort > 1.0 and error < 0)
+                    or (candidate_effort < -1.0 and error > 0)):
+                self.speed_integral = max(-1.0, min(1.0, candidate))
+            effort = SPEED_KP * error + self.speed_integral
+        throttle = max(0.0, min(1.0, effort))
+        front_brake = max(0.0, min(1.0, -effort * 0.6))
         controls = {"steer": steer, "throttle": throttle,
                     "front_brake": front_brake, "rear_brake": front_brake * 0.18,
                     "assist_enabled": True, "auto_shift": True}
-        diagnostics = {"controller": "model_trajectory_pure_pursuit_v1",
+        diagnostics = {"controller": "model_trajectory_pure_pursuit_pi_v2",
+                       "speed_error_m_s": error,
+                       "speed_integral_throttle": self.speed_integral,
                        "privileged_track_inputs": False,
                        "plan_step": self.step, "plan_time_s": self.step * DT,
                        "target_speed_m_s": target_speed, "target_lean_rad": requested_lean,

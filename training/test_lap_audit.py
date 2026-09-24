@@ -122,6 +122,69 @@ class LapAuditTests(unittest.TestCase):
         self.assertEqual(result["recorded_transitions"], 383)
         self.assertEqual(result["actions"], 32)
 
+    def test_speed_hold_setup_reconstructs_controls_and_preserves_policy_boundary(self):
+        from driving_trajectory import (
+            TrajectoryTracker, decode_controller_controls, encode_controller_controls,
+        )
+        self.parse_completion = decode_controller_controls
+        self.header['initial_state'].update(speed=5.0, lean=0.0)
+        tracker = TrajectoryTracker()
+        template = copy.deepcopy(self.rows[0])
+        decision_template = copy.deepcopy(self.decisions[0])
+        self.rows, self.decisions = [], []
+        for action in range(51):
+            tracker.replan([[(i + 1) * .5, 0., 0.] for i in range(64)])
+            controls, _ = tracker.next_controls(5., 0.)
+            completion = encode_controller_controls(controls)
+            controls = decode_controller_controls(completion)
+            decision = copy.deepcopy(decision_template)
+            decision.update(action_index=action, tick=(action + 1) * 12,
+                            action_source='scenario_setup' if action < 50 else 'model',
+                            completion=completion, controls=controls)
+            self.decisions.append(decision)
+            for offset in range(12):
+                tick = action * 12 + offset + 1
+                row = copy.deepcopy(template)
+                row.update(tick=tick, previous_tick=tick - 1, requested_controls=dict(controls))
+                row['state'].update(tick=tick, speed=5., lean=0.)
+                self.rows.append(row)
+        self.final = {key: copy.deepcopy(self.rows[-1][key]) for key in self.final
+                      if key in self.rows[-1]}
+        self.final['track']['completed_laps'] = 0
+        self.final['rollout_valid'] = True
+        kwargs = dict(initial_speed_m_s=5., scenario_setup_ticks=600,
+                      scenario_setup_kind='speed_hold')
+        result = self.audit(**kwargs)
+        self.assertEqual(result['scenario_setup_actions'], 50)
+        self.assertEqual(result['model_actions'], 1)
+        self.assertFalse(result['success'])
+
+        for index, field, value, message in (
+            (0, 'action_source', 'model', 'source mismatch'),
+            (50, 'action_source', 'scenario_setup', 'source mismatch'),
+            (0, 'completion_ids', [17], 'training targets'),
+            (0, 'behavior_logprobs', [-0.5], 'training targets'),
+        ):
+            with self.subTest(field=field, index=index):
+                original = copy.deepcopy(self.decisions[index])
+                self.decisions[index][field] = value
+                with self.assertRaisesRegex(ValueError, message):
+                    self.audit(**kwargs)
+                self.decisions[index] = original
+
+        # Matching generated text, submitted controls, and simulator receipts
+        # must still fail when setup did not use its declared controller.
+        altered = dict(self.decisions[0]['controls'], throttle=0.9)
+        self.decisions[0].update(controls=altered, completion=encode_controller_controls(altered))
+        for row in self.rows[:12]:
+            row['requested_controls'] = dict(altered)
+        with self.assertRaisesRegex(ValueError, 'setup controls differ'):
+            self.audit(**kwargs)
+        with self.assertRaisesRegex(ValueError, 'invalid scenario setup'):
+            self.audit(**dict(kwargs, scenario_setup_ticks=180))
+        with self.assertRaisesRegex(ValueError, 'invalid setup kind'):
+            self.audit(**dict(kwargs, scenario_setup_kind='teacher'))
+
     def test_metadata_keeps_full_lap_audit_strict(self):
         self.rows.insert(
             0, {"type": "model_decision", "tick": 0, "controls": self.controls}

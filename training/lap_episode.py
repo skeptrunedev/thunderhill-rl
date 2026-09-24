@@ -124,7 +124,7 @@ class LapEpisode:
     def __init__(self, *, godot, output, road, adapter_sha256, model, revision,
                  generation, rollout, time_budget_seconds=900, evaluation=False, rollout_count=None,
                  worker_factory=worker, stall_config=DEFAULT_STALL_CONFIG,
-                 action_parser=None, initial_speed_m_s=0.0, scenario_setup_ticks=0,
+                 action_parser=None, initial_speed_m_s=0.0, scenario_setup_ticks=0, scenario_setup_kind="neutral_coast",
                  policy_identity_kind="adapter_weights_sha256"):
         if policy_identity_kind not in {"adapter_weights_sha256", "api_request_config_sha256"}:
             raise ValueError("Unsupported policy identity kind")
@@ -133,9 +133,14 @@ class LapEpisode:
         if (type(initial_speed_m_s) not in (int, float)
                 or not math.isfinite(initial_speed_m_s) or not 0 <= initial_speed_m_s <= 10):
             raise ValueError("Invalid initial speed")
-        if (type(scenario_setup_ticks) is not int or scenario_setup_ticks not in (0, 180)
+        if (type(scenario_setup_ticks) is not int or scenario_setup_ticks not in (0, 180, 600)
                 or (scenario_setup_ticks and initial_speed_m_s <= 0)):
-            raise ValueError("Scenario setup must be 180 moving start ticks or zero")
+            raise ValueError("Invalid scenario setup tick count")
+        if scenario_setup_kind not in ("neutral_coast", "speed_hold"):
+            raise ValueError("Unknown scenario setup kind")
+        if scenario_setup_ticks and scenario_setup_ticks != (600 if scenario_setup_kind == "speed_hold" else 180):
+            raise ValueError("Scenario setup duration differs from configured kind")
+        self.scenario_setup_kind = scenario_setup_kind
         self.initial_speed_m_s = initial_speed_m_s
         self.scenario_setup_ticks = scenario_setup_ticks
         self.model_control_start_state = None
@@ -237,7 +242,7 @@ class LapEpisode:
             row["error"] = str(error)
             self.reason = "invalid_model_action"
         else:
-            if scenario_setup and any(controls.values()):
+            if scenario_setup and self.scenario_setup_kind == "neutral_coast" and any(controls.values()):
                 raise ValueError("Moving history setup requires neutral coasting")
             self.view = json.loads(self.env.control_bike(self.view["observation_token"], **controls))
             row.update(tick=self.observation["tick"], controls=controls)
@@ -273,6 +278,7 @@ class LapEpisode:
             "sim_seconds": final["sim_time"], "decisions": "decisions.jsonl",
             "initial_speed_m_s": self.initial_speed_m_s,
             "scenario_setup_ticks": self.scenario_setup_ticks,
+            "scenario_setup_kind": self.scenario_setup_kind,
             "model_control_start_state": self.model_control_start_state,
             "stall_config": asdict(self.stall_monitor.config),
             "stall_diagnostic": self.stall_monitor.diagnostic})
@@ -285,6 +291,7 @@ class LapEpisode:
                    "final_observation": final, "training_eligible": False,
                    "initial_speed_m_s": self.initial_speed_m_s,
                    "scenario_setup_ticks": self.scenario_setup_ticks,
+                   "scenario_setup_kind": self.scenario_setup_kind,
                    "model_control_start_state": self.model_control_start_state,
                    "stall_config": asdict(self.stall_monitor.config),
                    "stall_diagnostic": self.stall_monitor.diagnostic}
@@ -294,7 +301,7 @@ class LapEpisode:
                               track_sha256=self.road.track_sha256,
                               final_observation=final, decisions=self.records,
                               parse_completion=self.parse_completion, initial_speed_m_s=self.initial_speed_m_s,
-                              scenario_setup_ticks=self.scenario_setup_ticks)
+                              scenario_setup_ticks=self.scenario_setup_ticks, scenario_setup_kind=self.scenario_setup_kind)
             summary.update(audit)
             if infrastructure_failure:
                 summary["infrastructure_failure"] = True

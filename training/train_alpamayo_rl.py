@@ -144,13 +144,22 @@ def run_diagnostic(policy, args, tracker, manifest, initial):
     gate = baseline_gate(baseline)
     manifest['baseline_gate'] = gate
     publish(manifest_path, manifest)
-    if not gate['passed']:
-        manifest.update(diagnostic_complete=True, stop_reason='baseline_gate_failed')
-        publish(manifest_path, manifest)
-        tracker.log({'generation': 0, 'eval/baseline_gate_passed': 0})
-        print(json.dumps(dict(event='diagnostic_stopped', baseline_gate=gate)), flush=True)
-        return
-    tracker.log({'generation': 0, 'eval/baseline_gate_passed': 1})
+    # Driving failures are valid ownplay. Only broken mechanics/provenance block RL.
+    readiness = all(row['training_eligible'] and row['recording_provenance_verified'] for row in baseline)
+    for row in baseline:
+        if row['scenario_id'] == 'moving':
+            metrics = row.get('setup_speed_metrics') or {}
+            readiness = readiness and (
+                metrics.get('max_m_s', float('inf')) - metrics.get('min_m_s', 0.) <= .15
+                and abs(metrics.get('final_m_s', 0.) - row['initial_speed_m_s']) <= .15)
+    manifest['training_readiness'] = dict(passed=bool(readiness),
+        criteria='valid_recordings_and_verified_steady_motion_history',
+        driving_success_required=False)
+    publish(manifest_path, manifest)
+    if not readiness:
+        raise RuntimeError('Baseline infrastructure or moving history verification failed')
+    tracker.log({'generation': 0, 'eval/baseline_gate_passed': int(gate['passed']),
+                 'eval/training_readiness_passed': 1})
     for generation in range(1, 4):
         episodes, summaries = [], []
         generation_path = args.output / f'generation-{generation:03d}'
@@ -225,7 +234,8 @@ def main():
         manifest.update(generations_requested=3, evaluation_rollouts=4,
             maximum_attempts=40, baseline_criteria=BASELINE_CRITERIA,
             scenarios=list(SCENARIOS), evaluation_seeds=list(EVALUATION_SEEDS),
-            prehistory='stationary_padding_or_recorded_neutral_coast_excluded_from_reward',
+            prehistory='stationary_padding_or_recorded_steady_speed_setup_excluded_from_reward',
+            training_on_valid_failures=True,
             diagnostic_complete=False, reward_grouping='within_matching_start_condition')
     publish(manifest_path, manifest)
     with ExperimentTracker(args.output, manifest, mode=args.wandb_mode,

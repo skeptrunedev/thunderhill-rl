@@ -49,7 +49,7 @@ def audit_lap(
     final_observation,
     decisions,
     parse_completion=parse_action,
-    initial_speed_m_s=0.0, scenario_setup_ticks=0,
+    initial_speed_m_s=0.0, scenario_setup_ticks=0, scenario_setup_kind="neutral_coast",
 ):
     """Raise on broken provenance; return success=False for an honestly failed lap.
 
@@ -78,7 +78,9 @@ def audit_lap(
     require(header.get("track_sha256") == track_sha256, "track hash mismatch")
     require(header["initial_state"]["tick"] == 0, "episode must start at tick zero")
     require(header["initial_state"].get("speed", 0) == initial_speed_m_s, "initial speed differs from scenario")
-    require(scenario_setup_ticks in (0, 180) and (not scenario_setup_ticks or initial_speed_m_s > 0), "invalid scenario setup")
+    require(scenario_setup_kind in ("neutral_coast", "speed_hold"), "invalid setup kind")
+    expected_setup = 600 if scenario_setup_kind == "speed_hold" else 180
+    require(scenario_setup_ticks in (0, expected_setup) and (not scenario_setup_ticks or initial_speed_m_s > 0), "invalid scenario setup")
     require(header.get("start_station") == 0, "lap must start at station zero")
     require(final_observation.get("episode_id") == episode_id, "final episode mismatch")
     require(final_observation.get("policy_id") == policy_id, "final policy mismatch")
@@ -121,7 +123,8 @@ def audit_lap(
         setup = previous_tick < scenario_setup_ticks
         require(decision.get("action_source", "model") == ("scenario_setup" if setup else "model"), "scenario setup source mismatch")
         if setup:
-            require(not any(controls.values()), "scenario setup must coast with neutral controls")
+            if scenario_setup_kind == "neutral_coast":
+                require(not any(controls.values()), "scenario setup must coast with neutral controls")
             require(not decision.get("completion_ids") and not decision.get("behavior_logprobs"), "setup cannot contain training targets")
         require(
             controls == decision.get("controls")
@@ -136,6 +139,10 @@ def audit_lap(
         previous_tick == final_observation["tick"], "final tick differs from decisions"
     )
 
+    setup_tracker = None
+    if scenario_setup_ticks and scenario_setup_kind == "speed_hold":
+        from driving_trajectory import TrajectoryTracker, encode_controller_controls, decode_controller_controls
+        setup_tracker = TrajectoryTracker()
     gates = []
     offtrack = 0
     count = 0
@@ -160,6 +167,12 @@ def audit_lap(
                 action_index += 1
             require(action_index < len(actions), "transition has no model decision")
             start, end, controls = actions[action_index]
+            if setup_tracker is not None and start < scenario_setup_ticks and count == start + 1:
+                state = last["state"] if last else header["initial_state"]
+                setup_tracker.replan([[(i + 1) * .1 * initial_speed_m_s, 0., 0.] for i in range(64)])
+                expected, _ = setup_tracker.next_controls(state["speed"], state["lean"])
+                expected = decode_controller_controls(encode_controller_controls(expected))
+                require(recorded_controls_match(controls, expected), "setup controls differ from speed hold controller")
             require(start < count <= end, "transition outside decision interval")
             require(
                 recorded_controls_match(row.get("requested_controls"), controls),

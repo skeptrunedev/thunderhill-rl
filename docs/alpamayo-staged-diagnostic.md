@@ -15,10 +15,10 @@ The VLM remains frozen. Only the action expert adapter receives policy gradients
 There are two starting conditions at the track origin:
 
 * Standing, using stationary history padding.
-* Moving at 5 metres per second, followed by 1.5 seconds of real neutral coasting
-  to capture sixteen poses and four camera frames before model control.
+* Moving at 5 metres per second, followed by five seconds of recorded speed hold
+  to capture sixteen steady poses and four camera frames before model control.
 
-The coasting prefix is explicit scenario setup. It is recorded and audited,
+The speed hold prefix is explicit scenario setup. It is recorded and audited,
 never used as a training target, and excluded from reward, model duration and
 stall timing. An initial moving speed without actual history would incorrectly
 present zero velocity to the driving model, which estimates speed from poses.
@@ -28,17 +28,15 @@ within the matching condition, so starting momentum cannot win against standing
 starts. Evaluation uses seeds 1073 and 2073 for each condition at every generation.
 Training seeds are separate and change each generation.
 
-The baseline gate requires both moving attempts to produce at least 20 metres
-of legal progress during model control, finish at 1 metre per second or faster,
-avoid stalls, crashes and leaving the track, and initially predict a forward
-trajectory spanning at least 2 metres. These are conservative diagnostic cutoffs,
-not empirical proof of learning or eventual lap completion. Standing starts may
-fail without blocking the moving condition investigation. Log throttle and speed
-alongside progress so coasting is not confused with purposeful acceleration.
+The baseline driving metrics (progress, final speed, stalls and predicted motion)
+remain diagnostic, but do not block RL on valid failed attempts. Training requires
+valid recordings, actual finite model trajectories, and verified steady motion
+history. The final sixteen setup speeds must span at most 0.15 metres per second
+and finish within 0.15 metres per second of the requested starting speed.
 
-If the gate fails, archive all four attempts and stop without an optimizer update.
-If it passes, perform three generations, each with one grouped update, saved
-adapter, verified reload from previous to updated weights, and fixed evaluation.
+Perform three generations, each with one grouped update, saved adapter, verified
+reload from previous to updated weights, and fixed evaluation. There is no
+scripted driving after setup: the fixed controller follows only model trajectories.
 W&B reports rewards, progress, speed and stall rate separately by start condition.
 
 Launch using the existing CLI:
@@ -54,7 +52,7 @@ with no retries. Hardware camera preflight is included in that budget. The norma
 HF_TOKEN environment is preserved because the credential override is scoped to
 this subprocess. Model weights are prepared on CPU before allocating the GPU.
 
-## Observed result
+## Earlier diagnostic result (before controller repair)
 
 Run `alpamayo-diagnostic-20260924T024801Z` completed all four baseline attempts and
 stopped at the gate. No training generation or optimizer update was performed.
@@ -89,3 +87,23 @@ See [machine readable results](alpamayo-staged-diagnostic-result.json) and
 [W&B](https://wandb.ai/skeptrune-org/thunderhill-rl/runs/y14b3mt3).
 Recordings and videos are archived under
 `artifacts/modal-alpamayo-diagnostic-20260924T024801Z/`.
+
+## Controller repair and training eligibility
+
+The original proportional speed controller requested zero throttle at exact
+requested speed, so engine braking and drag necessarily slowed the bike. PI
+feedback now compensates using measured speed error, preserves integral state
+across replans, prevents saturation windup, and clears integral for stopped or
+reverse plans. It receives no track geometry or demonstration actions.
+
+Actual Godot tests measured 4.9925 metres per second at five seconds and 5.0033 at
+ten seconds for a constant 5 metre per second trajectory. The final sixteen setup
+samples varied by only 0.0362 metres per second. Acceleration and stopping tests
+also pass. Full rendered collection verifies steady camera history, exclusion of
+setup reward, and audit reconstruction of every setup control from recorded state.
+
+After the explicit request to fix the environment and start training, valid
+stalls are retained as RL experience. Poor driving is no longer a prerequisite
+for stopping the campaign. Nonfinite outputs, invalid recordings, bad setup
+history, inconsistent behavior probabilities and zero optimizer updates remain
+fatal. The earlier failed run and its evidence are preserved unchanged.

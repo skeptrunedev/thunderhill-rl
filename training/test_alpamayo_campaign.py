@@ -14,7 +14,9 @@ def summary(scenario, seed, *, progress=50., speed=4.):
     return dict(scenario_id=scenario, sample_seed=seed, recording_provenance_verified=True,
                 training_eligible=True, reward_components=dict(total=progress/100, legal_progress_m=progress),
                 final_observation=dict(state=dict(speed=speed, crashed=False)), offtrack_ticks=0,
-                reason='time_limit', trajectory_metrics=[dict(horizon_x_m=15.)])
+                reason='time_limit', trajectory_metrics=[dict(horizon_x_m=15.)],
+                initial_speed_m_s=5. if scenario == 'moving' else 0.,
+                setup_speed_metrics=dict(min_m_s=4.96, max_m_s=5., final_m_s=4.99))
 
 
 class GateTests(unittest.TestCase):
@@ -83,14 +85,13 @@ class CampaignTests(unittest.TestCase):
             run_diagnostic(Policy(), args, tracker, manifest, 'initial')
         return manifest, calls, updates
 
-    def test_failed_baseline_never_updates_or_collects_training(self):
+    def test_poor_driving_with_valid_mechanics_still_trains(self):
         manifest, calls, updates = self.run_campaign(False)
-        self.assertEqual(len(calls), 4)
-        self.assertTrue(all(c['evaluation'] for c in calls))
-        self.assertEqual(updates, [])
-        self.assertTrue(manifest['diagnostic_complete'])
-        self.assertFalse(manifest['complete'])
-        self.assertEqual(manifest['stop_reason'], 'baseline_gate_failed')
+        self.assertEqual(len(calls), 40)
+        self.assertEqual(len(updates), 3)
+        self.assertTrue(manifest['complete'])
+        self.assertFalse(manifest['baseline_gate']['passed'])
+        self.assertTrue(manifest['training_readiness']['passed'])
 
     def test_three_generations_have_balanced_groups_and_fixed_evaluations(self):
         manifest, calls, updates = self.run_campaign(True)
@@ -129,8 +130,8 @@ class NativeCollectionTests(unittest.TestCase):
             initial_speed_m_s=5., scenario_id='moving')
         self.assertEqual(len(episode['replays']), 1)
         self.assertEqual(episode['reward_group'], 'moving')
-        self.assertEqual(result['model_control_start_tick'], 180)
-        self.assertEqual(result['scenario_setup_actions'], 15)
+        self.assertEqual(result['model_control_start_tick'], 600)
+        self.assertEqual(result['scenario_setup_actions'], 50)
         self.assertAlmostEqual(result['reward_components']['sim_seconds'], .5)
         self.assertGreater(result['max_sampled_speed_m_s'], 1)
         self.assertEqual(len(result['trajectory_metrics']), 1)

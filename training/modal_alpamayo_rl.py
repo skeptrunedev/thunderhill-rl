@@ -81,7 +81,7 @@ def validate_diagnostic_result(campaign):
     elif campaign.get('stop_reason') == 'generations_completed':
         if (campaign.get('complete') is not True or len(campaign.get('generations', [])) != 3
                 or len(campaign.get('evaluations', [])) != 16
-                or campaign.get('baseline_gate', {}).get('passed') is not True):
+                or campaign.get('training_readiness', {}).get('passed') is not True):
             raise RuntimeError('Missing three completed generations and fixed evaluations')
     else:
         raise RuntimeError('Unknown diagnostic completion reason')
