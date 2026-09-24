@@ -34,9 +34,8 @@ The actual Cosmos Reason2 processor test passes in the pinned Alpamayo
 environment, including four camera frames and sixteen motion history poses.
 Run these checks with `training/alpamayo/.venv/bin/python`; the previous training
 environment contains incompatible Transformers configuration initialization.
-The full Alpamayo model has not completed a gameplay or optimizer validation.
-Neither local integration tests nor the CPU arithmetic tests establish that the
-complete model trains successfully on the planned GPU.
+The full model subsequently completed the bounded cloud validation described
+below. Local arithmetic tests alone do not establish full model trainability.
 
 The first GPU load exposed a serialization difference: the released model marks
 Fourier frequencies and action normalization statistics as nonpersistent, while
@@ -65,3 +64,29 @@ stationary images with only 0.346% of pixels changed, at most 3 levels out of 25
 per channel. Pose and simulator state were identical. Camera QA therefore checks
 bounded pixel stability separately from exact state and calibration invariance.
 The underlying cause of this small hardware raster variation is unconfirmed.
+
+## Completed cloud generation
+
+Run `alpamayo-validation-20260924T022439Z` completed on one RTX PRO 6000.
+The child execution took 171.76 seconds, including hardware camera preflight,
+baseline evaluation, two training attempts, a real optimizer update, checkpoint
+save and reload, and final evaluation. All four attempts passed recording audits.
+Four complete videos were rendered locally, each 330 frames, including model,
+generation and rollout identity. The Modal app is stopped with zero tasks and
+no containers remaining. The existing HF_TOKEN environment was never modified.
+
+This validates the RL plumbing, not racing performance. Every attempt stalled
+after 10 simulated seconds. Baseline legal progress was negative 0.142863 metres;
+the updated evaluation reached negative 0.142576 metres. That microscopic change
+is not convincing evidence of improved driving. Do not scale to long training
+based on this result; first investigate the stationary trajectory predictions
+and the driving model's behavior in this motorcycle camera setting.
+
+The update had a nonzero gradient norm of 0.00055014 and changed adapter weights.
+Loading the initial adapter restored its original hash; loading the saved updated
+adapter restored the new hash before evaluation. No supervised training occurred.
+
+See [machine readable evidence](alpamayo-validation-result.json) and
+[W&B run](https://wandb.ai/skeptrune-org/thunderhill-rl/runs/7lru9l4b).
+The local archive is under
+`artifacts/modal-alpamayo-validation-20260924T022439Z/`.
