@@ -45,6 +45,23 @@ This installs the actual upstream workspace. For source inspection alone, add
 NVIDIA's checkpoint conversion command from their onboarding guide. The model
 argument below must point to that converted checkpoint, not an old LoRA adapter.
 
+Navigation conditioning requires the reviewed Alpamayo 1.5 release. After
+conversion, verify it with an actual captured `native_model_input.pt` from the
+real game protocol check. This uses NVIDIA's tokenizer and compares rollout and
+replay tensors; it does not optimize weights:
+
+```sh
+/path/to/alpagym/.venv/bin/python tools/check_native_navigation.py \
+  --model-input /path/to/native_model_input.pt \
+  --checkpoint /path/to/converted/checkpoint \
+  --release-config /path/to/Alpamayo-1.5-10B/config.json \
+  --output artifacts/navigation-verification.json
+```
+
+The check records source configuration provenance in the converted checkpoint.
+The launcher rejects missing or changed provenance. It also verifies the pinned
+source plus the exact navigation patch before any GPU workers start.
+
 From this repository, using the upstream environment:
 
 ```sh

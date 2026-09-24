@@ -32,12 +32,6 @@ def verify_source(source: Path, *, apply_patch: bool = False) -> dict:
         ).splitlines()
     )
     expected = set(manifest["files"])
-    if not changed and apply_patch:
-        subprocess.run(
-            ["git", "-C", str(source), "apply", "--check", str(PATCH)], check=True
-        )
-        subprocess.run(["git", "-C", str(source), "apply", str(PATCH)], check=True)
-        changed = expected
     untracked = set(
         subprocess.check_output(
             ["git", "-C", str(source), "ls-files", "--others", "--exclude-standard"],
@@ -47,6 +41,12 @@ def verify_source(source: Path, *, apply_patch: bool = False) -> dict:
     if untracked - set(manifest.get("added_files", [])):
         raise ValueError("NVIDIA checkout contains unreviewed untracked files")
     changed.update(untracked)
+    if not changed and apply_patch:
+        subprocess.run(
+            ["git", "-C", str(source), "apply", "--check", str(PATCH)], check=True
+        )
+        subprocess.run(["git", "-C", str(source), "apply", str(PATCH)], check=True)
+        changed = expected
     if changed != expected:
         raise ValueError(
             "NVIDIA checkout must contain exactly the reviewed navigation patch; run tools/setup_alpagym.py"

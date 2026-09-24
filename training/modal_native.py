@@ -59,8 +59,13 @@ image = (
         f"git clone https://github.com/NVlabs/alpagym.git {UPSTREAM}",
         f"git -C {UPSTREAM} checkout --detach {REVISION}",
         f"uv sync --frozen --all-packages --project {UPSTREAM}",
-        f"uv sync --frozen --all-packages --check --project {UPSTREAM}",
     )
+    .add_local_file(
+        str(ROOT / "tools/check_native_dependencies.py"),
+        "/opt/check_native_dependencies.py",
+        copy=True,
+    )
+    .run_commands(f"python /opt/check_native_dependencies.py --checkout {UPSTREAM}")
     .add_local_file(str(GODOT), "/usr/local/bin/godot", copy=True)
     .add_local_dir(
         str(ROOT / "godot"),
@@ -93,6 +98,7 @@ image = (
     retries=0,
     volumes={"/model-cache": cache},
     include_source=False,
+    serialized=True,
 )
 def prepare_checkpoint():
     """Convert cached release with NVIDIA's converter before GPU allocation."""

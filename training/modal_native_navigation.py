@@ -28,6 +28,7 @@ for relative in (
     retries=0,
     volumes={"/model-cache": cache},
     include_source=False,
+    serialized=True,
 )
 def verify_navigation(captured_payload: bytes):
     import json

@@ -348,6 +348,14 @@ def validate(
             ],
             "validation-videos.log",
         )
+        status_path = run_dir / "run_status.json"
+        status = json.loads(status_path.read_text())
+        status.update(
+            optimizer_updates_verified=True,
+            checkpoint_reload_verified=True,
+            verification_report="validation.json",
+        )
+        write_json(status_path, status)
         report["state"] = "completed"
     except BaseException as error:
         # Each child has been reaped by launch() before reaching this handler.

@@ -11,9 +11,11 @@ runtime_image = (
     .add_local_dir(
         str(ROOT / "training"),
         REMOTE + "/training",
-        ignore=["alpamayo", "__pycache__", "results"],
+        ignore=["alpamayo", "__pycache__", "results", "*.md"],
     )
-    .add_local_dir(str(ROOT / "tools"), REMOTE + "/tools", ignore=["__pycache__"])
+    .add_local_dir(
+        str(ROOT / "tools"), REMOTE + "/tools", ignore=["__pycache__", "*.md"]
+    )
 )
 
 
@@ -27,7 +29,8 @@ runtime_image = (
     volumes={"/model-cache": cache, "/runs": runs},
     include_source=False,
 )
-def validate_gpu():
+def validate_gpu(source_revision: str):
+    import json
     import os
     import subprocess
     import uuid
@@ -37,6 +40,18 @@ def validate_gpu():
     os.environ["WANDB_MODE"] = "offline"
     destination = Path("/runs") / ("native-validation-" + uuid.uuid4().hex)
     destination.mkdir()
+    (destination / "source_identity.json").write_text(
+        json.dumps(
+            {
+                "repository": "skeptrunedev/thunderhill-rl",
+                "commit": source_revision,
+                "clean_worktree_at_launch": True,
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    print(f"Validation artifacts: {destination}", flush=True)
     try:
         with (destination / "gpu-topology.txt").open("w") as log:
             subprocess.run(
@@ -92,4 +107,14 @@ def validate_gpu():
 
 @app.local_entrypoint()
 def main():
-    print(validate_gpu.remote())
+    import subprocess
+
+    dirty = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=all"], cwd=ROOT, text=True
+    ).strip()
+    if dirty:
+        raise RuntimeError("Commit validation sources before GPU launch: " + dirty)
+    revision = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    print(validate_gpu.remote(revision))

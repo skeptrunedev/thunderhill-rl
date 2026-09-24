@@ -55,7 +55,7 @@ def main():
             check=True,
         )
         subprocess.run(
-            ["uv", "sync", "--frozen", "--all-packages", "--check", "--project", str(checkout)],
+            [sys.executable, str(Path(__file__).with_name("check_native_dependencies.py")), "--checkout", str(checkout)],
             check=True,
         )
     print(f"NVIDIA source: {checkout} at {ALPAGYM_REVISION}")
