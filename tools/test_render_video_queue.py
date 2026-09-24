@@ -2,12 +2,13 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "training"))
 from video_jobs import enqueue_video
-from render_video_queue import process_queue, recover_interrupted
+from render_video_queue import process_queue, process_queues, recover_interrupted
 
 
 class VideoQueueRenderTests(unittest.TestCase):
@@ -122,6 +123,50 @@ class VideoQueueRenderTests(unittest.TestCase):
             report = self.run_queue()
         self.assertFalse(report["complete"])
         self.assertEqual(report["unqueued_episodes"], ["interrupted"])
+
+
+class ParallelQueueTests(unittest.TestCase):
+    def test_two_workers_overlap_distinct_queues_with_bounded_concurrency(self):
+        barrier = threading.Barrier(2, timeout=5)
+        lock = threading.Lock()
+        active = maximum = 0
+        seen = []
+        def process(directory, **kwargs):
+            nonlocal active, maximum
+            with lock:
+                active += 1
+                maximum = max(active, maximum)
+                seen.append(directory)
+            barrier.wait()
+            with lock:
+                active -= 1
+            return {"failures": []}
+        queues = [Path(str(i)) for i in range(6)]
+        with patch("render_video_queue.process_queue", side_effect=process):
+            reports = list(process_queues(queues, workers=2))
+        self.assertEqual(maximum, 2)
+        self.assertCountEqual(seen, queues)
+        self.assertCountEqual([q for q, _ in reports], queues)
+
+    def test_serial_default_and_failure_do_not_start_more_queues(self):
+        with patch("render_video_queue.process_queue", side_effect=ValueError("bad recording")) as process:
+            with self.assertRaisesRegex(ValueError, "bad recording"):
+                list(process_queues([Path("a"), Path("b")]))
+        self.assertEqual(process.call_count, 1)
+
+    def test_watch_skips_active_locks_but_other_failures_propagate(self):
+        with patch("render_video_queue.process_queue", side_effect=BlockingIOError):
+            self.assertEqual(list(process_queues([Path("a")], watch=True)), [(Path("a"), None)])
+            with self.assertRaises(BlockingIOError):
+                list(process_queues([Path("a")]))
+        with patch("render_video_queue.process_queue", side_effect=PermissionError):
+            with self.assertRaises(PermissionError):
+                list(process_queues([Path("a")], watch=True))
+
+    def test_worker_bounds_checked_before_start(self):
+        for workers in (0, 3, True, 1.5):
+            with self.assertRaises(ValueError):
+                list(process_queues([], workers=workers))
 
 
 class InterruptedRecoveryTests(unittest.TestCase):

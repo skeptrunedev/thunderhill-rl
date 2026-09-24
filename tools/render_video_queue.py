@@ -5,6 +5,7 @@ An experiment has complete video coverage only when every job is in index.json.
 """
 
 import argparse
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 import fcntl
 import hashlib
 import json
@@ -263,12 +264,50 @@ def process_queue(directory, *, godot, ffmpeg, fps=30, retry_failed=False, wait_
         return report
 
 
+def process_queues(directories, *, workers=1, watch=False, **kwargs):
+    """Bound independent queues, retaining exclusive locks and safe completion.
+
+    Only one queue per worker is submitted. On an error, currently running
+    recordings finish before propagation, and no more queues are submitted.
+    """
+    if type(workers) is not int or not 1 <= workers <= 2:
+        raise ValueError("Video workers must be 1 or 2")
+
+    def process(directory):
+        try:
+            return process_queue(directory, **kwargs)
+        except BlockingIOError:
+            if not watch:
+                raise
+            return None
+
+    remaining = iter(directories)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        pending = {}
+
+        def submit_next():
+            directory = next(remaining, None)
+            if directory is not None:
+                pending[pool.submit(process, directory)] = directory
+
+        for _ in range(workers):
+            submit_next()
+        while pending:
+            completed, _ = wait(pending, return_when=FIRST_COMPLETED)
+            results = [(pending.pop(future), future.result()) for future in completed]
+            for directory, report in results:
+                yield directory, report
+                submit_next()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
     parser.add_argument("--godot", required=True)
     parser.add_argument("--ffmpeg", required=True)
     parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--workers", type=int, choices=(1, 2), default=2,
+                        help="Independent video queues to render concurrently (default: 2)")
     parser.add_argument("--watch", action="store_true")
     parser.add_argument("--retry-failed", action="store_true")
     parser.add_argument("--recover-interrupted", action="store_true",
@@ -296,31 +335,19 @@ def main():
         )
         if not queues and not args.watch:
             parser.error("No video queues found")
-        for directory in queues:
-            stamp = directory.stat().st_mtime_ns
-            if args.watch and scanned.get(directory) == stamp:
+        stamps = {directory: directory.stat().st_mtime_ns for directory in queues}
+        pending = [directory for directory in queues
+                   if not args.watch or scanned.get(directory) != stamps[directory]]
+        for directory, report in process_queues(
+                pending, workers=args.workers, watch=args.watch,
+                godot=args.godot, ffmpeg=args.ffmpeg, fps=args.fps,
+                retry_failed=args.retry_failed, wait_for_lock=args.wait_for_lock):
+            if report is None:
                 continue
-            try:
-                report = process_queue(
-                    directory,
-                    godot=args.godot,
-                    ffmpeg=args.ffmpeg,
-                    fps=args.fps,
-                    retry_failed=args.retry_failed,
-                    wait_for_lock=args.wait_for_lock,
-                )
-                failures += len(report["failures"])
-                if report["failures"]:
-                    print(
-                        json.dumps(
-                            {"queue": str(directory), "failures": report["failures"]}
-                        ),
-                        flush=True,
-                    )
-                scanned[directory] = stamp
-            except BlockingIOError:
-                if not args.watch:
-                    raise
+            failures += len(report["failures"])
+            if report["failures"]:
+                print(json.dumps({"queue": str(directory), "failures": report["failures"]}), flush=True)
+            scanned[directory] = stamps[directory]
         if not args.watch:
             print(json.dumps({"queues": len(queues), "failures": failures}))
             raise SystemExit(1 if failures else 0)
