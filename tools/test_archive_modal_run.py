@@ -18,6 +18,7 @@ class ArchiveTests(unittest.TestCase):
         self.calls = []
         self.pending = False
         self.wrong_identity = False
+        self.training_started = True
 
     def execute(self, command, **kwargs):
         self.calls.append(command)
@@ -41,6 +42,8 @@ class ArchiveTests(unittest.TestCase):
             self.assertTrue(destination.is_dir())
             self.assertFalse(self.out.exists())
             (destination / "trial").mkdir()
+            if self.training_started:
+                (destination / 'trial/experiment').mkdir()
             (destination / "trial/status.json").write_text(json.dumps(self.status))
             (destination / "trial/launch.json").write_text(json.dumps({"run_id": "wrong" if self.wrong_identity else "trial"}))
         else:
@@ -63,6 +66,17 @@ class ArchiveTests(unittest.TestCase):
         delays = []
         self.run_archive(watch=True, sleep=delays.append)
         self.assertEqual(delays, [30])
+
+    def test_failed_preflight_archives_without_requesting_nonexistent_videos(self):
+        self.training_started = False
+        self.assertEqual(self.run_archive(), self.out)
+        self.assertTrue(all(command[0] == 'modal' for command in self.calls))
+
+    def test_success_cannot_skip_renderer_even_without_experiment(self):
+        self.training_started = False
+        self.status['ok'] = True
+        self.run_archive()
+        self.assertTrue(any(command[0] != 'modal' for command in self.calls))
 
     def test_wrong_identity_never_published(self):
         self.wrong_identity = True

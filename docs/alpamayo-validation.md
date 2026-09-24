@@ -59,3 +59,9 @@ rendered gameplay, reward audit and recording tests on the RTX 2080 Ti. Root
 viewport presentation is disabled while camera viewports remain active, so Xvfb
 does not need a Vulkan presentation surface. Renderer validation and training
 share the original 25 minute child execution budget.
+
+Cloud hardware capture succeeded, but an exact pixel equality assertion rejected
+stationary images with only 0.346% of pixels changed, at most 3 levels out of 255
+per channel. Pose and simulator state were identical. Camera QA therefore checks
+bounded pixel stability separately from exact state and calibration invariance.
+The underlying cause of this small hardware raster variation is unconfirmed.

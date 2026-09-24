@@ -26,6 +26,32 @@ from check_agent import Client
 ROOT = Path(__file__).resolve().parents[1]
 
 
+# This tests observation stability, not GPU bit identity. On the RTX PRO 6000
+# archived preflight, 0.346% of pixels varied by at most 3 byte levels while
+# pose and ticks were identical (mean channel difference 0.001623).
+# Godot 4.7 mobile/tonemap dither is spatial, not temporal; background shader
+# specialization is a possible cause, not established by this measurement.
+# https://docs.godotengine.org/en/4.5/tutorials/performance/pipeline_compilations.html
+IDLE_IMAGE_LIMITS = dict(max_channel_change=3, mean_channel_change=0.005,
+                         changed_pixel_fraction=0.005)
+
+
+def validate_idle_capture(first_image, repeated_image, first_camera, repeated_camera):
+    if first_camera != repeated_camera:
+        raise AssertionError("Idle capture changed camera calibration or pose")
+    if first_image.size != repeated_image.size or first_image.mode != repeated_image.mode:
+        raise AssertionError("Idle capture changed image dimensions or format")
+    difference = ImageChops.difference(first_image, repeated_image)
+    pixels = list(difference.getdata())
+    channels = len(difference.getbands())
+    stats = dict(max_channel_change=max(high for low, high in difference.getextrema()),
+                 mean_channel_change=sum(sum(pixel) for pixel in pixels) / (len(pixels) * channels),
+                 changed_pixel_fraction=sum(any(pixel) for pixel in pixels) / len(pixels))
+    if any(stats[key] > limit for key, limit in IDLE_IMAGE_LIMITS.items()):
+        raise AssertionError(f"Idle camera image is unstable: {stats}; limits={IDLE_IMAGE_LIMITS}")
+    return stats
+
+
 @contextmanager
 def game(args, output: Path, headless: bool = False):
     with socket.socket() as reservation:
@@ -135,8 +161,11 @@ def main() -> None:
             assert repeat_info["mtime_ns"] == first_info["mtime_ns"], "Identical artifact was overwritten"
         idle_difference = ImageChops.difference(Image.open(output / "tick0.png"), Image.open(output / "tick0_repeat.png"))
         idle_max_channel_change = max(high for low, high in idle_difference.getextrema())
+        idle_stability = None
         if args.offscreen:
-            assert idle_max_channel_change == 0, "Offscreen startup did not stabilize camera pixels"
+            idle_stability = validate_idle_capture(
+                Image.open(output / "tick0.png"), Image.open(output / "tick0_repeat.png"),
+                first["camera"], repeated["camera"])
         advance = {"op": "advance", "episode_id": episode, "expected_tick": 0,
                    "action_id": "camera-first", "controls": {"throttle": 0.8}}
         advanced = client.request(advance)
@@ -177,6 +206,7 @@ def main() -> None:
     assert all("base64" not in row["image"] for row in observations)
     summary = {"ok": True, "renderer": first["camera"]["renderer"], "camera_observations_recorded": len(observations), "dimensions": [640, 360],
                "idle_rerender_max_channel_change": idle_max_channel_change,
+               "idle_image_stability": idle_stability, "idle_image_limits": IDLE_IMAGE_LIMITS,
                "checks": ["real_png", "sha256", "immutable_artifact", "deterministic_idle_pose",
                           "no_privileged_telemetry", "frozen_tick", "changed_pixels_after_advance",
                           "queued_advance_serialization", "queued_reset_serialization", "headless_rejection"],

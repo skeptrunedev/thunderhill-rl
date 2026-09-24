@@ -93,6 +93,10 @@ def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
             os.close(directory)
         print(json.dumps({"archive": str(output), "run_id": run_id,
                           "training_ok": status["ok"]}), flush=True)
+        if not status['ok'] and not (output / run_id / 'experiment').exists():
+            print(json.dumps({'run_id': run_id, 'video_status': 'no_training_attempt_started'}),
+                  flush=True)
+            return output
         execute([sys.executable, str(REPO / "tools/render_video_queue.py"), str(output),
                  "--godot", godot, "--ffmpeg", ffmpeg, "--wait-for-lock"], check=True)
         return output
