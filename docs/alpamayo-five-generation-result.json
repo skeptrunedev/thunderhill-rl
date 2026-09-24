@@ -1,0 +1,585 @@
+{
+  "run_id": "alpamayo-training-20260924T153854Z",
+  "wandb": "https://wandb.ai/skeptrune-org/thunderhill-rl/runs/ozwfci1u",
+  "model": "nvidia/Alpamayo-1.5-10B",
+  "revision": "7aba8293c09993f2e125c6819df05d7fa3e873ea",
+  "complete": true,
+  "generations_requested": 5,
+  "training_rollouts": 40,
+  "evaluation_attempts": 24,
+  "supervised_training_performed": false,
+  "reward_version": "audited-legal-progress-v2",
+  "generations": [
+    {
+      "generation": 1,
+      "update": {
+        "optimizer_updates": 1,
+        "optimizer_steps": 1,
+        "parameter_delta_l1": 10.82185054756701,
+        "loss": -0.047463850747590186,
+        "gradient_norm": 0.00012939245789311826,
+        "rewards": [
+          0.006788847967982292,
+          0.0003474915283732116,
+          0.007403448224067688,
+          0.005109105724841356,
+          0.3413487672805786,
+          0.40461745858192444,
+          0.3143136203289032,
+          0.19558767974376678
+        ],
+        "advantages": [
+          0.6784567832946777,
+          -1.6502890586853027,
+          0.9006534218788147,
+          0.07117900252342224,
+          0.3612506091594696,
+          1.1959573030471802,
+          0.004574688617140055,
+          -1.5617820024490356
+        ],
+        "reward_groups": [
+          "standing",
+          "standing",
+          "standing",
+          "standing",
+          "moving",
+          "moving",
+          "moving",
+          "moving"
+        ],
+        "reward_group_statistics": {
+          "moving": {
+            "count": 4,
+            "mean": 0.31396687030792236,
+            "std": 0.07579751312732697
+          },
+          "standing": {
+            "count": 4,
+            "mean": 0.0049122232012450695,
+            "std": 0.0027660196647047997
+          }
+        },
+        "max_behavior_logprob_error": 0.0004081139340996742,
+        "max_decisions": 60,
+        "adapter_sha256_before": "8051b31e825f51890c710308ee63304c1381d6a96e90654cbe896e84e83be140",
+        "adapter_sha256_after": "96e4d5ccb740dd75407ada7fe9ca1ee78d93214b3b75645c40b4438c822b2f9e"
+      },
+      "previous_adapter_sha256": "8051b31e825f51890c710308ee63304c1381d6a96e90654cbe896e84e83be140",
+      "adapter_sha256": "96e4d5ccb740dd75407ada7fe9ca1ee78d93214b3b75645c40b4438c822b2f9e",
+      "reload_verified": true
+    },
+    {
+      "generation": 2,
+      "update": {
+        "optimizer_updates": 1,
+        "optimizer_steps": 1,
+        "parameter_delta_l1": 9.170463021797332,
+        "loss": -0.1466417321935296,
+        "gradient_norm": 0.0001748120557749644,
+        "rewards": [
+          0.001976397354155779,
+          0.04802795127034187,
+          0.0025130370631814003,
+          -0.00026612356305122375,
+          0.7595540881156921,
+          0.498790442943573,
+          0.510776162147522,
+          0.3434692621231079
+        ],
+        "advantages": [
+          -0.5484516620635986,
+          1.7297459840774536,
+          -0.5219038128852844,
+          -0.6593905091285706,
+          1.5529364347457886,
+          -0.19701069593429565,
+          -0.11657626181840897,
+          -1.2393486499786377
+        ],
+        "reward_groups": [
+          "standing",
+          "standing",
+          "standing",
+          "standing",
+          "moving",
+          "moving",
+          "moving",
+          "moving"
+        ],
+        "reward_group_statistics": {
+          "moving": {
+            "count": 4,
+            "mean": 0.5281474590301514,
+            "std": 0.14901229739189148
+          },
+          "standing": {
+            "count": 4,
+            "mean": 0.013062815181910992,
+            "std": 0.020214028656482697
+          }
+        },
+        "max_behavior_logprob_error": 0.00036743003875017166,
+        "max_decisions": 60,
+        "adapter_sha256_before": "96e4d5ccb740dd75407ada7fe9ca1ee78d93214b3b75645c40b4438c822b2f9e",
+        "adapter_sha256_after": "140fc3e7ca00961eadb8da20f4916b7d26a5138d359d4b4c1ebc7ddec2cc904a"
+      },
+      "previous_adapter_sha256": "96e4d5ccb740dd75407ada7fe9ca1ee78d93214b3b75645c40b4438c822b2f9e",
+      "adapter_sha256": "140fc3e7ca00961eadb8da20f4916b7d26a5138d359d4b4c1ebc7ddec2cc904a",
+      "reload_verified": true
+    },
+    {
+      "generation": 3,
+      "update": {
+        "optimizer_updates": 1,
+        "optimizer_steps": 1,
+        "parameter_delta_l1": 6.549827101443952,
+        "loss": -0.05277836020104587,
+        "gradient_norm": 0.0001850726257544011,
+        "rewards": [
+          -0.0013603211846202612,
+          -0.001292157219722867,
+          -0.00113767443690449,
+          0.004033454228192568,
+          0.31699949502944946,
+          0.3037281334400177,
+          0.43410781025886536,
+          0.4770244061946869
+        ],
+        "advantages": [
+          -0.6192315816879272,
+          -0.5895307064056396,
+          -0.5222184062004089,
+          1.7309807538986206,
+          -0.8876104950904846,
+          -1.066185712814331,
+          0.6881618499755859,
+          1.2656339406967163
+        ],
+        "reward_groups": [
+          "standing",
+          "standing",
+          "standing",
+          "standing",
+          "moving",
+          "moving",
+          "moving",
+          "moving"
+        ],
+        "reward_group_statistics": {
+          "moving": {
+            "count": 4,
+            "mean": 0.38296496868133545,
+            "std": 0.0743180438876152
+          },
+          "standing": {
+            "count": 4,
+            "mean": 6.0825375840067863e-05,
+            "std": 0.002295016311109066
+          }
+        },
+        "max_behavior_logprob_error": 0.0003024376928806305,
+        "max_decisions": 60,
+        "adapter_sha256_before": "140fc3e7ca00961eadb8da20f4916b7d26a5138d359d4b4c1ebc7ddec2cc904a",
+        "adapter_sha256_after": "02c0ebe9155b709ff62766c46b6bf9008f23ecd5b10986cabb7b5365ec2cdc76"
+      },
+      "previous_adapter_sha256": "140fc3e7ca00961eadb8da20f4916b7d26a5138d359d4b4c1ebc7ddec2cc904a",
+      "adapter_sha256": "02c0ebe9155b709ff62766c46b6bf9008f23ecd5b10986cabb7b5365ec2cdc76",
+      "reload_verified": true,
+      "adapter_path": "generation-003/adapter"
+    },
+    {
+      "generation": 4,
+      "update": {
+        "optimizer_updates": 1,
+        "optimizer_steps": 1,
+        "parameter_delta_l1": 5.614058158462285,
+        "loss": -0.10133198955008993,
+        "gradient_norm": 0.0001568674633745104,
+        "rewards": [
+          0.005736954044550657,
+          -0.0013027359964326024,
+          0.001944582792930305,
+          0.025169990956783295,
+          0.2987637519836426,
+          0.41156789660453796,
+          0.6077409982681274,
+          0.34560129046440125
+        ],
+        "advantages": [
+          -0.20907507836818695,
+          -0.8935667276382446,
+          -0.5778194665908813,
+          1.6804614067077637,
+          -0.9947269558906555,
+          -0.036939702928066254,
+          1.6287091970443726,
+          -0.5970430374145508
+        ],
+        "reward_groups": [
+          "standing",
+          "standing",
+          "standing",
+          "standing",
+          "moving",
+          "moving",
+          "moving",
+          "moving"
+        ],
+        "reward_group_statistics": {
+          "moving": {
+            "count": 4,
+            "mean": 0.4159184992313385,
+            "std": 0.11777578294277191
+          },
+          "standing": {
+            "count": 4,
+            "mean": 0.007887197658419609,
+            "std": 0.010284552350640297
+          }
+        },
+        "max_behavior_logprob_error": 0.00042314454913139343,
+        "max_decisions": 60,
+        "adapter_sha256_before": "02c0ebe9155b709ff62766c46b6bf9008f23ecd5b10986cabb7b5365ec2cdc76",
+        "adapter_sha256_after": "6b5595bbb1d198aadcac1f1adcbb4c3781d74b9b46fc9a9ba220560f62d471c3"
+      },
+      "previous_adapter_sha256": "02c0ebe9155b709ff62766c46b6bf9008f23ecd5b10986cabb7b5365ec2cdc76",
+      "adapter_sha256": "6b5595bbb1d198aadcac1f1adcbb4c3781d74b9b46fc9a9ba220560f62d471c3",
+      "reload_verified": true,
+      "adapter_path": "generation-004/adapter"
+    },
+    {
+      "generation": 5,
+      "update": {
+        "optimizer_updates": 1,
+        "optimizer_steps": 1,
+        "parameter_delta_l1": 4.89289955359709,
+        "loss": -0.03262814972549677,
+        "gradient_norm": 0.00015675790200475603,
+        "rewards": [
+          0.005795440170913935,
+          0.0023437817580997944,
+          -0.001202498679049313,
+          0.006559871602803469,
+          0.40296781063079834,
+          0.559870719909668,
+          0.34643617272377014,
+          0.5036572813987732
+        ],
+        "advantages": [
+          0.7853760123252869,
+          -0.3342123031616211,
+          -1.4844924211502075,
+          1.033328890800476,
+          -0.6024390459060669,
+          1.2780758142471313,
+          -1.2799828052520752,
+          0.6043457388877869
+        ],
+        "reward_groups": [
+          "standing",
+          "standing",
+          "standing",
+          "standing",
+          "moving",
+          "moving",
+          "moving",
+          "moving"
+        ],
+        "reward_group_statistics": {
+          "moving": {
+            "count": 4,
+            "mean": 0.453233003616333,
+            "std": 0.08343614637851715
+          },
+          "standing": {
+            "count": 4,
+            "mean": 0.00337414862588048,
+            "std": 0.0030829710885882378
+          }
+        },
+        "max_behavior_logprob_error": 0.0003307349979877472,
+        "max_decisions": 60,
+        "adapter_sha256_before": "6b5595bbb1d198aadcac1f1adcbb4c3781d74b9b46fc9a9ba220560f62d471c3",
+        "adapter_sha256_after": "10f81b4d3de96567766a8baad2b1444ebf6311035812a4ce62d1e8246d3ee70c"
+      },
+      "previous_adapter_sha256": "6b5595bbb1d198aadcac1f1adcbb4c3781d74b9b46fc9a9ba220560f62d471c3",
+      "adapter_sha256": "10f81b4d3de96567766a8baad2b1444ebf6311035812a4ce62d1e8246d3ee70c",
+      "reload_verified": true,
+      "adapter_path": "generation-005/adapter"
+    }
+  ],
+  "evaluations": [
+    {
+      "generation": 0,
+      "scenarios": {
+        "standing": {
+          "mean_reward": 0.0034094627181854276,
+          "mean_progress_m": 0.34094627181854276,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": -0.13963416915531096,
+              "reward": -0.0013963416915531096,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 0.8215267127923965,
+              "reward": 0.008215267127923965,
+              "stop_reason": "stalled",
+              "success": false
+            }
+          ]
+        },
+        "moving": {
+          "mean_reward": 0.552673248784644,
+          "mean_progress_m": 55.26732487846439,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": 48.166112117765145,
+              "reward": 0.4816611211776515,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 62.36853763916365,
+              "reward": 0.6236853763916365,
+              "stop_reason": "episode_tick_limit",
+              "success": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "generation": 1,
+      "scenarios": {
+        "standing": {
+          "mean_reward": 0.0033948349499821045,
+          "mean_progress_m": 0.33948349499821046,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": -0.13920542130746746,
+              "reward": -0.0013920542130746746,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 0.8181724113038884,
+              "reward": 0.008181724113038883,
+              "stop_reason": "stalled",
+              "success": false
+            }
+          ]
+        },
+        "moving": {
+          "mean_reward": 0.36279831136741697,
+          "mean_progress_m": 36.27983113674169,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": 36.43718342190564,
+              "reward": 0.3643718342190564,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 36.12247885157775,
+              "reward": 0.36122478851577755,
+              "stop_reason": "stalled",
+              "success": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "generation": 2,
+      "scenarios": {
+        "standing": {
+          "mean_reward": 0.0034618823705549894,
+          "mean_progress_m": 0.3461882370554989,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": -0.13919269882014593,
+              "reward": -0.0013919269882014592,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 0.8315691729311437,
+              "reward": 0.008315691729311438,
+              "stop_reason": "stalled",
+              "success": false
+            }
+          ]
+        },
+        "moving": {
+          "mean_reward": 0.4293588360200669,
+          "mean_progress_m": 42.93588360200669,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": 55.13540472859145,
+              "reward": 0.5513540472859145,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 30.736362475421927,
+              "reward": 0.3073636247542193,
+              "stop_reason": "stalled",
+              "success": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "generation": 3,
+      "scenarios": {
+        "standing": {
+          "mean_reward": 0.0033080782138288343,
+          "mean_progress_m": 0.33080782138288345,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": -0.1395724650876851,
+              "reward": -0.0013957246508768508,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 0.801188107853452,
+              "reward": 0.00801188107853452,
+              "stop_reason": "stalled",
+              "success": false
+            }
+          ]
+        },
+        "moving": {
+          "mean_reward": 0.5716495638467178,
+          "mean_progress_m": 57.16495638467179,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": 46.58869777716406,
+              "reward": 0.46588697777164056,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 67.74121499217952,
+              "reward": 0.6774121499217952,
+              "stop_reason": "episode_tick_limit",
+              "success": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "generation": 4,
+      "scenarios": {
+        "standing": {
+          "mean_reward": 0.0034843362950295552,
+          "mean_progress_m": 0.34843362950295553,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": -0.13926998793444667,
+              "reward": -0.0013926998793444667,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 0.8361372469403577,
+              "reward": 0.008361372469403577,
+              "stop_reason": "stalled",
+              "success": false
+            }
+          ]
+        },
+        "moving": {
+          "mean_reward": 0.40487610646051475,
+          "mean_progress_m": 40.48761064605147,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": 35.92828214379364,
+              "reward": 0.3592828214379364,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 45.046939148309306,
+              "reward": 0.45046939148309306,
+              "stop_reason": "episode_tick_limit",
+              "success": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "generation": 5,
+      "scenarios": {
+        "standing": {
+          "mean_reward": 0.0034882359080069415,
+          "mean_progress_m": 0.34882359080069414,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": -0.13948945085314363,
+              "reward": -0.0013948945085314362,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 0.837136632454532,
+              "reward": 0.00837136632454532,
+              "stop_reason": "stalled",
+              "success": false
+            }
+          ]
+        },
+        "moving": {
+          "mean_reward": 0.5009868936470474,
+          "mean_progress_m": 50.09868936470474,
+          "attempts": [
+            {
+              "seed": 1073,
+              "progress_m": 49.23586348027713,
+              "reward": 0.4923586348027713,
+              "stop_reason": "stalled",
+              "success": false
+            },
+            {
+              "seed": 2073,
+              "progress_m": 50.961515249132354,
+              "reward": 0.5096151524913235,
+              "stop_reason": "episode_tick_limit",
+              "success": false
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "conclusion": "Five real updates completed; no consistent heldout driving improvement. Standing launches remain stalled, no laps completed."
+}

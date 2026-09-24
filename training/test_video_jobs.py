@@ -122,6 +122,13 @@ class VideoJobTests(unittest.TestCase):
             self.enqueue()
         self.assertFalse((self.out / "video_jobs").exists())
 
+    def test_partial_episode_requires_interruption_provenance(self):
+        with self.assertRaisesRegex(ValueError, "interruption provenance"):
+            enqueue_video(self.out, self.source, metadata=self.metadata, full_episode=False)
+        path = enqueue_video(self.out, self.source, full_episode=False,
+                             metadata={"stop_reason": "interrupted", "recovery": {"original": "episode.jsonl"}})
+        self.assertFalse(json.loads(path.read_text())["full_episode"])
+
 
 if __name__ == "__main__":
     unittest.main()
