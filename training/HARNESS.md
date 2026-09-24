@@ -1,56 +1,44 @@
-# Camera and trajectory racing harness
+# NVIDIA simulator boundary
 
-Alpamayo receives four camera frames and sixteen measured ego poses. The policy
-predicts future positions in metres in its current ego frame, with X forward,
-Y left and Z up, at 0.1 second intervals. At a stationary reset, missing history
-is padded with the stationary initial observation. Image hashes and simulator
-observation identity bind camera inputs to the recorded physics state.
+`alpagym_bridge.py` implements AlpaSim's `RuntimeService`. NVIDIA requests a
+simulation with a session UUID and an `EgodriverService` address. The bridge creates
+an isolated Godot process, then calls the unchanged NVIDIA driver:
 
-`DrivingEpisode` executes each sampled plan through `TrajectoryTracker`. The
-controller uses only the predicted trajectory, current speed and current lean.
-It does not read the centerline, choose an optimal racing line or supply training
-labels. Motion between replans is approximated from speed and lean; banking and
-slip can make that estimate inaccurate. Godot steer and lean are positive right,
-so the conversion reverses the model's leftward turn sign.
+1. `start_session` with actual camera calibration and a reproducible episode seed.
+2. `submit_image_observation` and `submit_egomotion_observation` with recorded
+   measurements at 10 Hz. A measured stationary warmup supplies initial history.
+3. `submit_route` with track geometry. This is navigation input, not a
+   demonstration of controls or an optimal racing line.
+4. `drive` every 0.2 simulated seconds. NVIDIA assembles observation buffers,
+   constructs model inputs and samples its native trajectory distribution.
+5. Execute the returned trajectory with the fixed motorcycle controller.
+6. `close_session`, return actual progress and failure metrics, flush recordings
+   and queue the attempt for video rendering.
 
-The model action is the sampled trajectory. The resulting steering, throttle
-and brake commands are deterministic controller outputs, not native language
-tool calls. Their likelihood must not be substituted for the trajectory's
-sampling probability during RL.
+Rig axes are X forward, Y left and Z up. Sensor poses preserve measured pitch and
+roll. Driver responses are timestamped world poses; the bridge converts future
+poses into the current rig frame before execution. The controller uses trajectory,
+speed and lean, without reading route geometry.
 
-## Simulator execution
+The policy action is a trajectory. `control_bike` records are controller outputs,
+not language tool tokens. NVIDIA records native action replay and performs its own
+GRPO update. No local likelihood or advantage implementation is substituted.
 
-`ThunderhillEnv` retains the audited control transport:
+Simulation pauses during inference. Each control advances twelve physics ticks,
+or 0.1 seconds. Stale receipts cannot advance simulation. Driving failure is valid
+RL experience; protocol or renderer failure is an infrastructure error.
+No prerecorded driving or teacher controls are used.
 
-| Operation | Purpose |
-| --- | --- |
-| `observe()` | Return current state and sequencing receipt without advancing time |
-| `control_bike(...)` | Apply bounded controls using the latest receipt and return the resulting state |
+## Recording identity
 
-Each control advances at most twelve physics ticks, or 0.1 simulated seconds.
-Stale receipts and malformed controls execute no physics. The trainer owns reset,
-episode duration, policy identity and reward collection. The policy cannot change
-its rewards or silently reset an unsuccessful attempt. Assistance and automatic
-shifting remain fixed by the environment.
+NVIDIA discards the `current_weight_version` supplied by Cosmos. A small subclass
+in `alpagym_worker.py` publishes that value and batch identity while delegating the
+entire rollout to NVIDIA. The simulator snapshots the identity when it starts.
+Missing or inactive identity fails rather than guessing a generation. Prefetch
+is disabled so episodes cannot start outside this versioned call. Training,
+sampling, inference batching and NCCL transport are unchanged.
 
-Road telemetry remains available to the shared lifecycle and diagnostic records.
-The Alpamayo policy input and trajectory controller do not use that privileged
-track geometry. Reward audits independently inspect the recorded simulator
-transitions and confirm that submitted controls actually executed.
-
-## Learning and recording
-
-The trainer groups gameplay attempts by generation and updates the policy from
-those attempts' simulator rewards. Stalls, crashes and track limit failures are
-valid outcomes when the recording audit passes. Infrastructure failures are
-reported separately and must not be presented as successful training.
-
-Each attempt retains camera observation identities, model trajectory decisions,
-executed controls, reward components, generation and rollout identity, plus an
-immutable simulator recording and queued video job. Evaluation uses identified
-checkpoints separately from training collection. W&B tracking provides reward
-and driving outcome graphs; a higher reward in one generation alone is not proof
-of a lasting improvement.
-
-No supervised imitation or scripted driving demonstrations are part of this
-training workflow.
+Simulator recordings are immutable. Camera receipts and hashes bind images to
+ticks; trajectory logs bind predictions to controls. Video work items are consumed
+by `tools/render_video_queue.py`. Historic runs retain their original provenance
+and are not relabeled as runs from the replacement stack.

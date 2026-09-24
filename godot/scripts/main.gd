@@ -1206,9 +1206,9 @@ func _validate_policy_display(value: Variant) -> String:
 			return "policy_display " + key + " must be an integer"
 		if number < (0 if key == "generation" else 1):
 			return "Invalid policy_display " + key
-	if value.has("rollout_number") != value.has("rollout_count"):
-		return "Rollout number and count must be supplied together"
-	if value.has("rollout_number") and value.rollout_number > value.rollout_count:
+	if value.has("rollout_count") and not value.has("rollout_number"):
+		return "Rollout count requires a rollout number"
+	if value.has("rollout_count") and value.rollout_number > value.rollout_count:
 		return "Rollout number exceeds count"
 	if value.has("evaluation"):
 		if not value.evaluation is bool or not value.evaluation:

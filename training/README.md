@@ -1,54 +1,95 @@
-# Alpamayo gameplay reinforcement learning
+# NVIDIA AlpaGym with the Thunderhill simulator
 
-The active training pipeline uses NVIDIA Alpamayo 1.5 to sample future driving
-trajectories from simulator camera frames and measured motion history. A fixed
-motorcycle controller executes those trajectories. Actual Godot progress,
-completion, crashes, track limits and stalls determine episode rewards.
+Training delegates to the pinned NVIDIA AlpaGym and Cosmos RL implementation.
+The previous custom Alpamayo optimizer, prompt builder, episode collector, adapter
+loader and Modal launcher have been removed. Historical recordings and result
+reports remain intact. This migration does not establish improved driving.
 
-There is no supervised imitation, demonstration dataset, scripted teacher or
-language tool formatting migration in this pipeline. The sampled action is a
-trajectory. Serialized `control_bike` messages are controller outputs used to
-execute and audit the action, not sampled model tokens.
+NVIDIA owns model loading, observation preprocessing, diffusion sampling, replay
+packing, GRPO optimization, checkpoints, weight synchronization and W&B logging.
+Our code supplies Godot through NVIDIA's AlpaSim gRPC protocol.
+There is no supervised imitation, ground truth trajectory reward or teacher.
 
-## Environment and entry points
+## Components
 
-The isolated environment is defined in [alpamayo/pyproject.toml](alpamayo/pyproject.toml).
-The previous Gemma and Qwen launchers, training environments and imitation code
-have been removed. Historical result reports remain in [results](results).
+* `nvidia_alpagym.py` prepares NVIDIA configuration and launches its worker stack.
+* `alpagym_bridge.py` supplies measured images, full poses and route geometry,
+  executes returned trajectories, reports metrics and records attempts.
+* `alpagym_worker.py` delegates to NVIDIA's worker and rollout backend. Its sole
+  rollout override preserves Cosmos's actual weight version for videos.
+* `driving_trajectory.py` converts trajectories into motorcycle controls. It has
+  no optimizer, learned policy, racing line or demonstration labels.
 
-* [modal_alpamayo_rl.py](modal_alpamayo_rl.py) provisions the bounded cloud validation.
-* [train_alpamayo_rl.py](train_alpamayo_rl.py) collects game episodes, performs one
-  generation of policy updates and evaluates the resulting checkpoint.
-* [alpamayo_policy.py](alpamayo_policy.py) loads the driving policy and implements
-  likelihood evaluation and RL updates using the upstream action distribution.
-* [driving_episode.py](driving_episode.py) captures images and motion history and
-  maintains the existing audited episode and video lifecycle.
-* [driving_trajectory.py](driving_trajectory.py) converts predicted trajectories
-  to motorcycle controls without reading track geometry.
+The pinned source is [NVlabs/alpagym at 972d160](https://github.com/NVlabs/alpagym/tree/972d160eed0e23d388497851504a3a233fec5879).
+Its own `uv.lock` and dependency revisions are authoritative. We no longer maintain
+a different slim training environment. The former local environment may remain on
+developer machines only as an ignored testing artifact.
 
-Inspect each entry point's arguments before launching paid compute. A successful
-build or local unit test does not establish that a cloud generation completed.
-Completion requires audited gameplay, a verified optimizer update, saved model
-state and its evaluation and recordings.
+## Install and prepare
 
-## Local verification
-
-The generic unit tests require no model weights or paid compute:
+Use a Linux CUDA host matching NVIDIA's [onboarding prerequisites](https://github.com/NVlabs/alpagym/blob/972d160eed0e23d388497851504a3a233fec5879/docs/ONBOARDING.md).
+Our simulator replaces AlpaSim Wizard and scene downloads, so it does not require
+NuRec datasets or AlpaSim Docker services. Cosmos still requires Redis and its
+CUDA dependencies. Godot requires a working renderer and display or Xvfb.
 
 ```sh
-PYTHONPATH=training:tools uv run --project training/alpamayo python -m unittest \
-  test_agent_harness test_driving_trajectory test_lap_audit test_lap_episode \
-  test_lap_policy test_lap_rollout test_video_jobs test_experiment_tracking
+python3 tools/setup_alpagym.py --checkout /path/to/alpagym
 ```
 
-Set `THUNDERHILL_GODOT` to a Godot executable to include actual simulator
-lifecycle tests. The policy distribution tests in `test_alpamayo_policy.py` also
-require the pinned NVIDIA source checkout via `ALPAMAYO_SOURCE_ROOT`. Small
-random test heads validate arithmetic, not driving competence.
+This installs the actual upstream workspace. For source inspection alone, add
+`--source-only`. Download the authorized Alpamayo checkpoint and convert it using
+NVIDIA's checkpoint conversion command from their onboarding guide. The model
+argument below must point to that converted checkpoint, not an old LoRA adapter.
 
-Every actual rollout keeps its model identity, generation, rollout number,
-trajectory decisions, executed controls and authoritative simulator recording.
-Each trajectory also retains its tokenized inputs, diffusion samples, timesteps
-and behavior density in a hashed replay artifact for reproducing the RL update.
-Video jobs are queued from those recordings. W&B metrics distinguish collection,
-optimizer updates and evaluation. See [HARNESS.md](HARNESS.md) for the interface.
+From this repository, using the upstream environment:
+
+```sh
+/path/to/alpagym/.venv/bin/python -m training.nvidia_alpagym prepare \
+  --source /path/to/alpagym \
+  --model /path/to/converted/checkpoint \
+  --godot /path/to/godot \
+  --max-steps 1 --rollouts 2 --episode-seconds 30
+
+/path/to/alpagym/.venv/bin/python -m training.nvidia_alpagym run /path/to/prepared/run
+```
+
+Preparation does not allocate compute or run training. `run` explicitly starts
+the prepared experiment, bounded by `--max-wall-seconds` (default 3600).
+The topology uses one training GPU and one rollout GPU, with NVIDIA's NCCL
+transport. NVIDIA recommends at least 40 GB per GPU for this setup. Our local
+11 GB GPU cannot validate full model optimization.
+
+`--rollouts` is the number of sibling attempts per scene. `--max-steps` bounds
+NVIDIA training steps. A step can contain several optimizer minibatches; it is
+not the old one update per generation loop. Video generations identify the actual
+Cosmos policy weight version, not an invented batch counter.
+
+## Deliberate simulator differences
+
+The official training and model code remains unchanged. The environment is our
+Godot motorcycle game, not NVIDIA's car simulator. The adapter exposes one real
+forward camera, measured stationary warmup and track centerline route geometry.
+It does not fabricate additional camera views or recorded expert motion.
+The control period is 0.2 seconds, sensor cadence 0.1 seconds. Rewards use actual
+progress, collision and offroad metrics, excluding warmup progress.
+
+Every attempt has session identity, policy version, sampled trajectories, executed
+controls, observation receipts, simulator recordings and an immutable video job,
+including failed attempts. Render them using `tools/render_video_queue.py`.
+Rendering is playback of recorded states, not a second gameplay rollout.
+
+## Verification
+
+With NVIDIA host/protocol packages and Torch installed:
+
+```sh
+PYTHONPATH=.:training:tools python -m unittest \
+  training.test_nvidia_alpagym training.test_alpagym_worker \
+  training.test_alpagym_bridge
+```
+
+Set `THUNDERHILL_GODOT` to an executable and provide a display to include real
+Godot protocol tests. Their synthetic driver is strictly a test fixture; no
+fixture actions enter training. CPU config and simulator checks do not verify a
+GPU update. A training validation requires real NVIDIA workers, nonzero optimizer
+steps, checkpoint output and evaluated gameplay recordings.

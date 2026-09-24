@@ -11,7 +11,7 @@ A new Godot motorcycle racing environment for training a language model on Thund
 5. Evaluation compares legal laps, completion rate, crashes, and lap times under identical conditions.
 6. Model checkpoints and state trajectories support recordings of training progress from consistent camera views.
 
-Current status: the Godot game supports human controls, agent stepping, camera observations, telemetry recording, and state replay. Previous language model experiments have concluded. The active work is a bounded Alpamayo gameplay RL validation; full model training remains unverified. See [training instructions](training/README.md) and [validation criteria](docs/alpamayo-validation.md).
+Current status: the Godot game supports human controls, agent stepping, camera observations, telemetry recording, and state replay. The custom Alpamayo training loop has been replaced by an adapter to NVIDIA AlpaGym and Cosmos RL. Full GPU training through the replacement stack remains unverified. See [training instructions](training/README.md).
 
 The motorcycle references the 2026 Ducati Streetfighter V4S. The [reference readiness report](docs/reference-readiness.md) records inspected footage, acquired terrain and materials, the M3 Pro Mac target, and remaining realism gaps.
 

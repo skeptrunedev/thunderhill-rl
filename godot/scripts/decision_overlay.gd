@@ -88,6 +88,8 @@ func _draw() -> void:
 		rollout_label = (
 			"Rollout %d of %d" % [int(identity.rollout_number), int(identity.rollout_count)]
 		)
+	elif identity.has("rollout_number"):
+		rollout_label = "Rollout %d" % int(identity.rollout_number)
 	_text(Vector2(18, 84), rollout_label, 17, MUTED)
 	if game.decision_feed.is_empty():
 		draw_line(Vector2(18, 104), Vector2(432, 104), Color("344147"))

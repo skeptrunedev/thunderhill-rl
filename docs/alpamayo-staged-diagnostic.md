@@ -1,5 +1,8 @@
 # Alpamayo staged driving diagnostic
 
+Historical experiment notes. The custom launcher below has been removed.
+Use the current [NVIDIA AlpaGym integration](../training/README.md) for new work.
+
 The authorized experiment is at most three generations with eight training
 rollouts per generation. Four fixed evaluation attempts run before training and
 after every generation, for at most 40 attempts. Each attempt allows 30 seconds
