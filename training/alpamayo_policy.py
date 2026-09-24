@@ -295,6 +295,14 @@ class AlpamayoPolicy:
             raise RuntimeError("Reloaded adapter hash does not match saved checkpoint")
         return digest
 
+    def restore_training(self, output: Path) -> str:
+        """Resume both policy weights and optimizer moments from our checkpoint."""
+        import torch
+        digest = self.reload(output)
+        state = torch.load(output / "optimizer.pt", map_location="cpu", weights_only=True)
+        self.optimizer.load_state_dict(state)
+        return digest
+
     def update(self, episodes: list[dict], *, learning_rate: float = 1e-5, max_decisions: int = 24) -> dict:
         """One grouped ownplay update, normalized by the fixed decision horizon."""
         import torch

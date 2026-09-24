@@ -119,18 +119,67 @@ def scenario_metrics(rows, prefix):
     return result
 
 
+def unused_attempt_path(path):
+    """Keep every interrupted recording in place; collect into a new attempt."""
+    candidate = path
+    attempt = 1
+    while candidate.exists():
+        attempt += 1
+        candidate = path.with_name(path.name + f'-attempt-{attempt:03d}')
+    return candidate
+
+
+def resume_checkpoint(policy, args, manifest):
+    """Restore the last committed policy and its Adam state, never partial updates."""
+    if (manifest['model'] != MODEL or manifest['revision'] != REVISION
+            or manifest['reward_version'] != REWARD_VERSION
+            or manifest['rollouts_per_generation'] != args.rollouts
+            or manifest['time_budget_seconds'] != args.seconds
+            or manifest.get('supervised_training_performed') is not False):
+        raise ValueError('Resume cannot change model, reward, or rollout contract')
+    digest = manifest['initial_adapter_sha256']
+    checkpoint = args.output / 'initial_adapter'
+    for index, generation in enumerate(manifest['generations'], 1):
+        if (generation['generation'] != index
+                or generation['previous_adapter_sha256'] != digest
+                or not generation['reload_verified']
+                or generation['update']['optimizer_steps'] != 1):
+            raise ValueError('Broken generation checkpoint lineage')
+        digest = generation['adapter_sha256']
+        checkpoint = args.output / generation.get('adapter_path', f'generation-{index:03d}/adapter')
+    if args.generations < len(manifest['generations']):
+        raise ValueError('Requested total cannot discard completed generations')
+    policy.restore_training(checkpoint)
+    if policy.fingerprint() != digest:
+        raise RuntimeError('Resume checkpoint fingerprint mismatch')
+    return digest, checkpoint
+
+
 def run_diagnostic(policy, args, tracker, manifest, initial):
     """Four fixed evaluations and at most three generations of eight ownplays."""
     manifest_path = args.output / 'campaign.json'
     current = initial
     previous_path = args.output / 'initial_adapter'
+    total = getattr(args, 'generations', 3)
+    completed = len(manifest['generations'])
+    if getattr(args, 'resume', False):
+        current, previous_path = resume_checkpoint(policy, args, manifest)
 
     def evaluate(generation):
         rows = []
         for scenario in SCENARIOS:
             for replicate, seed in enumerate(EVALUATION_SEEDS):
                 directory = args.output / f'evaluation-{generation:03d}' / f"{scenario['scenario_id']}-{replicate+1}"
+                existing = [row for row in manifest['evaluations']
+                    if row.get('generation') == generation and row['scenario_id'] == scenario['scenario_id']
+                    and row['sample_seed'] == seed]
+                if existing:
+                    if len(existing) != 1 or existing[0]['adapter_sha256'] != current:
+                        raise RuntimeError('Evaluation checkpoint identity mismatch')
+                    rows.append(existing[0])
+                    continue
                 directory.parent.mkdir(exist_ok=True)
+                directory = unused_attempt_path(directory)
                 episode, summary = collect(policy, args, directory, generation=generation,
                     rollout=replicate+1, evaluation=True, digest=current, seed=seed, **scenario)
                 del episode
@@ -140,29 +189,34 @@ def run_diagnostic(policy, args, tracker, manifest, initial):
         tracker.log({'generation': generation, **scenario_metrics(rows, 'eval')})
         return rows
 
-    baseline = evaluate(0)
-    gate = baseline_gate(baseline)
-    manifest['baseline_gate'] = gate
-    publish(manifest_path, manifest)
-    # Driving failures are valid ownplay. Only broken mechanics/provenance block RL.
-    readiness = all(row['training_eligible'] and row['recording_provenance_verified'] for row in baseline)
-    for row in baseline:
-        if row['scenario_id'] == 'moving':
-            metrics = row.get('setup_speed_metrics') or {}
-            readiness = readiness and (
-                metrics.get('max_m_s', float('inf')) - metrics.get('min_m_s', 0.) <= .15
-                and abs(metrics.get('final_m_s', 0.) - row['initial_speed_m_s']) <= .15)
-    manifest['training_readiness'] = dict(passed=bool(readiness),
-        criteria='valid_recordings_and_verified_steady_motion_history',
-        driving_success_required=False)
-    publish(manifest_path, manifest)
-    if not readiness:
-        raise RuntimeError('Baseline infrastructure or moving history verification failed')
-    tracker.log({'generation': 0, 'eval/baseline_gate_passed': int(gate['passed']),
-                 'eval/training_readiness_passed': 1})
-    for generation in range(1, 4):
+    if not completed:
+        baseline = evaluate(0)
+        gate = baseline_gate(baseline)
+        manifest['baseline_gate'] = gate
+        publish(manifest_path, manifest)
+        # Driving failures are valid ownplay. Only broken mechanics/provenance block RL.
+        readiness = all(row['training_eligible'] and row['recording_provenance_verified'] for row in baseline)
+        for row in baseline:
+            if row['scenario_id'] == 'moving':
+                metrics = row.get('setup_speed_metrics') or {}
+                readiness = readiness and (
+                    metrics.get('max_m_s', float('inf')) - metrics.get('min_m_s', 0.) <= .15
+                    and abs(metrics.get('final_m_s', 0.) - row['initial_speed_m_s']) <= .15)
+        manifest['training_readiness'] = dict(passed=bool(readiness),
+            criteria='valid_recordings_and_verified_steady_motion_history',
+            driving_success_required=False)
+        publish(manifest_path, manifest)
+        if not readiness:
+            raise RuntimeError('Baseline infrastructure or moving history verification failed')
+        tracker.log({'generation': 0, 'eval/baseline_gate_passed': int(gate['passed']),
+                     'eval/training_readiness_passed': 1})
+    else:
+        if not manifest.get('training_readiness', {}).get('passed'):
+            raise RuntimeError('Missing verified baseline infrastructure')
+        evaluate(completed)
+    for generation in range(completed + 1, total + 1):
         episodes, summaries = [], []
-        generation_path = args.output / f'generation-{generation:03d}'
+        generation_path = unused_attempt_path(args.output / f'generation-{generation:03d}')
         generation_path.mkdir()
         for index in range(8):
             scenario = SCENARIOS[index // 4]
@@ -187,7 +241,8 @@ def run_diagnostic(policy, args, tracker, manifest, initial):
         if policy.fingerprint() != updated:
             raise RuntimeError('Updated adapter reload failed')
         manifest['generations'].append(dict(generation=generation, update=update,
-            previous_adapter_sha256=current, adapter_sha256=updated, reload_verified=True))
+            previous_adapter_sha256=current, adapter_sha256=updated, reload_verified=True,
+            adapter_path=str(adapter_path.relative_to(args.output))))
         current, previous_path = updated, adapter_path
         del episodes
         publish(manifest_path, manifest)
@@ -196,7 +251,7 @@ def run_diagnostic(policy, args, tracker, manifest, initial):
         evaluate(generation)
     manifest.update(complete=True, diagnostic_complete=True, stop_reason='generations_completed')
     publish(manifest_path, manifest)
-    print(json.dumps(dict(event='diagnostic_complete', generations=3)), flush=True)
+    print(json.dumps(dict(event='diagnostic_complete', generations=total)), flush=True)
 
 
 def main():
@@ -208,6 +263,8 @@ def main():
     parser.add_argument('--seconds', type=float, default=12)
     parser.add_argument('--rollouts', type=int, default=2)
     parser.add_argument('--diagnostic', action='store_true')
+    parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--generations', type=int, default=3)
     parser.add_argument('--wandb-mode', choices=['online', 'offline', 'disabled'], default='online')
     args = parser.parse_args()
     if args.diagnostic:
@@ -215,10 +272,14 @@ def main():
             parser.error('Diagnostic requires eight rollouts and 30 seconds')
     elif not 2 <= args.rollouts <= 4 or not 0 < args.seconds <= 12:
         parser.error('Validation budget requires 2 to 4 rollouts and at most 12 simulated seconds')
+    if args.resume and not args.diagnostic:
+        parser.error('Resume is supported for diagnostic campaigns only')
+    if not 1 <= args.generations <= 5:
+        parser.error('Generation budget must be between one and five')
     from alpamayo_policy import AlpamayoPolicy
-    args.output.mkdir(parents=True, exist_ok=False)
+    args.output.mkdir(parents=True, exist_ok=args.resume)
     policy = AlpamayoPolicy(checkpoint=args.checkpoint, processor_path=args.processor_path)
-    initial = policy.save(args.output / 'initial_adapter')
+    initial = None if args.resume else policy.save(args.output / 'initial_adapter')
     manifest = dict(model=MODEL, revision=REVISION, generations_requested=1,
                     rollouts_per_generation=args.rollouts, time_budget_seconds=args.seconds,
                     reward_version=REWARD_VERSION, supervised_training_performed=False,
@@ -231,15 +292,24 @@ def main():
                     complete=False, generations=[], evaluations=[])
     manifest_path = args.output / 'campaign.json'
     if args.diagnostic:
-        manifest.update(generations_requested=3, evaluation_rollouts=4,
-            maximum_attempts=40, baseline_criteria=BASELINE_CRITERIA,
+        manifest.update(generations_requested=args.generations, evaluation_rollouts=4,
+            maximum_attempts=4 + 12 * args.generations, baseline_criteria=BASELINE_CRITERIA,
             scenarios=list(SCENARIOS), evaluation_seeds=list(EVALUATION_SEEDS),
             prehistory='stationary_padding_or_recorded_steady_speed_setup_excluded_from_reward',
             training_on_valid_failures=True,
             diagnostic_complete=False, reward_grouping='within_matching_start_condition')
+    if args.resume:
+        manifest = json.loads(manifest_path.read_text())
+        # Validate and restore before changing the authoritative manifest.
+        resume_checkpoint(policy, args, manifest)
+        initial = manifest['initial_adapter_sha256']
+        manifest.update(generations_requested=args.generations,
+                        maximum_attempts=4 + 12 * args.generations,
+                        complete=False, diagnostic_complete=False)
+        manifest.pop('stop_reason', None)
     publish(manifest_path, manifest)
     with ExperimentTracker(args.output, manifest, mode=args.wandb_mode,
-                           entity='skeptrune-org', name=args.output.parent.name) as tracker:
+                           entity='skeptrune-org', name=args.output.parent.name, resume=args.resume) as tracker:
         if args.diagnostic:
             run_diagnostic(policy, args, tracker, manifest, initial)
             return

@@ -107,3 +107,24 @@ stalls are retained as RL experience. Poor driving is no longer a prerequisite
 for stopping the campaign. Nonfinite outputs, invalid recordings, bad setup
 history, inconsistent behavior probabilities and zero optimizer updates remain
 fatal. The earlier failed run and its evidence are preserved unchanged.
+
+## Recovery and five generation continuation
+
+The September 24 campaign completed two optimizer updates before Modal preempted
+its GPU during the final generation 2 evaluation. Automatic restart failed because
+the launcher required a new directory. Both adapter checkpoints and Adam optimizer
+states survived in the Modal volume.
+
+Diagnostic campaigns now accept `--generations 5 --resume`. Recovery verifies the
+committed checkpoint lineage, restores weights and optimizer moments, preserves
+completed evaluations, and finishes the missing evaluation before new gameplay.
+Interrupted attempts remain in place; replacement attempts use distinct directory
+names. An uncommitted generation is recollected from the last committed policy,
+not represented as a completed update. Every explicit launch retains source
+provenance, separate invocation logs, and a 5400 second deadline shared across
+Modal preemption restarts. Tracking resumes the same W&B run.
+
+The five generation target is 40 training rollouts and 24 fixed evaluations,
+excluding additional interrupted attempts. This changes the experiment duration,
+not the reward, starting conditions, or training method. Completion still requires
+five actual updates, checkpoint reload verification, and all fixed evaluations.

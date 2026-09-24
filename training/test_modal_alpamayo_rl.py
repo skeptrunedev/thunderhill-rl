@@ -92,6 +92,63 @@ class DiagnosticCompletionTests(unittest.TestCase):
                 launcher.validate_diagnostic_result({**value, **changed})
 
 
+class ResumeInvocationTests(unittest.TestCase):
+    def prepare(self, root, **changes):
+        args = dict(run_id='test', launch_id='first', source={'git_commit': 'new'},
+                    diagnostic=True, generations=5, resume=False, now=100)
+        args.update(changes)
+        return launcher.prepare_invocation(root, **args)
+
+    def test_preemption_keeps_deadline_and_logs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'test'
+            launch, first = self.prepare(root)
+            (first / 'run.log').write_text('original logs')
+            again, second = self.prepare(root, now=200)
+            self.assertEqual(launch, again)
+            self.assertEqual(again['deadline_at'], 5500)
+            self.assertNotEqual(first, second)
+            self.assertEqual((first / 'run.log').read_text(), 'original logs')
+
+    def test_changed_source_requires_explicit_resume_and_retains_lineage(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'test'
+            original, _ = self.prepare(root)
+            with self.assertRaises(FileExistsError):
+                self.prepare(root, launch_id='second')
+            with self.assertRaisesRegex(ValueError, 'source mismatch'):
+                self.prepare(root, source={'git_commit': 'other'})
+            resumed, invocation = self.prepare(root, launch_id='second', resume=True,
+                source={'git_commit': 'other'}, now=300)
+            self.assertEqual(resumed['resumed_from_source'], original['source'])
+            self.assertEqual(json.loads((root / 'launch.json').read_text()), original)
+            self.assertEqual(resumed['source']['git_commit'], 'other')
+            self.assertEqual(resumed['deadline_at'], 5700)
+
+    def test_resume_cannot_create_missing_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(FileNotFoundError):
+                self.prepare(Path(directory) / 'test', resume=True)
+
+    def test_previous_terminal_status_is_preserved_outside_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'test'
+            self.prepare(root)
+            (root / 'status.json').write_text('{"ok": false}')
+            _, invocation = self.prepare(root, launch_id='second', resume=True)
+            self.assertFalse((root / 'status.json').exists())
+            self.assertEqual((invocation / 'previous-status.json').read_text(), '{"ok": false}')
+
+    def test_five_generation_completion_cannot_accept_three(self):
+        value = dict(diagnostic_complete=True, complete=True, generations=[{}] * 5,
+                     evaluations=[{}] * 24, training_readiness={'passed': True},
+                     stop_reason='generations_completed')
+        launcher.validate_diagnostic_result(value, 5)
+        with self.assertRaises(RuntimeError):
+            launcher.validate_diagnostic_result({**value, 'generations': [{}] * 3}, 5)
+
+
 @unittest.skipUnless(sys.platform == 'linux', 'Process group tests require Linux')
 class ProcessCleanupTests(unittest.TestCase):
     def run_child(self, code, root, **kwargs):

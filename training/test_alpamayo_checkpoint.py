@@ -40,6 +40,25 @@ class CheckpointTests(unittest.TestCase):
             self.assertEqual(fresh.reload(initial), initial_hash)
             self.assertEqual(fresh.reload(updated), updated_hash)
 
+    def test_training_resume_restores_adam_moments_and_next_step(self):
+        policy = self.make_policy()
+        def step(p):
+            p.optimizer.zero_grad()
+            for parameter in p.trainable:
+                parameter.grad = torch.full_like(parameter, .25)
+            p.optimizer.step()
+        step(policy)
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'checkpoint'
+            digest = policy.save(path)
+            fresh = self.make_policy()
+            self.assertEqual(fresh.restore_training(path), digest)
+            for parameter in fresh.trainable:
+                self.assertEqual(fresh.optimizer.state[parameter]['step'].item(), 1)
+            step(policy)
+            step(fresh)
+            self.assertEqual(policy.fingerprint(), fresh.fingerprint())
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,6 @@
 """Staged experiment must gate spending and compare identical evaluation seeds."""
 import copy
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -7,7 +8,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from train_alpamayo_rl import baseline_gate, run_diagnostic, collect, SCENARIOS
+from train_alpamayo_rl import baseline_gate, run_diagnostic, collect, SCENARIOS, MODEL, REVISION, REWARD_VERSION
 
 
 def summary(scenario, seed, *, progress=50., speed=4.):
@@ -107,6 +108,66 @@ class CampaignTests(unittest.TestCase):
         training_seeds = [c['seed'] for c in calls if not c['evaluation']]
         self.assertEqual(len(set(training_seeds)), 24)
         self.assertTrue(all(g['reload_verified'] for g in manifest['generations']))
+
+
+class RecoveryTests(unittest.TestCase):
+    def test_resume_two_updates_to_five_preserves_interrupted_recordings(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            args = SimpleNamespace(output=root, seconds=30, rollouts=8, generations=5, resume=False)
+            manifest = dict(model=MODEL, revision=REVISION, reward_version=REWARD_VERSION,
+                rollouts_per_generation=8, time_budget_seconds=30,
+                supervised_training_performed=False, initial_adapter_sha256='initial',
+                complete=False, generations=[], evaluations=[])
+            calls = []
+            class Policy:
+                current = 'initial'
+                steps = 0
+                saved = {root / 'initial_adapter': ('initial', 0)}
+                def update(self, episodes, max_decisions):
+                    self.steps += 1
+                    self.current = f'updated{self.steps}'
+                    return dict(optimizer_steps=1, parameter_delta_l1=1.)
+                def save(self, path):
+                    self.saved[path] = (self.current, self.steps)
+                    return self.current
+                def reload(self, path):
+                    self.current = self.saved[path][0]
+                def restore_training(self, path):
+                    self.current, self.steps = self.saved[path]
+                def fingerprint(self):
+                    return self.current
+            interrupted = False
+            def fake_collect(policy, args, directory, **kw):
+                nonlocal interrupted
+                directory.mkdir()
+                (directory / 'recording').write_text('preserved')
+                calls.append(kw)
+                if kw['evaluation'] and kw['generation'] == 2 and kw['rollout'] == 2 and kw['scenario_id'] == 'moving' and not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt('preempted')
+                row = summary(kw['scenario_id'], kw['seed'])
+                row.update(generation=kw['generation'], adapter_sha256=kw['digest'])
+                return dict(reward=.5, reward_group=kw['scenario_id'], replays=['fixture']), row
+            policy = Policy()
+            tracker = SimpleNamespace(log=lambda _: None)
+            with patch('train_alpamayo_rl.collect', fake_collect):
+                with self.assertRaises(KeyboardInterrupt):
+                    run_diagnostic(policy, args, tracker, manifest, 'initial')
+                self.assertEqual(len(manifest['generations']), 2)
+                self.assertEqual(len(manifest['evaluations']), 11)
+                args.resume = True
+                # An unrelated fresh process must restore optimizer step count too.
+                policy.steps = 0
+                policy.current = 'wrong'
+                run_diagnostic(policy, args, tracker, manifest, 'initial')
+            self.assertEqual(policy.steps, 5)
+            self.assertEqual(len(manifest['generations']), 5)
+            self.assertEqual(len(manifest['evaluations']), 24)
+            self.assertEqual(len([c for c in calls if not c['evaluation']]), 40)
+            self.assertTrue(manifest['complete'])
+            self.assertEqual((root / 'evaluation-002/moving-2/recording').read_text(), 'preserved')
+            self.assertTrue((root / 'evaluation-002/moving-2-attempt-002/recording').exists())
 
 
 @unittest.skipUnless(os.environ.get('THUNDERHILL_GODOT'), 'Native Godot required')

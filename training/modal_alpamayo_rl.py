@@ -9,6 +9,7 @@ import codecs
 import selectors
 import signal
 import time
+import uuid
 
 import modal
 
@@ -69,8 +70,8 @@ def download_model_files(cache_dir):
     return dict(checkpoint=checkpoint, processor_path=processor)
 
 
-def validate_diagnostic_result(campaign):
-    """A deliberate baseline stop is terminal, but never a completed training run."""
+def validate_diagnostic_result(campaign, generations=3):
+    """Validate the requested generation count, preserving historical stop evidence."""
     if campaign.get('diagnostic_complete') is not True:
         raise RuntimeError('Missing terminal diagnostic evidence')
     if campaign.get('stop_reason') == 'baseline_gate_failed':
@@ -79,10 +80,10 @@ def validate_diagnostic_result(campaign):
                 or campaign.get('baseline_gate', {}).get('passed') is not False):
             raise RuntimeError('Invalid baseline stop evidence')
     elif campaign.get('stop_reason') == 'generations_completed':
-        if (campaign.get('complete') is not True or len(campaign.get('generations', [])) != 3
-                or len(campaign.get('evaluations', [])) != 16
+        if (campaign.get('complete') is not True or len(campaign.get('generations', [])) != generations
+                or len(campaign.get('evaluations', [])) != 4 * (generations + 1)
                 or campaign.get('training_readiness', {}).get('passed') is not True):
-            raise RuntimeError('Missing three completed generations and fixed evaluations')
+            raise RuntimeError('Missing requested completed generations and fixed evaluations')
     else:
         raise RuntimeError('Unknown diagnostic completion reason')
 
@@ -163,61 +164,135 @@ def prepare_weights():
     return paths
 
 
+def write_json(path, value):
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_text(json.dumps(value, indent=2))
+    temporary.replace(path)
+
+
+def prepare_invocation(root, *, run_id, launch_id, source, diagnostic,
+                       generations, resume, now=None):
+    """Retain immutable launch provenance and one deadline across preemptions."""
+    now = time.time() if now is None else now
+    if not 1 <= generations <= 5 or (not diagnostic and (resume or generations != 1)):
+        raise ValueError('Resume and multiple generations require diagnostic mode')
+    manifest = root / 'launches' / launch_id / 'launch.json'
+    root_existed = root.exists()
+    previous = None
+    if root_existed:
+        previous = json.loads((root / 'launch.json').read_text())
+        if previous['run_id'] != run_id:
+            raise ValueError('Existing run identity mismatch')
+        if not resume and not manifest.exists():
+            raise FileExistsError('Existing run requires explicit --resume')
+    elif resume:
+        raise FileNotFoundError('Cannot resume a missing run')
+    else:
+        root.mkdir(parents=True)
+    launch_root = manifest.parent
+    launch_root.mkdir(parents=True, exist_ok=True)
+    if manifest.exists():
+        launch = json.loads(manifest.read_text())
+        expected = dict(source=source, diagnostic=diagnostic, generations=generations,
+                        resume=resume, run_id=run_id, launch_id=launch_id)
+        if any(launch.get(key) != value for key, value in expected.items()):
+            raise ValueError('Automatic restart launch identity or source mismatch')
+    else:
+        child_timeout = 5400 if diagnostic else 1500
+        launch = dict(run_id=run_id, launch_id=launch_id, source=source,
+            diagnostic=diagnostic, generations=generations, resume=resume,
+            started_at=now, deadline_at=now + child_timeout,
+            child_timeout_seconds=child_timeout, gpu='RTX-PRO-6000',
+            supervised_training_performed=False,
+            resumed_from_source=previous.get('source') if previous else None)
+        write_json(manifest, launch)
+        if not root_existed:
+            write_json(root / 'launch.json', launch)
+    invocation = launch_root / ('invocation-' + uuid.uuid4().hex)
+    invocation.mkdir()
+    # A completed earlier invocation is retained, never mistaken for this launch.
+    if (root / 'status.json').exists():
+        (root / 'status.json').replace(invocation / 'previous-status.json')
+    write_json(invocation / 'start.json', dict(started_at=now, launch_id=launch_id))
+    return launch, invocation
+
+
 @app.function(image=image, gpu='RTX-PRO-6000', cpu=8, memory=65536,
               timeout=5700, retries=0, max_containers=1, include_source=False,
               volumes={'/model-cache': cache, '/runs': runs})
-def run_generation(run_id: str, paths: dict, source: dict, diagnostic: bool = False):
+def run_generation(run_id: str, paths: dict, source: dict, diagnostic: bool = False,
+                   resume: bool = False, generations: int = 1, launch_id: str = ''):
     import re
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}', run_id):
-        raise ValueError('Invalid run ID')
+    for identifier in (run_id, launch_id):
+        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}', identifier):
+            raise ValueError('Invalid run or launch ID')
     cache.reload()
     runs.reload()
     root = Path('/runs') / run_id
-    root.mkdir(exist_ok=False)
-    child_timeout = 5400 if diagnostic else 1500
+    launch, invocation = prepare_invocation(root, run_id=run_id, launch_id=launch_id,
+        source=source, diagnostic=diagnostic, generations=generations, resume=resume)
     command = ['xvfb-run', '-a', '-s', '-screen 0 800x600x24', PYTHON,
         '-u', REMOTE + '/training/train_alpamayo_rl.py', '--checkpoint', paths['checkpoint'],
         '--processor-path', paths['processor_path'], '--godot', '/usr/local/bin/godot',
         '--output', str(root / 'experiment'), '--seconds', '30' if diagnostic else '12',
-        '--rollouts', '8' if diagnostic else '2', *(['--diagnostic'] if diagnostic else [])]
-    (root / 'launch.json').write_text(json.dumps(dict(run_id=run_id, command=command, source=source,
-        gpu='RTX-PRO-6000', diagnostic=diagnostic, child_timeout_seconds=child_timeout,
-        supervised_training_performed=False), indent=2))
+        '--rollouts', '8' if diagnostic else '2']
+    if diagnostic:
+        command += ['--diagnostic', '--generations', str(generations)]
+        if (root / 'experiment/campaign.json').exists():
+            command += ['--resume']
+    write_json(invocation / 'command.json', command)
     runs.commit()
     started = time.monotonic()
-    status = dict(run_id=run_id, ok=False)
+    status = dict(run_id=run_id, launch_id=launch_id, ok=False)
+    terminal = False
+    def remaining():
+        seconds = launch['deadline_at'] - time.time()
+        if seconds <= 0:
+            raise TimeoutError('Launch runtime budget exhausted across preemptions')
+        return seconds
     try:
-        # Prove actual GPU pixels before allocating the model or collecting data.
         renderer_command = ['xvfb-run', '-a', '-s', '-screen 0 800x600x24', PYTHON,
             '-u', REMOTE + '/tools/check_camera.py',
             '--godot', '/usr/local/bin/godot', '--rendering-method', 'mobile',
-            '--offscreen', '--require-hardware', '--output', str(root / 'renderer-check')]
-        run_logged_process(renderer_command, cwd=REMOTE, log_path=root / 'renderer.log',
-            timeout_seconds=120, heartbeat=runs.commit)
-        run_logged_process(command, cwd=REMOTE, log_path=root / 'run.log',
-            timeout_seconds=max(1, child_timeout - (time.monotonic() - started)), heartbeat=runs.commit)
+            '--offscreen', '--require-hardware', '--output', str(invocation / 'renderer-check')]
+        run_logged_process(renderer_command, cwd=REMOTE, log_path=invocation / 'renderer.log',
+            timeout_seconds=min(120, remaining()), heartbeat=runs.commit)
+        run_logged_process(command, cwd=REMOTE, log_path=invocation / 'run.log',
+            timeout_seconds=remaining(), heartbeat=runs.commit)
         campaign = json.loads((root / 'experiment/campaign.json').read_text())
         if diagnostic:
-            validate_diagnostic_result(campaign)
+            validate_diagnostic_result(campaign, generations)
             status['outcome'] = campaign['stop_reason']
         elif not campaign['complete'] or len(campaign['generations']) != 1:
             raise RuntimeError('Missing completed generation evidence')
         status['ok'] = True
+        terminal = True
         return dict(status)
-    except BaseException as error:
+    except Exception as error:
+        terminal = True
         status['error'] = repr(error)
+        raise
+    except BaseException as error:
+        # Modal may restart this same input after its interruption signal.
+        status['interrupted'] = repr(error)
         raise
     finally:
         status['elapsed_seconds'] = time.monotonic() - started
-        (root / 'status.json').write_text(json.dumps(status, indent=2))
+        write_json(invocation / 'status.json', status)
+        if terminal:
+            write_json(root / 'status.json', status)
         runs.commit()
 
 
 @app.local_entrypoint()
-def main(run_id: str, diagnostic: bool = False):
+def main(run_id: str, diagnostic: bool = False, resume: bool = False, generations: int = 0):
     import re
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}', run_id):
         raise ValueError('Invalid run ID')
+    generations = generations or (3 if diagnostic else 1)
+    if not 1 <= generations <= 5 or (not diagnostic and (resume or generations != 1)):
+        raise ValueError('Resume and multiple generations require diagnostic mode')
+    launch_id = uuid.uuid4().hex
     auth = netrc.netrc().authenticators('api.wandb.ai')
     if not auth or not auth[2]:
         raise RuntimeError('W&B authentication missing')
@@ -232,4 +307,5 @@ def main(run_id: str, diagnostic: bool = False):
         runtime_sha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files})
     paths = prepare_weights.with_options(secrets=[secret]).remote()
     print(json.dumps({'model_files_prepared': paths}), flush=True)
-    print(json.dumps(run_generation.with_options(secrets=[secret]).remote(run_id, paths, source, diagnostic)))
+    print(json.dumps(run_generation.with_options(secrets=[secret]).remote(
+        run_id, paths, source, diagnostic, resume, generations, launch_id)))
