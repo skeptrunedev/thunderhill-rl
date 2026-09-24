@@ -75,30 +75,19 @@ def download_volume_run(volume, run_id, stage, *, workers=4):
                               mtime=getattr(entry, 'mtime', None)))
     if not inventory:
         raise ValueError('Volume run inventory is empty')
-    # Modal's public FileEntry exposes no link target. Do not dereference links.
-    # W&B's three convenience aliases are redundant with concrete run logs;
-    # retain their listing metadata and make the omission explicit in the receipt.
+    # Modal exposes link metadata but no target. W&B diagnostic links may point
+    # outside the run (for example debug-core.log in a temporary directory).
+    # Preserve their metadata explicitly; download every concrete file. A link
+    # anywhere else could replace required training evidence and fails closed.
     wandb_root = PurePosixPath(run_id) / 'experiment' / 'wandb'
     for entry in inventory:
         if entry['type'] != 3:
             continue
         path = PurePosixPath(entry['path'])
-        if path.parent != wandb_root or path.name not in ('debug.log', 'debug-internal.log', 'latest-run'):
+        if not path.is_relative_to(wandb_root):
             raise ValueError(f"Unsupported volume symlink: {entry['path']}")
-        concrete = []
-        for candidate in inventory:
-            other = PurePosixPath(candidate['path'])
-            if candidate['type'] != 1 or not other.is_relative_to(wandb_root):
-                continue
-            components = other.relative_to(wandb_root).parts
-            if not components or not components[0].startswith(('run-', 'offline-run-')):
-                continue
-            if path.name == 'latest-run' or components[1:] == ('logs', path.name):
-                concrete.append(candidate['path'])
-        if not concrete:
-            raise ValueError(f"W&B alias has no concrete archived log files: {entry['path']}")
-        entry.update(archive_action='metadata_only_wandb_convenience_symlink',
-                     target_available=False, concrete_run_files=concrete)
+        entry.update(archive_action='metadata_only_wandb_diagnostic_symlink',
+                     target_available=False)
     with (stage / 'download-inventory.json').open('x') as receipt:
         json.dump(inventory, receipt, indent=2)
     for entry in inventory:

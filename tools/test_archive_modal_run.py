@@ -169,7 +169,7 @@ class VolumeDownloadTests(unittest.TestCase):
 
     def test_wandb_aliases_preserve_metadata_and_concrete_logs(self):
         entries = [SimpleNamespace(path='trial/experiment/wandb/' + name, type=3, size=12)
-                   for name in ('debug.log', 'debug-internal.log', 'latest-run')]
+                   for name in ('debug.log', 'debug-internal.log', 'latest-run', 'run-2026/logs/debug-core.log')]
         entries += [SimpleNamespace(path='trial/experiment/wandb/run-2026/logs/' + name, type=1, size=3)
                     for name in ('debug.log', 'debug-internal.log')]
         entries += [SimpleNamespace(path='trial/experiment/rollout/recording.jsonl', type=1, size=3)]
@@ -182,24 +182,13 @@ class VolumeDownloadTests(unittest.TestCase):
             download_volume_run(volume, 'trial', root)
             inventory = json.loads((Path(root) / 'download-inventory.json').read_text())
             aliases = [entry for entry in inventory if entry['type'] == 3]
-            self.assertEqual(len(aliases), 3)
-            self.assertTrue(all(entry['archive_action'] == 'metadata_only_wandb_convenience_symlink'
+            self.assertEqual(len(aliases), 4)
+            self.assertTrue(all(entry['archive_action'] == 'metadata_only_wandb_diagnostic_symlink'
                                 and entry['target_available'] is False for entry in aliases))
             self.assertEqual(len(read_paths), 3)
             self.assertEqual((Path(root) / 'trial/experiment/rollout/recording.jsonl').read_bytes(), b'abc')
             self.assertFalse((Path(root) / 'trial/experiment/wandb/debug.log').exists())
             self.assertEqual((Path(root) / 'trial/experiment/wandb/run-2026/logs/debug.log').read_bytes(), b'abc')
-
-    def test_wandb_alias_without_concrete_logs_is_rejected(self):
-        from unittest.mock import Mock
-        read = Mock()
-        volume = SimpleNamespace(iterdir=lambda *args, **kwargs: [
-            SimpleNamespace(path='trial/experiment/wandb/debug.log', type=3, size=12)],
-            read_file_into_fileobj=read)
-        with tempfile.TemporaryDirectory() as root:
-            with self.assertRaisesRegex(ValueError, 'no concrete archived log files'):
-                download_volume_run(volume, 'trial', root)
-        read.assert_not_called()
 
     def test_unsafe_inventory_is_rejected_before_any_reads(self):
         from unittest.mock import Mock
