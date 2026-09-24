@@ -16,9 +16,34 @@ except ModuleNotFoundError as error:
         raise
     raise unittest.SkipTest("Launcher tests require the separate Modal CLI environment") from error
 
+import modal_alpamayo_rl as launcher
+
 from modal_alpamayo_rl import (
     MODEL, PROCESSOR, download_model_files, run_logged_process,
 )
+
+
+class SourcePackagingTests(unittest.TestCase):
+    def test_both_remote_functions_have_uploadable_entrypoint_modules(self):
+        # Inspect actual SDK dependency mounts, not source text or mocked calls.
+        # include_source=False functions import their module by name remotely.
+        for image, function in ((launcher.download_image, launcher.prepare_weights),
+                                (launcher.image, launcher.run_generation)):
+            info = function._get_info()
+            with self.subTest(function=info.function_name):
+                self.assertFalse(info.is_serialized())
+                expected_remote = (Path(launcher.REMOTE) / 'training' /
+                                   (info.module_name.replace('.', '/') + '.py'))
+                uploads = []
+                for dependency in image.deps():
+                    for entry in getattr(dependency, 'entries', ()):
+                        uploads.extend(entry.get_files_to_upload())
+                matching = [(local, remote) for local, remote in uploads
+                            if str(remote) == str(expected_remote)]
+                self.assertEqual(len(matching), 1)
+                local, _ = matching[0]
+                self.assertEqual(local.resolve(), Path(launcher.__file__).resolve())
+                self.assertEqual(local.read_bytes(), Path(launcher.__file__).read_bytes())
 
 
 class DownloadOrderTests(unittest.TestCase):
