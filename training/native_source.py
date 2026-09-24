@@ -136,7 +136,7 @@ def record_navigation_checkpoint(checkpoint: Path, release_config: Path) -> dict
         converted_config_sha256=hashlib.sha256(
             (checkpoint / "config.json").read_bytes()
         ).hexdigest(),
-        source_config=str(release_config.resolve()),
+        source_config=str(release_config.absolute()),
         navigation_format="native_navigation_text_v1",
         comparison=comparison,
     )

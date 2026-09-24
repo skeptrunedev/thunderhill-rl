@@ -286,10 +286,12 @@ def validate(
             "convert-reload.log",
             module=False,
         )
-        source_release = json.loads((model / "navigation_provenance.json").read_text())[
-            "source_config"
-        ]
-        record_navigation_checkpoint(reloaded, Path(source_release))
+        # Use the stable mounted snapshot path, not Modal's internal volume path.
+        source_release = model.parent / (
+            "hub/models--nvidia--Alpamayo-1.5-10B/snapshots/"
+            "7aba8293c09993f2e125c6819df05d7fa3e873ea/config.json"
+        )
+        record_navigation_checkpoint(reloaded, source_release)
         comparison = compare_exports(model, reloaded)
         frozen_changes = [
             row
