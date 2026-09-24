@@ -27,7 +27,10 @@ SOURCES = ('train_alpamayo_rl.py', 'alpamayo_policy.py', 'driving_episode.py',
 app = modal.App('thunderhill-alpamayo-gameplay-rl')
 cache = modal.Volume.from_name('thunderhill-huggingface-v2', create_if_missing=True, version=2)
 runs = modal.Volume.from_name('thunderhill-runs-v2', create_if_missing=True, version=2)
-download_image = modal.Image.debian_slim(python_version='3.12').pip_install('huggingface-hub==0.36.0')
+download_image = (modal.Image.debian_slim(python_version='3.12')
+    .pip_install('huggingface-hub==0.36.0')
+    .env({'PYTHONPATH': REMOTE + '/training'})
+    .add_local_file(str(Path(__file__)), REMOTE + '/training/modal_alpamayo_rl.py'))
 image = (modal.Image.from_registry('nvidia/cuda:12.8.1-devel-ubuntu24.04', add_python='3.12')
     .apt_install('git', 'build-essential', 'xvfb', 'xauth', 'libgl1-mesa-dri', 'libglx-mesa0',
                  'libvulkan1', 'mesa-vulkan-drivers', 'libxcursor1', 'libxinerama1', 'libxi6', 'libxrandr2')
@@ -50,6 +53,7 @@ for name in SOURCES:
     image = image.add_local_file(str(ROOT / 'training' / name), REMOTE + '/training/' + name)
 for name in ('check_parallel.py', 'check_agent.py'):
     image = image.add_local_file(str(ROOT / 'tools' / name), REMOTE + '/tools/' + name)
+image = image.add_local_file(str(Path(__file__)), REMOTE + '/training/modal_alpamayo_rl.py')
 
 
 def download_model_files(cache_dir):
