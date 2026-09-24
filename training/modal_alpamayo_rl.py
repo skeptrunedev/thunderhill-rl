@@ -166,7 +166,7 @@ def run_generation(run_id: str, paths: dict, source: dict):
         if not campaign['complete'] or len(campaign['generations']) != 1:
             raise RuntimeError('Missing completed generation evidence')
         status['ok'] = True
-        return dict(run_id=run_id, **status)
+        return dict(status)
     except BaseException as error:
         status['error'] = repr(error)
         raise
