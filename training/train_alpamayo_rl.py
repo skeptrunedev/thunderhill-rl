@@ -96,11 +96,17 @@ def main():
         final = policy.save(args.output / 'adapter')
         if final == initial:
             raise RuntimeError('Saved adapter did not change')
+        # Replace the live updated weights first, so a no-op reload cannot pass.
+        policy.reload(args.output / 'initial_adapter')
+        if policy.fingerprint() != initial:
+            raise RuntimeError('Initial adapter reload did not restore original weights')
         policy.reload(args.output / 'adapter')
         if policy.fingerprint() != final:
             raise RuntimeError('Reloaded adapter does not match saved weights')
         del episodes
         manifest['generations'].append(dict(generation=1, update=update, adapter_sha256=final))
+        manifest['reload_verification'] = dict(initial_adapter_sha256=initial,
+            updated_adapter_sha256=final, restored_initial_then_updated=True)
         tracker.log({'generation': 1, **{'update/' + key: value for key, value in update.items()
                                       if isinstance(value, (float, int))},
                      'rollout/mean_reward': sum(x['reward_components']['total'] for x in summaries) / len(summaries)})

@@ -42,6 +42,7 @@ image = (modal.Image.from_registry('nvidia/cuda:12.8.1-devel-ubuntu24.04', add_p
     .add_local_file(str(ROOT / 'training/alpamayo/pyproject.toml'), REMOTE + '/training/alpamayo/pyproject.toml', copy=True)
     .add_local_file(str(ROOT / 'training/alpamayo/uv.lock'), REMOTE + '/training/alpamayo/uv.lock', copy=True)
     .run_commands('uv sync --frozen --project ' + REMOTE + '/training/alpamayo')
+    .apt_install('libfontconfig1')
     .add_local_file(str(GODOT_SOURCE), '/usr/local/bin/godot', copy=True)
     .add_local_dir(str(ROOT / 'godot'), REMOTE + '/godot', copy=True, ignore=['.godot', '**/.DS_Store'])
     .run_commands('chmod 755 /usr/local/bin/godot',

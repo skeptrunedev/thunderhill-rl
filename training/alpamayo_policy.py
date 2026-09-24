@@ -51,6 +51,85 @@ def configure_sources(source_root: Path) -> None:
         sys.path.insert(0, str(source_root / rel))
 
 
+CONFIG_DERIVED_BUFFERS = frozenset({
+    "action_in_proj.sinus.0.freqs", "action_in_proj.sinus.1.freqs",
+    "action_in_proj.timestep_fourier_encoder.freqs", "action_space.accel_mean",
+    "action_space.accel_std", "action_space.curvature_mean", "action_space.curvature_std",
+})
+
+
+def restore_release_buffers(model, load_info: dict, converted_config: dict) -> dict:
+    """Reconstruct the seven nonlearned release buffers, never missing weights.
+
+    Alpamayo 1.5 declares these persistent=False; the pinned AlpaGym-compatible
+    R1 classes declare them persistent=True. Release safetensors therefore omit
+    them. HF meta loading may leave missing buffers uninitialized, so accepting
+    the missing-key warning alone is insufficient. Recreate from the original
+    constructor inputs and copy real values before any inference.
+    """
+    import torch
+    from hydra.utils import instantiate
+
+    missing = set(load_info.get("missing_keys", ()))
+    problems = {key: load_info.get(key) for key in (
+        "unexpected_keys", "mismatched_keys", "error_msgs"
+    ) if load_info.get(key)}
+    unknown = missing - CONFIG_DERIVED_BUFFERS
+    if unknown:
+        problems["missing_keys"] = sorted(unknown)
+    if problems:
+        raise RuntimeError(f"Release checkpoint did not load exactly: {problems}")
+    if not missing:
+        return {"restored": {}, "reason": "no_missing_buffers"}
+    if converted_config["action_in_proj_cfg"]["_target_"] != (
+        "alpagym_alpamayo_r1.submodules.action_in_proj.PerWaypointActionInProjV2"
+    ) or converted_config["action_space_cfg"]["_target_"] != (
+        "alpamayo_r1.action_space.unicycle_accel_curvature.UnicycleAccelCurvatureActionSpace"
+    ):
+        raise ValueError("Buffer reconstruction requires the verified release module classes")
+    # The projection constructor initializes temporary learned layers too. Save
+    # CPU RNG so reconstructing constants does not alter subsequent LoRA seeds.
+    with torch.random.fork_rng(devices=[]), torch.device("cpu"):
+        projection = instantiate(
+            converted_config["action_in_proj_cfg"],
+            in_dims=model.action_in_proj.in_dims, out_dim=model.action_in_proj.out_dim,
+        )
+        action_space = instantiate(converted_config["action_space_cfg"])
+    reference = {"action_in_proj": projection, "action_space": action_space}
+    replacements = []
+    for name in sorted(missing):
+        root, relative = name.split(".", 1)
+        expected = reference[root].get_buffer(relative).detach()
+        module_name, buffer_name = name.rsplit(".", 1)
+        module = model.get_submodule(module_name)
+        if buffer_name not in module._buffers or buffer_name in module._parameters:
+            raise RuntimeError(f"Expected registered nonlearned buffer: {name}")
+        old = module._buffers[buffer_name]
+        if old is None or old.shape != expected.shape or old.requires_grad:
+            raise RuntimeError(f"Unexpected buffer contract for {name}")
+        # Use a loaded model parameter for device placement even when HF left
+        # the omitted buffer on meta; preserve the module's intended dtype.
+        target = expected.to(device=next(model.parameters()).device, dtype=old.dtype)
+        if target.is_meta or not torch.isfinite(target).all():
+            raise RuntimeError(f"Invalid reconstructed buffer: {name}")
+        replacements.append((name, module, buffer_name, target))
+    restored = {}
+    with torch.no_grad():
+        for name, module, buffer_name, target in replacements:
+            module.register_buffer(buffer_name, target, persistent=True)
+            restored[name] = {"shape": list(target.shape), "dtype": str(target.dtype),
+                              "values": target.float().cpu().tolist()}
+    return {
+        "restored": restored,
+        "reason": "release_nonpersistent_buffers_reconstructed_from_converted_config",
+        "release_source_revision": "36aeb4c5938cbc2eb2aed33b22434773da4ab639",
+        "recipe_source_revision": SOURCE_REVISIONS["alpamayo"],
+        "config_sha256": hashlib.sha256(json.dumps(
+            converted_config, sort_keys=True, separators=(",", ":")
+        ).encode()).hexdigest(),
+    }
+
+
 class AlpamayoPolicy:
     def __init__(
         self, source_root: Path | None = None, *, checkpoint: Path | None = None,
@@ -96,11 +175,7 @@ class AlpamayoPolicy:
             self.model_path, config=config, torch_dtype=torch.bfloat16,
             device_map=device, attn_implementation="sdpa", output_loading_info=True,
         )
-        problems = {key: load_info.get(key) for key in (
-            "missing_keys", "unexpected_keys", "mismatched_keys", "error_msgs"
-        ) if load_info.get(key)}
-        if problems:
-            raise RuntimeError(f"Release checkpoint did not load exactly: {problems}")
+        self.buffer_restoration = restore_release_buffers(self.model, load_info, converted)
         self.model.requires_grad_(False)
         if adapter:
             metadata = json.loads((adapter / "policy_manifest.json").read_text())
@@ -279,6 +354,7 @@ class AlpamayoPolicy:
                     "source_revisions": SOURCE_REVISIONS, "training": "ownplay_sde_policy_gradient",
                     "trainable_parameters": sum(p.numel() for p in self.trainable),
                     "adapter_sha256": self.adapter_hash(), "diffusion_steps": self.diffusion_steps,
-                    "noise_level": self.noise_level, "converted_config": self.converted_config}
+                    "noise_level": self.noise_level, "converted_config": self.converted_config,
+                    "buffer_restoration": self.buffer_restoration}
         (output / "policy_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         return manifest["adapter_sha256"]

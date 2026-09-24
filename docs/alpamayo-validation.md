@@ -37,3 +37,11 @@ environment contains incompatible Transformers configuration initialization.
 The full Alpamayo model has not completed a gameplay or optimizer validation.
 Neither local integration tests nor the CPU arithmetic tests establish that the
 complete model trains successfully on the planned GPU.
+
+The first GPU load exposed a serialization difference: the released model marks
+Fourier frequencies and action normalization statistics as nonpersistent, while
+the pinned RL classes expect persistent buffers. The loader reconstructs only
+those seven constants from the published configuration using official module
+constructors. Missing learned weights remain fatal. See NVIDIA's
+[release Fourier encoder](https://github.com/NVlabs/alpamayo1.5/blob/36aeb4c5938cbc2eb2aed33b22434773da4ab639/src/alpamayo1_5/models/action_in_proj.py)
+and [action normalization](https://github.com/NVlabs/alpamayo1.5/blob/36aeb4c5938cbc2eb2aed33b22434773da4ab639/src/alpamayo1_5/action_space/unicycle_accel_curvature.py).
