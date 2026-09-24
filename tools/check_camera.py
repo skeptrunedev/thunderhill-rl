@@ -101,7 +101,7 @@ def game(args, output: Path, headless: bool = False):
                 process.wait()
 
 
-def validate_capture(response: dict, output: Path, label: str, episode: str, tick: int) -> dict:
+def validate_capture(response: dict, output: Path, label: str, episode: str, tick: int, *, view_only=False) -> dict:
     assert "error" not in response, response
     assert response["episode_id"] == episode and response["tick"] == tick, response
     assert not {"state", "track", "transitions", "reward_components"}.intersection(response), response.keys()
@@ -115,13 +115,33 @@ def validate_capture(response: dict, output: Path, label: str, episode: str, tic
     assert decoded.convert("RGB").entropy() > 3.0, "Observation appears blank"
     assert response["camera"]["hud_visible"] is False
     assert response["camera"]["rider_mesh_visible"] is False
-    assert math.isclose(response["camera"]["vertical_fov_degrees"], math.degrees(2 * math.atan(math.tan(math.radians(60)) * 320 / 512)), abs_tol=1e-4)
+    horizontal_fov = 30 if response["logical_id"] == "camera_front_tele_30fov" else 120
+    expected_vertical = math.degrees(2 * math.atan(math.tan(math.radians(horizontal_fov / 2)) * 320 / 512))
+    assert math.isclose(response["camera"]["vertical_fov_degrees"], expected_vertical, abs_tol=1e-4)
+    expected_focal = 512 / (2 * math.tan(math.radians(horizontal_fov / 2)))
+    assert math.isclose(response["camera"]["intrinsics"]["fx"], expected_focal, rel_tol=1e-6)
+    if not view_only:
+        views = response["views"]
+        assert [view["logical_id"] for view in views] == [
+            "camera_cross_left_120fov", "camera_front_wide_120fov",
+            "camera_cross_right_120fov", "camera_front_tele_30fov"]
+        assert len({view["image"]["sha256"] for view in views}) == 4, "Duplicated camera images"
+        for view in views:
+            validate_capture(view, output, label + "_" + view["logical_id"], episode, tick, view_only=True)
+        assert views[1]["image"] == response["image"]
+        assert views[0]["camera"]["pose"] != views[2]["camera"]["pose"]
+        assert views[1]["camera"]["pose"] == views[3]["camera"]["pose"]
     assert len(response["camera"]["pose"]["position"]) == 3
     assert response["camera"]["intrinsics"]["fx"] > 0
     artifacts = list((output / "userdata").rglob(digest + ".png"))
     assert len(artifacts) == 1 and artifacts[0].read_bytes() == png, "Recorded bytes differ from policy image"
     (output / f"{label}.png").write_bytes(png)
-    metadata = {**response, "image": {k: v for k, v in image.items() if k != "base64"}}
+    metadata = {k: v for k, v in response.items() if k != "views"}
+    metadata["image"] = {k: v for k, v in image.items() if k != "base64"}
+    if not view_only:
+        metadata["views"] = [
+            {**view, "image": {k: v for k, v in view["image"].items() if k != "base64"}}
+            for view in response["views"]]
     (output / f"{label}.json").write_text(json.dumps(metadata, indent=2) + "\n")
     return {"sha256": digest, "mtime_ns": artifacts[0].stat().st_mtime_ns}
 
@@ -164,6 +184,11 @@ def main() -> None:
         idle_max_channel_change = max(high for low, high in idle_difference.getextrema())
         idle_stability = None
         if args.offscreen:
+            for first_view, repeated_view in zip(first["views"], repeated["views"], strict=True):
+                validate_idle_capture(
+                    Image.open(io.BytesIO(base64.b64decode(first_view["image"]["base64"]))),
+                    Image.open(io.BytesIO(base64.b64decode(repeated_view["image"]["base64"]))),
+                    first_view["camera"], repeated_view["camera"])
             idle_stability = validate_idle_capture(
                 Image.open(output / "tick0.png"), Image.open(output / "tick0_repeat.png"),
                 first["camera"], repeated["camera"])
@@ -204,11 +229,11 @@ def main() -> None:
         records.extend(json.loads(line) for line in path.read_text().splitlines())
     observations = [row for row in records if row.get("type") == "camera_observation"]
     assert len(observations) == 5, len(observations)
-    assert all("base64" not in row["image"] for row in observations)
-    summary = {"ok": True, "renderer": first["camera"]["renderer"], "camera_observations_recorded": len(observations), "dimensions": [512, 320],
+    assert all("base64" not in row["image"] and all("base64" not in view["image"] for view in row["views"]) for row in observations)
+    summary = {"ok": True, "renderer": first["camera"]["renderer"], "camera_observations_recorded": len(observations), "dimensions": [512, 320], "views_per_observation": 4,
                "idle_rerender_max_channel_change": idle_max_channel_change,
                "idle_image_stability": idle_stability, "idle_image_limits": IDLE_IMAGE_LIMITS,
-               "checks": ["real_png", "sha256", "immutable_artifact", "deterministic_idle_pose",
+               "checks": ["four_distinct_calibrated_views_same_tick", "real_png", "sha256", "immutable_artifact", "deterministic_idle_pose",
                           "no_privileged_telemetry", "frozen_tick", "changed_pixels_after_advance",
                           "queued_advance_serialization", "queued_reset_serialization", "headless_rejection"],
                "output": str(output)}

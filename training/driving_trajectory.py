@@ -8,8 +8,8 @@ not the leaned rider camera. It preserves measured elevation changes.
 """
 from __future__ import annotations
 
-import math
 import json
+import math
 from collections.abc import Sequence
 
 DT = 0.1
@@ -17,6 +17,9 @@ GRAVITY = 9.81
 SPEED_KP = 0.25  # throttle fraction per m/s speed error
 SPEED_KI = 0.20  # throttle fraction per metre of accumulated speed error
 MAX_LEAN = 0.88  # godot/scripts/motorcycle.gd rider_max_lean_rad
+WHEELBASE = 1.496
+MAX_STEERING = 0.50
+LOW_SPEED_ASSIST_THRESHOLD = 4.0
 
 CONTROL_FIELDS = ('steer', 'throttle', 'front_brake', 'rear_brake')
 
@@ -142,7 +145,21 @@ class TrajectoryTracker:
         curvature = 2.0 * lateral / max(dx * dx + dy * dy, 1.0)
         # Model left is negative Godot steer. Assisted steer requests lean.
         requested_lean = -math.atan(speed * speed * curvature / GRAVITY)
-        steer = max(-1.0, min(1.0, requested_lean / MAX_LEAN))
+        # Godot switches actuator semantics at the low speed assist threshold:
+        # below it, steer requests wheel angle, not lean. Using lean there makes
+        # a stationary launch unable to steer and understeers slow trajectories.
+        if speed < LOW_SPEED_ASSIST_THRESHOLD:
+            steering_mode = "wheel_angle"
+            requested_command = -math.atan(WHEELBASE * curvature) / MAX_STEERING
+        else:
+            steering_mode = "lean"
+            requested_command = requested_lean / MAX_LEAN
+        steer = max(-1.0, min(1.0, requested_command))
+        # Residual against the timestamped plan, not the lookahead target. This
+        # exposes actuator tracking failures separately from bad policy plans.
+        reference_dx, reference_dy = start[0] - position[0], start[1] - position[1]
+        longitudinal_error = fx * reference_dx + fy * reference_dy
+        lateral_error = -fy * reference_dx + fx * reference_dy
         error = target_speed - speed
         # A constant velocity requires nonzero engine torque to balance engine
         # braking, rolling resistance and drag. Integral feedback learns that
@@ -164,8 +181,14 @@ class TrajectoryTracker:
         controls = {"steer": steer, "throttle": throttle,
                     "front_brake": front_brake, "rear_brake": front_brake * 0.18,
                     "assist_enabled": True, "auto_shift": True}
-        diagnostics = {"controller": "model_trajectory_world_pose_pi_v3",
+        diagnostics = {"controller": "model_trajectory_world_pose_pi_v4",
                        "speed_error_m_s": error,
+                       "steering_mode": steering_mode,
+                       "steer_saturated": abs(requested_command) > 1.0,
+                       "tracking_position_error_m": math.dist(start, position),
+                       "tracking_longitudinal_error_m": longitudinal_error,
+                       "tracking_lateral_error_m": lateral_error,
+                       "tracking_vertical_error_m": start[2] - position[2],
                        "speed_integral_throttle": self.speed_integral,
                        "privileged_track_inputs": False,
                        "feedback": "measured_world_pose",

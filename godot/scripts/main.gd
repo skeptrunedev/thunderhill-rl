@@ -1131,6 +1131,8 @@ func _capture_request(request: Dictionary) -> Dictionary:
 	if not captured.has("error"):
 		var metadata: Dictionary = captured.duplicate(true)
 		metadata.image.erase("base64")
+		for view: Dictionary in metadata.get("views", []):
+			view.image.erase("base64")
 		metadata["type"] = "camera_observation"
 		_record(metadata)
 		if recorder:

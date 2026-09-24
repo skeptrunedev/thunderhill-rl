@@ -1,9 +1,13 @@
 """Install the pinned NVIDIA workspace without a separate training dependency stack."""
 
 import argparse
-from pathlib import Path
-import subprocess
 import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from training.native_source import verify_source
 
 ALPAGYM_REVISION = "972d160eed0e23d388497851504a3a233fec5879"
 ALPAGYM_URL = "https://github.com/NVlabs/alpagym.git"
@@ -22,13 +26,11 @@ def checkout_source(destination: Path) -> None:
     actual = subprocess.check_output(
         ["git", "-C", str(destination), "rev-parse", "HEAD"], text=True
     ).strip()
-    dirty = subprocess.check_output(
-        ["git", "-C", str(destination), "status", "--porcelain"], text=True
-    ).strip()
-    if actual != ALPAGYM_REVISION or dirty:
+    if actual != ALPAGYM_REVISION:
         raise RuntimeError(
-            "Expected a clean pinned NVIDIA checkout; refusing to change an existing checkout"
+            "Expected the pinned NVIDIA checkout; refusing to change its revision"
         )
+    verify_source(destination, apply_patch=True)
 
 
 def main():
@@ -53,7 +55,7 @@ def main():
             check=True,
         )
         subprocess.run(
-            ["uv", "pip", "check", "--python", str(checkout / ".venv/bin/python")],
+            ["uv", "sync", "--frozen", "--all-packages", "--check", "--project", str(checkout)],
             check=True,
         )
     print(f"NVIDIA source: {checkout} at {ALPAGYM_REVISION}")

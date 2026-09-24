@@ -1,4 +1,4 @@
-"""Prepare and launch NVIDIA AlpaGym unchanged against the Godot runtime bridge.
+"""Launch NVIDIA AlpaGym with a reviewed navigation input patch and Godot bridge.
 
 Preparation is CPU only. The explicit run command requires the installed upstream
 CUDA environment and its two GPU topology. This module contains no RL optimizer.
@@ -7,23 +7,24 @@ CUDA environment and its two GPU topology. This module contains no RL optimizer.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
 import ctypes
 import json
 import math
 import os
-import signal
 import shutil
-from pathlib import Path
+import signal
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
+from pathlib import Path
 
 from training.alpagym_metrics import (
     REWARD_SCALES,
     REWARD_VERSION,
     validate_reward_terms,
 )
+from training.native_source import validate_navigation_checkpoint, verify_source
 
 ALPAGYM_REVISION = "972d160eed0e23d388497851504a3a233fec5879"
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -32,16 +33,7 @@ DEFAULT_SOURCE = REPO_ROOT.parent / "thunderhill-references" / "alpagym"
 
 def load_upstream(source: Path) -> Path:
     source = source.resolve()
-    head = subprocess.check_output(
-        ["git", "-C", str(source), "rev-parse", "HEAD"], text=True
-    ).strip()
-    if head != ALPAGYM_REVISION:
-        raise ValueError(f"Expected AlpaGym {ALPAGYM_REVISION}, found {head}")
-    if subprocess.check_output(
-        ["git", "-C", str(source), "status", "--porcelain", "--untracked-files=no"],
-        text=True,
-    ).strip():
-        raise ValueError("Upstream AlpaGym has modified tracked files")
+    verify_source(source)
     # Preparation imports only the upstream host package, not its CUDA runtime.
     host_src = source / "packages/host/src"
     if str(host_src) not in sys.path:
@@ -77,14 +69,14 @@ def prepare(
     if abs(round(episode_seconds * 10) - episode_seconds * 10) > 1e-8:
         raise ValueError("Episode duration must use whole 0.1 second samples")
     source = load_upstream(source)
-    from hydra import compose, initialize_config_dir
-    from alpagym_host.config import register_config_schema, RewardTermConfig
+    import yaml
+    from alpagym_host.config import RewardTermConfig, register_config_schema
     from alpagym_host.run_artifacts import (
         build_artifact_paths,
         build_run_config,
         write_run_artifacts,
     )
-    import yaml
+    from hydra import compose, initialize_config_dir
 
     register_config_schema()
     policy_configs = (
@@ -106,7 +98,6 @@ def prepare(
         )
     config.run_root = str(output.resolve())
     config.policy.model.path = str(model.resolve())
-    config.policy.model.use_cameras = ["camera_front_wide_120fov"]
     config.expected_valid_steps = math.ceil(episode_seconds / 0.2)
     config.dataset.scene_ids = ["thunderhill-east-standing"]
     # No prerecorded driving or ground truth actions are used for warmup/reward.
@@ -153,6 +144,7 @@ def prepare(
                 "alpagym_source": str(source),
                 "run_id": paths.run_dir.name,
                 "alpagym_revision": ALPAGYM_REVISION,
+                "native_source_patch": verify_source(source),
                 "status": "prepared_only",
                 "max_wall_seconds": max_wall_seconds,
                 "max_video_seconds": max_video_seconds,
@@ -209,6 +201,7 @@ def validate_runtime_files(source: Path, config, game: dict) -> None:
     model_config = json.loads((checkpoint / "config.json").read_text())
     if model_config.get("model_type") != "alpamayo_reasoning_vla_expert":
         raise ValueError("Use NVIDIA's converted Alpamayo expert checkpoint")
+    validate_navigation_checkpoint(checkpoint)
     index = checkpoint / "model.safetensors.index.json"
     if index.is_file():
         weights = set(json.loads(index.read_text())["weight_map"].values())
@@ -238,12 +231,12 @@ def validate_godot_run_config(config) -> None:
     host validator also validates deployment of AlpaSim, which we do not launch.
     """
     from alpagym_host.config_validation import (
-        _validate_training_policy_config,
         _validate_cosmos_grpo_batch_geometry,
-        _validate_transport_config,
-        _validate_policy_model_path,
         _validate_cosmos_mode,
         _validate_nccl_test_model,
+        _validate_policy_model_path,
+        _validate_training_policy_config,
+        _validate_transport_config,
     )
 
     if str(config.execution.backend) != "local_process":
@@ -532,6 +525,8 @@ def _run_owned(run_dir: Path) -> None:
     write_status(run_dir, "started", max_wall_seconds=budget)
     try:
         source = load_upstream(Path(manifest["alpagym_source"]))
+        if manifest.get("native_source_patch") != verify_source(source):
+            raise ValueError("Native navigation input contract changed; prepare a fresh run")
         from alpagym_host.config import load_run_config
         from alpagym_host.endpoint_registry import FileTopologyRegistry
         from alpagym_host.transport_env import apply_transport_env_vars
@@ -562,11 +557,11 @@ def _run_owned(run_dir: Path) -> None:
             runtime
             + [
                 "-c",
-                "import torch; import alpagym_runtime.cosmos.entrypoint; "
+                ("import torch; import alpagym_runtime.cosmos.entrypoint; "
                 "from alpagym_alpamayo_r1.bundle import install_alpamayo_r1_runtime_bridge; "
                 "install_alpamayo_r1_runtime_bridge(); "
                 "assert torch.cuda.is_available(), 'CUDA unavailable'; "
-                "assert torch.cuda.device_count() >= 2, 'The official topology requires two CUDA GPUs'",
+                "assert torch.cuda.device_count() >= 2, 'The official topology requires two CUDA GPUs'"),
             ],
             start_new_session=True,
         )

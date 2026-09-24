@@ -14,11 +14,11 @@ Current episodes begin from a standing start. A measured 1.5 second stationary w
 
 ## Observation and action boundary
 
-The bridge supplies a real forward camera, exact image receipts and full measured poses at 10 Hz. NVIDIA preprocessing retains four camera frames and sixteen historical poses. Raw PNG captures and the exact JPEG bytes sent to the driver are retained. Camera pose, timestamps and image hashes identify what was observed.
+The bridge supplies four real synchronized camera views, exact image receipts and full measured poses at 10 Hz. NVIDIA preprocessing retains four frames per camera and sixteen historical poses. Raw PNG captures and the exact JPEG bytes sent to the driver are retained. Camera pose, timestamps and image hashes identify what was observed.
 
-The policy camera renders 512 by 320 pixels with a 120 degree horizontal field of view, matching the native input aspect ratio. It remains a single motorcycle view rather than the upstream multiple camera setup.
+Each view renders 512 by 320 pixels. Left, front wide and right cameras use 120 degree horizontal fields; front telephoto uses 30 degrees. Native camera identities and order match the selected policy. Motorcycle mounting and banked views still differ from NVIDIA's car observations. Camera calibration is metadata rather than a model input tensor.
 
-The simulator also supplies twenty centerline route points covering eighty metres. They satisfy the policy buffer contract, but the pinned Alpamayo R1 adapter does not pass route data into the model. Do not claim that this checkpoint follows road telemetry through that field. Camera calibration is also metadata rather than a model input tensor. One synthetic motorcycle view remains a different observation distribution from NVIDIA's multiple vehicle cameras.
+The simulator supplies twenty centerline route points covering eighty metres. A reviewed patch expresses their road direction and distance through NVIDIA's existing navigation text builder. The route is preserved in replay so training reconstructs the same input tokens as rollout inference. This makes the route an actual model input; it does not prove the model obeys it. No optimal racing line is specified.
 
 The sampled policy action is a trajectory, not a language tool call. A fixed motorcycle controller converts that trajectory into throttle, steering, front brake and rear brake commands. Requested and applied controls are recorded. The controller and the motorcycle's balance assistance and automatic shifting are explicit simulator components, separate from the learned trajectory expert.
 
@@ -30,7 +30,7 @@ The current [reward contract](../training/README.md#reward-contract) normalizes 
 
 Ordered gates and lap validity determine circuit completion. Incomplete trajectories, brief offroad events, reversals and crashes must not be reported as successful laps. Stall detection ends an attempt that makes insufficient legal progress. A completed lap terminates the current episode; continuous multiple lap episodes are not implemented.
 
-This reward is an explicit motorcycle adaptation of NVIDIA's metric reward, not full parity with its recorded trajectory and vehicle footprint scoring. It has no separate lap time bonus. Faster progress within a fixed horizon can score higher; equally complete legal laps receive the same progress term.
+This reward is an explicit motorcycle adaptation of NVIDIA's metric reward, not full parity with its recorded trajectory and vehicle footprint scoring. A safe completed lap adds `max(0, 1 - elapsed_sim_seconds / episode_budget_seconds)`, distinguishing faster finishes. The bonus is zero for incomplete attempts and any collision, offroad event or fall. Faster progress within a fixed horizon can score higher before completion; equally complete legal laps receive the same progress term but different speed bonuses.
 
 ## Required records
 

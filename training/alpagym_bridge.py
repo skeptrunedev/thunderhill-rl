@@ -1,8 +1,10 @@
-"""Godot RuntimeService for NVIDIA's unmodified AlpaGym driver and trainer.
+"""Godot RuntimeService for NVIDIA AlpaGym with reviewed navigation input support.
 
 Only the simulator boundary lives here: measured sensors, route geometry,
 trajectory execution, metrics and immutable recordings. No model, sampling,
 replay objective, optimizer, demonstration or teacher action is implemented.
+The tracked NVIDIA source patch carries native navigation text through inference
+and replay; the native driver, sampling objective and optimizer remain upstream.
 """
 
 from __future__ import annotations
@@ -22,6 +24,8 @@ import signal
 
 import grpc
 import numpy as np
+import torch
+from alpagym_alpamayo_r1.navigation import navigation_instruction
 from PIL import Image
 from scipy.spatial.transform import Rotation
 from alpasim_grpc.v0 import common_pb2 as common
@@ -42,6 +46,12 @@ from training.alpagym_metrics import EpisodeMetrics, validate_reward_terms
 ROOT = Path(__file__).resolve().parents[1]
 SCENE_ID = "thunderhill-east-standing"
 CAMERA_ID = "camera_front_wide_120fov"
+CAMERA_IDS = (
+    "camera_cross_left_120fov",
+    CAMERA_ID,
+    "camera_cross_right_120fov",
+    "camera_front_tele_30fov",
+)
 SAMPLE_US = 100_000
 WARMUP_TICKS = 180  # 1.5 measured seconds, sixteen poses including t=0
 CONTROL_SAMPLES = 2  # NVIDIA example: replan every 0.2 simulated seconds
@@ -105,7 +115,7 @@ def camera_calibration(capture, position, rotation):
     image, camera = capture["image"], capture["camera"]
     intrinsics = camera["intrinsics"]
     spec = sensor.CameraSpec(
-        logical_id=CAMERA_ID, resolution_w=image["width"], resolution_h=image["height"]
+        logical_id=capture["logical_id"], resolution_w=image["width"], resolution_h=image["height"]
     )
     pinhole = spec.opencv_pinhole_param
     pinhole.focal_length_x, pinhole.focal_length_y = intrinsics["fx"], intrinsics["fy"]
@@ -121,7 +131,7 @@ def camera_calibration(capture, position, rotation):
     )
     offset = (GODOT_TO_LOCAL @ np.asarray(pose["position"]) - position) @ rotation
     return sensor.AvailableCamerasReturn.AvailableCamera(
-        logical_id=CAMERA_ID,
+        logical_id=capture["logical_id"],
         intrinsics=spec,
         rig_to_camera=pose_proto(offset, rotation.T @ optical_world),
     )
@@ -162,7 +172,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     provider_kind="godot",
                     metadata=runtime.SceneMetadata(
                         uuid=SCENE_ID,
-                        camera_ids=[CAMERA_ID],
+                        camera_ids=list(CAMERA_IDS),
                         start_time_us=0,
                         end_time_us=int((self.game["episode_seconds"] + 1.5) * 1e6),
                     ),
@@ -267,7 +277,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 action_semantics="native_trajectory_with_fixed_motorcycle_controller",
                 model_name=self.game["model_name"],
                 model_path=self.game.get("model_path"),
-                navigation_conditioning=False,
+                navigation_conditioning="native_navigation_text_v1",
                 training_scope="trajectory_expert_frozen_vlm",
             )
             _write_json(output / "provenance.json", provenance)
@@ -360,24 +370,34 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     raise RuntimeError(
                         f"Invalid image receipt: {receipt.get('error', 'identity mismatch')}"
                     )
-                pixels = base64.b64decode(receipt["image"]["base64"], validate=True)
-                if hashlib.sha256(pixels).hexdigest() != receipt["image"]["sha256"]:
-                    raise ValueError("Image digest mismatch")
-                # AlpaGym's native decoder accepts JPEG (including nvJPEG on CUDA).
-                # Preserve source PNG plus the exact bytes actually sent to the model.
-                encoded = io.BytesIO()
-                with Image.open(io.BytesIO(pixels)) as image:
-                    image.convert("RGB").save(
-                        encoded, format="JPEG", quality=95, subsampling=0
-                    )
-                jpeg = encoded.getvalue()
-                jpeg_digest = hashlib.sha256(jpeg).hexdigest()
+                views = receipt.get("views", [])
+                if tuple(view["logical_id"] for view in views) != CAMERA_IDS:
+                    raise ValueError("Capture requires the four native camera views in order")
+                encoded_views = []
+                view_records = []
                 image_directory = output / "driver_images"
                 image_directory.mkdir(exist_ok=True)
-                (image_directory / f"{jpeg_digest}.jpg").write_bytes(jpeg)
+                for camera_view in views:
+                    pixels = base64.b64decode(camera_view["image"]["base64"], validate=True)
+                    if hashlib.sha256(pixels).hexdigest() != camera_view["image"]["sha256"]:
+                        raise ValueError("Image digest mismatch")
+                    # Native CUDA image decoding expects JPEG. Preserve exact sent bytes.
+                    encoded = io.BytesIO()
+                    with Image.open(io.BytesIO(pixels)) as image:
+                        image.convert("RGB").save(encoded, format="JPEG", quality=95, subsampling=0)
+                    jpeg = encoded.getvalue()
+                    jpeg_digest = hashlib.sha256(jpeg).hexdigest()
+                    (image_directory / f"{jpeg_digest}.jpg").write_bytes(jpeg)
+                    encoded_views.append((camera_view["logical_id"], jpeg))
+                    view_records.append(dict(
+                        logical_id=camera_view["logical_id"],
+                        image_sha256=camera_view["image"]["sha256"],
+                        driver_jpeg_sha256=jpeg_digest,
+                        camera=camera_view["camera"],
+                    ))
                 position, rotation = measured_rig(obs, receipt)
                 timestamp = obs["tick"] * 1_000_000 // 120
-                captures.append((timestamp, position, rotation, receipt, jpeg))
+                captures.append((timestamp, position, rotation, receipt, encoded_views))
                 observations.write(
                     json.dumps(
                         dict(
@@ -385,7 +405,8 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             timestamp_us=timestamp,
                             observation_id=receipt["observation_id"],
                             image_sha256=receipt["image"]["sha256"],
-                            driver_jpeg_sha256=jpeg_digest,
+                            driver_jpeg_sha256=view_records[1]["driver_jpeg_sha256"],
+                            views=view_records,
                             jpeg_quality=95,
                             jpeg_subsampling=0,
                             local_position=position.tolist(),
@@ -403,18 +424,19 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
 
             def submit(row):
                 timestamp, position, rotation, receipt, pixels = row
-                stub.submit_image_observation(
-                    driver.RolloutCameraImage(
-                        session_uuid=session,
-                        camera_image=driver.RolloutCameraImage.CameraImage(
-                            frame_start_us=timestamp,
-                            frame_end_us=timestamp,
-                            image_bytes=pixels,
-                            logical_id=CAMERA_ID,
+                for logical_id, jpeg in pixels:
+                    stub.submit_image_observation(
+                        driver.RolloutCameraImage(
+                            session_uuid=session,
+                            camera_image=driver.RolloutCameraImage.CameraImage(
+                                frame_start_us=timestamp,
+                                frame_end_us=timestamp,
+                                image_bytes=jpeg,
+                                logical_id=logical_id,
+                            ),
                         ),
-                    ),
-                    timeout=120,
-                )
+                        timeout=120,
+                    )
                 stub.submit_egomotion_observation(
                     driver.RolloutEgoTrajectory(
                         session_uuid=session,
@@ -495,7 +517,8 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                         rollout_spec=driver.DriveSessionRequest.RolloutSpec(
                             vehicle=driver.DriveSessionRequest.RolloutSpec.VehicleDefinition(
                                 available_cameras=[
-                                    camera_calibration(first[3], first[1], first[2])
+                                    camera_calibration(camera_view, first[1], first[2])
+                                    for camera_view in first[3]["views"]
                                 ]
                             )
                         ),
@@ -568,6 +591,9 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                                 session_uuid=session,
                                 xyz_rig=xyz,
                                 route_rig=route_rig.tolist(),
+                                navigation_instruction=navigation_instruction(
+                                    torch.as_tensor(route_rig[:, :2], dtype=torch.float32)
+                                ),
                                 policy_version=provenance["policy_version"],
                             ),
                             allow_nan=False,
@@ -609,9 +635,13 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             or "finished"
                         )
                 final = env._observation
-                metrics = reward_metrics.values()
                 elapsed = (final["tick"] - WARMUP_TICKS) / 120.0
                 completed = reason == "lap_completed" and final["track"]["lap_valid"]
+                metrics = reward_metrics.values(
+                    elapsed_seconds=elapsed,
+                    episode_seconds=self.game["episode_seconds"],
+                    lap_completed=completed,
+                )
                 metrics.update(
                     sim_seconds=elapsed,
                     legal_progress_m=reward_metrics.distance,

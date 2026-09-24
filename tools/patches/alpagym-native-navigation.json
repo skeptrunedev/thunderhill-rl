@@ -1,0 +1,14 @@
+{
+  "version": "native_navigation_text_v1",
+  "upstream_revision": "972d160eed0e23d388497851504a3a233fec5879",
+  "patch_sha256": "bb2a834587c7e603703d21029a42316c59de64313123310bb2bb783141d6d334",
+  "files": {
+    "packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/tokenize_online.py": "c317514d2c8e664905ec3bf04f978a3608a11bcf1c77555ddf99fae853f3d764",
+    "packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/bundle.py": "bab7b2cd19b523eb3efa4eb0104c577bad0223154e2180c3cd463f6f7d773b9f",
+    "packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/inference_model.py": "48e86e1de71698b5582cf6c558112b860077fd07eeaf27e6f3acf409c3a8a5e5",
+    "packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/navigation.py": "3dc4877afc49699417938b91f2883472966e82a54005a4c23d9812e8e3d50395"
+  },
+  "added_files": [
+    "packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/navigation.py"
+  ]
+}

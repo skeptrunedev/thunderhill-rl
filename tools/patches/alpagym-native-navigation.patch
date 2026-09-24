@@ -1,0 +1,130 @@
+--- a/packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/tokenize_online.py
++++ b/packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/tokenize_online.py
+@@ -14,6 +14,8 @@
+ from __future__ import annotations
+ 
+ from typing import Any
++
++from alpagym_alpamayo_r1.navigation import navigation_instruction
+ 
+ from alpagym_alpamayo_r1.data.chat_template.conversation import build_conversation
+ from alpagym_alpamayo_r1.data.cosmos.datapacker.alpa_qwen_sft import AlpaQwenPacker
+@@ -74,10 +76,10 @@
+         data["image_frames"] = (data["image_frames"] + 1.0) / 2.0
+ 
+     if last_component == "traj_future":
+-        components_order = ["image", "traj_history", "prompt", "traj_future"]
++        components_order = ["image", "traj_history", "nav_instruction", "prompt", "traj_future"]
+         components_prompt = ["traj_future"]
+     elif last_component == "cot":
+-        components_order = ["image", "traj_history", "prompt", "cot"]
++        components_order = ["image", "traj_history", "nav_instruction", "prompt", "cot"]
+         components_prompt = ["cot", "traj_future"]
+     else:
+         raise ValueError(f"Unsupported last_component: {last_component}")
+@@ -89,6 +91,7 @@
+         sample: dict[str, Any] = {
+             "image_frames": data["image_frames"][i],
+             "camera_indices": data["camera_indices"][i],
++            "nav_text": [navigation_instruction(data["route_xy"][i])],
+         }
+         image_keys = ("image_frames", "camera_indices")
+         sample.update(sort_images_by_camera_ids({k: sample[k] for k in image_keys if k in sample}))
+--- a/packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/bundle.py
++++ b/packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/bundle.py
+@@ -58,6 +58,7 @@
+         camera_indices: torch.Tensor,
+         ego_history_xyz: torch.Tensor,
+         ego_history_rot: torch.Tensor,
++        route_xy: torch.Tensor,
+         samples_list: torch.Tensor,
+         timesteps: torch.Tensor,
+         teacher_model: Any = None,
+@@ -94,6 +95,7 @@
+             {
+                 "image_frames": image_frames.to(torch.float32) / 127.5 - 1.0,
+                 "camera_indices": camera_indices,
++                "route_xy": route_xy,
+             },
+             last_component="traj_future",
+         )
+--- a/packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/inference_model.py
++++ b/packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/inference_model.py
+@@ -283,8 +283,8 @@
+ 
+         return PolicyReplayData(
+             replay_schema_version=1,
+-            payload_schema="alpamayo_r1.trajectory.v1",
+-            payload_schema_version=1,
++            payload_schema="alpamayo_r1.trajectory.navigation.v2",
++            payload_schema_version=2,
+             model_family="alpamayo_r1",
+             action_selection=action_selection,
+             old_logprob=torch.as_tensor(old_logprob, dtype=torch.float32).reshape(()),
+@@ -309,15 +309,15 @@
+         / ``input_ids`` bitwise-identically, which keeps the artifact
+         ~25x smaller than persisting the post-Qwen view.
+         """
+-        if replay_data.payload_schema != "alpamayo_r1.trajectory.v1":
++        if replay_data.payload_schema != "alpamayo_r1.trajectory.navigation.v2":
+             raise ValueError(
+                 f"{replay_data.model_family} replay payload_schema "
+-                f"{replay_data.payload_schema!r} != 'alpamayo_r1.trajectory.v1'"
+-            )
+-        if replay_data.payload_schema_version != 1:
++                f"{replay_data.payload_schema!r} != 'alpamayo_r1.trajectory.navigation.v2'"
++            )
++        if replay_data.payload_schema_version != 2:
+             raise ValueError(
+                 f"{replay_data.model_family} replay payload_schema_version "
+-                f"{replay_data.payload_schema_version} != 1"
++                f"{replay_data.payload_schema_version} != 2"
+             )
+         payload = replay_data.payload
+         require_payload_keys(
+@@ -342,6 +342,7 @@
+         model_inputs: dict[str, Any] = {
+             "image_frames": forward_inputs["image_frames"],
+             "camera_indices": forward_inputs["camera_indices"],
++            "route_xy": forward_inputs["route_xy"],
+             "ego_history_xyz": forward_inputs["ego_history_xyz"],
+             "ego_history_rot": forward_inputs["ego_history_rot"],
+             "samples_list": torch.as_tensor(payload["samples_list"], dtype=torch.float32),
+--- /dev/null
++++ b/packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/navigation.py
+@@ -0,0 +1,35 @@
++"""Route geometry to native Alpamayo navigation text (Thunderhill adapter)."""
++
++import math
++from typing import Any
++
++
++def navigation_instruction(route_xy: Any) -> str:
++    """Thunderhill adapter: express submitted road geometry as native 1.5 navigation text.
++
++    This is a route instruction, never a racing line or target action. NaN padding
++    follows the AlpaGym route contract. Every rollout and replay uses this function.
++    """
++    rows = route_xy.detach().to(device="cpu").reshape(-1, 2).tolist()
++    points = [(x, y) for x, y in rows if math.isfinite(x) and math.isfinite(y)]
++    if len(points) < 2:
++        raise ValueError("Navigation conditioning requires at least two route points")
++    segments = []
++    distance = 0.0
++    for first, second in zip(points, points[1:]):
++        dx, dy = second[0] - first[0], second[1] - first[1]
++        length = math.hypot(dx, dy)
++        if length > 0.01:
++            segments.append((distance, math.atan2(dy, dx)))
++        distance += length
++    if not segments:
++        raise ValueError("Navigation conditioning requires a nondegenerate route")
++    initial_heading = segments[0][1]
++    for distance, heading in segments[1:]:
++        delta = math.atan2(math.sin(heading - initial_heading), math.cos(heading - initial_heading))
++        if abs(delta) >= math.radians(15):
++            direction = "left" if delta > 0 else "right"
++            return f"Follow the road as it curves {direction} in {round(distance)} m."
++    return "Continue following the road ahead."
++
++

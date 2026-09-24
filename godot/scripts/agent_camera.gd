@@ -2,7 +2,15 @@ class_name AgentCamera
 extends Node
 ## Observation camera, independent of presentation cameras and UI canvases.
 
-const VERSION := "rider-rgb-v2"
+const VERSION := "rider-multiview-rgb-v3"
+# Native Alpamayo camera identities, with genuine motorcycle mounted views.
+# Side yaw is our declared motorcycle sensor mount, not recovered car calibration.
+const VIEWS := [
+	{"logical_id": "camera_cross_left_120fov", "yaw_degrees": 60.0, "horizontal_fov_degrees": 120.0},
+	{"logical_id": "camera_front_wide_120fov", "yaw_degrees": 0.0, "horizontal_fov_degrees": 120.0},
+	{"logical_id": "camera_cross_right_120fov", "yaw_degrees": -60.0, "horizontal_fov_degrees": 120.0},
+	{"logical_id": "camera_front_tele_30fov", "yaw_degrees": 0.0, "horizontal_fov_degrees": 30.0},
+]
 const WIDTH := 512
 const HEIGHT := 320
 const RIDER_LAYER := 1 << 19
@@ -44,6 +52,22 @@ static func assign_rider_layer(node: Node, layer: int = RIDER_LAYER) -> void:
 
 
 func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: String) -> Dictionary:
+	var tick: int = sim.tick
+	var views: Array[Dictionary] = []
+	for spec: Dictionary in VIEWS:
+		var view := await _capture_view(sim, normal, episode_id, folder, spec)
+		if view.has("error"):
+			return view
+		if sim.tick != tick:
+			return {"error": "Simulation changed during multiview capture", "failure_type": "infrastructure"}
+		views.append(view)
+	# Keep the front wide receipt at top level for existing camera clients.
+	var receipt := views[1].duplicate(true)
+	receipt["views"] = views
+	return receipt
+
+
+func _capture_view(sim: RefCounted, normal: Vector3, episode_id: String, folder: String, spec: Dictionary) -> Dictionary:
 	if (
 		DisplayServer.get_name() == "headless"
 		or (
@@ -62,6 +86,8 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 	var rider_up: Vector3 = upright * cos(sim.lean) + right * sin(sim.lean)
 	camera.position = sim.position + rider_up * EYE_HEIGHT_M + tangent * EYE_FORWARD_M
 	var look_direction := tangent * cos(LOOK_DOWN_RAD) - rider_up * sin(LOOK_DOWN_RAD)
+	look_direction = look_direction.rotated(rider_up, deg_to_rad(spec.yaw_degrees))
+	camera.fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(spec.horizontal_fov_degrees) * 0.5) * HEIGHT / WIDTH))
 	camera.look_at(camera.position + look_direction, rider_up)
 	var capture_tick: int = sim.tick
 	var pose := camera.global_transform
@@ -132,6 +158,7 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 			}
 	var focal_px := HEIGHT / (2.0 * tan(deg_to_rad(camera.fov) * 0.5))
 	return {
+		"logical_id": spec.logical_id,
 		"episode_id": episode_id,
 		"tick": capture_tick,
 		"observation_version": VERSION,
@@ -155,6 +182,7 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 				"offscreen": manual_draw,
 			},
 			"vertical_fov_degrees": camera.fov,
+			"horizontal_fov_degrees": spec.horizontal_fov_degrees,
 			"near_m": camera.near,
 			"far_m": camera.far,
 			"intrinsics": {"fx": focal_px, "fy": focal_px, "cx": WIDTH / 2.0, "cy": HEIGHT / 2.0},
@@ -169,7 +197,7 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 			"rider_mesh_visible": false,
 			"hud_visible": false,
 			"mount":
-			{"height_m": EYE_HEIGHT_M, "forward_m": EYE_FORWARD_M, "look_down_rad": LOOK_DOWN_RAD},
+			{"height_m": EYE_HEIGHT_M, "forward_m": EYE_FORWARD_M, "look_down_rad": LOOK_DOWN_RAD, "yaw_degrees": spec.yaw_degrees},
 		},
 	}
 

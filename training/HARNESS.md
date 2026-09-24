@@ -8,8 +8,9 @@ an isolated Godot process, then calls the unchanged NVIDIA driver:
 2. `submit_image_observation` and `submit_egomotion_observation` with recorded
    measurements at 10 Hz. A measured stationary warmup supplies initial history.
 3. `submit_route` with track geometry to satisfy the native policy buffer
-   contract. The pinned Alpamayo R1 adapter does not consume this route in its
-   model input preparation. It is not an optimal racing line.
+   contract. Our reviewed native source patch turns it into navigation text using
+   NVIDIA's existing navigation prompt builder and preserves it for training replay.
+   It is not an optimal racing line.
 4. `drive` every 0.2 simulated seconds. NVIDIA assembles observation buffers,
    constructs model inputs and samples its native trajectory distribution.
 5. Execute the returned trajectory with the fixed motorcycle controller.
@@ -21,10 +22,15 @@ roll. Driver responses are timestamped world poses. The controller follows nativ
 world XYZ using measured current position and forward direction. Steering uses
 horizontal pure pursuit and target speed uses 3D waypoint distance. Sensor history
 retains the measured banked rig pose independently. The controller reads no route
-geometry. The policy camera is 512 by 320 with a 120 degree horizontal field of view.
+geometry. The policy receives four genuine synchronized cameras at 512 by 320 pixels:
+left, front wide, right (120 degree horizontal fields) and front telephoto
+(30 degrees). Native preprocessing packs four measured frames per camera.
+Motorcycle mounts differ from NVIDIA car mounts. Below 4 m/s the controller
+requests wheel angle; above it, lean. Tracking residuals are recorded.
 
 The policy action is a trajectory. `control_bike` records are controller outputs,
-not language tool tokens. NVIDIA records native action replay and performs its own
+not language tool tokens. The reviewed navigation patch carries route context through both input paths.
+NVIDIA records native action replay and performs its own
 GRPO update of its trajectory expert. The vision language backbone is frozen.
 No local likelihood or advantage implementation is substituted. Supplying
 correct camera calibration does not remove the visual domain difference: native
@@ -56,7 +62,9 @@ and are not relabeled as runs from the replacement stack.
 
 Reward metrics use full circuit normalized legal progress, excluding warmup.
 Every executed physics tick contributes collision and offroad events. Motorcycle
-falls without obstacle contact have a separate penalty. Invalid lap status alone
+falls without obstacle contact have a separate penalty. Clean completed laps also
+receive a bounded bonus for finishing sooner within the fixed episode budget.
+Incomplete or unsafe attempts receive no speed bonus. Invalid lap status alone
 is not an offroad event. See [the reward contract](README.md#reward-contract) for
 coefficients and the remaining differences from NVIDIA. No reward targets an
 optimized racing line or closeness to the centerline.

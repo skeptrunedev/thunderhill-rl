@@ -1,6 +1,7 @@
 # NVIDIA AlpaGym with the Thunderhill simulator
 
-Training delegates to the pinned NVIDIA AlpaGym and Cosmos RL implementation.
+Training delegates to the pinned NVIDIA AlpaGym and Cosmos RL implementation,
+with a reviewed patch that carries native navigation text through inference and replay.
 The previous custom Alpamayo optimizer, prompt builder, episode collector, adapter
 loader and Modal launcher have been removed. Historical recordings remain in
 their artifact archives. Obsolete runbooks and result reports were removed.
@@ -72,24 +73,34 @@ Cosmos policy weight version, not an invented batch counter.
 
 ## Deliberate simulator differences
 
-The official training and model code remains unchanged. The environment is our
-Godot motorcycle game, not NVIDIA's car simulator. The adapter exposes one real
-forward camera at 512 by 320 pixels with a true 120 degree horizontal field of
-view, measured stationary warmup and track centerline route geometry. Its image
-aspect ratio matches native preprocessing. One view remains different from the
-upstream multiple camera configuration.
-The route reaches the native policy buffer, but the pinned Alpamayo R1 model
-adapter does not consume it when preparing the checkpoint's model inputs. It
-must not be described as steering guidance that this policy actually sees.
-Camera calibration is recorded but is not supplied as a model input tensor;
-matching protocol metadata does not correct the camera appearance difference.
-It does not fabricate additional camera views or recorded expert motion.
+NVIDIA owns sampling, replay loss, optimization and checkpointing. A small versioned
+patch enables the checkpoint's native navigation text input in both rollout and
+training tokenization. The installer and launcher verify the exact patched file
+hashes; arbitrary upstream edits are rejected. The environment is our
+Godot motorcycle game, not NVIDIA's car simulator. The adapter exposes four real
+camera views, matching the selected native policy camera identities and ordering:
+left, front wide, right and front telephoto. Each view has 512 by 320 pixels,
+with 120 degree horizontal fields for wide views and 30 degrees for telephoto.
+Four frames per view and sixteen measured poses supply native temporal context.
+All cameras capture the same frozen physics tick. The side cameras use declared
+motorcycle mounts at 60 degrees left and right from the rider eye. These are not
+recovered NVIDIA car extrinsics. Actual motorcycle roll and pitch remain visible.
+Camera calibration is recorded but native model inputs do not include calibration
+tensors. The domain difference therefore remains even with matching inputs.
+
+Track centerline geometry is expressed as a simple upcoming road direction and
+distance instruction using NVIDIA's native navigation tokens. This is route
+context, not an optimized racing line or control target. The exact route tensor
+is preserved in replay and produces identical navigation text for training.
+No additional camera views or recorded expert motion are fabricated.
 The control period is 0.2 seconds, sensor cadence 0.1 seconds. Rewards use actual
 progress, collision and offroad metrics, excluding warmup progress. NVIDIA's
 car controller is replaced by our motorcycle controller and physics. Sensor
 protocol compatibility is not complete simulator or driving distribution parity.
 The controller follows native world XYZ using measured current position and
-forward direction, horizontal pure pursuit steering and 3D waypoint speed. Model
+forward direction, horizontal pure pursuit steering and 3D waypoint speed. Below 4 m/s it requests
+wheel angle; above that threshold it requests lean, matching the game actuator.
+Recorded tracking residuals distinguish execution error from policy plans. Model
 motion history retains full measured roll and pitch.
 
 Every attempt has session identity, policy version, sampled trajectories, executed
@@ -142,3 +153,10 @@ circuit progress and the game's on_track point test. NVIDIA's optional reference
 trajectory distance penalty is omitted; there is no recorded expert trajectory or
 imitation target. New summaries and prepared runs identify the reward version;
 stale prepared configurations are rejected. Historical results are unchanged.
+
+A safe completed lap also earns `max(0, 1 - elapsed_sim_seconds / episode_budget_seconds)`.
+The episode budget is fixed across siblings and warmup is excluded. Incomplete
+attempts and any collision, offroad event or fall receive no speed bonus. This
+rewards faster legal finishes without an accumulating time cost that early
+failure could evade. Partial attempts retain their normalized progress signal.
+See [reward details](../docs/reward-references.md).

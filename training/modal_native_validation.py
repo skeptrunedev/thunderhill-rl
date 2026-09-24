@@ -1,0 +1,95 @@
+"""Allocate bounded native validation GPUs after CPU preparation has succeeded."""
+
+import modal
+
+from training.modal_native import REMOTE, ROOT, UPSTREAM, cache, image, runs
+
+app = modal.App("thunderhill-native-gpu-validation")
+
+runtime_image = (
+    image.env({"NVIDIA_DRIVER_CAPABILITIES": "all"})
+    .add_local_dir(
+        str(ROOT / "training"),
+        REMOTE + "/training",
+        ignore=["alpamayo", "__pycache__", "results"],
+    )
+    .add_local_dir(str(ROOT / "tools"), REMOTE + "/tools", ignore=["__pycache__"])
+)
+
+
+@app.function(
+    image=runtime_image,
+    gpu="H100:2",
+    cpu=16,
+    memory=131072,
+    timeout=3600,
+    retries=0,
+    volumes={"/model-cache": cache, "/runs": runs},
+    include_source=False,
+)
+def validate_gpu():
+    import os
+    import subprocess
+    import uuid
+    from pathlib import Path
+
+    os.chdir(REMOTE)
+    os.environ["WANDB_MODE"] = "offline"
+    destination = Path("/runs") / ("native-validation-" + uuid.uuid4().hex)
+    destination.mkdir()
+    try:
+        with (destination / "gpu-topology.txt").open("w") as log:
+            subprocess.run(
+                ["nvidia-smi", "topo", "-m"],
+                check=True,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+            )
+        subprocess.run(
+            [
+                UPSTREAM + "/.venv/bin/python",
+                "-c",
+                (
+                    "import torch; assert torch.cuda.device_count() == 2; "
+                    "assert torch.cuda.can_device_access_peer(0,1) and "
+                    "torch.cuda.can_device_access_peer(1,0), 'CUDA peer access unavailable'"
+                ),
+            ],
+            check=True,
+        )
+        with (destination / "supervisor.log").open("w") as log:
+            subprocess.run(
+                [
+                    "xvfb-run",
+                    "-a",
+                    "-s",
+                    "-screen 0 800x600x24",
+                    UPSTREAM + "/.venv/bin/python",
+                    "-m",
+                    "training.native_validation",
+                    "run",
+                    "--source",
+                    UPSTREAM,
+                    "--model",
+                    "/model-cache/alpagym-converted-1.5",
+                    "--output",
+                    str(destination),
+                    "--seconds",
+                    "5",
+                    "--budget",
+                    "3300",
+                ],
+                check=True,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=3450,
+            )
+    finally:
+        runs.commit()
+        print(f"Validation artifacts: {destination}")
+    return str(destination)
+
+
+@app.local_entrypoint()
+def main():
+    print(validate_gpu.remote())

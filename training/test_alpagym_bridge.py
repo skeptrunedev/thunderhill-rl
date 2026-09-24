@@ -12,7 +12,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 from training.alpagym_bridge import (
     ROOT,
-    CAMERA_ID,
+    CAMERA_IDS,
     SCENE_ID,
     GodotRuntime,
     pose_proto,
@@ -154,7 +154,7 @@ class RealGameTests(unittest.TestCase):
         self.assertTrue(result.success, result.error)
         self.assertEqual(
             set(result.aggregated_metrics),
-            {"progress", "collision_any", "offroad", "fall_without_collision",
+            {"progress", "collision_any", "offroad", "fall_without_collision", "completed_lap_speed",
              "sim_seconds", "legal_progress_m", "mean_progress_speed_m_s",
              "lap_completed", "stalled", "crashed"},
         )
@@ -164,7 +164,7 @@ class RealGameTests(unittest.TestCase):
             [p.timestamp_us for p in fixture.poses[:16]],
             list(range(0, 1_500_001, 100_000)),
         )
-        self.assertEqual(fixture.images[0].camera_image.logical_id, CAMERA_ID)
+        self.assertEqual([image.camera_image.logical_id for image in fixture.images[:4]], list(CAMERA_IDS))
         self.assertEqual(len(fixture.routes[0].route.waypoints), 20)
         self.assertEqual(fixture.ground_truth_calls, 0)
         self.assertTrue(fixture.closed)
@@ -220,7 +220,7 @@ class RealGameTests(unittest.TestCase):
                 path="fixture-no-weights",
                 device="cpu",
                 dtype="float32",
-                use_cameras=[CAMERA_ID],
+                use_cameras=list(CAMERA_IDS),
                 num_context_frames=4,
                 num_historical_waypoints=16,
                 num_future_waypoints=64,
@@ -249,10 +249,15 @@ class RealGameTests(unittest.TestCase):
         self.assertTrue(result.success, result.error)
         self.assertEqual(len(engine.inputs), 3)
         first = engine.inputs[0]
-        self.assertEqual(tuple(first.camera_frames.shape), (4, 3, 320, 512))
+        from dataclasses import asdict
+
+        torch.save(asdict(first), output / "native_model_input.pt")
+        print(f"Native captured model input: {output / 'native_model_input.pt'}", flush=True)
+        self.assertEqual(tuple(first.camera_frames.shape), (16, 3, 320, 512))
         self.assertEqual(
-            first.relative_timestamps.tolist(), [-300_000, -200_000, -100_000, 0]
+            first.relative_timestamps.tolist(), [-300_000, -200_000, -100_000, 0] * 4
         )
+        self.assertEqual(first.camera_indices.tolist(), [0] * 4 + [1] * 4 + [2] * 4 + [6] * 4)
         self.assertEqual(tuple(first.ego_history_xyz.shape), (1, 16, 3))
         self.assertEqual(tuple(first.route_xy.shape), (20, 2))
         self.assertTrue(torch.isfinite(first.route_xy).all())

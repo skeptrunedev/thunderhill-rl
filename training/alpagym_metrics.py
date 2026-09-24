@@ -7,12 +7,13 @@ Motorcycle falls are an explicit extension, not mislabeled obstacle collisions.
 
 import math
 
-REWARD_VERSION = "thunderhill-normalized-progress-safety-v2"
+REWARD_VERSION = "thunderhill-normalized-progress-safe-lap-speed-v3"
 REWARD_SCALES = {
     "progress": 1.0,
     "collision_any": -10.0,
     "offroad": -5.0,
     "fall_without_collision": -10.0,
+    "completed_lap_speed": 1.0,
 }
 
 
@@ -56,16 +57,49 @@ class EpisodeMetrics:
         self.offroad |= not track["on_track"]
         self.crashed |= state["crashed"]
 
-    def values(self):
+    def values(self, *, elapsed_seconds, episode_seconds, lap_completed):
+        if not math.isfinite(episode_seconds) or episode_seconds <= 0:
+            raise ValueError("Episode budget must be finite and positive")
+        if not math.isfinite(elapsed_seconds) or elapsed_seconds <= 0:
+            raise ValueError("Executed episode duration must be finite and positive")
+        if type(lap_completed) is not bool:
+            raise ValueError("Expected simulator lap completion flag")
+        # Game gates accept only forward displacements below five metres per
+        # physics tick. Allow that terminal crossing discretization, never a
+        # partial circuit marked complete by an inconsistent caller.
+        full_distance = self.distance >= self.track_length_m - 5.0
+        safe_completion = (
+            lap_completed
+            and full_distance
+            and not (self.collision or self.offroad or self.crashed)
+        )
+        # A terminal bonus avoids rewarding fast failures or subtracting time
+        # costs that a crash can evade. Partial progress keeps its native scale.
+        speed_bonus = (
+            max(0.0, 1.0 - elapsed_seconds / episode_seconds)
+            if safe_completion
+            else 0.0
+        )
+        self.speed_report = {
+            "completed_lap_speed": speed_bonus,
+            "completed_lap_speed_formula": "max(0, 1 - elapsed_seconds / episode_seconds) for a safe completed lap, else 0",
+            "episode_budget_seconds": episode_seconds,
+            "elapsed_seconds": elapsed_seconds,
+            "safe_completion": safe_completion,
+            "completion_distance_tolerance_m": 5.0,
+            "full_lap_distance_verified": full_distance,
+        }
         return {
             "progress": min(1.0, max(0.0, self.distance / self.track_length_m)),
             "collision_any": float(self.collision),
             "offroad": float(self.offroad),
             "fall_without_collision": float(self.crashed and not self.collision),
+            "completed_lap_speed": speed_bonus,
         }
 
     def report(self):
         return {
+            **self.speed_report,
             "reward_version": REWARD_VERSION,
             "progress_normalizer_m": self.track_length_m,
             "legal_progress_m": self.distance,
