@@ -93,3 +93,28 @@ Godot protocol tests. Their synthetic driver is strictly a test fixture; no
 fixture actions enter training. CPU config and simulator checks do not verify a
 GPU update. A training validation requires real NVIDIA workers, nonzero optimizer
 steps, checkpoint output and evaluated gameplay recordings.
+
+## Reward contract
+
+Progress is signed legal forward distance since the end of warmup divided by the
+full circuit length, clamped to [0, 1]. Raw meters remain in each summary for
+inspection. This fixes the former unit mismatch with NVIDIA's normalized progress.
+The existing centerline measures route position; proximity to it earns no reward.
+No optimized racing line has been selected. Preview the reference with:
+
+```sh
+uv run tools/plot_track_reference.py --output artifacts/track-reference.png
+```
+
+NVIDIA's metric dispatcher applies +1 times progress, minus 10 for an obstacle
+collision and minus 5 for any offroad event. A motorcycle fall without a collision
+has a separate penalty of 10, so falls are neither free nor double counted as
+collisions. Events are accumulated across every executed physics tick, including
+brief excursions between observations. An invalid lap alone is not an offroad event.
+
+This is an adaptation, not exact reward parity. NVIDIA projects position onto a
+recorded scene trajectory and tests vehicle footprint geometry. We use legal
+circuit progress and the game's on_track point test. NVIDIA's optional reference
+trajectory distance penalty is omitted; there is no recorded expert trajectory or
+imitation target. New summaries and prepared runs identify the reward version;
+stale prepared configurations are rejected. Historical results are unchanged.

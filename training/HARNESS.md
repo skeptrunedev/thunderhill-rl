@@ -42,3 +42,10 @@ Simulator recordings are immutable. Camera receipts and hashes bind images to
 ticks; trajectory logs bind predictions to controls. Video work items are consumed
 by `tools/render_video_queue.py`. Historic runs retain their original provenance
 and are not relabeled as runs from the replacement stack.
+
+Reward metrics use full circuit normalized legal progress, excluding warmup.
+Every executed physics tick contributes collision and offroad events. Motorcycle
+falls without obstacle contact have a separate penalty. Invalid lap status alone
+is not an offroad event. See [the reward contract](README.md#reward-contract) for
+coefficients and the remaining differences from NVIDIA. No reward targets an
+optimized racing line or closeness to the centerline.

@@ -18,6 +18,8 @@ import subprocess
 import sys
 import time
 
+from training.alpagym_metrics import REWARD_SCALES, REWARD_VERSION, validate_reward_terms
+
 ALPAGYM_REVISION = "972d160eed0e23d388497851504a3a233fec5879"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = REPO_ROOT.parent / "thunderhill-references" / "alpagym"
@@ -100,9 +102,8 @@ def prepare(
     config.alpasim.wizard_args.force_gt_duration_us = 0
     config.alpasim.wizard_args.n_sim_steps = config.expected_valid_steps
     config.reward.terms = [
-        RewardTermConfig(kind="metric", metric_name="progress", scale=1.0),
-        RewardTermConfig(kind="metric", metric_name="collision_any", scale=-10.0),
-        RewardTermConfig(kind="metric", metric_name="offroad", scale=-5.0),
+        RewardTermConfig(kind="metric", metric_name=name, scale=scale)
+        for name, scale in REWARD_SCALES.items()
     ]
     config.cosmos.train.max_num_steps = max_steps
     config.cosmos.train.num_epochs = max_steps
@@ -136,6 +137,7 @@ def prepare(
                 "status": "prepared_only",
                 "max_wall_seconds": max_wall_seconds,
                 "gpu_training_verified": False,
+                "reward_version": REWARD_VERSION,
                 "topology": "local_disaggregated_2gpu",
                 "minimum_gpus": 2,
                 "upstream_recommended_vram_gb_per_gpu": 40,
@@ -330,6 +332,9 @@ def _run_owned(run_dir: Path) -> None:
         from alpagym_host.transport_env import apply_transport_env_vars
 
         config = load_run_config(run_dir / "resolved_config.yaml")
+        if manifest.get("reward_version") != REWARD_VERSION:
+            raise ValueError("Reward contract changed; prepare a fresh normalized reward run")
+        validate_reward_terms(config.reward.terms)
         validate_run_config(config, "run")
         registry = FileTopologyRegistry(config.artifact_paths.topology_registry_dir)
         if config.artifact_paths.topology_registry_dir.exists():

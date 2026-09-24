@@ -9,6 +9,7 @@ import tempfile
 import tomllib
 import unittest
 
+from training.alpagym_metrics import REWARD_SCALES, REWARD_VERSION
 from training.nvidia_alpagym import (
     DEFAULT_SOURCE,
     cosmos_command,
@@ -62,14 +63,16 @@ class ConfigurationTests(unittest.TestCase):
             self.assertTrue(all(term.kind == "metric" for term in config.reward.terms))
             self.assertEqual(
                 {term.metric_name for term in config.reward.terms},
-                {"progress", "collision_any", "offroad"},
+                {"progress", "collision_any", "offroad", "fall_without_collision"},
             )
+            self.assertEqual({term.metric_name: term.scale for term in config.reward.terms}, REWARD_SCALES)
             self.assertEqual(config.cosmos.mode, "disaggregated")
             command = cosmos_command(DEFAULT_SOURCE, config)
             self.assertEqual(command[-1], "training.alpagym_worker")
             self.assertIn("cosmos_rl.launcher.launch_all", command)
             manifest = json.loads((run_dir / "launch_manifest.json").read_text())
             self.assertFalse(manifest["gpu_training_verified"])
+            self.assertEqual(manifest["reward_version"], REWARD_VERSION)
             self.assertFalse((run_dir / "topology").exists())
             game = json.loads((run_dir / "game_config.json").read_text())
             self.assertTrue((Path(game["project_path"]) / "project.godot").is_file())

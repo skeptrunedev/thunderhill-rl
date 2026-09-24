@@ -202,7 +202,8 @@ class RealGameTests(unittest.TestCase):
         output, fixture, result = self.run_fixture(False)
         self.assertTrue(result.success, result.error)
         self.assertEqual(
-            set(result.aggregated_metrics), {"progress", "collision_any", "offroad"}
+            set(result.aggregated_metrics),
+            {"progress", "collision_any", "offroad", "fall_without_collision"},
         )
         self.assertGreater(result.aggregated_metrics["progress"], 0)
         self.assertEqual(fixture.drive_times, [1_500_000, 1_700_000, 1_900_000])
@@ -218,6 +219,14 @@ class RealGameTests(unittest.TestCase):
         summary = json.loads((output / "summary.json").read_text())
         self.assertEqual(summary["policy_version"], 7)
         self.assertTrue(summary["warmup_progress_excluded"])
+        definition = summary["reward_definition"]
+        self.assertAlmostEqual(
+            result.aggregated_metrics["progress"],
+            definition["legal_progress_m"] / definition["progress_normalizer_m"],
+        )
+        self.assertGreater(definition["progress_normalizer_m"], 1000)
+        self.assertEqual(result.aggregated_metrics["offroad"], 0)
+        self.assertEqual(result.aggregated_metrics["fall_without_collision"], 0)
 
     def test_official_driver_and_policy_preprocessing(self):
         from concurrent.futures import Future

@@ -37,6 +37,7 @@ from driving_trajectory import TrajectoryTracker
 from lap_policy import RoadTelemetry
 from lap_episode import StallMonitor
 from video_jobs import enqueue_video
+from training.alpagym_metrics import EpisodeMetrics, validate_reward_terms
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENE_ID = "thunderhill-east-standing"
@@ -335,6 +336,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
             tracker = TrajectoryTracker()
             stall_monitor = StallMonitor()
             baseline = None
+            reward_metrics = None
             model_decisions = 0
             reason = "episode_tick_limit"
 
@@ -431,6 +433,12 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 view = json.loads(
                     env.control_bike(view["observation_token"], **command)
                 )
+                if reward_metrics is not None:
+                    transitions = env._observation["transitions"]
+                    if not transitions:
+                        raise RuntimeError("An executed control has no physics transitions")
+                    for transition in transitions:
+                        reward_metrics.observe(transition)
                 decisions.write(
                     json.dumps(
                         dict(
@@ -462,6 +470,10 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 if env._observation["state"]["speed"] > 0.01:
                     raise RuntimeError("Standing warmup moved the motorcycle")
                 baseline = env._observation["track"]["legal_distance"]
+                reward_metrics = EpisodeMetrics(
+                    track_length_m=self.road.length,
+                    start_legal_distance_m=baseline,
+                )
                 stall_monitor.observe(0, baseline)
                 first = captures[0]
                 stub.start_session(
@@ -582,16 +594,13 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             or "finished"
                         )
                 final = env._observation
-                metrics = dict(
-                    progress=float(final["track"]["legal_distance"] - baseline),
-                    collision_any=float(final["state"]["crashed"]),
-                    offroad=float(not final["track"]["lap_valid"]),
-                )
+                metrics = reward_metrics.values()
                 _write_json(
                     output / "summary.json",
                     dict(
                         **provenance,
                         metrics=metrics,
+                        reward_definition=reward_metrics.report(),
                         stop_reason=reason,
                         final_observation=final,
                         warmup_progress_excluded=True,
@@ -660,6 +669,7 @@ def main():
     from alpagym_host.endpoint_registry import FileTopologyRegistry, TopologyEndpoint
 
     cfg = load_run_config(args.resolved_config)
+    validate_reward_terms(cfg.reward.terms)
     game = json.loads(args.game_config.read_text())
     service = GodotRuntime(game, Path(cfg.artifact_paths.run_dir) / "rollout_identity")
     server = grpc.server(ThreadPoolExecutor(max_workers=game["concurrency"] + 4))
