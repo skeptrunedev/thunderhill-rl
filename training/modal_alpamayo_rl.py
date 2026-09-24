@@ -154,11 +154,11 @@ def run_generation(run_id: str, paths: dict, source: dict):
         '-u', REMOTE + '/training/train_alpamayo_rl.py', '--checkpoint', paths['checkpoint'],
         '--processor-path', paths['processor_path'], '--godot', '/usr/local/bin/godot',
         '--output', str(root / 'experiment'), '--seconds', '12', '--rollouts', '2']
-    (root / 'launch.json').write_text(json.dumps(dict(command=command, source=source,
+    (root / 'launch.json').write_text(json.dumps(dict(run_id=run_id, command=command, source=source,
         gpu='RTX-PRO-6000', child_timeout_seconds=1500, supervised_training_performed=False), indent=2))
     runs.commit()
     started = time.monotonic()
-    status = dict(ok=False)
+    status = dict(run_id=run_id, ok=False)
     try:
         run_logged_process(command, cwd=REMOTE, log_path=root / 'run.log',
             timeout_seconds=1500, heartbeat=runs.commit)
