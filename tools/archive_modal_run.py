@@ -6,10 +6,11 @@ finished. Failed training runs are archived and rendered exactly like successes.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import fcntl
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import sys
@@ -47,8 +48,76 @@ def finished_status(run_id, *, staging_root, execute=subprocess.run):
     return status
 
 
+def download_volume_run(volume, run_id, stage, *, workers=4):
+    """Finish the inventory RPC before starting bounded, atomic file downloads."""
+    if not 1 <= workers <= 8:
+        raise ValueError('Download workers must be between 1 and 8')
+    stage = Path(stage).resolve()
+    stage.mkdir(parents=True, exist_ok=True)
+    entries = list(volume.iterdir(run_id, recursive=True))
+    inventory = []
+    seen = set()
+    for entry in entries:
+        relative = PurePosixPath(entry.path.lstrip('/'))
+        if ('..' in relative.parts or not relative.parts or relative.parts[0] != run_id
+                or str(relative) in seen):
+            raise ValueError(f'Unsafe or duplicate volume path: {entry.path}')
+        seen.add(str(relative))
+        destination = stage.joinpath(*relative.parts)
+        if not destination.resolve().is_relative_to(stage):
+            raise ValueError(f'Volume path escapes staging: {entry.path}')
+        kind = int(entry.type)
+        if kind not in (1, 2):
+            raise ValueError(f'Unsupported volume entry type: {entry.path}')
+        if entry.size < 0:
+            raise ValueError(f'Invalid volume file size: {entry.path}')
+        inventory.append(dict(path=str(relative), type=kind, size=entry.size))
+    if not inventory:
+        raise ValueError('Volume run inventory is empty')
+    with (stage / 'download-inventory.json').open('x') as receipt:
+        json.dump(inventory, receipt, indent=2)
+    for entry in inventory:
+        destination = stage / entry['path']
+        if entry['type'] == 2:
+            destination.mkdir(parents=True, exist_ok=True)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if destination.exists():
+                raise FileExistsError(destination)
+
+    def download(entry):
+        destination = stage / entry['path']
+        # Failed or interrupted files stay visibly partial in the staging tree.
+        fd, partial = tempfile.mkstemp(prefix=destination.name + '.', suffix='.partial',
+                                       dir=destination.parent)
+        with os.fdopen(fd, 'wb') as stream:
+            transferred = volume.read_file_into_fileobj(entry['path'], stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if transferred != entry['size'] or os.stat(partial).st_size != entry['size']:
+            raise ValueError(f"Downloaded size mismatch: {entry['path']}")
+        # Atomic publication without replacing any existing file.
+        os.link(partial, destination)
+        os.unlink(partial)
+        return entry['size']
+
+    pool = ThreadPoolExecutor(max_workers=workers)
+    try:
+        futures = [pool.submit(download, item) for item in inventory if item['type'] == 1]
+        sizes = [future.result() for future in as_completed(futures)]
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
+    print(json.dumps({'downloaded_files': len(sizes), 'downloaded_bytes': sum(sizes),
+                      'download_workers': workers}), flush=True)
+
+
+def download_with_sdk(run_id, stage, *, modal_python, execute=subprocess.run):
+    execute([str(modal_python), str(Path(__file__).resolve()), 'download',
+             '--run-id', run_id, '--stage', str(stage)], check=True)
+
+
 def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
-                execute=subprocess.run, sleep=time.sleep):
+                execute=subprocess.run, sleep=time.sleep, modal_python=None, downloader=None):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", run_id):
         raise ValueError("Invalid run ID")
     staging_root, output = Path(staging_root).resolve(), Path(output).resolve()
@@ -76,8 +145,12 @@ def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
             print(json.dumps({"waiting_for_run": run_id}), flush=True)
             sleep(30)
         stage = Path(tempfile.mkdtemp(prefix=f"{run_id}-", dir=staging_root))
-        # Modal 1.5.4 requires the directory to exist before recursive downloads.
-        execute(["modal", "volume", "get", VOLUME, run_id, str(stage)], check=True)
+        if downloader is not None:
+            downloader(run_id, stage)
+        else:
+            if modal_python is None:
+                raise ValueError('Supply --modal-python with an interpreter containing the Modal SDK')
+            download_with_sdk(run_id, stage, modal_python=modal_python, execute=execute)
         downloaded = stage / run_id
         local_status = json.loads((downloaded / "status.json").read_text())
         launch = json.loads((downloaded / "launch.json").read_text())
@@ -105,6 +178,17 @@ def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'download':
+        parser = argparse.ArgumentParser(description='Download an inventoried Modal run')
+        parser.add_argument('--run-id', required=True)
+        parser.add_argument('--stage', type=Path, required=True)
+        args = parser.parse_args(sys.argv[2:])
+        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,127}', args.run_id):
+            raise ValueError('Invalid run ID')
+        import modal
+        volume = modal.Volume.from_name(VOLUME)
+        download_volume_run(volume, args.run_id, args.stage)
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--staging-root", type=Path, required=True)
@@ -112,6 +196,7 @@ def main():
     parser.add_argument("--godot", required=True)
     parser.add_argument("--ffmpeg", required=True)
     parser.add_argument("--watch", action="store_true")
+    parser.add_argument("--modal-python", type=Path, required=True)
     args = parser.parse_args()
     archive_run(**vars(args))
 
