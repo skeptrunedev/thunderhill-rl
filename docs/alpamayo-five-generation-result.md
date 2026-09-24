@@ -34,3 +34,16 @@ rendered separately with explicit interrupted metadata. Both Modal apps are stop
 * Run: `alpamayo-training-20260924T153854Z`
 * Resume source commit: `6cb29c0`
 * Recovery rendering source commit: `106056f`
+
+## Verified recordings
+
+All 65 attempt videos are rendered and verified, including the interrupted attempt.
+The archive has 36,424 video frames totaling 20 minutes 14 seconds. Recording,
+job, and movie hashes match; all 65 video indices report complete with zero
+failures. The 64 completed attempt summaries match their recorded final ticks.
+
+Local archive: `artifacts/modal-alpamayo-training-20260924T153854Z`.
+Its `video-index.md` links every movie, and `video-index.json` provides a machine
+readable index for future montage assembly. All 17,739 regular remote files were
+size verified during download. Five W&B diagnostic symlinks are preserved as
+listing metadata rather than followed; concrete regular files remain archived.

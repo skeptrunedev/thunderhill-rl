@@ -581,5 +581,18 @@
       }
     }
   ],
-  "conclusion": "Five real updates completed; no consistent heldout driving improvement. Standing launches remain stalled, no laps completed."
+  "conclusion": "Five real updates completed; no consistent heldout driving improvement. Standing launches remain stalled, no laps completed.",
+  "archive_verification": {
+    "complete": true,
+    "regular_files": 17739,
+    "regular_file_bytes": 39056311463,
+    "verified_video_count": 65,
+    "complete_attempts": 64,
+    "interrupted_attempts": 1,
+    "video_frames": 36424,
+    "video_seconds": 1214.133333,
+    "render_failures": 0,
+    "recorded_transitions": 137889,
+    "wandb_diagnostic_symlinks_metadata_only": 5
+  }
 }
