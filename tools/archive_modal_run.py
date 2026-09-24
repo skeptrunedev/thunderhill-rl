@@ -48,10 +48,18 @@ def finished_status(run_id, *, staging_root, execute=subprocess.run):
     return status
 
 
-def download_volume_run(volume, run_id, stage, *, workers=4):
+def download_volume_run(volume, run_id, stage, *, workers=4, resume=False):
+    stage = Path(stage).resolve()
+    stage.mkdir(parents=True, exist_ok=True)
+    with (stage / '.download.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return _download_volume_run(volume, run_id, stage, workers=workers, resume=resume)
+
+
+def _download_volume_run(volume, run_id, stage, *, workers, resume):
     """Finish the inventory RPC before starting bounded, atomic file downloads."""
-    if not 1 <= workers <= 8:
-        raise ValueError('Download workers must be between 1 and 8')
+    if not 1 <= workers <= 16:
+        raise ValueError('Download workers must be between 1 and 16')
     stage = Path(stage).resolve()
     stage.mkdir(parents=True, exist_ok=True)
     entries = list(volume.iterdir(run_id, recursive=True))
@@ -64,6 +72,9 @@ def download_volume_run(volume, run_id, stage, *, workers=4):
             raise ValueError(f'Unsafe or duplicate volume path: {entry.path}')
         seen.add(str(relative))
         destination = stage.joinpath(*relative.parts)
+        components = [destination, *destination.parents]
+        if any(part.is_symlink() for part in components if part.is_relative_to(stage)):
+            raise ValueError(f'Unexpected local symlink: {entry.path}')
         if not destination.resolve().is_relative_to(stage):
             raise ValueError(f'Volume path escapes staging: {entry.path}')
         kind = int(entry.type)
@@ -88,8 +99,16 @@ def download_volume_run(volume, run_id, stage, *, workers=4):
             raise ValueError(f"Unsupported volume symlink: {entry['path']}")
         entry.update(archive_action='metadata_only_wandb_diagnostic_symlink',
                      target_available=False)
-    with (stage / 'download-inventory.json').open('x') as receipt:
-        json.dump(inventory, receipt, indent=2)
+    receipt_path = stage / 'download-inventory.json'
+    if resume:
+        if sorted(json.loads(receipt_path.read_text()), key=lambda item: item['path']) != sorted(
+                inventory, key=lambda item: item['path']):
+            raise ValueError('Remote inventory changed since the original download')
+    else:
+        with receipt_path.open('x') as receipt:
+            json.dump(inventory, receipt, indent=2)
+    pending = []
+    completed_bytes = completed_files = 0
     for entry in inventory:
         destination = stage / entry['path']
         if entry['type'] == 3:
@@ -99,7 +118,18 @@ def download_volume_run(volume, run_id, stage, *, workers=4):
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             if destination.exists():
-                raise FileExistsError(destination)
+                if not resume:
+                    raise FileExistsError(destination)
+                if not destination.is_file() or destination.stat().st_size != entry['size']:
+                    raise ValueError(f'Invalid completed staging file: {destination}')
+                # These final names were created only after the original writer
+                # fsynced and size checked its temporary file, using atomic link.
+                completed_files += 1
+                completed_bytes += entry['size']
+            else:
+                pending.append(entry)
+    print(json.dumps({'resumed_files': completed_files, 'resumed_bytes': completed_bytes,
+                      'pending_files': len(pending), 'download_workers': workers}), flush=True)
 
     def download(entry):
         destination = stage / entry['path']
@@ -119,8 +149,14 @@ def download_volume_run(volume, run_id, stage, *, workers=4):
 
     pool = ThreadPoolExecutor(max_workers=workers)
     try:
-        futures = [pool.submit(download, item) for item in inventory if item['type'] == 1]
-        sizes = [future.result() for future in as_completed(futures)]
+        futures = [pool.submit(download, item) for item in pending]
+        sizes = []
+        for future in as_completed(futures):
+            sizes.append(future.result())
+            if len(sizes) % 256 == 0:
+                print(json.dumps({'downloaded_files': len(sizes),
+                                  'pending_files': len(pending) - len(sizes),
+                                  'resumed_files': completed_files}), flush=True)
     finally:
         pool.shutdown(wait=True, cancel_futures=True)
     print(json.dumps({'downloaded_files': len(sizes), 'downloaded_bytes': sum(sizes),
@@ -128,15 +164,22 @@ def download_volume_run(volume, run_id, stage, *, workers=4):
                       'wandb_aliases_metadata_only': sum(item['type'] == 3 for item in inventory)}), flush=True)
 
 
-def download_with_sdk(run_id, stage, *, modal_python, execute=subprocess.run):
-    execute([str(modal_python), str(Path(__file__).resolve()), 'download',
-             '--run-id', run_id, '--stage', str(stage)], check=True)
+def download_with_sdk(run_id, stage, *, modal_python, execute=subprocess.run,
+                      workers=4, resume=False):
+    command = [str(modal_python), str(Path(__file__).resolve()), 'download',
+               '--run-id', run_id, '--stage', str(stage), '--download-workers', str(workers)]
+    if resume:
+        command.append('--resume')
+    execute(command, check=True)
 
 
 def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
-                execute=subprocess.run, sleep=time.sleep, modal_python=None, downloader=None):
+                execute=subprocess.run, sleep=time.sleep, modal_python=None, downloader=None,
+                resume_stage=None, download_workers=4):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", run_id):
         raise ValueError("Invalid run ID")
+    if not 1 <= download_workers <= 16:
+        raise ValueError('Download workers must be between 1 and 16')
     staging_root, output = Path(staging_root).resolve(), Path(output).resolve()
     watched = (REPO / "artifacts").resolve()
     if staging_root.is_relative_to(watched) or staging_root.is_relative_to(output.parent):
@@ -161,13 +204,30 @@ def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
                 raise RuntimeError("Run has no terminal status; use --watch to wait")
             print(json.dumps({"waiting_for_run": run_id}), flush=True)
             sleep(30)
-        stage = Path(tempfile.mkdtemp(prefix=f"{run_id}-", dir=staging_root))
+        if resume_stage is not None:
+            stage = Path(resume_stage).resolve()
+            if (stage.parent != staging_root or not stage.is_dir()
+                    or not stage.name.startswith(run_id + '-')):
+                raise ValueError('Resume stage must be an existing run directory in staging root')
+            local_status = json.loads((stage / run_id / 'status.json').read_text())
+            local_launch = json.loads((stage / run_id / 'launch.json').read_text())
+            if local_status != status or local_launch.get('run_id') != run_id:
+                raise ValueError('Resume stage run status or launch identity mismatch')
+            with tempfile.TemporaryDirectory(prefix='launch-', dir=staging_root) as directory:
+                launch_path = Path(directory) / 'launch.json'
+                execute(['modal', 'volume', 'get', VOLUME, f'{run_id}/launch.json', str(launch_path)],
+                        check=True, capture_output=True, text=True, timeout=60)
+                if json.loads(launch_path.read_text()) != local_launch:
+                    raise ValueError('Resume stage launch differs from remote launch')
+        else:
+            stage = Path(tempfile.mkdtemp(prefix=f"{run_id}-", dir=staging_root))
         if downloader is not None:
             downloader(run_id, stage)
         else:
             if modal_python is None:
                 raise ValueError('Supply --modal-python with an interpreter containing the Modal SDK')
-            download_with_sdk(run_id, stage, modal_python=modal_python, execute=execute)
+            download_with_sdk(run_id, stage, modal_python=modal_python, execute=execute,
+                              workers=download_workers, resume=resume_stage is not None)
         downloaded = stage / run_id
         local_status = json.loads((downloaded / "status.json").read_text())
         launch = json.loads((downloaded / "launch.json").read_text())
@@ -199,12 +259,15 @@ def main():
         parser = argparse.ArgumentParser(description='Download an inventoried Modal run')
         parser.add_argument('--run-id', required=True)
         parser.add_argument('--stage', type=Path, required=True)
+        parser.add_argument('--download-workers', type=int, default=4)
+        parser.add_argument('--resume', action='store_true')
         args = parser.parse_args(sys.argv[2:])
         if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,127}', args.run_id):
             raise ValueError('Invalid run ID')
         import modal
         volume = modal.Volume.from_name(VOLUME)
-        download_volume_run(volume, args.run_id, args.stage)
+        download_volume_run(volume, args.run_id, args.stage,
+                            workers=args.download_workers, resume=args.resume)
         return
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True)
@@ -213,6 +276,8 @@ def main():
     parser.add_argument("--godot", required=True)
     parser.add_argument("--ffmpeg", required=True)
     parser.add_argument("--watch", action="store_true")
+    parser.add_argument("--resume-stage", type=Path)
+    parser.add_argument("--download-workers", type=int, default=4)
     parser.add_argument("--modal-python", type=Path, required=True)
     args = parser.parse_args()
     archive_run(**vars(args))

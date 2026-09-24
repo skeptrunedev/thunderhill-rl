@@ -107,6 +107,38 @@ class ArchiveTests(unittest.TestCase):
                         godot="godot", ffmpeg="ffmpeg", execute=fail_render, downloader=self.download)
         self.assertTrue((self.out / "trial/status.json").is_file())
 
+    def test_resume_reuses_stage_and_checks_remote_launch(self):
+        stage = self.root / 'staging/trial-existing'
+        stage.mkdir(parents=True)
+        self.download('trial', stage)
+        downloaded = []
+        def execute(command, **kwargs):
+            if len(command) > 4 and command[4] == 'trial/launch.json':
+                Path(command[-1]).write_text(json.dumps({'run_id': 'trial'}))
+                return subprocess.CompletedProcess(command, 0)
+            return self.execute(command, **kwargs)
+        archive_run(run_id='trial', staging_root=self.root / 'staging', output=self.out,
+                    godot='godot', ffmpeg='ffmpeg', execute=execute,
+                    downloader=lambda run_id, path: downloaded.append(path),
+                    resume_stage=stage, download_workers=16)
+        self.assertEqual(downloaded, [stage])
+        self.assertTrue((self.out / 'trial/status.json').exists())
+        self.assertFalse(stage.exists())
+
+    def test_resume_mismatched_status_never_downloads_or_publishes(self):
+        stage = self.root / 'staging/trial-existing'
+        stage.mkdir(parents=True)
+        self.download('trial', stage)
+        (stage / 'trial/status.json').write_text(json.dumps({'run_id': 'trial', 'ok': True}))
+        from unittest.mock import Mock
+        downloader = Mock()
+        with self.assertRaisesRegex(ValueError, 'status or launch identity mismatch'):
+            archive_run(run_id='trial', staging_root=self.root / 'staging', output=self.out,
+                        godot='godot', ffmpeg='ffmpeg', execute=self.execute,
+                        downloader=downloader, resume_stage=stage)
+        downloader.assert_not_called()
+        self.assertFalse(self.out.exists())
+
     def test_cli_failure_is_not_pending(self):
         def fail(*args, **kwargs):
             raise subprocess.CalledProcessError(1, args[0])
@@ -189,6 +221,50 @@ class VolumeDownloadTests(unittest.TestCase):
             self.assertEqual((Path(root) / 'trial/experiment/rollout/recording.jsonl').read_bytes(), b'abc')
             self.assertFalse((Path(root) / 'trial/experiment/wandb/debug.log').exists())
             self.assertEqual((Path(root) / 'trial/experiment/wandb/run-2026/logs/debug.log').read_bytes(), b'abc')
+
+    def test_resume_skips_only_complete_verified_files_and_preserves_partials(self):
+        entries = [SimpleNamespace(path='trial/' + name, type=1, size=3)
+                   for name in ('complete', 'interrupted')]
+        reads = []
+        def interrupted(path, output):
+            reads.append(path)
+            if path.endswith('interrupted'):
+                output.write(b'a')
+                raise ConnectionError('lost')
+            return output.write(b'abc')
+        volume = SimpleNamespace(iterdir=lambda *args, **kwargs: entries,
+                                 read_file_into_fileobj=interrupted)
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaises(ConnectionError):
+                download_volume_run(volume, 'trial', root, workers=1)
+            complete = Path(root) / 'trial/complete'
+            original_inode = complete.stat().st_ino
+            partials = list((Path(root) / 'trial').glob('*.partial'))
+            self.assertEqual(len(partials), 1)
+            reads.clear()
+            def recovered(path, output):
+                reads.append(path)
+                return output.write(b'abc')
+            volume.read_file_into_fileobj = recovered
+            download_volume_run(volume, 'trial', root, workers=16, resume=True)
+            self.assertEqual(reads, ['trial/interrupted'])
+            self.assertEqual(complete.stat().st_ino, original_inode)
+            self.assertEqual(partials[0].read_bytes(), b'a')
+
+    def test_resume_rejects_changed_inventory_and_corrupt_final_file(self):
+        entries = [SimpleNamespace(path='trial/complete', type=1, size=3)]
+        volume = SimpleNamespace(iterdir=lambda *args, **kwargs: entries,
+                                 read_file_into_fileobj=lambda path, output: output.write(b'abc'))
+        with tempfile.TemporaryDirectory() as root:
+            download_volume_run(volume, 'trial', root)
+            entries[0].size = 4
+            with self.assertRaisesRegex(ValueError, 'inventory changed'):
+                download_volume_run(volume, 'trial', root, resume=True)
+            entries[0].size = 3
+            (Path(root) / 'trial/complete').write_bytes(b'a')
+            with self.assertRaisesRegex(ValueError, 'Invalid completed staging file'):
+                download_volume_run(volume, 'trial', root, resume=True)
+            self.assertEqual((Path(root) / 'trial/complete').read_bytes(), b'a')
 
     def test_unsafe_inventory_is_rejected_before_any_reads(self):
         from unittest.mock import Mock
