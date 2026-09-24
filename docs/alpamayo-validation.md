@@ -30,7 +30,10 @@ reward auditing, recording queues and persisted replay artifacts. CPU tests of
 NVIDIA's stochastic sampler verify replay density and policy gradient arithmetic
 using a tiny test head, not a driving checkpoint.
 
-The actual processor test remains gated by access to `nvidia/Cosmos-Reason2-8B`.
+The actual Cosmos Reason2 processor test passes in the pinned Alpamayo
+environment, including four camera frames and sixteen motion history poses.
+Run these checks with `training/alpamayo/.venv/bin/python`; the previous training
+environment contains incompatible Transformers configuration initialization.
 The full Alpamayo model has not completed a gameplay or optimizer validation.
 Neither local integration tests nor the CPU arithmetic tests establish that the
 complete model trains successfully on the planned GPU.
