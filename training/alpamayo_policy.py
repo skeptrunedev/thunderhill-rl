@@ -305,7 +305,19 @@ class AlpamayoPolicy:
         rewards = torch.tensor([episode["reward"] for episode in episodes], dtype=torch.float32)
         if not torch.isfinite(rewards).all():
             raise ValueError("Nonfinite gameplay reward")
-        advantages = (rewards - rewards.mean()) / rewards.std(unbiased=False).clamp_min(1e-6)
+        groups = [episode.get('reward_group', 'default') for episode in episodes]
+        if any(not isinstance(group, str) or not group for group in groups):
+            raise ValueError('Reward groups require nonempty scenario names')
+        advantages = torch.zeros_like(rewards)
+        group_statistics = {}
+        for group in sorted(set(groups)):
+            indices = [i for i, value in enumerate(groups) if value == group]
+            if len(indices) < 2:
+                raise ValueError('Each reward group requires at least two gameplay episodes')
+            values = rewards[indices]
+            mean, std = values.mean(), values.std(unbiased=False)
+            advantages[indices] = (values - mean) / std.clamp_min(1e-6)
+            group_statistics[group] = dict(count=len(indices), mean=float(mean), std=float(std))
         if not advantages.abs().max().item():
             raise RuntimeError("Equal gameplay rewards give no learning signal; collect another rollout")
         before = self.adapter_hash()
@@ -341,6 +353,7 @@ class AlpamayoPolicy:
                        for param, old in zip(self.trainable, before_parameters))
         return {"optimizer_updates": 1, "optimizer_steps": 1, "parameter_delta_l1": delta_l1, "loss": loss_sum, "gradient_norm": float(norm),
                 "rewards": rewards.tolist(), "advantages": advantages.tolist(),
+                "reward_groups": groups, "reward_group_statistics": group_statistics,
                 "max_behavior_logprob_error": max_replay_error, "max_decisions": max_decisions,
                 "adapter_sha256_before": before, "adapter_sha256_after": after}
 

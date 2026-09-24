@@ -114,7 +114,7 @@ def episode_reward(*, legal_progress_m, track_length_m, sim_seconds,
 
 
 class LapEpisode:
-    """One isolated standing start, advanced by externally generated actions.
+    """One isolated configured start, advanced by externally generated actions.
 
     Use with ExitStack. Every started episode is closed and queued on context exit,
     including inference failures. Infrastructure failures propagate and cannot
@@ -124,12 +124,21 @@ class LapEpisode:
     def __init__(self, *, godot, output, road, adapter_sha256, model, revision,
                  generation, rollout, time_budget_seconds=900, evaluation=False, rollout_count=None,
                  worker_factory=worker, stall_config=DEFAULT_STALL_CONFIG,
-                 action_parser=None,
+                 action_parser=None, initial_speed_m_s=0.0, scenario_setup_ticks=0,
                  policy_identity_kind="adapter_weights_sha256"):
         if policy_identity_kind not in {"adapter_weights_sha256", "api_request_config_sha256"}:
             raise ValueError("Unsupported policy identity kind")
         if policy_identity_kind == "api_request_config_sha256" and not evaluation:
             raise ValueError("Remote API policies are evaluation only")
+        if (type(initial_speed_m_s) not in (int, float)
+                or not math.isfinite(initial_speed_m_s) or not 0 <= initial_speed_m_s <= 10):
+            raise ValueError("Invalid initial speed")
+        if (type(scenario_setup_ticks) is not int or scenario_setup_ticks not in (0, 180)
+                or (scenario_setup_ticks and initial_speed_m_s <= 0)):
+            raise ValueError("Scenario setup must be 180 moving start ticks or zero")
+        self.initial_speed_m_s = initial_speed_m_s
+        self.scenario_setup_ticks = scenario_setup_ticks
+        self.model_control_start_state = None
         self.policy_identity_kind = policy_identity_kind
         if len(adapter_sha256) != 64 or any(c not in "0123456789abcdef" for c in adapter_sha256):
             raise ValueError("Expected SHA256 policy identity")
@@ -139,7 +148,7 @@ class LapEpisode:
         self.godot, self.output, self.road = godot, Path(output).resolve(), road
         self.adapter_sha256, self.model, self.revision = adapter_sha256, model, revision
         self.generation, self.rollout = generation, rollout
-        self.time_budget_seconds, self.max_ticks = time_budget_seconds, ticks
+        self.time_budget_seconds, self.max_ticks = time_budget_seconds, ticks + scenario_setup_ticks
         self.display = {"model_name": model, "generation": generation}
         if evaluation:
             self.display["evaluation"] = True
@@ -168,13 +177,14 @@ class LapEpisode:
             self.policy_step = f"lap-generation-{self.generation}-rollout-{self.rollout}-{self.adapter_sha256[:12]}"
             self.env = ThunderhillEnv(self.client, self.rollout, trace, lambda: self.policy_step,
                                       road_telemetry=self.road)
-            self.env.reset(policy_display=self.display)
+            self.env.reset(policy_display=self.display, initial_speed_m_s=self.initial_speed_m_s)
             self._started = True
             self.episode_id = self.env._observation["episode_id"]
             self.view = json.loads(self.env.observe())
-            if self.env._observation["tick"] != 0 or self.env._observation["state"]["speed"] != 0:
-                raise ValueError("Full lap requires standing start at tick zero")
-            self.stall_monitor.observe(0, self.observation["track"]["legal_distance"])
+            if self.env._observation["tick"] != 0 or self.env._observation["state"]["speed"] != self.initial_speed_m_s:
+                raise ValueError("Episode reset must match configured initial speed at tick zero")
+            if not self.scenario_setup_ticks:
+                self.begin_model_control()
             return self
         except BaseException:
             try:
@@ -183,6 +193,13 @@ class LapEpisode:
             finally:
                 self._stack.close()
             raise
+
+    def begin_model_control(self):
+        if self.observation["tick"] != self.scenario_setup_ticks:
+            raise ValueError("Incomplete scenario history setup")
+        self.model_control_start_state = self.observation["state"]
+        self.model_control_start_progress_m = self.observation["track"]["legal_distance"]
+        self.stall_monitor.observe(0, self.model_control_start_progress_m)
 
     @property
     def done(self):
@@ -197,9 +214,11 @@ class LapEpisode:
             raise ValueError("Episode finished")
         return self.road.prompt_features(self.view["road"])
 
-    def apply(self, completion, completion_ids, prompt_ids, *, behavior_logprobs=None):
+    def apply(self, completion, completion_ids, prompt_ids, *, behavior_logprobs=None, scenario_setup=False):
         if self.done or self._finished:
             raise ValueError("Episode finished")
+        if scenario_setup != (self.observation["tick"] < self.scenario_setup_ticks):
+            raise ValueError("Scenario setup cannot replace model controls")
         row = {"action_index": len(self.records), "episode_id": self.episode_id,
                "prompt": self.prompt(), "prompt_ids": list(prompt_ids),
                "completion": completion, "completion_ids": list(completion_ids),
@@ -207,6 +226,7 @@ class LapEpisode:
         # adapter_sha256 remains the legacy audit identity field. Remote runs
         # explicitly identify a request configuration, never verified weights.
         row["policy_identity_kind"] = self.policy_identity_kind
+        row["action_source"] = "scenario_setup" if scenario_setup else "model"
         if behavior_logprobs is not None:
             if len(behavior_logprobs) != len(completion_ids) or not all(math.isfinite(x) for x in behavior_logprobs):
                 raise ValueError("Behavior log probabilities must match completion tokens")
@@ -217,6 +237,8 @@ class LapEpisode:
             row["error"] = str(error)
             self.reason = "invalid_model_action"
         else:
+            if scenario_setup and any(controls.values()):
+                raise ValueError("Moving history setup requires neutral coasting")
             self.view = json.loads(self.env.control_bike(self.view["observation_token"], **controls))
             row.update(tick=self.observation["tick"], controls=controls)
             obs = self.observation
@@ -224,7 +246,7 @@ class LapEpisode:
                 self.reason = obs.get("termination_reason") or obs.get("truncation_reason") or "finished"
             elif not obs["track"]["lap_valid"]:
                 self.reason = "track_limits"
-            elif self.stall_monitor.observe(obs["tick"], obs["track"]["legal_distance"]):
+            elif not scenario_setup and self.stall_monitor.observe(obs["tick"] - self.scenario_setup_ticks, obs["track"]["legal_distance"]):
                 self.reason = "stalled"
                 row["stall_diagnostic"] = self.stall_monitor.diagnostic
         self.records.append(row)
@@ -249,6 +271,9 @@ class LapEpisode:
             "policy_identity_kind": self.policy_identity_kind,
             "policy_display": self.display, "stop_reason": self.reason,
             "sim_seconds": final["sim_time"], "decisions": "decisions.jsonl",
+            "initial_speed_m_s": self.initial_speed_m_s,
+            "scenario_setup_ticks": self.scenario_setup_ticks,
+            "model_control_start_state": self.model_control_start_state,
             "stall_config": asdict(self.stall_monitor.config),
             "stall_diagnostic": self.stall_monitor.diagnostic})
         summary = {"episode_id": self.episode_id, "reason": self.reason,
@@ -258,6 +283,9 @@ class LapEpisode:
                    "policy_identity_kind": self.policy_identity_kind,
                    "video_job": str(video.relative_to(self.output)),
                    "final_observation": final, "training_eligible": False,
+                   "initial_speed_m_s": self.initial_speed_m_s,
+                   "scenario_setup_ticks": self.scenario_setup_ticks,
+                   "model_control_start_state": self.model_control_start_state,
                    "stall_config": asdict(self.stall_monitor.config),
                    "stall_diagnostic": self.stall_monitor.diagnostic}
         try:
@@ -265,7 +293,8 @@ class LapEpisode:
                               policy_id="interactive-step-" + self.policy_step,
                               track_sha256=self.road.track_sha256,
                               final_observation=final, decisions=self.records,
-                              parse_completion=self.parse_completion)
+                              parse_completion=self.parse_completion, initial_speed_m_s=self.initial_speed_m_s,
+                              scenario_setup_ticks=self.scenario_setup_ticks)
             summary.update(audit)
             if infrastructure_failure:
                 summary["infrastructure_failure"] = True
@@ -273,13 +302,17 @@ class LapEpisode:
                 with paths[0].open() as source:
                     next(source)
                     legal_progress = sum(row["reward_components"]["legal_progress_m"]
-                                         for row in recorded_transitions(source))
+                                         for row in recorded_transitions(source) if row["tick"] > self.scenario_setup_ticks)
                 summary["reward_components"] = episode_reward(
                     legal_progress_m=legal_progress, track_length_m=self.road.length,
-                    sim_seconds=final["sim_time"], time_budget_seconds=self.time_budget_seconds,
+                    sim_seconds=max(0, final["sim_time"] - self.scenario_setup_ticks / 120), time_budget_seconds=self.time_budget_seconds,
                     success=audit["success"], failed=final["state"]["crashed"] or not final["track"]["lap_valid"],
                     invalid_syntax=self.reason == "invalid_model_action")
-                summary["training_eligible"] = self.policy_identity_kind == "adapter_weights_sha256" and self.reason in {
+                summary["model_control_start_tick"] = self.scenario_setup_ticks
+                summary["scenario_setup_seconds"] = self.scenario_setup_ticks / 120
+                summary["model_control_legal_progress_m"] = legal_progress
+                summary["model_control_start_progress_m"] = getattr(self, "model_control_start_progress_m", None)
+                summary["training_eligible"] = self.model_control_start_state is not None and self.policy_identity_kind == "adapter_weights_sha256" and self.reason in {
                     "lap_completed", "crash", "episode_tick_limit", "track_limits", "invalid_model_action", "stalled"}
         except BaseException as error:
             summary["audit_error"] = str(error)

@@ -76,7 +76,7 @@ class LapAuditTests(unittest.TestCase):
         self.final["track"]["completed_laps"] = 1
         self.final["rollout_valid"] = True
 
-    def audit(self, paths=None):
+    def audit(self, paths=None, **kwargs):
         self.path.write_text(
             "".join(json.dumps(row) + "\n" for row in [self.header, *self.rows])
         )
@@ -88,7 +88,33 @@ class LapAuditTests(unittest.TestCase):
             final_observation=self.final,
             decisions=self.decisions,
             parse_completion=getattr(self, "parse_completion", parse_action),
+            **kwargs,
         )
+
+    def test_moving_setup_is_neutral_and_explicitly_separate(self):
+        self.header['initial_state']['speed'] = 5
+        neutral = parse_action('control_bike 0 0 0 0')
+        for decision in self.decisions[:15]:
+            decision.update(action_source='scenario_setup', controls=dict(neutral),
+                            completion='control_bike 0 0 0 0')
+        for row in self.rows[:180]:
+            row['requested_controls'] = dict(neutral)
+        result = self.audit(initial_speed_m_s=5, scenario_setup_ticks=180)
+        self.assertEqual(result['scenario_setup_actions'], 15)
+        self.assertEqual(result['model_actions'], 17)
+        self.decisions[0]['action_source'] = 'model'
+        with self.assertRaisesRegex(ValueError, 'source mismatch'):
+            self.audit(initial_speed_m_s=5, scenario_setup_ticks=180)
+        self.decisions[0]['action_source'] = 'scenario_setup'
+        self.decisions[0]['completion_ids'] = [1]
+        with self.assertRaisesRegex(ValueError, 'training targets'):
+            self.audit(initial_speed_m_s=5, scenario_setup_ticks=180)
+        self.decisions[0]['completion_ids'] = []
+        self.decisions[0]['completion'] = 'control_bike 0 1 0 0'
+        with self.assertRaisesRegex(ValueError, 'neutral'):
+            self.audit(initial_speed_m_s=5, scenario_setup_ticks=180)
+        with self.assertRaisesRegex(ValueError, 'initial speed'):
+            self.audit()
 
     def test_complete_lap_and_partial_final_action(self):
         result = self.audit()

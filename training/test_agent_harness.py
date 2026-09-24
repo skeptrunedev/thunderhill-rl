@@ -41,6 +41,15 @@ class HarnessTests(unittest.TestCase):
         self.env = ThunderhillEnv(self.client, 0, self.trace, lambda: 7)
         self.env.reset()
 
+    def test_moving_start_speed_is_explicit_and_validated(self):
+        self.env.reset(initial_speed_m_s=5)
+        self.assertEqual(self.client.requests[-1]['initial_speed_m_s'], 5)
+        self.env.reset()
+        self.assertNotIn('initial_speed_m_s', self.client.requests[-1])
+        for speed in (True, -1, 11, float('nan'), '5'):
+            with self.assertRaises(ValueError):
+                self.env.reset(initial_speed_m_s=speed)
+
     def test_policy_display_is_forwarded_only_for_requested_episode(self):
         metadata = {
             "model_name": "example",

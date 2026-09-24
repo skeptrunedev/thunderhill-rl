@@ -447,7 +447,8 @@ func reset_episode(
 	checkpoint: String = "human",
 	initial_state: Dictionary = {},
 	snapshot: Dictionary = {},
-	display: Variant = null
+	display: Variant = null,
+	initial_speed_m_s: float = 0.0
 ) -> Dictionary:
 	policy_display = (startup_policy_display if display == null else display).duplicate(true)
 	var index := 0
@@ -460,7 +461,7 @@ func reset_episode(
 	var tangent: Vector3 = (
 		(track.points[(index + 1) % track.points.size()] - track.points[index]).normalized()
 	)
-	sim.reset(track.points[index], atan2(tangent.x, -tangent.z))
+	sim.reset(track.points[index], atan2(tangent.x, -tangent.z), initial_speed_m_s)
 	episode_number += 1
 	episode_id = run_id + "_" + str(episode_number)
 	policy_id = checkpoint
@@ -1223,7 +1224,9 @@ func _request(request: Dictionary) -> Dictionary:
 	var op: String = request.get("op", "")
 	if op == "reset":
 		for key: Variant in request:
-			if key not in ["op", "station", "policy_id", "snapshot_id", "policy_display"]:
+			if key not in [
+				"op", "station", "policy_id", "snapshot_id", "policy_display", "initial_speed_m_s"
+			]:
 				return {"error": "Unknown reset field: " + str(key)}
 		var display: Variant = request.get("policy_display", startup_policy_display)
 		if request.has("policy_display"):
@@ -1232,14 +1235,22 @@ func _request(request: Dictionary) -> Dictionary:
 				return {"error": display_error}
 		if request.has("snapshot_id"):
 			var id: Variant = request.snapshot_id
-			if request.has("station"):
-				return {"error": "Snapshot reset cannot also select station"}
+			if request.has("station") or request.has("initial_speed_m_s"):
+				return {"error": "Snapshot reset cannot also select station or initial speed"}
 			if not id is String or id.length() != 32 or not agent_snapshots.has(id):
 				return {"error": "Unknown worker snapshot"}
 			var snapshot: Dictionary = agent_snapshots[id]
 			return reset_episode(
 				snapshot.station, str(request.get("policy_id", "unassigned")), {}, snapshot, display
 			)
+		var initial_speed: Variant = request.get("initial_speed_m_s", 0.0)
+		if (
+			not (initial_speed is float or initial_speed is int)
+			or not is_finite(float(initial_speed))
+			or initial_speed < 0
+			or initial_speed > 10
+		):
+			return {"error": "Invalid initial speed (expected 0 to 10 m/s)"}
 		var station: Variant = request.get("station", 0.0)
 		if (
 			not (station is float or station is int)
@@ -1249,7 +1260,9 @@ func _request(request: Dictionary) -> Dictionary:
 		):
 			return {"error": "Invalid station"}
 		return reset_episode(
-			float(station), str(request.get("policy_id", "unassigned")), {}, {}, display
+			float(station),
+			str(request.get("policy_id", "unassigned")),
+			{}, {}, display, float(initial_speed)
 		)
 	if request.get("episode_id", "") != episode_id:
 		return {"error": "Episode mismatch"}

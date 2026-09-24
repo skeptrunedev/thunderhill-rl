@@ -28,8 +28,11 @@ def rendered_worker(godot, directory, timeout, extra_args=()):
 
 class DrivingEpisode:
     def __init__(self, **kwargs):
-        self.episode = LapEpisode(road=RoadTelemetry(), worker_factory=rendered_worker,
-                                  action_parser=decode_controller_controls, **kwargs)
+        self.initial_speed_m_s = kwargs.get("initial_speed_m_s", 0.0)
+        self.episode = LapEpisode(
+            scenario_setup_ticks=180 if self.initial_speed_m_s > 0 else 0,
+            road=RoadTelemetry(), worker_factory=rendered_worker,
+            action_parser=decode_controller_controls, **kwargs)
         self.images = deque(maxlen=4)
         self.positions = deque(maxlen=16)
         self.headings = deque(maxlen=16)
@@ -41,7 +44,17 @@ class DrivingEpisode:
         self.episode.__enter__()
         try:
             self.plans = (self.episode.output / 'trajectory_decisions.jsonl').open('w')
-            self.capture()
+            self.capture(pad=self.initial_speed_m_s == 0)
+            if self.initial_speed_m_s > 0:
+                # Actual neutral coasting supplies history, never training targets.
+                neutral = encode_controller_controls(dict(
+                    steer=0., throttle=0., front_brake=0., rear_brake=0., shift=0))
+                for _ in range(15):
+                    self.episode.apply(neutral, [], [], scenario_setup=True)
+                    self.capture(pad=False)
+                    if self.episode.done:
+                        raise RuntimeError("Moving scenario terminated during recorded history setup")
+                self.episode.begin_model_control()
         except BaseException as error:
             import sys
             try:
@@ -64,7 +77,7 @@ class DrivingEpisode:
         finally:
             self.plans.close()
 
-    def capture(self):
+    def capture(self, *, pad=True):
         observation = self.episode.observation
         response = self.episode.client.request(dict(op='capture',
             episode_id=self.episode.episode_id, expected_tick=observation['tick']))
@@ -80,10 +93,10 @@ class DrivingEpisode:
         self.positions.append(list(observation['state']['position']))
         self.headings.append(observation['state']['heading'])
         # At a standing reset the unavailable prehistory is stationary padding.
-        while len(self.images) < 4:
+        while pad and len(self.images) < 4:
             self.images.appendleft(pixels.copy())
             self.image_ids.appendleft(response['observation_id'])
-        while len(self.positions) < 16:
+        while pad and len(self.positions) < 16:
             self.positions.appendleft(self.positions[0][:])
             self.headings.appendleft(self.headings[0])
 

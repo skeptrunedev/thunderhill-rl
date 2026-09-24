@@ -71,6 +71,27 @@ class DownloadOrderTests(unittest.TestCase):
         snapshot.assert_not_called()
 
 
+class DiagnosticCompletionTests(unittest.TestCase):
+    def test_baseline_stop_is_valid_but_not_completed_training(self):
+        value = dict(diagnostic_complete=True, complete=False, generations=[],
+                     evaluations=[{}] * 4, baseline_gate={'passed': False},
+                     stop_reason='baseline_gate_failed')
+        launcher.validate_diagnostic_result(value)
+        for changed in (dict(complete=True), dict(generations=[{}]), dict(evaluations=[])):
+            with self.assertRaises(RuntimeError):
+                launcher.validate_diagnostic_result({**value, **changed})
+
+    def test_success_requires_all_generations_and_evaluations(self):
+        value = dict(diagnostic_complete=True, complete=True, generations=[{}] * 3,
+                     evaluations=[{}] * 16, baseline_gate={'passed': True},
+                     stop_reason='generations_completed')
+        launcher.validate_diagnostic_result(value)
+        for changed in (dict(generations=[{}]), dict(evaluations=[{}] * 4),
+                        dict(baseline_gate={'passed': False}), dict(diagnostic_complete=False)):
+            with self.assertRaises(RuntimeError):
+                launcher.validate_diagnostic_result({**value, **changed})
+
+
 @unittest.skipUnless(sys.platform == 'linux', 'Process group tests require Linux')
 class ProcessCleanupTests(unittest.TestCase):
     def run_child(self, code, root, **kwargs):

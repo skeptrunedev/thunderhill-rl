@@ -163,6 +163,22 @@ class StallMonitorTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("THUNDERHILL_GODOT"), "Set THUNDERHILL_GODOT for native collector verification")
 class EpisodeLifecycleTests(unittest.TestCase):
+    def test_moving_reset_validates_speed_and_preserves_default(self):
+        root = Path(tempfile.mkdtemp(prefix='moving-reset-native-',
+                                    dir=Path(__file__).resolve().parents[1] / 'artifacts'))
+        with LapEpisode(godot=os.environ['THUNDERHILL_GODOT'], output=root / 'episode',
+                        road=RoadTelemetry(), adapter_sha256='e' * 64,
+                        model='moving reset fixture', revision='test', generation=0,
+                        rollout=1, initial_speed_m_s=5, time_budget_seconds=.1) as episode:
+            self.assertEqual(episode.observation['state']['speed'], 5)
+            self.assertEqual(episode.observation['state']['longitudinal_velocity'], 5)
+            for speed in (-1, 11, True, '5'):
+                response = episode.client.request(dict(op='reset', initial_speed_m_s=speed))
+                self.assertIn('error', response)
+            episode.apply('control_bike 0 0 0 0', [], [])
+        self.assertTrue(episode.summary['recording_provenance_verified'])
+        self.assertEqual(episode.summary['initial_speed_m_s'], 5)
+
     def test_continuous_controls_survive_protocol_and_recording(self):
         from driving_trajectory import encode_controller_controls, decode_controller_controls
         root = Path(tempfile.mkdtemp(prefix='continuous-collector-native-',

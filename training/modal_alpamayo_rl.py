@@ -69,6 +69,24 @@ def download_model_files(cache_dir):
     return dict(checkpoint=checkpoint, processor_path=processor)
 
 
+def validate_diagnostic_result(campaign):
+    """A deliberate baseline stop is terminal, but never a completed training run."""
+    if campaign.get('diagnostic_complete') is not True:
+        raise RuntimeError('Missing terminal diagnostic evidence')
+    if campaign.get('stop_reason') == 'baseline_gate_failed':
+        if (campaign.get('complete') is not False or campaign.get('generations') != []
+                or len(campaign.get('evaluations', [])) != 4
+                or campaign.get('baseline_gate', {}).get('passed') is not False):
+            raise RuntimeError('Invalid baseline stop evidence')
+    elif campaign.get('stop_reason') == 'generations_completed':
+        if (campaign.get('complete') is not True or len(campaign.get('generations', [])) != 3
+                or len(campaign.get('evaluations', [])) != 16
+                or campaign.get('baseline_gate', {}).get('passed') is not True):
+            raise RuntimeError('Missing three completed generations and fixed evaluations')
+    else:
+        raise RuntimeError('Unknown diagnostic completion reason')
+
+
 def signal_process_group(process, signum):
     """The wrapper can exit before descendants, so do not predicate on poll()."""
     try:
@@ -146,9 +164,9 @@ def prepare_weights():
 
 
 @app.function(image=image, gpu='RTX-PRO-6000', cpu=8, memory=65536,
-              timeout=1800, retries=0, max_containers=1, include_source=False,
+              timeout=5700, retries=0, max_containers=1, include_source=False,
               volumes={'/model-cache': cache, '/runs': runs})
-def run_generation(run_id: str, paths: dict, source: dict):
+def run_generation(run_id: str, paths: dict, source: dict, diagnostic: bool = False):
     import re
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}', run_id):
         raise ValueError('Invalid run ID')
@@ -156,12 +174,15 @@ def run_generation(run_id: str, paths: dict, source: dict):
     runs.reload()
     root = Path('/runs') / run_id
     root.mkdir(exist_ok=False)
+    child_timeout = 5400 if diagnostic else 1500
     command = ['xvfb-run', '-a', '-s', '-screen 0 800x600x24', PYTHON,
         '-u', REMOTE + '/training/train_alpamayo_rl.py', '--checkpoint', paths['checkpoint'],
         '--processor-path', paths['processor_path'], '--godot', '/usr/local/bin/godot',
-        '--output', str(root / 'experiment'), '--seconds', '12', '--rollouts', '2']
+        '--output', str(root / 'experiment'), '--seconds', '30' if diagnostic else '12',
+        '--rollouts', '8' if diagnostic else '2', *(['--diagnostic'] if diagnostic else [])]
     (root / 'launch.json').write_text(json.dumps(dict(run_id=run_id, command=command, source=source,
-        gpu='RTX-PRO-6000', child_timeout_seconds=1500, supervised_training_performed=False), indent=2))
+        gpu='RTX-PRO-6000', diagnostic=diagnostic, child_timeout_seconds=child_timeout,
+        supervised_training_performed=False), indent=2))
     runs.commit()
     started = time.monotonic()
     status = dict(run_id=run_id, ok=False)
@@ -174,9 +195,12 @@ def run_generation(run_id: str, paths: dict, source: dict):
         run_logged_process(renderer_command, cwd=REMOTE, log_path=root / 'renderer.log',
             timeout_seconds=120, heartbeat=runs.commit)
         run_logged_process(command, cwd=REMOTE, log_path=root / 'run.log',
-            timeout_seconds=max(1, 1500 - (time.monotonic() - started)), heartbeat=runs.commit)
+            timeout_seconds=max(1, child_timeout - (time.monotonic() - started)), heartbeat=runs.commit)
         campaign = json.loads((root / 'experiment/campaign.json').read_text())
-        if not campaign['complete'] or len(campaign['generations']) != 1:
+        if diagnostic:
+            validate_diagnostic_result(campaign)
+            status['outcome'] = campaign['stop_reason']
+        elif not campaign['complete'] or len(campaign['generations']) != 1:
             raise RuntimeError('Missing completed generation evidence')
         status['ok'] = True
         return dict(status)
@@ -190,7 +214,7 @@ def run_generation(run_id: str, paths: dict, source: dict):
 
 
 @app.local_entrypoint()
-def main(run_id: str):
+def main(run_id: str, diagnostic: bool = False):
     import re
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}', run_id):
         raise ValueError('Invalid run ID')
@@ -208,4 +232,4 @@ def main(run_id: str):
         runtime_sha256={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files})
     paths = prepare_weights.with_options(secrets=[secret]).remote()
     print(json.dumps({'model_files_prepared': paths}), flush=True)
-    print(json.dumps(run_generation.with_options(secrets=[secret]).remote(run_id, paths, source)))
+    print(json.dumps(run_generation.with_options(secrets=[secret]).remote(run_id, paths, source, diagnostic)))

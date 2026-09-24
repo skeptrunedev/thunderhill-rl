@@ -76,9 +76,14 @@ class ThunderhillEnv:
             self._log("infrastructure_failure", error=self._fault)
             raise
 
-    def reset(self, *, policy_display=None, **kwargs) -> str:
+    def reset(self, *, policy_display=None, initial_speed_m_s=0.0, **kwargs) -> str:
         self._fault = None
+        if (type(initial_speed_m_s) not in (int, float)
+                or not math.isfinite(initial_speed_m_s) or not 0 <= initial_speed_m_s <= 10):
+            raise ValueError("Initial speed must be finite and in [0, 10] m/s")
         request = {"op": "reset", "policy_id": f"interactive-step-{self._step()}"}
+        if initial_speed_m_s:
+            request["initial_speed_m_s"] = initial_speed_m_s
         if policy_display is not None:
             request["policy_display"] = policy_display
         self._observation = self._request(request)
@@ -87,6 +92,7 @@ class ThunderhillEnv:
         self._log(
             "reset",
             observation=self._view(),
+            initial_speed_m_s=initial_speed_m_s,
             observation_version=(
                 "privileged-road-telemetry-v1"
                 if self._road_telemetry is not None
@@ -97,7 +103,7 @@ class ThunderhillEnv:
         task = (
             "Ride the track safely using the supplied simulator road geometry. "
             if self._road_telemetry is not None
-            else "You control a stationary motorcycle on a straight. Explore throttle values between 0 and 1. "
+            else "You control a motorcycle on a straight. Explore throttle values between 0 and 1. "
         )
         return (
             task

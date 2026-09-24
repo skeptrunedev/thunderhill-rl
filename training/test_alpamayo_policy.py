@@ -122,6 +122,25 @@ class OfficialFlowTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "density replay mismatch"):
             policy.update(episodes)
 
+    def test_start_conditions_do_not_compete_for_advantage(self):
+        policy, flow = self.make_policy()
+        episodes = [dict(reward=reward, reward_group=group, replays=[self.sample(policy, flow, seed)])
+                    for seed, (group, reward) in enumerate(
+                        [('standing', 1.), ('standing', 3.), ('moving', 101.), ('moving', 103.)])]
+        result = policy.update(episodes)
+        self.assertEqual(result['advantages'], [-1., 1., -1., 1.])
+        self.assertEqual(result['reward_group_statistics']['moving']['mean'], 102.)
+
+    def test_start_offset_alone_cannot_produce_learning(self):
+        policy, flow = self.make_policy()
+        episodes = [dict(reward=reward, reward_group=group, replays=[self.sample(policy, flow, seed)])
+                    for seed, (group, reward) in enumerate(
+                        [('standing', 1.), ('standing', 1.), ('moving', 100.), ('moving', 100.)])]
+        with self.assertRaisesRegex(RuntimeError, 'Equal gameplay rewards'):
+            policy.update(episodes)
+        with self.assertRaisesRegex(ValueError, 'at least two'):
+            policy.update(episodes[:3])
+
 
 if __name__ == "__main__":
     unittest.main()

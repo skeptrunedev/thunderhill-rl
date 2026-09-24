@@ -14,7 +14,7 @@ MODEL = 'nvidia/Alpamayo-1.5-10B'
 REVISION = '7aba8293c09993f2e125c6819df05d7fa3e873ea'
 INSTRUCTION = ('Race forward along this paved racing circuit. Follow the track through its turns, '
                'stay inside the pavement boundaries, and make fast forward progress. '
-               'You are starting a motorcycle from rest. There is no traffic or speed limit.')
+               'You are riding a motorcycle. There is no traffic or speed limit.')
 
 
 def publish(path, value):
@@ -23,27 +23,171 @@ def publish(path, value):
     pending.replace(path)
 
 
-def collect(policy, args, directory, *, generation, rollout, evaluation, digest, seed):
+def collect(policy, args, directory, *, generation, rollout, evaluation, digest, seed,
+            initial_speed_m_s=0.0, scenario_id='standing'):
     started = time.monotonic()
+    trajectory_metrics = []
+    speeds = []
     with DrivingEpisode(godot=args.godot, output=directory, adapter_sha256=digest,
                         model=MODEL, revision=REVISION, generation=generation,
                         rollout=rollout, rollout_count=args.rollouts, evaluation=evaluation,
-                        time_budget_seconds=args.seconds) as run:
+                        time_budget_seconds=args.seconds, initial_speed_m_s=initial_speed_m_s) as run:
         while not run.episode.done:
             observation = run.model_input()
             prediction = policy.sample(camera_frames=observation['images'],
                 ego_history_xyz=observation['ego_history_xyz'],
                 ego_history_rot=observation['ego_history_rot'],
                 seed=seed + len(run.replays), instruction=INSTRUCTION)
+            xyz = prediction['xyz']
+            if xyz.shape != (64, 3):
+                raise RuntimeError('Published action contract requires 64 XYZ waypoints at 10Hz')
+            trajectory_metrics.append(dict(first_x_m=float(xyz[0, 0]),
+                half_second_x_m=float(xyz[4, 0]), horizon_x_m=float(xyz[-1, 0])))
             run.execute(prediction, hold_steps=5)
+            speeds.append(float(run.episode.observation['state']['speed']))
             print(json.dumps(dict(event='trajectory', generation=generation, rollout=rollout,
                 evaluation=evaluation, tick=run.episode.observation['tick'],
                 speed=run.episode.observation['state']['speed'],
                 elapsed_seconds=time.monotonic() - started)), flush=True)
         summary = run.finish()
+        summary.update(scenario_id=scenario_id, sample_seed=seed,
+                       initial_speed_m_s=initial_speed_m_s, trajectory_metrics=trajectory_metrics,
+                       mean_sampled_speed_m_s=sum(speeds) / len(speeds),
+                       max_sampled_speed_m_s=max(speeds),
+                       wall_seconds=time.monotonic() - started)
+        controls = [row['controls'] for row in run.episode.records
+                    if 'controls' in row and row.get('action_source') != 'scenario_setup']
+        summary['max_policy_throttle'] = max(row['throttle'] for row in controls)
+        summary['mean_policy_throttle'] = sum(row['throttle'] for row in controls) / len(controls)
+        publish(directory / 'summary.json', summary)
         if not summary['training_eligible']:
             raise RuntimeError('Simulator attempt failed audit or collection eligibility')
-        return dict(reward=summary['reward_components']['total'], replays=run.replays), summary
+        return dict(reward=summary['reward_components']['total'], replays=run.replays,
+                    reward_group=scenario_id), summary
+
+
+SCENARIOS = (dict(scenario_id='standing', initial_speed_m_s=0.0),
+             dict(scenario_id='moving', initial_speed_m_s=5.0))
+EVALUATION_SEEDS = (1073, 2073)
+BASELINE_CRITERIA = dict(minimum_controlled_progress_m=20.0, minimum_final_speed_m_s=1.0,
+                         minimum_first_plan_horizon_x_m=2.0)
+
+
+def baseline_gate(summaries):
+    """Conservative diagnostic gate, not a claim of learned racing capability."""
+    if len(summaries) != 4 or any(sum(r['scenario_id'] == s['scenario_id']
+            for r in summaries) != 2 for s in SCENARIOS):
+        raise ValueError('Baseline requires two attempts per starting condition')
+    results = []
+    for row in summaries:
+        if row['scenario_id'] != 'moving':
+            continue
+        reasons = []
+        if not row['recording_provenance_verified'] or not row['training_eligible']:
+            reasons.append('invalid_recording')
+        if row['reward_components']['legal_progress_m'] < BASELINE_CRITERIA['minimum_controlled_progress_m']:
+            reasons.append('insufficient_forward_progress')
+        final = row['final_observation']
+        if final['state']['speed'] < BASELINE_CRITERIA['minimum_final_speed_m_s']:
+            reasons.append('did_not_maintain_motion')
+        if final['state']['crashed'] or row['offtrack_ticks'] or row['reason'] in ('stalled', 'track_limits'):
+            reasons.append('failed_to_follow_straight')
+        if row['trajectory_metrics'][0]['horizon_x_m'] < BASELINE_CRITERIA['minimum_first_plan_horizon_x_m']:
+            reasons.append('first_plan_near_stationary_or_reverse')
+        results.append(dict(seed=row['sample_seed'], passed=not reasons, reasons=reasons))
+    return dict(passed=all(r['passed'] for r in results), criteria=BASELINE_CRITERIA,
+                moving_attempts=results)
+
+
+def scenario_metrics(rows, prefix):
+    result = {}
+    for scenario in SCENARIOS:
+        selected = [row for row in rows if row['scenario_id'] == scenario['scenario_id']]
+        if not selected:
+            continue
+        base = prefix + '/' + scenario['scenario_id'] + '/'
+        for name, values in (
+            ('reward', [r['reward_components']['total'] for r in selected]),
+            ('progress_m', [r['reward_components']['legal_progress_m'] for r in selected]),
+            ('final_speed_m_s', [r['final_observation']['state']['speed'] for r in selected]),
+            ('stall_rate', [int(r['reason'] == 'stalled') for r in selected]),
+            ('offtrack_ticks', [r['offtrack_ticks'] for r in selected]),
+            ('max_policy_throttle', [r.get('max_policy_throttle', 0.) for r in selected]),
+            ('mean_sampled_speed_m_s', [r.get('mean_sampled_speed_m_s', 0.) for r in selected]),
+        ):
+            result[base + name] = sum(values) / len(values)
+    return result
+
+
+def run_diagnostic(policy, args, tracker, manifest, initial):
+    """Four fixed evaluations and at most three generations of eight ownplays."""
+    manifest_path = args.output / 'campaign.json'
+    current = initial
+    previous_path = args.output / 'initial_adapter'
+
+    def evaluate(generation):
+        rows = []
+        for scenario in SCENARIOS:
+            for replicate, seed in enumerate(EVALUATION_SEEDS):
+                directory = args.output / f'evaluation-{generation:03d}' / f"{scenario['scenario_id']}-{replicate+1}"
+                directory.parent.mkdir(exist_ok=True)
+                episode, summary = collect(policy, args, directory, generation=generation,
+                    rollout=replicate+1, evaluation=True, digest=current, seed=seed, **scenario)
+                del episode
+                rows.append(summary)
+                manifest['evaluations'].append(summary)
+                publish(manifest_path, manifest)
+        tracker.log({'generation': generation, **scenario_metrics(rows, 'eval')})
+        return rows
+
+    baseline = evaluate(0)
+    gate = baseline_gate(baseline)
+    manifest['baseline_gate'] = gate
+    publish(manifest_path, manifest)
+    if not gate['passed']:
+        manifest.update(diagnostic_complete=True, stop_reason='baseline_gate_failed')
+        publish(manifest_path, manifest)
+        tracker.log({'generation': 0, 'eval/baseline_gate_passed': 0})
+        print(json.dumps(dict(event='diagnostic_stopped', baseline_gate=gate)), flush=True)
+        return
+    tracker.log({'generation': 0, 'eval/baseline_gate_passed': 1})
+    for generation in range(1, 4):
+        episodes, summaries = [], []
+        generation_path = args.output / f'generation-{generation:03d}'
+        generation_path.mkdir()
+        for index in range(8):
+            scenario = SCENARIOS[index // 4]
+            episode, summary = collect(policy, args, generation_path / f'rollout-{index+1:04d}',
+                generation=generation-1, rollout=index+1, evaluation=False, digest=current,
+                seed=100000 * generation + 1000 * index + 73, **scenario)
+            episodes.append(episode)
+            summaries.append(summary)
+            publish(generation_path / 'collection.json', dict(generation=generation,
+                adapter_sha256=current, rollouts=summaries))
+        update = policy.update(episodes, max_decisions=math.ceil(args.seconds / .5))
+        if update['optimizer_steps'] != 1 or update['parameter_delta_l1'] <= 0:
+            raise RuntimeError('Generation did not produce a nonzero policy update')
+        adapter_path = generation_path / 'adapter'
+        updated = policy.save(adapter_path)
+        if updated == current:
+            raise RuntimeError('Updated adapter hash unchanged')
+        policy.reload(previous_path)
+        if policy.fingerprint() != current:
+            raise RuntimeError('Previous adapter reload failed')
+        policy.reload(adapter_path)
+        if policy.fingerprint() != updated:
+            raise RuntimeError('Updated adapter reload failed')
+        manifest['generations'].append(dict(generation=generation, update=update,
+            previous_adapter_sha256=current, adapter_sha256=updated, reload_verified=True))
+        current, previous_path = updated, adapter_path
+        del episodes
+        publish(manifest_path, manifest)
+        tracker.log({'generation': generation, **scenario_metrics(summaries, 'rollout'),
+            **{'update/' + k: v for k, v in update.items() if isinstance(v, (int, float))}})
+        evaluate(generation)
+    manifest.update(complete=True, diagnostic_complete=True, stop_reason='generations_completed')
+    publish(manifest_path, manifest)
+    print(json.dumps(dict(event='diagnostic_complete', generations=3)), flush=True)
 
 
 def main():
@@ -54,9 +198,13 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--seconds', type=float, default=12)
     parser.add_argument('--rollouts', type=int, default=2)
+    parser.add_argument('--diagnostic', action='store_true')
     parser.add_argument('--wandb-mode', choices=['online', 'offline', 'disabled'], default='online')
     args = parser.parse_args()
-    if not 2 <= args.rollouts <= 4 or not 0 < args.seconds <= 12:
+    if args.diagnostic:
+        if args.rollouts != 8 or args.seconds != 30:
+            parser.error('Diagnostic requires eight rollouts and 30 seconds')
+    elif not 2 <= args.rollouts <= 4 or not 0 < args.seconds <= 12:
         parser.error('Validation budget requires 2 to 4 rollouts and at most 12 simulated seconds')
     from alpamayo_policy import AlpamayoPolicy
     args.output.mkdir(parents=True, exist_ok=False)
@@ -73,9 +221,18 @@ def main():
                     prehistory='stationary_padding_at_standing_reset',
                     complete=False, generations=[], evaluations=[])
     manifest_path = args.output / 'campaign.json'
+    if args.diagnostic:
+        manifest.update(generations_requested=3, evaluation_rollouts=4,
+            maximum_attempts=40, baseline_criteria=BASELINE_CRITERIA,
+            scenarios=list(SCENARIOS), evaluation_seeds=list(EVALUATION_SEEDS),
+            prehistory='stationary_padding_or_recorded_neutral_coast_excluded_from_reward',
+            diagnostic_complete=False, reward_grouping='within_matching_start_condition')
     publish(manifest_path, manifest)
     with ExperimentTracker(args.output, manifest, mode=args.wandb_mode,
                            entity='skeptrune-org', name=args.output.parent.name) as tracker:
+        if args.diagnostic:
+            run_diagnostic(policy, args, tracker, manifest, initial)
+            return
         baseline_episode, baseline = collect(policy, args, args.output / 'baseline', generation=0,
                               rollout=1, evaluation=True, digest=initial, seed=1073)
         del baseline_episode

@@ -49,6 +49,7 @@ def audit_lap(
     final_observation,
     decisions,
     parse_completion=parse_action,
+    initial_speed_m_s=0.0, scenario_setup_ticks=0,
 ):
     """Raise on broken provenance; return success=False for an honestly failed lap.
 
@@ -76,6 +77,8 @@ def audit_lap(
     require(header.get("policy_id") == policy_id, "header policy mismatch")
     require(header.get("track_sha256") == track_sha256, "track hash mismatch")
     require(header["initial_state"]["tick"] == 0, "episode must start at tick zero")
+    require(header["initial_state"].get("speed", 0) == initial_speed_m_s, "initial speed differs from scenario")
+    require(scenario_setup_ticks in (0, 180) and (not scenario_setup_ticks or initial_speed_m_s > 0), "invalid scenario setup")
     require(header.get("start_station") == 0, "lap must start at station zero")
     require(final_observation.get("episode_id") == episode_id, "final episode mismatch")
     require(final_observation.get("policy_id") == policy_id, "final policy mismatch")
@@ -115,6 +118,11 @@ def audit_lap(
                 require(False, "valid completion marked invalid")
             continue
         controls = parse_completion(decision["completion"])
+        setup = previous_tick < scenario_setup_ticks
+        require(decision.get("action_source", "model") == ("scenario_setup" if setup else "model"), "scenario setup source mismatch")
+        if setup:
+            require(not any(controls.values()), "scenario setup must coast with neutral controls")
+            require(not decision.get("completion_ids") and not decision.get("behavior_logprobs"), "setup cannot contain training targets")
         require(
             controls == decision.get("controls")
             and recorded_controls_match(decision.get("controls"), controls),
@@ -211,6 +219,8 @@ def audit_lap(
         "gates": gates,
         "offtrack_ticks": offtrack,
         "actions": len(actions),
+        "scenario_setup_actions": sum(start < scenario_setup_ticks for start, _, _ in actions),
+        "model_actions": sum(start >= scenario_setup_ticks for start, _, _ in actions),
         "adapter_sha256": adapter_hash,
         "recording_provenance_verified": True,
     }
