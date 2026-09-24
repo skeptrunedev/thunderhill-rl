@@ -80,17 +80,18 @@ Rendering is playback of recorded states, not a second gameplay rollout.
 
 ## Verification
 
-With NVIDIA host/protocol packages and Torch installed:
+Verification uses actual simulator workflows rather than standalone unit tests.
+With NVIDIA host/protocol packages, Torch, a Godot executable and a display:
 
 ```sh
-PYTHONPATH=.:training:tools python -m unittest \
-  training.test_nvidia_alpagym training.test_alpagym_worker \
-  training.test_alpagym_bridge
+PYTHONPATH=.:training:tools THUNDERHILL_GODOT=/path/to/godot python -m unittest \
+  training.test_alpagym_bridge training.test_driving_trajectory \
+  training.test_lap_episode
 ```
 
 Set `THUNDERHILL_GODOT` to an executable and provide a display to include real
 Godot protocol tests. Their synthetic driver is strictly a test fixture; no
-fixture actions enter training. CPU config and simulator checks do not verify a
+fixture actions enter training. Simulator checks do not verify a
 GPU update. A training validation requires real NVIDIA workers, nonzero optimizer
 steps, checkpoint output and evaluated gameplay recordings.
 

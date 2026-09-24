@@ -41,9 +41,9 @@ These results support replacing the ruled elevation model. They do not certify p
 
 Run `uv run tools/build_road_surface.py`, then `uv run tools/audit_road_alignment.py --download-datum-grids`. The latter command only downloads missing openly licensed datum grids and verifies them against the pinned manifest. Subsequent runs can omit the download option. Artifacts are `artifacts/road-surface/cyclone-alignment.png` and its JSON report, including all raw fit diagnostics and source hashes.
 
-`uv run tools/test_road_alignment.py` verifies an analytical tilted quadratic, one sided fitting, zero plane curvature under multiple directions, and rejection of collinear observations. Both source and overlay panels were visually inspected after datum correction.
+Historical analytical checks covered tilted quadratics, fitting boundaries and collinear observations. Both source and overlay panels were visually inspected after datum correction. Standalone unit tests were subsequently removed at the user's request.
 
-Run `uv run tools/fit_cyclone_surface.py` after the road surface audit to produce `artifacts/road-surface/cyclone-height-fit.json`. It records all candidate coefficients, validation folds, coverage, solver diagnostics and input hashes. Run `uv run --with numpy==2.4.3 --with scipy==1.17.1 python -m unittest discover -s tools -p test_cyclone_surface.py` for the three tests covering analytical derivatives and bending energy, plane preservation, extrapolation rejection, invalid parameters and stale provenance.
+Run `uv run tools/fit_cyclone_surface.py` after the road surface audit to produce `artifacts/road-surface/cyclone-height-fit.json`. It records all candidate coefficients, validation folds, coverage, solver diagnostics and input hashes.
 
 ## Game surface evaluator
 
@@ -59,6 +59,6 @@ Generate the historical fixture with:
 uv run tools/export_lidar_height_surface.py --spacing 2 --strength 0.01
 ```
 
-Run `godot --headless --path godot --script res://tests/test_lidar_height_surface.gd -- --fixture=/absolute/path/to/artifacts/road-surface/lidar-height-fixture.json`. Run the Python conversion test with `uv run --with numpy==2.4.3 --with scipy==1.17.1 python -m unittest discover -s tools -p test_lidar_height_export.py`. The Python test module also exposes `nonuniform_fixture()` to reproduce the second fixture as JSON.
+The historical analytical conversion suite and synthetic fixture helpers were removed with the standalone unit tests. The export command above remains available for inspecting the actual candidate data.
 
 The live track does not yet load these patches. Joining patch heights with continuous first and second derivatives, verifying complete road coverage, and rebuilding mesh and contact together remain required before changing playable geometry. This evaluator alone does not change tire loads or provide suspension.

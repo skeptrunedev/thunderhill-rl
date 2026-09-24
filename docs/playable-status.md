@@ -1,5 +1,7 @@
 # Playable implementation status
 
+> Historical verification note: standalone unit tests referenced below were removed at the user's request. Their results remain historical evidence, but their old commands are no longer available. Use the actual game checks described in [training verification](../training/README.md#verification).
+
 September 20, 2026. The requested end state remains an attractive, hyperrealistic Thunderhill East motorcycle game reviewed on the owner's MacBook. The first implementation is a working prototype, not acceptance of that goal. A small Gemma 3 launch probe has now verified GPU adapter updates from game rewards; no racing policy training or E4B training has started. See [local training validation](../training/README.md).
 
 ## September 21 closeout checkpoint
@@ -91,7 +93,7 @@ Open `godot/project.godot` in Godot 4.7.2 and run the main scene, or run `godot 
 
 Controls: W or up for throttle, S or down for front brake, space for rear brake, A and D or left and right for steering, C to cycle chase, rider and onboard cameras, R for restart, Escape for pause, F11 for full screen. Gamepad triggers control throttle and front brake; the left stick steers. Rider assistance and automatic shifting are enabled in the human prototype and labeled in recordings.
 
-Run `godot --headless --path godot --script tests/test_motorcycle.gd`, `godot --headless --path godot --script tests/test_human.gd`, and `uv run tools/check_agent.py --godot /path/to/godot` for the implemented checks.
+Run `godot --headless --path godot --script tests/test_human.gd` and `uv run tools/check_agent.py --godot /path/to/godot` for checks against the actual game.
 
 Agent mode starts with `godot --headless --path godot -- --agent-port=PORT`. Bind is localhost only. The process owns the fixed action duration. Send newline separated JSON requests; see `tools/check_agent.py` for an exercised client. This is a development telemetry interface, not the complete Harbor training harness.
 

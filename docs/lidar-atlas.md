@@ -1,5 +1,7 @@
 # Continuous lidar surface
 
+> Historical verification note: standalone unit tests referenced below were removed at the user's request. Their results remain historical evidence, but their old commands are no longer available. Use the actual game checks described in [training verification](../training/README.md#verification).
+
 The new atlas is an experimental replacement for the road's centerline bank extrapolation. It is not yet loaded by the playable game. Historical class 2 ground observations constrain two dimensional height patches, allowing the road interior and edges to have different slopes and curvature.
 
 ## Construction
@@ -14,13 +16,13 @@ The Godot evaluator uses a spatial index to visit nearby patches. When only one 
 
 ## Verification
 
-Analytical Python tests check plane preservation, weight derivatives, changing patch weights, quotient derivatives and internal support seams. An independent Godot implementation is compared with Python at negative spatial cells and both sides of internal support boundaries. The analytical fixture uses different patch heights so omitted blend derivatives cannot pass accidentally.
+Historical analytical Python tests checked plane preservation, weight derivatives, changing patch weights, quotient derivatives and internal support seams. An independent Godot implementation is compared with Python at negative spatial cells and both sides of internal support boundaries. The analytical fixture uses different patch heights so omitted blend derivatives cannot pass accidentally.
 
 Build the full experimental data with `OPENBLAS_NUM_THREADS=1 uv run tools/build_lidar_atlas.py`. The single BLAS thread avoids thread pool overhead on the small sparse patch fits. Output is `artifacts/road-surface/lidar-atlas.json` and its audit. `--limit` creates an explicitly marked partial diagnostic that the circuit audit rejects.
 
 Run `uv run tools/audit_lidar_atlas.py` to check seven lateral positions at one metre station spacing and generate the full circuit Godot fixture. It checks source hashes, positive weight, first and second derivatives, distance to raw observations, differences from the previous ribbon and directional normal curvature. Run the Godot test with `godot --headless --path godot --script res://tests/test_lidar_height_atlas.gd -- --fixture=/absolute/path/to/artifacts/road-surface/lidar-atlas-circuit.parity.json`.
 
-The Python test command is `uv run --with numpy==2.4.3 --with scipy==1.17.1 python -m unittest discover -s tools -p test_lidar_atlas.py`. Its `parity_fixture()` function returns the reproducible analytical fixture as a JSON serializable dictionary.
+The standalone analytical unit tests and their synthetic fixture helper were removed at the user's request. Use the full circuit audit above for current data verification.
 
 ## Remaining integration
 

@@ -1,5 +1,7 @@
 # Road and terrain boundary
 
+> Historical verification note: standalone unit tests referenced below were removed at the user's request. Their results remain historical evidence, but their old commands are no longer available. Use the actual game checks described in [training verification](../training/README.md#verification).
+
 20 September 2026. The old terrain builder lowered ground toward 0.65 metres below the local road plane, extending that modification up to 16 metres beyond the road edge. On rising ground this could remove more than 0.65 metres. This was used to hide overlaps with separate road and shoulder ribbons. Despite old metadata calling it visual only, the lowered ground also supplied off road motorcycle contact.
 
 The game now uses raw source DEM elevations on the original 8 metre grid, with no artificial recess. A generated 4 metre triangulation is clipped around the rendered pavement footprint. A provisional six metre shoulder transition joins its boundary heights to the measured ground. The outer transition boundary also splits the triangles, so the blend cannot bleed into the surrounding terrain. Its polygonal round joins approximate the six metre boundary with at most 1.808 mm chord inset.

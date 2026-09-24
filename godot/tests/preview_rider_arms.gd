@@ -7,7 +7,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	if DisplayServer.get_name() == "headless":
-		push_error("Arm preview requires a renderer; use test_rider_pose.gd for headless checks")
+		push_error("Arm preview requires a renderer")
 		quit(2)
 		return
 	var steering := 0.0

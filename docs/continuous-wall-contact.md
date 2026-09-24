@@ -1,5 +1,7 @@
 # Continuous motorcycle contact with the pit divider
 
+> Historical verification note: standalone unit tests referenced below were removed at the user's request. Their results remain historical evidence, but their old commands are no longer available. Use the actual game checks described in [training verification](../training/README.md#verification).
+
 The game now queries the authored motorcycle and rider envelope against the solid historical pit divider on every successful simulation tick. Human input and agent actions use the same integration callback. A contact terminates the episode at the preceding clear pose and records the event. It does not simulate an impact impulse, deformation, rider separation, sliding or injury.
 
 ## Motion and geometric bound

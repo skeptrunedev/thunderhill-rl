@@ -1,7 +1,6 @@
 """GPU free protocol tests. Scripted driver is a test fixture, never training data."""
 
 import json
-import math
 import os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -15,10 +14,7 @@ from training.alpagym_bridge import (
     ROOT,
     CAMERA_ID,
     SCENE_ID,
-    GODOT_TO_LOCAL,
     GodotRuntime,
-    measured_rig,
-    future_in_rig,
     pose_proto,
     common,
     driver,
@@ -26,52 +22,6 @@ from training.alpagym_bridge import (
     runtime,
     runtime_grpc,
 )
-
-
-class GeometryTests(unittest.TestCase):
-    def test_camera_roll_and_pitch_are_preserved(self):
-        rig = Rotation.from_euler("zyx", [0.7, 0.12, -0.3]).as_matrix()
-        tangent, left, up = (GODOT_TO_LOCAL.T @ rig).T
-        forward = tangent * math.cos(0.08) - up * math.sin(0.08)
-        camera_up = tangent * math.sin(0.08) + up * math.cos(0.08)
-        receipt = {
-            "camera": {
-                "pose": {
-                    "basis_x": (-left).tolist(),
-                    "basis_y": camera_up.tolist(),
-                    "basis_z": (-forward).tolist(),
-                }
-            }
-        }
-        position, actual = measured_rig(
-            {"state": {"position": [3.0, 4.0, 5.0]}}, receipt
-        )
-        np.testing.assert_allclose(actual, rig, atol=1e-10)
-        np.testing.assert_allclose(position, [-5.0, -3.0, 4.0])
-
-    def test_native_world_plan_current_pose_removed(self):
-        rotation = Rotation.from_euler("z", math.pi / 2).as_matrix()
-        origin = np.array([50.0, 70.0, 3.0])
-        response = driver.DriveResponse(
-            trajectory=common.Trajectory(
-                poses=[
-                    common.PoseAtTime(
-                        timestamp_us=1_500_000 + i * 100_000,
-                        pose=pose_proto(
-                            origin + rotation @ np.array([i * 0.5, 0.0, 0.0]), rotation
-                        ),
-                    )
-                    for i in range(4)
-                ]
-            )
-        )
-        actual = future_in_rig(response, 1_500_000, origin, rotation)
-        np.testing.assert_allclose(
-            actual, [[0.5, 0, 0], [1.0, 0, 0], [1.5, 0, 0]], atol=1e-6
-        )
-        response.trajectory.poses[-1].timestamp_us += 1
-        with self.assertRaises(ValueError):
-            future_in_rig(response, 1_500_000, origin, rotation)
 
 
 class FixtureDriver(driver_grpc.EgodriverServiceServicer):

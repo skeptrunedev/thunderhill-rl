@@ -1,5 +1,7 @@
 # Rider glove and articulation study
 
+> Historical verification note: standalone unit tests referenced below were removed at the user's request. Their results remain historical evidence, but their old commands are no longer available. Use the actual game checks described in [training verification](../training/README.md#verification).
+
 The playable rider now uses articulated arms and original glove meshes. Human
 close cameras show these limbs while excluding the helmet and torso. The policy
 camera continues to exclude all rider geometry.

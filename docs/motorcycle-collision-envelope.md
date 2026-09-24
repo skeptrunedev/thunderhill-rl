@@ -1,5 +1,7 @@
 # Authored motorcycle collision envelope
 
+> Historical verification note: standalone unit tests referenced below were removed at the user's request. Their results remain historical evidence, but their old commands are no longer available. Use the actual game checks described in [training verification](../training/README.md#verification).
+
 `godot/scripts/bike_collision_envelope.gd` snapshots a constructed `BikeVisual` into convex parts. Each mesh contributes one part. The rider and instrument meshes remain included when hidden by the cockpit camera or instrument state. Labels do not contribute geometry. The model identifier is `authored-convex-parts-v1`.
 
 This is a collision approximation of the original artwork, not Ducati CAD or measured rider geometry. Each hull fills that mesh's concavities, including wheel centres, spring coils and body panel recesses. Separate meshes remain separate parts so the entire motorcycle is not enclosed in one large convex solid.
