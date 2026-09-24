@@ -48,6 +48,7 @@ class ArchiveTests(unittest.TestCase):
             (destination / "trial/launch.json").write_text(json.dumps({"run_id": "wrong" if self.wrong_identity else "trial"}))
         else:
             self.assertIn("render_video_queue.py", command[1])
+            self.assertIn("--recover-interrupted", command)
             self.assertTrue((self.out / "trial/status.json").is_file())
         return subprocess.CompletedProcess(command, 0)
 

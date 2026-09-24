@@ -13,7 +13,7 @@ from pathlib import Path
 import tempfile
 
 
-def enqueue_video(out: Path, source: Path, *, metadata: dict) -> Path:
+def enqueue_video(out: Path, source: Path, *, metadata: dict, full_episode: bool = True) -> Path:
     """Publish one full episode render job, or verify an identical existing job.
 
     The caller must flush the recorder before enqueueing and must not append to
@@ -30,6 +30,9 @@ def enqueue_video(out: Path, source: Path, *, metadata: dict) -> Path:
         raise ValueError("Video source must be a recording file")
     if not isinstance(metadata, dict):
         raise ValueError("Video metadata must be an object")
+    if type(full_episode) is not bool or (not full_episode and
+            (metadata.get("stop_reason") != "interrupted" or not metadata.get("recovery"))):
+        raise ValueError("Incomplete episodes require explicit interruption provenance")
 
     digest = hashlib.sha256()
     with recording.open("rb") as stream:
@@ -69,7 +72,7 @@ def enqueue_video(out: Path, source: Path, *, metadata: dict) -> Path:
         "source_sha256": digest.hexdigest(),
         "policy_display": display,
         "metadata": metadata,
-        "full_episode": True,
+        "full_episode": full_episode,
     }
     # Round trip also detaches caller owned nested metadata. Reject NaN/Infinity.
     payload = json.dumps(job, sort_keys=True, indent=2, allow_nan=False) + "\n"

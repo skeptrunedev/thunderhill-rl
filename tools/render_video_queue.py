@@ -10,9 +10,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import sys
 import time
 
-from render_run_video import render_video
+from render_run_video import inspect_recording, render_video
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "training"))
+from video_jobs import enqueue_video
 
 
 def digest(path):
@@ -27,6 +31,94 @@ def write_json(path, value):
         stream.flush()
         os.fsync(stream.fileno())
     temporary.replace(path)
+
+
+def preserve_bytes(path, payload):
+    """Recovery is idempotent but cannot overwrite changed evidence."""
+    if path.exists():
+        if path.read_bytes() != payload:
+            raise ValueError(f"Recovery evidence changed: {path}")
+    else:
+        with path.open("xb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+
+def verify_recovery(root, job, source):
+    recovery = job["metadata"]["recovery"]
+    paths = [(root / recovery[key]).resolve() for key in ("original", "tail")]
+    if any(not path.is_relative_to(root) for path in paths):
+        raise ValueError("Recovery evidence escapes experiment directory")
+    original, tail = (path.read_bytes() for path in paths)
+    if (hashlib.sha256(original).hexdigest() != recovery["original_sha256"]
+            or source.read_bytes() + tail != original):
+        raise ValueError("Interrupted recording recovery provenance changed")
+
+
+def recover_interrupted(root):
+    """Recover only archived terminal runs, keeping originals and every tail byte.
+
+    A final row without a newline was not durably flushed and is excluded even
+    if it happens to parse. Invalid terminated rows or discontinuities fail
+    closed. No missing simulator state is synthesized.
+    """
+    root = Path(root).resolve()
+    statuses = list(root.rglob("status.json"))
+    recovered = []
+    terminal_runs = 0
+    for status_path in statuses:
+        run = status_path.parent
+        launch_path = run / "launch.json"
+        if not launch_path.is_file():
+            continue
+        status, launch = json.loads(status_path.read_text()), json.loads(launch_path.read_text())
+        if (type(status.get("ok")) is not bool or not status.get("run_id")
+                or status["run_id"] != launch.get("run_id")):
+            raise ValueError("Recovery requires matching terminal run status and launch")
+        terminal_runs += 1
+        with (run / ".recording-recovery.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            for environment in sorted(run.rglob("environment*")):
+                if not environment.is_dir():
+                    continue
+                attempt = environment.parent
+                queue = attempt / "video_jobs"
+                queued = {json.loads(p.read_text())["episode_id"]
+                          for p in queue.glob("*.json")}
+                for original in sorted(environment.rglob("*.jsonl")):
+                    payload = original.read_bytes()
+                    first = payload.partition(b"\n")[0]
+                    if not first:
+                        continue
+                    header = json.loads(first)
+                    if (header.get("type") != "episode" or not header.get("policy_display")
+                            or header["episode_id"] in queued):
+                        continue
+                    boundary = payload.rfind(b"\n") + 1
+                    if not boundary:
+                        raise ValueError("Interrupted episode has no flushed header")
+                    identity = hashlib.sha256(header["episode_id"].encode()).hexdigest()
+                    directory = attempt / "recovered_recordings" / identity
+                    directory.mkdir(parents=True, exist_ok=True)
+                    source, tail = directory / "flushed-prefix.jsonl", directory / "unflushed-tail.bin"
+                    preserve_bytes(source, payload[:boundary])
+                    preserve_bytes(tail, payload[boundary:])
+                    info = inspect_recording(source)
+                    recovery = dict(original=str(original.relative_to(attempt)),
+                                    original_sha256=hashlib.sha256(payload).hexdigest(),
+                                    tail=str(tail.relative_to(attempt)),
+                                    unflushed_tail_bytes=len(payload) - boundary,
+                                    recovered_transitions=info["transitions"],
+                                    final_tick=info["final_tick"])
+                    metadata = dict(kind="interrupted_attempt", stop_reason="interrupted",
+                                    training_eligible=False, episode_complete=False, recovery=recovery)
+                    job = enqueue_video(attempt, source, metadata=metadata, full_episode=False)
+                    recovered.append(str(job.relative_to(root)))
+                    queued.add(header["episode_id"])
+    if not terminal_runs:
+        raise ValueError("Recovery requires an archived terminal run")
+    return recovered
 
 
 def acquire_renderer_lock(lock, *, wait=False):
@@ -53,7 +145,10 @@ def process_queue(directory, *, godot, ffmpeg, fps=30, retry_failed=False, wait_
         for job_path in sorted(directory.glob("*.json")):
             job = json.loads(job_path.read_text())
             job_hash = digest(job_path)
-            if job.get("schema_version") != 1 or job.get("full_episode") is not True:
+            interrupted = (job.get("full_episode") is False
+                           and job.get("metadata", {}).get("stop_reason") == "interrupted"
+                           and job.get("metadata", {}).get("recovery"))
+            if job.get("schema_version") != 1 or (job.get("full_episode") is not True and not interrupted):
                 raise ValueError(f"Unsupported video job: {job_path}")
             source = (root / job["source"]).resolve()
             if not source.is_relative_to(root):
@@ -63,6 +158,8 @@ def process_queue(directory, *, godot, ffmpeg, fps=30, retry_failed=False, wait_
             receipt_path = target / "complete.json"
             if digest(source) != job["source_sha256"]:
                 raise ValueError(f"Recording changed after queueing: {source}")
+            if interrupted:
+                verify_recovery(root, job, source)
             if receipt_path.exists():
                 receipt = json.loads(receipt_path.read_text())
                 movie = (root / receipt["video"]).resolve()
@@ -101,6 +198,7 @@ def process_queue(directory, *, godot, ffmpeg, fps=30, retry_failed=False, wait_
                     "video_sha256": digest(output),
                     "policy_display": job["policy_display"],
                     "metadata": job["metadata"],
+                    "full_episode": job["full_episode"],
                     "render": rendered,
                 }
                 write_json(receipt_path, receipt)
@@ -173,6 +271,8 @@ def main():
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--watch", action="store_true")
     parser.add_argument("--retry-failed", action="store_true")
+    parser.add_argument("--recover-interrupted", action="store_true",
+                        help="Queue preserved prefixes from an archived terminal run")
     parser.add_argument("--wait-for-lock", action="store_true",
                         help="Wait for another renderer to finish this queue")
     args = parser.parse_args()
@@ -182,6 +282,10 @@ def main():
         parser.error("FPS must be positive")
     if args.watch and args.retry_failed:
         parser.error("Retry failed attempts once, without --watch")
+    if args.recover_interrupted:
+        if args.watch:
+            parser.error("Recovery is only for archived terminal runs, without --watch")
+        print(json.dumps({"recovered_interrupted_jobs": recover_interrupted(args.root)}), flush=True)
     scanned = {}
     while True:
         failures = 0

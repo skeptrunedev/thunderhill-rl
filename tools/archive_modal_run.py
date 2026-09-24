@@ -99,7 +99,8 @@ def archive_run(*, run_id, staging_root, output, godot, ffmpeg, watch=False,
                   flush=True)
             return output
         execute([sys.executable, str(REPO / "tools/render_video_queue.py"), str(output),
-                 "--godot", godot, "--ffmpeg", ffmpeg, "--wait-for-lock"], check=True)
+                 "--godot", godot, "--ffmpeg", ffmpeg, "--wait-for-lock",
+                 "--recover-interrupted"], check=True)
         return output
 
 
