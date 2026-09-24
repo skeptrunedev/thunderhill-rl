@@ -12,9 +12,12 @@ const EYE_FORWARD_M := 0.05
 const LOOK_DOWN_RAD := 0.08
 var viewport: SubViewport
 var camera: Camera3D
+var manual_draw := false
+var renderer_warmed := false
 
 
-func configure(world: World3D) -> void:
+func configure(world: World3D, offscreen: bool = false) -> void:
+	manual_draw = offscreen
 	viewport = SubViewport.new()
 	viewport.name = "PolicyObservationViewport"
 	viewport.size = Vector2i(WIDTH, HEIGHT)
@@ -63,7 +66,23 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 	var capture_tick: int = sim.tick
 	var pose := camera.global_transform
 	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-	await RenderingServer.frame_post_draw
+	if manual_draw:
+		# SceneTree must first flush pending Node3D transform notifications.
+		# The caller holds the agent request lock across this frame boundary.
+		await get_tree().process_frame
+		camera.force_update_transform()
+		if not renderer_warmed:
+			# Ordinary rendering initializes scene/shadow resources before an
+			# observation arrives. On demand rendering needs the same initial pass.
+			RenderingServer.force_draw(false)
+			await get_tree().process_frame
+			camera.force_update_transform()
+			renderer_warmed = true
+			viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+		# Readback synchronizes this draw; no X11 surface is presented.
+		RenderingServer.force_draw(false)
+	else:
+		await RenderingServer.frame_post_draw
 	if sim.tick != capture_tick:
 		return {
 			"error": "Simulation changed during camera capture", "failure_type": "infrastructure"
@@ -128,6 +147,13 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 		"artifact": artifact,
 		"camera":
 		{
+			"renderer":
+			{
+				"adapter": RenderingServer.get_video_adapter_name(),
+				"driver": RenderingServer.get_current_rendering_driver_name(),
+				"method": RenderingServer.get_current_rendering_method(),
+				"offscreen": manual_draw,
+			},
 			"vertical_fov_degrees": camera.fov,
 			"near_m": camera.near,
 			"far_m": camera.far,

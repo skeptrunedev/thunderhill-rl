@@ -14,9 +14,12 @@ import torch
 from PIL import Image
 
 from lap_episode import LapEpisode
-from lap_policy import RoadTelemetry, encode_action
+from lap_policy import RoadTelemetry
 from check_parallel import worker
-from driving_trajectory import TrajectoryTracker, godot_history_to_ego
+from driving_trajectory import (
+    TrajectoryTracker, godot_history_to_ego, encode_controller_controls,
+    decode_controller_controls,
+)
 
 
 def rendered_worker(godot, directory, timeout, extra_args=()):
@@ -25,7 +28,8 @@ def rendered_worker(godot, directory, timeout, extra_args=()):
 
 class DrivingEpisode:
     def __init__(self, **kwargs):
-        self.episode = LapEpisode(road=RoadTelemetry(), worker_factory=rendered_worker, **kwargs)
+        self.episode = LapEpisode(road=RoadTelemetry(), worker_factory=rendered_worker,
+                                  action_parser=decode_controller_controls, **kwargs)
         self.images = deque(maxlen=4)
         self.positions = deque(maxlen=16)
         self.headings = deque(maxlen=16)
@@ -113,7 +117,7 @@ class DrivingEpisode:
             for _ in range(hold_steps):
                 state = self.episode.observation['state']
                 controls, diagnostics = self.tracker.next_controls(state['speed'], state['lean'])
-                command = encode_action(controls)
+                command = encode_controller_controls(controls)
                 row = self.episode.apply(command, [], [])
                 record['controls'].append(dict(tick=row.get('tick'), controls=row.get('controls'),
                                                diagnostics=diagnostics))

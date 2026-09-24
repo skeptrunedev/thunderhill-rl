@@ -49,10 +49,11 @@ image = (modal.Image.from_registry('nvidia/cuda:12.8.1-devel-ubuntu24.04', add_p
                   'godot --headless --path ' + REMOTE + '/godot --editor --import')
     .env({'PYTHONPATH': REMOTE + '/training:/opt/alpamayo/src:/opt/alpamayo-recipes/recipes:/opt/alpagym/packages/policies/alpamayo_r1/src',
           'HF_HOME': '/model-cache', 'HF_HUB_OFFLINE': '1', 'TOKENIZERS_PARALLELISM': 'false',
-          'PYTHONUNBUFFERED': '1', 'LIBGL_ALWAYS_SOFTWARE': '1', 'ALPAMAYO_SOURCE_ROOT': '/opt'}))
+          'PYTHONUNBUFFERED': '1', 'ALPAMAYO_SOURCE_ROOT': '/opt',
+          'THUNDERHILL_RENDERING_METHOD': 'mobile', 'THUNDERHILL_AGENT_OFFSCREEN': '1'}))
 for name in SOURCES:
     image = image.add_local_file(str(ROOT / 'training' / name), REMOTE + '/training/' + name)
-for name in ('check_parallel.py', 'check_agent.py'):
+for name in ('check_parallel.py', 'check_agent.py', 'check_camera.py'):
     image = image.add_local_file(str(ROOT / 'tools' / name), REMOTE + '/tools/' + name)
 image = image.add_local_file(str(Path(__file__)), REMOTE + '/training/modal_alpamayo_rl.py')
 
@@ -165,8 +166,15 @@ def run_generation(run_id: str, paths: dict, source: dict):
     started = time.monotonic()
     status = dict(run_id=run_id, ok=False)
     try:
+        # Prove actual GPU pixels before allocating the model or collecting data.
+        renderer_command = ['xvfb-run', '-a', '-s', '-screen 0 800x600x24', PYTHON,
+            '-u', REMOTE + '/tools/check_camera.py',
+            '--godot', '/usr/local/bin/godot', '--rendering-method', 'mobile',
+            '--offscreen', '--require-hardware', '--output', str(root / 'renderer-check')]
+        run_logged_process(renderer_command, cwd=REMOTE, log_path=root / 'renderer.log',
+            timeout_seconds=120, heartbeat=runs.commit)
         run_logged_process(command, cwd=REMOTE, log_path=root / 'run.log',
-            timeout_seconds=1500, heartbeat=runs.commit)
+            timeout_seconds=max(1, 1500 - (time.monotonic() - started)), heartbeat=runs.commit)
         campaign = json.loads((root / 'experiment/campaign.json').read_text())
         if not campaign['complete'] or len(campaign['generations']) != 1:
             raise RuntimeError('Missing completed generation evidence')

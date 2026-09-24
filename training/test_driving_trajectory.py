@@ -1,10 +1,28 @@
 import math
 import unittest
 
-from driving_trajectory import TrajectoryTracker, godot_history_to_ego
+from driving_trajectory import (
+    TrajectoryTracker, godot_history_to_ego, encode_controller_controls,
+    decode_controller_controls,
+)
 
 
 class TrajectoryTests(unittest.TestCase):
+    def test_continuous_commands_preserve_small_distinct_inputs(self):
+        controls = dict(steer=-1.234567891234567e-8, throttle=0.00089031472971384,
+                        front_brake=0.000136217883843274, rear_brake=0.0, shift=0)
+        self.assertEqual(decode_controller_controls(encode_controller_controls(controls)), controls)
+        second = dict(controls, throttle=controls['throttle'] * 1.01)
+        self.assertNotEqual(encode_controller_controls(controls), encode_controller_controls(second))
+
+    def test_continuous_commands_reject_invalid_controls(self):
+        controls = dict(steer=0.0, throttle=0.0, front_brake=0.0, rear_brake=0.0)
+        for value in (float('nan'), float('inf'), True, -0.01, 1.01):
+            with self.assertRaises(ValueError):
+                encode_controller_controls(dict(controls, throttle=value))
+        with self.assertRaises(ValueError):
+            decode_controller_controls('control_bike 0 0 0 0')
+
     def controls(self, plan, speed=10, lean=0):
         tracker = TrajectoryTracker()
         tracker.replan(plan)

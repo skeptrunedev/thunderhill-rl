@@ -36,8 +36,12 @@ def game(args, output: Path, headless: bool = False):
     if headless:
         command.append("--headless")
     else:
-        command += ["--resolution", "800x500", "--position", "40,40"]
+        driver = "opengl3" if args.rendering_method == "gl_compatibility" else "vulkan"
+        command += ["--resolution", "800x500", "--position", "40,40",
+                    "--rendering-method", args.rendering_method, "--rendering-driver", driver]
     command += ["--", f"--agent-port={port}"]
+    if args.offscreen and not headless:
+        command.append("--agent-offscreen")
     log_path = output / ("headless.log" if headless else "rendered.log")
     with log_path.open("wb") as log:
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env)
@@ -98,8 +102,12 @@ def validate_capture(response: dict, output: Path, label: str, episode: str, tic
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--godot", default=shutil.which("godot") or shutil.which("godot4"))
-    parser.add_argument("--display", default=":1")
+    parser.add_argument("--display", default=os.environ.get("DISPLAY", ":1"))
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--rendering-method", choices=["gl_compatibility", "mobile", "forward_plus"],
+                        default="gl_compatibility")
+    parser.add_argument("--offscreen", action="store_true")
+    parser.add_argument("--require-hardware", action="store_true")
     args = parser.parse_args()
     if not args.godot:
         parser.error("Provide --godot")
@@ -112,6 +120,12 @@ def main() -> None:
         capture = {"op": "capture", "episode_id": episode, "expected_tick": 0}
         first = client.request(capture)
         first_info = validate_capture(first, output, "tick0", episode, 0)
+        assert first["camera"]["renderer"]["offscreen"] is args.offscreen
+        assert first["camera"]["renderer"]["method"] == args.rendering_method
+        if args.require_hardware:
+            adapter = first["camera"]["renderer"]["adapter"].lower()
+            assert adapter and not any(name in adapter for name in
+                ("llvmpipe", "lavapipe", "swiftshader", "software")), first["camera"]["renderer"]
         time.sleep(0.25)
         assert client.request({"op": "observe", "episode_id": episode}) == initial, "Rendering advanced physics"
         repeated = client.request(capture)
@@ -121,6 +135,8 @@ def main() -> None:
             assert repeat_info["mtime_ns"] == first_info["mtime_ns"], "Identical artifact was overwritten"
         idle_difference = ImageChops.difference(Image.open(output / "tick0.png"), Image.open(output / "tick0_repeat.png"))
         idle_max_channel_change = max(high for low, high in idle_difference.getextrema())
+        if args.offscreen:
+            assert idle_max_channel_change == 0, "Offscreen startup did not stabilize camera pixels"
         advance = {"op": "advance", "episode_id": episode, "expected_tick": 0,
                    "action_id": "camera-first", "controls": {"throttle": 0.8}}
         advanced = client.request(advance)
@@ -159,7 +175,7 @@ def main() -> None:
     observations = [row for row in records if row.get("type") == "camera_observation"]
     assert len(observations) == 5, len(observations)
     assert all("base64" not in row["image"] for row in observations)
-    summary = {"ok": True, "camera_observations_recorded": len(observations), "dimensions": [640, 360],
+    summary = {"ok": True, "renderer": first["camera"]["renderer"], "camera_observations_recorded": len(observations), "dimensions": [640, 360],
                "idle_rerender_max_channel_change": idle_max_channel_change,
                "checks": ["real_png", "sha256", "immutable_artifact", "deterministic_idle_pose",
                           "no_privileged_telemetry", "frozen_tick", "changed_pixels_after_advance",

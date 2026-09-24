@@ -163,6 +163,31 @@ class StallMonitorTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("THUNDERHILL_GODOT"), "Set THUNDERHILL_GODOT for native collector verification")
 class EpisodeLifecycleTests(unittest.TestCase):
+    def test_continuous_controls_survive_protocol_and_recording(self):
+        from driving_trajectory import encode_controller_controls, decode_controller_controls
+        root = Path(tempfile.mkdtemp(prefix='continuous-collector-native-',
+                                    dir=Path(__file__).resolve().parents[1] / 'artifacts'))
+        controls = dict(steer=-1.234567891234567e-8, throttle=0.00089031472971384,
+                        front_brake=0.000136217883843274, rear_brake=0.0, shift=0)
+        with LapEpisode(godot=os.environ['THUNDERHILL_GODOT'], output=root / 'episode',
+                        road=RoadTelemetry(), adapter_sha256='e' * 64,
+                        model='continuous control plumbing fixture', revision='test',
+                        generation=0, rollout=1, time_budget_seconds=.1,
+                        action_parser=decode_controller_controls) as episode:
+            row = episode.apply(encode_controller_controls(controls), [], [])
+            self.assertEqual(row['controls'], controls)
+        self.assertTrue(episode.summary['recording_provenance_verified'])
+        self.assertEqual(episode.summary['recorded_transitions'], 12)
+        from lap_audit import recorded_controls_match
+        transitions = [json.loads(line) for path in episode.summary['recordings']
+                       for line in Path(path).read_text().splitlines()
+                       if json.loads(line).get('type') == 'transition']
+        self.assertEqual(len(transitions), 12)
+        for transition in transitions:
+            self.assertTrue(recorded_controls_match(transition['requested_controls'], controls))
+            for name in ('steer', 'throttle', 'front_brake'):
+                self.assertNotEqual(transition['requested_controls'][name], 0.0)
+
     def episode(self, root, name):
         return LapEpisode(godot=os.environ["THUNDERHILL_GODOT"], output=root / name,
                           road=RoadTelemetry(), adapter_sha256="a" * 64,

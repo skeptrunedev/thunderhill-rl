@@ -9,11 +9,44 @@ not the leaned rider camera. It preserves measured elevation changes.
 from __future__ import annotations
 
 import math
+import json
 from collections.abc import Sequence
 
 DT = 0.1
 GRAVITY = 9.81
 MAX_LEAN = 0.88  # godot/scripts/motorcycle.gd rider_max_lean_rad
+
+CONTROL_FIELDS = ('steer', 'throttle', 'front_brake', 'rear_brake')
+
+
+def _controller_arguments(arguments):
+    if not isinstance(arguments, dict) or set(arguments) != {*CONTROL_FIELDS, 'shift'}:
+        raise ValueError('Expected exactly four continuous controls and shift')
+    for name in CONTROL_FIELDS:
+        value = arguments[name]
+        if (not isinstance(value, (int, float)) or isinstance(value, bool)
+                or not math.isfinite(value)
+                or not (-1 if name == 'steer' else 0) <= value <= 1):
+            raise ValueError(f'Invalid continuous control: {name}')
+    if type(arguments['shift']) is not int or arguments['shift'] != 0:
+        raise ValueError('Trajectory controller uses automatic shifting')
+    return {**{name: float(arguments[name]) for name in CONTROL_FIELDS}, 'shift': 0}
+
+
+def encode_controller_controls(controls):
+    """Preserve continuous controller outputs; these are not sampled tool tokens."""
+    arguments = _controller_arguments({**{name: controls[name] for name in CONTROL_FIELDS},
+                                       'shift': controls.get('shift', 0)})
+    return json.dumps({'tool': 'control_bike', 'arguments': arguments},
+                      separators=(',', ':'), allow_nan=False)
+
+
+def decode_controller_controls(text):
+    payload = json.loads(text)
+    if (not isinstance(payload, dict) or set(payload) != {'tool', 'arguments'}
+            or payload['tool'] != 'control_bike'):
+        raise ValueError('Expected a control_bike controller receipt')
+    return _controller_arguments(payload['arguments'])
 
 
 def _finite(value: float) -> float:

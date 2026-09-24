@@ -45,3 +45,17 @@ those seven constants from the published configuration using official module
 constructors. Missing learned weights remain fatal. See NVIDIA's
 [release Fourier encoder](https://github.com/NVlabs/alpamayo1.5/blob/36aeb4c5938cbc2eb2aed33b22434773da4ab639/src/alpamayo1_5/models/action_in_proj.py)
 and [action normalization](https://github.com/NVlabs/alpamayo1.5/blob/36aeb4c5938cbc2eb2aed33b22434773da4ab639/src/alpamayo1_5/action_space/unicycle_accel_curvature.py).
+
+The next GPU attempt loaded the full model and sampled trajectories, but exposed
+two integration problems before any optimizer update. The legacy integer control
+codec rounded small continuous controller outputs to zero. CPU software rendering
+also dominated rollout time. That attempt was stopped and both attempted episodes
+were archived with complete videos. It is not evidence of learning.
+
+Trajectory execution now uses continuous JSON control values. Modal uses Vulkan
+Mobile with explicit offscreen observation draws, and validates actual hardware
+PNG capture before loading the model. The same offscreen path passed the local
+rendered gameplay, reward audit and recording tests on the RTX 2080 Ti. Root
+viewport presentation is disabled while camera viewports remain active, so Xvfb
+does not need a Vulkan presentation surface. Renderer validation and training
+share the original 25 minute child execution budget.

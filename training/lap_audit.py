@@ -3,10 +3,41 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from lap_policy import parse_action
 from lap_rollout import recorded_transitions
+
+
+# Godot 4.7 core/io/json.cpp:374 uses String::to_float; core/string/ustring.cpp:
+# 2306-2337 counts leading zeros toward its 18-digit mantissa limit. Thus
+# 0.000136217883843274 parses as 0.00013621788384327 (2.95e-14 relative).
+# Full precision stringify cannot recover discarded input digits. This bound
+# admits that measured serialization loss, not arbitrary small absolute errors.
+# Values suffering worse precision loss fail closed instead of widening it.
+RECORDED_CONTROL_REL_TOL = 1e-13
+_CONTROL_FIELDS = {"steer", "throttle", "front_brake", "rear_brake", "shift"}
+
+
+def recorded_controls_match(recorded, requested):
+    """Compare only the simulator receipt with the exact submitted controls."""
+    for controls in (recorded, requested):
+        if not isinstance(controls, dict) or set(controls) != _CONTROL_FIELDS:
+            return False
+        for name, value in controls.items():
+            if type(value) not in (int, float) or not math.isfinite(value):
+                return False
+            if name == "shift":
+                if value not in (-1, 0, 1):
+                    return False
+            elif not (-1 if name == "steer" else 0) <= value <= 1:
+                return False
+    return recorded["shift"] == requested["shift"] and all(
+        math.isclose(recorded[name], requested[name],
+                     rel_tol=RECORDED_CONTROL_REL_TOL, abs_tol=0.0)
+        for name in _CONTROL_FIELDS - {"shift"}
+    )
 
 
 def audit_lap(
@@ -85,7 +116,8 @@ def audit_lap(
             continue
         controls = parse_completion(decision["completion"])
         require(
-            controls == decision.get("controls"),
+            controls == decision.get("controls")
+            and recorded_controls_match(decision.get("controls"), controls),
             "generated and submitted controls differ",
         )
         end_tick = decision["tick"]
@@ -122,7 +154,7 @@ def audit_lap(
             start, end, controls = actions[action_index]
             require(start < count <= end, "transition outside decision interval")
             require(
-                row["requested_controls"] == controls,
+                recorded_controls_match(row.get("requested_controls"), controls),
                 "recorded controls differ from generated controls",
             )
             if count == end and end - start < 12:

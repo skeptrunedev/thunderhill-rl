@@ -24,8 +24,21 @@ from pathlib import Path
 from check_agent import ROOT, Client
 
 
+def rendered_options():
+    """Explicit renderer selection, with compatibility as the existing default."""
+    method = os.environ.get("THUNDERHILL_RENDERING_METHOD", "gl_compatibility")
+    if method not in {"gl_compatibility", "mobile", "forward_plus"}:
+        raise ValueError(f"Unsupported rendering method: {method}")
+    offscreen = os.environ.get("THUNDERHILL_AGENT_OFFSCREEN", "0")
+    if offscreen not in {"0", "1"}:
+        raise ValueError("THUNDERHILL_AGENT_OFFSCREEN must be zero or one")
+    driver = "opengl3" if method == "gl_compatibility" else "vulkan"
+    return method, driver, offscreen == "1"
+
+
 @contextmanager
 def worker(godot, directory, timeout, extra_args=(), *, rendered=False):
+    method, driver, offscreen = rendered_options() if rendered else (None, None, False)
     directory.mkdir()
     data = directory / "data"
     log = directory / "godot.log"
@@ -38,13 +51,14 @@ def worker(godot, directory, timeout, extra_args=(), *, rendered=False):
         process = subprocess.Popen(
             [
                 godot,
-                *(["--rendering-method", "gl_compatibility", "--rendering-driver", "opengl3",
+                *(["--rendering-method", method, "--rendering-driver", driver,
                    "--audio-driver", "Dummy", "--resolution", "640x360", "--max-fps", "30"]
                   if rendered else ["--headless"]),
                 "--path",
                 str(ROOT / "godot"),
                 "--",
                 f"--agent-port={port}",
+                *(["--agent-offscreen"] if offscreen else []),
                 *extra_args,
             ],
             stdout=output,

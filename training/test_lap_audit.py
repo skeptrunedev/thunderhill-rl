@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lap_audit import audit_lap
+from lap_audit import audit_lap, recorded_controls_match
 from lap_policy import parse_action
 
 
@@ -87,6 +87,7 @@ class LapAuditTests(unittest.TestCase):
             track_sha256="track",
             final_observation=self.final,
             decisions=self.decisions,
+            parse_completion=getattr(self, "parse_completion", parse_action),
         )
 
     def test_complete_lap_and_partial_final_action(self):
@@ -125,6 +126,49 @@ class LapAuditTests(unittest.TestCase):
     def test_submitted_controls_cannot_override_model(self):
         self.decisions[0]["controls"]["steer"] = 0.7
         with self.assertRaisesRegex(ValueError, "generated and submitted"):
+            self.audit()
+
+    def test_continuous_receipt_roundoff_is_bounded_and_only_in_recording(self):
+        from driving_trajectory import decode_controller_controls, encode_controller_controls
+        controls = dict(steer=-1.234567891234567e-8, throttle=0.00089031472971384,
+                        front_brake=0.000136217883843274, rear_brake=0.0, shift=0)
+        for decision in self.decisions:
+            decision['completion'] = encode_controller_controls(controls)
+            decision['controls'] = dict(controls)
+        for row in self.rows:
+            row['requested_controls'] = dict(controls, front_brake=0.00013621788384327)
+        self.parse_completion = decode_controller_controls
+        self.assertTrue(self.audit()['recording_provenance_verified'])
+        self.decisions[0]['controls']['front_brake'] = 0.00013621788384327
+        with self.assertRaisesRegex(ValueError, 'generated and submitted'):
+            self.audit()
+
+    def test_receipt_tolerance_does_not_hide_tiny_control_tampering(self):
+        for requested, recorded in ((1e-20, 0.0), (0.0, 1e-20), (1e-20, -1e-20),
+                                    (1e-20, 1.000000000001e-20), (0.2, 0.200000000001)):
+            with self.subTest(requested=requested, recorded=recorded):
+                self.assertFalse(recorded_controls_match(
+                    dict(self.controls, steer=recorded), dict(self.controls, steer=requested)))
+
+    def test_recorded_control_schema_and_shift_are_strict(self):
+        corruptions = [None, [], dict(self.controls, extra=0),
+                       {key: value for key, value in self.controls.items() if key != 'shift'}]
+        for key in self.controls:
+            for value in (True, '0', None, float('nan'), float('inf'), -float('inf')):
+                corruptions.append(dict(self.controls, **{key: value}))
+        for value in (1, -1, 1e-20, 0.00000000000001):
+            corruptions.append(dict(self.controls, shift=value))
+        corruptions.extend([dict(self.controls, throttle=-1e-20), dict(self.controls, steer=1.1)])
+        for value in corruptions:
+            with self.subTest(recorded=value):
+                self.rows[0]['requested_controls'] = value
+                with self.assertRaisesRegex(ValueError, 'recorded controls'):
+                    self.audit()
+
+
+    def test_submitted_boolean_is_not_a_numeric_control(self):
+        self.decisions[0]['controls']['rear_brake'] = False
+        with self.assertRaisesRegex(ValueError, 'generated and submitted'):
             self.audit()
 
     def test_identity_and_tick_corruption_rejected(self):

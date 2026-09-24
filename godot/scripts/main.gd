@@ -32,6 +32,7 @@ var camera: Camera3D
 var hud: Control
 var paused := true
 var agent_mode := false
+var agent_offscreen := false
 var camera_mode := 0
 var wheel_rotation := 0.0
 var lap_time := 0.0
@@ -125,6 +126,8 @@ func _ready() -> void:
 				get_tree().quit(2)
 				return
 			agent_max_episode_ticks = int(value)
+		if arg == "--agent-offscreen":
+			agent_offscreen = true
 		if arg.begins_with("--agent-port="):
 			server_port = int(arg.split("=")[1])
 			agent_mode = true
@@ -164,6 +167,16 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	startup_policy_display = policy_display.duplicate(true)
+	if agent_offscreen:
+		if not agent_mode or DisplayServer.get_name() == "headless":
+			push_error("Agent offscreen rendering requires a rendered agent session")
+			get_tree().quit(2)
+			return
+		# Logic and TCP stepping continue, but no X11 presentation is required.
+		RenderingServer.render_loop_enabled = false
+		RenderingServer.viewport_set_update_mode(
+			get_viewport().get_viewport_rid(), RenderingServer.VIEWPORT_UPDATE_DISABLED
+		)
 	if agent_max_episode_ticks > 0 and not agent_mode:
 		push_error("Agent episode tick limit requires agent mode")
 		get_tree().quit(2)
@@ -269,7 +282,7 @@ func _ready() -> void:
 	if agent_mode and DisplayServer.get_name() != "headless":
 		agent_camera = AgentCameraScript.new()
 		add_child(agent_camera)
-		agent_camera.configure(get_world_3d())
+		agent_camera.configure(get_world_3d(), agent_offscreen)
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	hud = HudScript.new()
@@ -534,7 +547,7 @@ func _start_recording(station: float) -> void:
 
 func _record(record: Dictionary) -> void:
 	if recorder:
-		recorder.store_line(JSON.stringify(serializable(record)))
+		recorder.store_line(JSON.stringify(serializable(record), "", true, true))
 
 
 func serializable(value: Variant) -> Variant:
@@ -891,7 +904,8 @@ func _process(dt: float) -> void:
 	_poll_agent()
 	if engine_audio != null:
 		engine_audio.muted = paused or agent_mode
-	_update_visual(dt)
+	if not agent_offscreen:
+		_update_visual(dt)
 	if not paused and frame_times.size() < 72000:
 		frame_times.append(dt)
 	if not screenshot_path.is_empty() and Engine.get_process_frames() > 12:
@@ -1088,7 +1102,7 @@ func _poll_agent() -> void:
 					agent_request_pending = false
 				else:
 					response = _request(request)
-			peer.put_data((JSON.stringify(response) + "\n").to_utf8_buffer())
+			peer.put_data((JSON.stringify(response, "", true, true) + "\n").to_utf8_buffer())
 
 
 func _capture_request(request: Dictionary) -> Dictionary:

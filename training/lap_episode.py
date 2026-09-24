@@ -124,6 +124,7 @@ class LapEpisode:
     def __init__(self, *, godot, output, road, adapter_sha256, model, revision,
                  generation, rollout, time_budget_seconds=900, evaluation=False, rollout_count=None,
                  worker_factory=worker, stall_config=DEFAULT_STALL_CONFIG,
+                 action_parser=None,
                  policy_identity_kind="adapter_weights_sha256"):
         if policy_identity_kind not in {"adapter_weights_sha256", "api_request_config_sha256"}:
             raise ValueError("Unsupported policy identity kind")
@@ -146,7 +147,7 @@ class LapEpisode:
             if rollout < 1 or (rollout_count is not None and rollout_count < rollout):
                 raise ValueError("Rollout is one based and cannot exceed rollout_count")
             self.display.update(rollout_number=rollout, rollout_count=rollout_count or rollout)
-        self.parse_completion = getattr(road, "parse_completion", parse_action)
+        self.parse_completion = action_parser or getattr(road, "parse_completion", parse_action)
         self.worker_factory = worker_factory
         self.stall_monitor = StallMonitor(stall_config)
         self.records = []
