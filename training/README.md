@@ -51,7 +51,7 @@ real game protocol check. This uses NVIDIA's tokenizer and compares rollout and
 replay tensors; it does not optimize weights:
 
 ```sh
-/path/to/alpagym/.venv/bin/python tools/check_native_navigation.py \
+/path/to/alpagym/.venv/bin/python -m tools.check_native_navigation \
   --model-input /path/to/native_model_input.pt \
   --checkpoint /path/to/converted/checkpoint \
   --release-config /path/to/Alpamayo-1.5-10B/config.json \
