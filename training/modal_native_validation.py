@@ -5,10 +5,10 @@ import modal
 from training.modal_native import REMOTE, ROOT, UPSTREAM, cache, image, runs
 
 app = modal.App("thunderhill-native-gpu-validation")
-# Half trains, a quarter renders. Six-rollout groups (NVIDIA's size) at four
-# concurrent rides need two ride waves per update: 27.5 training minutes ran out
-# during the final checkpoint save, so qualification gets 40.
-VALIDATION_BUDGET_SECONDS = 4800
+# Half trains, a quarter renders. Training covers three six-ride groups: the
+# rollout worker generates one more group after the final step before the
+# controller shuts down, and six rides at four concurrent take two waves.
+VALIDATION_BUDGET_SECONDS = 7200
 
 runtime_image = (
     image.env({
