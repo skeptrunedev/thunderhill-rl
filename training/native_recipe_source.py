@@ -42,8 +42,19 @@ def verify_recipe(root: Path, *, apply_patch: bool = False) -> dict:
             raise ValueError(
                 "Native recipe requires the complete reviewed padding mask patch"
             )
-        subprocess.run(["git", "apply", "--check", str(PATCH)], cwd=root, check=True)
-        subprocess.run(["git", "apply", str(PATCH)], cwd=root, check=True)
+        # A venv can live below a git checkout. Applying from that subdirectory
+        # otherwise silently skips package-relative paths outside git's prefix.
+        destination = root.resolve()
+        command = [
+            "git",
+            "apply",
+            "--directory",
+            str(destination.relative_to(destination.anchor)),
+        ]
+        subprocess.run(
+            [*command, "--check", str(PATCH)], cwd=destination.anchor, check=True
+        )
+        subprocess.run([*command, str(PATCH)], cwd=destination.anchor, check=True)
         return verify_recipe(root)
     return manifest
 
