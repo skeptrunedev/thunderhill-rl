@@ -401,6 +401,7 @@ def validate(
                 "--workers",
                 "1",
                 "--recover-interrupted",
+                    *(["--retry-failed"] if attempt else []),
             ],
             "validation-videos.log",
         )
@@ -437,6 +438,7 @@ def validate(
                     "--workers",
                     "1",
                     "--recover-interrupted",
+                    *(["--retry-failed"] if attempt else []),
                 ],
                 "validation-failure-videos.log",
             )
