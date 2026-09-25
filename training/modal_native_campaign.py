@@ -50,6 +50,7 @@ def prerequisites(
     resume_campaign: str = "",
     resume_checkpoint_step: int = 0,
     settings: dict | None = None,
+    retry_failed_continuation: str = "",
 ):
     import json
     import os
@@ -97,6 +98,23 @@ def prerequisites(
             timeout=150,
         )
         certificate["resume_plan"] = json.loads(result.stdout)
+        if retry_failed_continuation:
+            result = subprocess.run(
+                [
+                    UPSTREAM + "/.venv/bin/python",
+                    "-c",
+                    "import json,sys; from pathlib import Path; from training.native_resume import verify_failed_continuation_retry; "
+                    "plan=json.loads(sys.argv[1]); print(json.dumps(verify_failed_continuation_retry(Path(plan['parent_campaign']).parent/sys.argv[2],plan)))",
+                    json.dumps(certificate["resume_plan"]),
+                    retry_failed_continuation,
+                ],
+                cwd=REMOTE,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=150,
+            )
+            certificate["retry_receipt"] = json.loads(result.stdout)
     return certificate
 
 
@@ -151,6 +169,7 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
         settings=settings,
         validated_prerequisites=certificate,
         native_resume=resume_plan,
+        retry_receipt=certificate.get("retry_receipt"),
     )
     (destination / "source_identity.json").write_text(
         json.dumps(identity, indent=2) + "\n"
@@ -222,7 +241,9 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
             timeout=120,
         )
         if json.loads(check.stdout) != {
-            key: value for key, value in certificate.items() if key != "resume_plan"
+            key: value
+            for key, value in certificate.items()
+            if key not in ("resume_plan", "retry_receipt")
         }:
             raise RuntimeError("Validated model or receipt changed before allocation")
         command = [
@@ -323,6 +344,7 @@ def main(
     evaluation_episodes: int = 8,
     resume_campaign: str = "",
     resume_checkpoint_step: int = 0,
+    retry_failed_continuation: str = "",
 ):
     import json
     import math
@@ -368,8 +390,19 @@ def main(
         raise ValueError(
             "Explicit continuation requires both parent campaign and positive checkpoint step"
         )
+    if retry_failed_continuation and (
+        not resume_campaign
+        or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{2,79}", retry_failed_continuation)
+    ):
+        raise ValueError(
+            "A continuation retry requires an explicit valid failed campaign ID"
+        )
     certificate = prerequisites.remote(
-        validation_run, resume_campaign, resume_checkpoint_step, settings
+        validation_run,
+        resume_campaign,
+        resume_checkpoint_step,
+        settings,
+        retry_failed_continuation,
     )
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
@@ -389,12 +422,22 @@ def main(
             "This campaign ID was already attempted; refusing a duplicate GPU run"
         )
     if resume_campaign:
-        continuation_key = (
-            "continuation:" + certificate["resume_plan"]["parent_campaign"]
-        )
+        if retry_failed_continuation:
+            failed_reservation = reservations.get(retry_failed_continuation)
+            if not failed_reservation or failed_reservation.get("state") != "failed":
+                raise RuntimeError("Failed continuation reservation is not terminal")
+            continuation_key = "continuation-retry:" + retry_failed_continuation
+        else:
+            continuation_key = (
+                "continuation:" + certificate["resume_plan"]["parent_campaign"]
+            )
         if not reservations.put(
             continuation_key,
-            dict(campaign_id=campaign_id, checkpoint_step=resume_checkpoint_step),
+            dict(
+                campaign_id=campaign_id,
+                checkpoint_step=resume_checkpoint_step,
+                retry_failed_continuation=retry_failed_continuation,
+            ),
             skip_if_exists=True,
         ):
             raise RuntimeError(

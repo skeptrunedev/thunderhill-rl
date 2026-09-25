@@ -108,6 +108,69 @@ def register_verified_resume_trainer():
     return VerifiedNativeResume
 
 
+def verify_failed_continuation_retry(failed_campaign: Path, resume_plan: dict) -> dict:
+    """Permit an explicit successor only after a failed attempt made no update."""
+    from training.native_campaign import summarize
+
+    failed_campaign = failed_campaign.resolve()
+    allocation_path = failed_campaign / "allocation_status.json"
+    allocation = json.loads(allocation_path.read_text())
+    campaign = json.loads((failed_campaign / "campaign.json").read_text())
+    identity = json.loads((failed_campaign / "source_identity.json").read_text())
+    previous = identity["native_resume"]
+    for key in (
+        "parent_campaign",
+        "checkpoint",
+        "checkpoint_step",
+        "hard_deadline_unix",
+        "deadline_unix",
+        "settings",
+    ):
+        if previous[key] != resume_plan[key]:
+            raise ValueError(
+                "Retry differs from the failed continuation's original lineage or budget"
+            )
+    run_dir = failed_campaign / Path(campaign["run_dir"]).name
+    status = json.loads((run_dir / "run_status.json").read_text())
+    if (
+        allocation.get("state") != "failed"
+        or not allocation.get("finished_at_unix")
+        or campaign.get("state") != "failed"
+        or status.get("runtime_stopped") is not True
+    ):
+        raise ValueError(
+            "Only a terminal failed allocation with completed runtime cleanup can be retried"
+        )
+    progress = summarize(run_dir)
+    if (
+        progress["trainer_steps_started"]
+        or progress["nonzero_gradient_log_records"]
+        or progress["completed_native_checkpoints"]
+        or any(run_dir.glob("cosmos/**/checkpoints/step_*"))
+    ):
+        raise ValueError(
+            "Failed continuation reached training; refusing to restart its original checkpoint"
+        )
+    policy_logs = [
+        path
+        for path in (run_dir / "logs").rglob("*.log")
+        if "verify_restored_state" in path.read_text(errors="replace")
+    ]
+    if not policy_logs:
+        raise ValueError(
+            "Retry requires evidence of failure in checkpoint verification before training"
+        )
+    return dict(
+        failed_campaign=failed_campaign.name,
+        failed_directory=str(failed_campaign),
+        allocation_sha256=hashlib.sha256(allocation_path.read_bytes()).hexdigest(),
+        runtime_stopped=True,
+        trainer_steps_started=[],
+        new_checkpoints=0,
+        original_deadline_unix=resume_plan["hard_deadline_unix"],
+    )
+
+
 def verify_resume_configuration(config) -> None:
     """Require identical optimizer, schedule, objective and model geometry."""
     run_dir = Path(config.custom["resolved_config_path"]).parent
@@ -123,9 +186,61 @@ def verify_resume_configuration(config) -> None:
             raise ValueError(f"Continuation changed native {section} configuration")
 
 
+def exact_resume_state_equal(left, right) -> bool:
+    """Compare both checkpoint and live DTensors without distributed dispatch."""
+    import numpy as np
+    import torch
+    from torch.distributed.tensor import DTensor
+
+    if isinstance(left, torch.Tensor):
+        if (
+            not isinstance(right, torch.Tensor)
+            or left.dtype != right.dtype
+            or left.shape != right.shape
+        ):
+            return False
+        left_distributed, right_distributed = (
+            isinstance(left, DTensor),
+            isinstance(right, DTensor),
+        )
+        if left_distributed != right_distributed:
+            return False
+        if left_distributed:
+            if (
+                left.device_mesh.size() != 1
+                or right.device_mesh.size() != 1
+                or left.placements != right.placements
+                or left.device_mesh.mesh_dim_names != right.device_mesh.mesh_dim_names
+                or not torch.equal(
+                    left.device_mesh.mesh.cpu(), right.device_mesh.mesh.cpu()
+                )
+            ):
+                return False
+            left, right = left.to_local(), right.to_local()
+        return bool(torch.equal(left.detach().cpu(), right.detach().cpu()))
+    if isinstance(left, dict):
+        return (
+            isinstance(right, dict)
+            and left.keys() == right.keys()
+            and all(exact_resume_state_equal(left[key], right[key]) for key in left)
+        )
+    if isinstance(left, (tuple, list)):
+        return (
+            type(left) is type(right)
+            and len(left) == len(right)
+            and all(exact_resume_state_equal(a, b) for a, b in zip(left, right))
+        )
+    if isinstance(left, np.ndarray):
+        return (
+            isinstance(right, np.ndarray)
+            and left.dtype == right.dtype
+            and np.array_equal(left, right)
+        )
+    return type(left) is type(right) and left == right
+
+
 def verify_restored_state(trainer, extra: dict) -> dict:
     import torch
-    from alpagym_runtime.cosmos.padding_skip import _equal
     from cosmos_rl.utils.checkpoint import CheckpointMananger
 
     run_dir = Path(trainer.config.custom["resolved_config_path"]).parent
@@ -154,11 +269,11 @@ def verify_restored_state(trainer, extra: dict) -> dict:
         key: value for key, value in saved_extra.items() if key != "rng_state"
     }
     checks = {
-        "extra_state_exact": _equal(expected_extra, extra),
+        "extra_state_exact": exact_resume_state_equal(expected_extra, extra),
         "step_exact": extra.get("step") == plan["checkpoint_step"],
         "scheduler_horizon_exact": extra.get("total_steps")
         == plan["settings"]["max_steps"],
-        "policy_rng_exact": _equal(
+        "policy_rng_exact": exact_resume_state_equal(
             saved_extra["rng_state"], CheckpointMananger.get_rng_state()
         ),
     }
@@ -175,7 +290,7 @@ def verify_restored_state(trainer, extra: dict) -> dict:
             weights_only=False,
             mmap=True,
         )
-        checks[name + "_exact"] = bool(_equal(saved, current.state_dict()))
+        checks[name + "_exact"] = exact_resume_state_equal(saved, current.state_dict())
         del saved
     if all(checks.values()):
         # CheckpointMananger already rebuilt this scheduler using the saved
