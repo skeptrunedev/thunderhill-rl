@@ -54,6 +54,13 @@ def validated_prerequisites(
             or padding.get("policy_world_size") != 1
             or padding.get("inter_policy_world_size") != 1):
         raise ValueError("Campaign requires verified native padding state equivalence")
+    replay = report.get("replay_storage_verification", {})
+    if not all(replay.get(key) is True for key in (
+        "cuda_retention_verified",
+        "all_retained_replay_tensors_on_cpu",
+        "exact_tensor_values_shapes_dtypes",
+    )):
+        raise ValueError("Campaign requires verified CUDA replay storage bounds and exact values")
     launch = json.loads((validation_run / "launch_manifest.json").read_text())
     camera = json.loads((validation_run / "camera-preflight/summary.json").read_text())
     adapter = camera.get("renderer", {}).get("adapter", "")
@@ -89,6 +96,7 @@ def validated_prerequisites(
         navigation_provenance=validate_navigation_checkpoint(model),
         native_source_patch=launch["native_source_patch"],
         padding_skip_verification=padding,
+        replay_storage_verification=replay,
         reward_version=launch["reward_version"],
         renderer=adapter,
         topology=launch["topology"],
