@@ -69,11 +69,13 @@ def compare_exports(base: Path, trained: Path) -> dict:
 
 def evaluate(
     run_dir: Path, model: Path, destination: Path, version: int,
-    *, episodes: int = 2,
+    *, episodes: int = 2, rpc_timeout_seconds: float = 900,
 ) -> None:
     """Freshly load native weights and drive the actual game with identical seeds."""
     if episodes < 1:
         raise ValueError("Evaluation requires at least one episode")
+    if not math.isfinite(rpc_timeout_seconds) or rpc_timeout_seconds <= 0:
+        raise ValueError("Evaluation RPC timeout must be finite and positive")
     import threading
     from concurrent.futures import ThreadPoolExecutor
 
@@ -148,7 +150,7 @@ def evaluate(
                     ],
                     n_concurrent_per_driver=1,
                 ),
-                timeout=900,
+                timeout=rpc_timeout_seconds,
             )
         rows = [
             {
@@ -238,6 +240,7 @@ def validate(
                 "--rendering-method",
                 "mobile",
                 "--require-hardware",
+                "--initial-capture-timeout", "120", "--trace-render",
                 "--output",
                 str(run_dir / "camera-preflight"),
             ],
@@ -416,6 +419,7 @@ def main():
     ev.add_argument("destination", type=Path)
     ev.add_argument("version", type=int)
     ev.add_argument("--episodes", type=int, default=2)
+    ev.add_argument("--rpc-timeout-seconds", type=float, default=900)
     run = sub.add_parser("run")
     run.add_argument("--source", type=Path, required=True)
     run.add_argument("--model", type=Path, required=True)
@@ -427,6 +431,7 @@ def main():
         evaluate(
             args.run_dir, args.model, args.destination, args.version,
             episodes=args.episodes,
+            rpc_timeout_seconds=args.rpc_timeout_seconds,
         )
     else:
         print(
