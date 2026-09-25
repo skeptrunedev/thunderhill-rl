@@ -54,18 +54,27 @@ def validate_gpu(source_revision: str):
     print(f"Validation artifacts: {destination}", flush=True)
     try:
         with (destination / "gpu-topology.txt").open("w") as log:
-            subprocess.run(
+            topology = subprocess.run(
                 ["nvidia-smi", "topo", "-m"],
-                check=True,
+                check=False,
                 stdout=log,
                 stderr=subprocess.STDOUT,
             )
+        (destination / "gpu-topology-status.json").write_text(
+            json.dumps(
+                {
+                    "exit_code": topology.returncode,
+                    "note": "NVML topology visibility is diagnostic; actual CUDA peer access is mandatory below.",
+                }
+            )
+            + "\n"
+        )
         subprocess.run(
             [
                 UPSTREAM + "/.venv/bin/python",
                 "-c",
                 (
-                    "import torch; assert torch.cuda.device_count() == 2; "
+                    "import torch; print([torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]); assert torch.cuda.device_count() == 2; "
                     "assert torch.cuda.can_device_access_peer(0,1) and "
                     "torch.cuda.can_device_access_peer(1,0), 'CUDA peer access unavailable'"
                 ),
@@ -92,7 +101,7 @@ def validate_gpu(source_revision: str):
                     "--seconds",
                     "5",
                     "--budget",
-                    "3300",
+                    "2700",
                 ],
                 check=True,
                 stdout=log,
