@@ -15,6 +15,8 @@ import sys
 import time
 from pathlib import Path
 
+from training.nvidia_alpagym import NVIDIA_CLRL_GROUP_SIZE
+
 
 def write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2) + "\n")
@@ -229,6 +231,7 @@ def evaluate(
 def validate(
     source: Path, model: Path, output: Path, *, seconds: float, budget: float,
     initial_speed_m_s: float = 0.0, randomized_starts: int = 0, start_seed: int = 0,
+    rollouts: int = NVIDIA_CLRL_GROUP_SIZE,
     resume_run_dir: Path | None = None,
     concurrency: int = 1, replay_fixture: Path | None = None,
     scatter_diagnostics: bool = False,
@@ -246,7 +249,7 @@ def validate(
             model,
             godot="godot",
             max_steps=2,
-            rollouts=4,
+            rollouts=rollouts,
             episode_seconds=seconds,
             concurrency=concurrency,
             max_wall_seconds=budget / 2,
@@ -265,6 +268,7 @@ def validate(
             "initial_speed_m_s": initial_speed_m_s,
             "randomized_starts": randomized_starts,
             "start_seed": start_seed,
+            "rollouts": rollouts,
             "scatter_diagnostics": scatter_diagnostics,
         }
         write_json(run_dir / "validation.json", report)
@@ -584,6 +588,7 @@ def main():
     run.add_argument("--initial-speed-m-s", type=float, default=0.0)
     run.add_argument("--randomized-starts", type=int, default=0)
     run.add_argument("--start-seed", type=int, default=0)
+    run.add_argument("--rollouts", type=int, default=NVIDIA_CLRL_GROUP_SIZE)
     run.add_argument("--resume-run-dir", type=Path)
     run.add_argument("--concurrency", type=int, default=1)
     run.add_argument("--replay-fixture", type=Path)
@@ -607,6 +612,7 @@ def main():
                     initial_speed_m_s=args.initial_speed_m_s,
                     randomized_starts=args.randomized_starts,
                     start_seed=args.start_seed,
+                    rollouts=args.rollouts,
                     resume_run_dir=args.resume_run_dir,
                     concurrency=args.concurrency,
                     replay_fixture=args.replay_fixture,
