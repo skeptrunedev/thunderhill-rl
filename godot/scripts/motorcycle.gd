@@ -118,8 +118,13 @@ func reset(start_position: Vector3, start_heading: float, initial_speed: float =
 	lean = 0.0
 	lean_rate = 0.0
 	steering = 0.0
+	# A rolling start must be drivetrain consistent: begin in the gear automatic
+	# shifting settles into from first, not in first above the shift point or
+	# rev limit, which would cost a shift cascade with drive cut on tick one.
 	gear = 1
-	rpm = float(parameters.idle_rpm)
+	while gear < GEAR_RATIOS.size() and _engine_rpm_in_gear(gear) > float(parameters.shift_up_rpm):
+		gear += 1
+	rpm = maxf(float(parameters.idle_rpm), _engine_rpm_in_gear(gear))
 	crashed = false
 	crash_reason = ""
 	collision_contact.clear()
@@ -683,15 +688,18 @@ func _update_steering(dt: float, command: float, normal_gravity: float) -> void:
 	)
 
 
-func _update_drivetrain(dt: float, shift_command: int) -> void:
-	shift_remaining = maxf(0.0, shift_remaining - dt)
+func _engine_rpm_in_gear(selected_gear: int) -> float:
 	var ratio := (
 		float(parameters.primary_ratio)
-		* float(GEAR_RATIOS[gear - 1])
+		* float(GEAR_RATIOS[selected_gear - 1])
 		* float(parameters.final_ratio)
 	)
-	var wheel_rpm := speed / float(parameters.rear_rolling_radius_m) * 60.0 / TAU
-	rpm = maxf(float(parameters.idle_rpm), wheel_rpm * ratio)
+	return speed / float(parameters.rear_rolling_radius_m) * 60.0 / TAU * ratio
+
+
+func _update_drivetrain(dt: float, shift_command: int) -> void:
+	shift_remaining = maxf(0.0, shift_remaining - dt)
+	rpm = maxf(float(parameters.idle_rpm), _engine_rpm_in_gear(gear))
 	# An explicit automatic slipping clutch permits standing starts.
 	rpm = maxf(
 		rpm,

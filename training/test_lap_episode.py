@@ -20,7 +20,7 @@ class EpisodeLifecycleTests(unittest.TestCase):
                         rollout=1, initial_speed_m_s=5, time_budget_seconds=.1) as episode:
             self.assertEqual(episode.observation['state']['speed'], 5)
             self.assertEqual(episode.observation['state']['longitudinal_velocity'], 5)
-            for speed in (-1, 11, True, '5'):
+            for speed in (-1, 41, True, '5'):
                 response = episode.client.request(dict(op='reset', initial_speed_m_s=speed))
                 self.assertIn('error', response)
             episode.apply('control_bike 0 0 0 0', [], [])

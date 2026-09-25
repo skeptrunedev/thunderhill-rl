@@ -51,6 +51,8 @@ def prepare(
     rollouts: int = 2,
     episode_seconds: float = 30,
     initial_speed_m_s: float = 0.0,
+    randomized_start_count: int = 0,
+    randomized_start_seed: int = 0,
     concurrency: int = 1,
     max_wall_seconds: float = 3600,
     model_name: str | None = None,
@@ -58,9 +60,20 @@ def prepare(
     max_video_seconds: float = 3600,
     scatter_diagnostics: bool = False,
 ) -> Path:
-    from training.episode_config import scene_id
+    from training.episode_config import game_scene_ids
+    from training.lap_policy import RoadTelemetry
 
-    scenario = scene_id(initial_speed_m_s)
+    if type(randomized_start_count) is not int or randomized_start_count < 0:
+        raise ValueError("Randomized start count must be zero (off) or positive")
+    initial_conditions = {"initial_speed_m_s": initial_speed_m_s}
+    if randomized_start_count:
+        # Each start is its own scene, so a GRPO sibling group shares one start.
+        initial_conditions["randomized_start"] = dict(
+            count=randomized_start_count,
+            seed=randomized_start_seed,
+            track_sha256=RoadTelemetry().track_sha256,
+        )
+    scenarios = game_scene_ids(initial_conditions)
     if type(scatter_diagnostics) is not bool:
         raise ValueError("Scatter diagnostics must be an explicit boolean")
     if max_steps < 1 or rollouts < 2 or concurrency < 1:
@@ -107,7 +120,7 @@ def prepare(
     config.run_root = str(output.resolve())
     config.policy.model.path = str(model.resolve())
     config.expected_valid_steps = math.ceil(episode_seconds / 0.2)
-    config.dataset.scene_ids = [scenario]
+    config.dataset.scene_ids = list(scenarios)
     # No prerecorded driving or ground truth actions are used for warmup/reward.
     config.alpasim.wizard_args.force_gt_duration_us = 0
     config.alpasim.wizard_args.control_timestep_us = 200_000
@@ -146,8 +159,8 @@ def prepare(
         "ffmpeg_binary": ffmpeg,
         "project_path": str(REPO_ROOT / "godot"),
         "episode_seconds": episode_seconds,
-        "initial_speed_m_s": initial_speed_m_s,
-        "scenario_id": scenario,
+        **initial_conditions,
+        "scenario_ids": scenarios,
         "concurrency": concurrency,
         "recording_root": str(paths.run_dir / "recordings"),
         "model_name": model_name or model.resolve().name,
@@ -273,13 +286,15 @@ def validate_godot_run_config(config, game: dict) -> None:
         raise ValueError("Godot episodes must not use recorded ground truth warmup")
     if config.alpasim.wizard_args.control_timestep_us != 200_000:
         raise ValueError("Godot bridge requires 0.2 second replanning")
-    from training.episode_config import scene_id
+    from training.episode_config import game_scene_ids
 
-    scenario = scene_id(game.get("initial_speed_m_s", 0.0))
-    if game.get("scenario_id", scenario) != scenario:
+    scenarios = game_scene_ids(game)
+    if game.get("scenario_ids", scenarios) != scenarios or game.get(
+        "scenario_id", scenarios[0]
+    ) != scenarios[0]:
         raise ValueError("Game scene identity differs from initial conditions")
     if (
-        list(config.dataset.scene_ids or []) != [scenario]
+        list(config.dataset.scene_ids or []) != scenarios
         or config.dataset.test_suite_id
     ):
         raise ValueError("Godot launcher requires the supported Thunderhill scene")
@@ -717,7 +732,19 @@ def main(argv: list[str] | None = None) -> None:
         help="Sibling rollouts per scene, NVIDIA n_generation",
     )
     prep.add_argument("--episode-seconds", type=float, default=30)
-    prep.add_argument("--initial-speed-m-s", type=float, default=0.0)
+    prep.add_argument(
+        "--initial-speed-m-s",
+        type=float,
+        default=0.0,
+        help="Start-line speed, or the cap for curvature-derived randomized start speeds",
+    )
+    prep.add_argument(
+        "--randomized-starts",
+        type=int,
+        default=0,
+        help="Number of seeded track-position start scenes (0 keeps the start line)",
+    )
+    prep.add_argument("--start-seed", type=int, default=0)
     prep.add_argument("--scatter-diagnostics", action="store_true")
     prep.add_argument("--concurrency", type=int, default=1)
     prep.add_argument("--max-wall-seconds", type=float, default=3600)
@@ -743,6 +770,8 @@ def main(argv: list[str] | None = None) -> None:
                 rollouts=args.rollouts,
                 episode_seconds=args.episode_seconds,
                 initial_speed_m_s=args.initial_speed_m_s,
+                randomized_start_count=args.randomized_starts,
+                randomized_start_seed=args.start_seed,
                 scatter_diagnostics=args.scatter_diagnostics,
                 concurrency=args.concurrency,
                 max_wall_seconds=args.max_wall_seconds,

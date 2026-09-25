@@ -93,12 +93,14 @@ def validated_prerequisites(
         )
     if launch.get("topology") != "local_disaggregated_2gpu":
         raise ValueError("Campaign requires the validated native two GPU topology")
-    from training.episode_config import scene_id
+    from training.episode_config import game_scene_ids
 
     game = json.loads((validation_run / "game_config.json").read_text())
-    scenario = scene_id(game.get("initial_speed_m_s", 0.0))
-    if game.get("scenario_id", scenario) != scenario:
-        raise ValueError("Validated scene identity disagrees with its starting speed")
+    scenarios = game_scene_ids(game)
+    if game.get("scenario_ids", scenarios) != scenarios or game.get(
+        "scenario_id", scenarios[0]
+    ) != scenarios[0]:
+        raise ValueError("Validated scene identity disagrees with its initial conditions")
     if Path(game["model_path"]).resolve() != model.resolve():
         raise ValueError("Campaign initial model differs from the validated model")
     scatter_proof = None
@@ -123,7 +125,15 @@ def validated_prerequisites(
         topology=launch["topology"],
         gpu=gpu,
         initial_speed_m_s=game.get("initial_speed_m_s", 0.0),
-        scenario_id=scenario,
+        randomized_start=game.get("randomized_start"),
+        scenario_ids=scenarios,
+    )
+
+
+def _randomized_start_matches(certificate, count, seed):
+    spread = certificate.get("randomized_start")
+    return (spread is None and count == 0) or (
+        spread is not None and (spread["count"], spread["seed"]) == (count, seed)
     )
 
 
@@ -139,6 +149,8 @@ def prepare_campaign(
     training_seconds: float,
     video_seconds: float,
     initial_speed_m_s: float = 0.0,
+    randomized_starts: int = 0,
+    start_seed: int = 0,
     max_steps: int = 100_000,
     resume_plan: dict | None = None,
     scatter_diagnostics: bool = False,
@@ -161,6 +173,8 @@ def prepare_campaign(
         rollouts=rollouts,
         episode_seconds=episode_seconds,
         initial_speed_m_s=initial_speed_m_s,
+        randomized_start_count=randomized_starts,
+        randomized_start_seed=start_seed,
         scatter_diagnostics=scatter_diagnostics,
         concurrency=concurrency,
         max_wall_seconds=training_seconds,
@@ -418,6 +432,8 @@ def run_campaign(
     concurrency: int,
     checkpoint_every: int,
     initial_speed_m_s: float = 0.0,
+    randomized_starts: int = 0,
+    start_seed: int = 0,
     max_steps: int = 100_000,
     evaluation_episodes: int = 8,
     resume_campaign: Path | None = None,
@@ -441,6 +457,8 @@ def run_campaign(
         raise ValueError("Campaign diagnostic mode must match its qualification")
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
+    if not _randomized_start_matches(certificate, randomized_starts, start_seed):
+        raise ValueError("Campaign start positions differ from validated initial state")
     patch = verify_source(source, apply_patch=True)
     resume_plan = None
     if resume_campaign is not None:
@@ -477,6 +495,8 @@ def run_campaign(
         model,
         episode_seconds=episode_seconds,
         initial_speed_m_s=initial_speed_m_s,
+        randomized_starts=randomized_starts,
+        start_seed=start_seed,
         rollouts=rollouts,
         concurrency=concurrency,
         checkpoint_every=checkpoint_every,
@@ -793,6 +813,8 @@ def main():
             item.add_argument("--" + name, type=Path, required=True)
         item.add_argument("--episode-seconds", type=float, required=True)
         item.add_argument("--initial-speed-m-s", type=float, default=0.0)
+        item.add_argument("--randomized-starts", type=int, default=0)
+        item.add_argument("--start-seed", type=int, default=0)
         item.add_argument("--rollouts", type=int, required=True)
         item.add_argument("--concurrency", type=int, required=True)
         item.add_argument("--checkpoint-every", type=int, default=2)

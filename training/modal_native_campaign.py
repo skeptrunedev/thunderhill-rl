@@ -348,6 +348,8 @@ def main(
     rollouts: int,
     concurrency: int,
     initial_speed_m_s: float = 0.0,
+    randomized_starts: int = 0,
+    start_seed: int = 0,
     checkpoint_every: int = 2,
     max_steps: int = 100000,
     evaluation_episodes: int = 8,
@@ -362,13 +364,17 @@ def main(
     import subprocess
     import time
 
+    from training.episode_config import MAX_INITIAL_SPEED_M_S
+
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{2,79}", campaign_id):
         raise ValueError(
             "Use a stable campaign ID with 3 to 80 lowercase letters, digits, underscores or hyphens"
         )
     if (
         not math.isfinite(initial_speed_m_s)
-        or not 0 <= initial_speed_m_s <= 10
+        or not 0 <= initial_speed_m_s <= MAX_INITIAL_SPEED_M_S
+        or randomized_starts < 0
+        or start_seed < 0
         or not math.isfinite(episode_seconds)
         or episode_seconds <= 0
         or abs(round(episode_seconds * 10) - episode_seconds * 10) > 1e-8
@@ -390,6 +396,8 @@ def main(
     settings = dict(
         episode_seconds=episode_seconds,
         initial_speed_m_s=initial_speed_m_s,
+        randomized_starts=randomized_starts,
+        start_seed=start_seed,
         rollouts=rollouts,
         concurrency=concurrency,
         checkpoint_every=checkpoint_every,
@@ -417,6 +425,10 @@ def main(
     )
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
+    spread = certificate.get("randomized_start")
+    validated = (spread["count"], spread["seed"]) if spread else None
+    if validated != ((randomized_starts, start_seed) if randomized_starts else None):
+        raise ValueError("Campaign start positions differ from validated initial state")
     reserved = reservations.put(
         campaign_id,
         dict(

@@ -183,12 +183,14 @@ def evaluate(
                             ip="127.0.0.1", port=port
                         )
                     ],
+                    # Matched evaluation: episode i always uses the same start scene.
                     rollout_specs=[
                         runtime.RolloutSpec(
-                            scenario_id=service.scene_id,
-                            nr_rollouts=episodes,
-                            session_uuids=[f"evaluation_seed_{i}" for i in range(episodes)],
+                            scenario_id=service.scene_ids[i % len(service.scene_ids)],
+                            nr_rollouts=1,
+                            session_uuids=[f"evaluation_seed_{i}"],
                         )
+                        for i in range(episodes)
                     ],
                     n_concurrent_per_driver=1,
                 ),
@@ -209,8 +211,9 @@ def evaluate(
                 "model": str(model),
                 "policy_version": version,
                 "policy_version_source": "evaluation_identity_not_live_cosmos_version",
-                "scenario_id": service.scene_id,
+                "scenario_ids": list(service.scene_ids),
                 "initial_speed_m_s": game.get("initial_speed_m_s", 0.0),
+                "randomized_start": game.get("randomized_start"),
                 "episodes": rows,
             },
         )
@@ -225,7 +228,8 @@ def evaluate(
 
 def validate(
     source: Path, model: Path, output: Path, *, seconds: float, budget: float,
-    initial_speed_m_s: float = 0.0, resume_run_dir: Path | None = None,
+    initial_speed_m_s: float = 0.0, randomized_starts: int = 0, start_seed: int = 0,
+    resume_run_dir: Path | None = None,
     concurrency: int = 1, replay_fixture: Path | None = None,
     scatter_diagnostics: bool = False,
 ) -> dict:
@@ -249,6 +253,8 @@ def validate(
             max_video_seconds=budget / 4,
             model_name="Alpamayo 1.5 native RL",
             initial_speed_m_s=initial_speed_m_s,
+            randomized_start_count=randomized_starts,
+            randomized_start_seed=start_seed,
             scatter_diagnostics=scatter_diagnostics,
         )
         report = {
@@ -257,6 +263,8 @@ def validate(
             "optimizer_updates_verified": False,
             "checkpoint_reload_verified": False,
             "initial_speed_m_s": initial_speed_m_s,
+            "randomized_starts": randomized_starts,
+            "start_seed": start_seed,
             "scatter_diagnostics": scatter_diagnostics,
         }
         write_json(run_dir / "validation.json", report)
@@ -574,6 +582,8 @@ def main():
     run.add_argument("--seconds", type=float, default=5)
     run.add_argument("--budget", type=float, default=3300)
     run.add_argument("--initial-speed-m-s", type=float, default=0.0)
+    run.add_argument("--randomized-starts", type=int, default=0)
+    run.add_argument("--start-seed", type=int, default=0)
     run.add_argument("--resume-run-dir", type=Path)
     run.add_argument("--concurrency", type=int, default=1)
     run.add_argument("--replay-fixture", type=Path)
@@ -595,6 +605,8 @@ def main():
                     seconds=args.seconds,
                     budget=args.budget,
                     initial_speed_m_s=args.initial_speed_m_s,
+                    randomized_starts=args.randomized_starts,
+                    start_seed=args.start_seed,
                     resume_run_dir=args.resume_run_dir,
                     concurrency=args.concurrency,
                     replay_fixture=args.replay_fixture,

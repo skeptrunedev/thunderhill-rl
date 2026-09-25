@@ -42,11 +42,15 @@ from driving_trajectory import TrajectoryTracker
 from lap_policy import RoadTelemetry
 from lap_episode import StallMonitor
 from video_jobs import enqueue_video
-from training.episode_config import scene_id
+from training.episode_config import (
+    WARMUP_SECONDS,
+    WarmupSpeedHold,
+    game_scene_ids,
+    parse_scene_id,
+)
 from training.alpagym_metrics import EpisodeMetrics, validate_reward_terms
 
 ROOT = Path(__file__).resolve().parents[1]
-SCENE_ID = "thunderhill-east-standing"
 CAMERA_ID = "camera_front_wide_120fov"
 CAMERA_IDS = (
     "camera_cross_left_120fov",
@@ -55,7 +59,7 @@ CAMERA_IDS = (
     "camera_front_tele_30fov",
 )
 SAMPLE_US = 100_000
-WARMUP_TICKS = 180  # 1.5 measured seconds, sixteen poses including t=0
+WARMUP_TICKS = round(WARMUP_SECONDS * 120)  # sixteen poses including t=0
 CONTROL_SAMPLES = 2  # NVIDIA example: replan every 0.2 simulated seconds
 # Fixed world basis only. Do not rebase each observation onto the latest pose.
 GODOT_TO_LOCAL = np.array([[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
@@ -142,10 +146,13 @@ def camera_calibration(capture, position, rotation):
 class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
     def __init__(self, game, identity_root, *, identity_provider=None):
         self.game = dict(game)
+        self.road = RoadTelemetry()
         self.initial_speed_m_s = game.get("initial_speed_m_s", 0.0)
-        self.scene_id = scene_id(self.initial_speed_m_s)
-        if game.get("scenario_id", self.scene_id) != self.scene_id:
-            raise ValueError("Configured scene differs from initial speed")
+        self.scene_ids = tuple(game_scene_ids(game, self.road))
+        if list(game.get("scenario_ids", self.scene_ids)) != list(self.scene_ids) or (
+            game.get("scenario_id", self.scene_ids[0]) != self.scene_ids[0]
+        ):
+            raise ValueError("Configured scenes differ from the initial conditions")
         if not isinstance(game.get("model_name"), str) or not game["model_name"].strip():
             raise ValueError("Game configuration requires the actual model label")
         if Path(game["project_path"]).resolve() != ROOT / "godot":
@@ -162,7 +169,6 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
         self.slots = threading.BoundedSemaphore(game["concurrency"])
         self.identity_root = Path(identity_root)
         self.identity_provider = identity_provider
-        self.road = RoadTelemetry()
         self._counter = {}
         self._lock = threading.Lock()
         self.shutdown = threading.Event()
@@ -174,15 +180,18 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
             renderer_type="godot",
             scenes=[
                 runtime.SceneInfo(
-                    scene_id=self.scene_id,
+                    scene_id=scene,
                     provider_kind="godot",
                     metadata=runtime.SceneMetadata(
-                        uuid=self.scene_id,
+                        uuid=scene,
                         camera_ids=list(CAMERA_IDS),
                         start_time_us=0,
-                        end_time_us=int((self.game["episode_seconds"] + 1.5) * 1e6),
+                        end_time_us=int(
+                            (self.game["episode_seconds"] + WARMUP_SECONDS) * 1e6
+                        ),
                     ),
                 )
+                for scene in self.scene_ids
             ],
         )
 
@@ -214,7 +223,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
             )
         jobs = []
         for spec in request.rollout_specs:
-            if spec.scenario_id != self.scene_id or spec.nr_rollouts < 1:
+            if spec.scenario_id not in self.scene_ids or spec.nr_rollouts < 1:
                 context.abort(
                     grpc.StatusCode.INVALID_ARGUMENT,
                     "Unknown scene or empty rollout spec",
@@ -271,17 +280,33 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 rollout = self._counter[version]
             output = Path(self.game["recording_root"]) / session
             output.mkdir(parents=True, exist_ok=False)
+            start = parse_scene_id(spec.scenario_id)
+            spread = self.game.get("randomized_start")
             provenance = dict(
                 identity,
                 session_uuid=session,
                 rollout_number=rollout,
                 driver_port=address.port,
-                scenario_id=self.scene_id,
+                scenario_id=spec.scenario_id,
                 control_period_seconds=0.2,
                 sensor_period_seconds=0.1,
-                warmup_seconds=1.5,
-                initial_speed_m_s=self.initial_speed_m_s,
-                warmup_controls="neutral_coasting" if self.initial_speed_m_s else "stationary_braking",
+                warmup_seconds=WARMUP_SECONDS,
+                initial_speed_m_s=start["initial_speed_m_s"],
+                start_station_m=start["start_station_m"],
+                start_selection=(
+                    dict(
+                        kind="randomized_track_position",
+                        max_speed_m_s=self.initial_speed_m_s,
+                        **spread,
+                    )
+                    if spread
+                    else dict(kind="start_line")
+                ),
+                warmup_controls=(
+                    "speed_hold_throttle_brake_zero_steer"
+                    if start["initial_speed_m_s"]
+                    else "stationary_braking"
+                ),
                 action_semantics="native_trajectory_with_fixed_motorcycle_controller",
                 model_name=self.game["model_name"],
                 model_path=self.game.get("model_path"),
@@ -341,7 +366,12 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 lambda: session,
                 road_telemetry=self.road,
             )
-            env.reset(policy_display=display, initial_speed_m_s=self.initial_speed_m_s)
+            initial_speed = provenance["initial_speed_m_s"]
+            env.reset(
+                policy_display=display,
+                initial_speed_m_s=initial_speed,
+                station=provenance["start_station_m"],
+            )
             view = json.loads(env.observe())
             episode_id = env._observation["episode_id"]
             channel = stack.enter_context(
@@ -494,29 +524,40 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
 
             try:
                 capture_and_submit()
+                speed_hold = WarmupSpeedHold(initial_speed) if initial_speed else None
+                warmup_speeds = [env._observation["state"]["speed"]]
                 for _ in range(WARMUP_TICKS // 12):
-                    advance(
-                        dict(
-                            throttle=0.0,
-                            steer=0.0,
-                            front_brake=0.0 if self.initial_speed_m_s else 1.0,
-                            rear_brake=0.0 if self.initial_speed_m_s else 1.0,
-                        ),
-                        "neutral_coasting_sensor_warmup"
-                        if self.initial_speed_m_s
-                        else "stationary_sensor_warmup",
+                    if speed_hold is None:
+                        advance(
+                            dict(throttle=0.0, steer=0.0, front_brake=1.0, rear_brake=1.0),
+                            "stationary_sensor_warmup",
+                        )
+                    else:
+                        # Initial-condition setup, never a model action or label.
+                        controls, diagnostic = speed_hold.controls(
+                            env._observation["state"]["speed"]
+                        )
+                        advance(controls, "speed_hold_sensor_warmup", diagnostic)
+                    warmup_speeds.extend(
+                        t["state"]["speed"] for t in env._observation["transitions"]
                     )
                     if view["done"]:
                         raise RuntimeError(
                             "Simulator terminated during measured sensor warmup"
                         )
                     capture_and_submit()
-                if self.initial_speed_m_s == 0 and env._observation["state"]["speed"] > 0.01:
+                if initial_speed == 0 and env._observation["state"]["speed"] > 0.01:
                     raise RuntimeError("Standing warmup moved the motorcycle")
-                if self.initial_speed_m_s > 0 and env._observation["state"]["speed"] <= 0.01:
+                if initial_speed > 0 and env._observation["state"]["speed"] <= 0.01:
                     raise RuntimeError("Rolling scene stopped before model control began")
                 view = json.loads(env.begin_model_control())
                 provenance["model_control_start"] = env._observation["model_control_start"]
+                provenance["warmup_speed_m_s"] = dict(
+                    min=min(warmup_speeds),
+                    max=max(warmup_speeds),
+                    final=warmup_speeds[-1],
+                    physics_ticks=len(warmup_speeds) - 1,
+                )
                 _write_json(output / "provenance.json", provenance)
                 baseline = env._observation["track"]["legal_distance"]
                 reward_metrics = EpisodeMetrics(
@@ -532,7 +573,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             hashlib.sha256(session.encode()).hexdigest()[:8], 16
                         ),
                         debug_info=driver.DriveSessionRequest.DebugInfo(
-                            scene_id=self.scene_id
+                            scene_id=provenance["scenario_id"]
                         ),
                         rollout_spec=driver.DriveSessionRequest.RolloutSpec(
                             vehicle=driver.DriveSessionRequest.RolloutSpec.VehicleDefinition(
@@ -671,6 +712,9 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     lap_completed=float(completed),
                     stalled=float(reason == "stalled"),
                     crashed=float(final["state"]["crashed"]),
+                    # Initial-condition diagnostics, not reward terms.
+                    start_station_m=float(provenance["start_station_m"]),
+                    initial_speed_m_s=float(initial_speed),
                 )
                 if completed:
                     metrics["lap_time_seconds"] = elapsed

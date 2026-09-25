@@ -110,7 +110,8 @@ def repair_archived_recordings(run_dir, destination, deadline):
     volumes={"/model-cache": cache, "/runs": runs},
     include_source=False,
 )
-def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1, repair_recordings: str = "", scatter_diagnostics: bool = False):
+def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1, repair_recordings: str = "", scatter_diagnostics: bool = False,
+                 initial_speed_m_s: float = 8.0, randomized_starts: int = 0, start_seed: int = 0):
     import json
     import os
     import subprocess
@@ -204,7 +205,11 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
                     "--concurrency",
                     str(concurrency),
                     "--initial-speed-m-s",
-                    "8",
+                    str(initial_speed_m_s),
+                    "--randomized-starts",
+                    str(randomized_starts),
+                    "--start-seed",
+                    str(start_seed),
                     "--budget",
                     "3300",
                     *(["--resume-run-dir", resume_run_dir] if resume_run_dir else []),
@@ -358,7 +363,8 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_checkpoint: str = "/model-cache/alpagym-converted-1.5",
          repair_recordings: str = "", scatter_diagnostics: bool = False,
          diagnostic_threaded_stress: bool = False, diagnostic_stress_workers: int = 4,
-         diagnostic_stress_iterations: int = 50, diagnostic_policy_step: bool = False):
+         diagnostic_stress_iterations: int = 50, diagnostic_policy_step: bool = False,
+         initial_speed_m_s: float = 8.0, randomized_starts: int = 0, start_seed: int = 0):
     import subprocess
 
     if diagnostic_policy_step and not diagnostic_threaded_stress:
@@ -388,4 +394,5 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
                                        diagnostic_threaded_stress, diagnostic_stress_workers,
                                        diagnostic_stress_iterations, diagnostic_policy_step))
     else:
-        print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings, scatter_diagnostics))
+        print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings, scatter_diagnostics,
+                                  initial_speed_m_s, randomized_starts, start_seed))
