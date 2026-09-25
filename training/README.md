@@ -166,11 +166,11 @@ No optimized racing line has been selected. Preview the reference with:
 uv run tools/plot_track_reference.py --output artifacts/track-reference.png
 ```
 
-Obstacle collisions, offroad excursions and falls without a collision each cost
-the rider's kinetic energy as metres of 0.25 g braking, `v^2 / (2 * 2.45)`,
-charged once at the onset of each incident (`collision_cost`, `offroad_cost`,
-`fall_cost`, scale minus one). A slow incident is cheap and a fast one is
-expensive. Fixed penalties taught racing agents to brake and stand still.
+Progress is the only reward term (v5). Obstacle collisions, offroad excursions
+and falls end the episode, which forfeits the rest of the horizon; their kinetic
+energy as metres of 0.25 g braking (`collision_cost`, `offroad_cost`,
+`fall_cost`) is reported as a diagnostic, not rewarded, because charging it on
+top of the forfeited horizon ranked stalling above attempting a corner.
 Events are accumulated across every executed physics tick, including brief
 excursions between observations. An invalid lap alone is not an offroad event.
 The 0/1 flags `collision_any`, `offroad` and `fall_without_collision` are still
