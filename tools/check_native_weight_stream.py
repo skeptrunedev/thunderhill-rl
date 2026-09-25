@@ -102,14 +102,14 @@ def check_receive_lifetime(root):
             "constant": SimpleNamespace(COSMOS_RECV_TENSOR_QUEUE_SIZE=10000),
         }
         # Both method bodies above are authenticated against reviewed pinned hashes.
-        exec(
+        exec(  # noqa: S102
             compile(
                 ast.Module(body=nested, type_ignores=[]),
                 "<native recv functions>",
                 "exec",
             ),
             namespace,
-        )  # noqa: S102
+        )
         target = torch.zeros((2048, 2048), device="cuda", dtype=torch.bfloat16)
         spare = torch.zeros_like(target)
         torch.cuda.synchronize()  # Diagnostic initialization only.
