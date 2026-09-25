@@ -80,6 +80,10 @@ def evaluate(
     import threading
     from concurrent.futures import ThreadPoolExecutor
 
+    from training.native_recipe_source import verify_installed
+
+    verify_installed(apply_patch=True)
+
     import grpc
     from alpagym_alpamayo_r1.bundle import install_alpamayo_r1_runtime_bridge
     from alpagym_host.config import load_run_config
