@@ -102,7 +102,7 @@ def repair_archived_recordings(run_dir, destination, deadline):
 
 @app.function(
     image=runtime_image,
-    gpu="H100:2",
+    gpu="H100!:2",
     cpu=16,
     memory=393216,
     timeout=3600,
@@ -172,7 +172,8 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
                 UPSTREAM + "/.venv/bin/python",
                 "-c",
                 (
-                    "import torch; print([torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]); assert torch.cuda.device_count() == 2; "
+                    "import torch; names=[torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]; print(names); assert len(names) == 2; "
+                    "assert all('H100' in name for name in names), 'Qualification requires exact H100 hardware'; "
                     "assert torch.cuda.can_device_access_peer(0,1) and "
                     "torch.cuda.can_device_access_peer(1,0), 'CUDA peer access unavailable'"
                 ),
@@ -231,7 +232,7 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
 
 @app.function(
     image=runtime_image,
-    gpu="H100",
+    gpu="H100!",
     cpu=8,
     memory=65536,
     timeout=600,

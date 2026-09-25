@@ -123,7 +123,7 @@ def prerequisites(
 
 @app.function(
     image=runtime_image,
-    gpu="H100:2",
+    gpu="H100!:2",
     cpu=16,
     memory=393216,
     timeout=43200,
@@ -218,6 +218,7 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
                     "names=[torch.cuda.get_device_name(i) for i in range(n)]; "
                     "peers=[torch.cuda.can_device_access_peer(0,1),torch.cuda.can_device_access_peer(1,0)]; "
                     "print(json.dumps(dict(devices=names,bidirectional_peer_access=peers))); "
+                    f"assert all({certificate['gpu']!r}.casefold() in name.casefold() for name in names), 'Campaign GPU differs from qualified hardware'; "
                     "assert all(peers), 'CUDA peer access unavailable'",
                 ],
                 check=True,
@@ -471,7 +472,7 @@ def main(
     )
     print(
         campaign.with_options(
-            gpu=certificate["gpu"] + ":2",
+            gpu=("H100!" if certificate["gpu"] == "H100" else certificate["gpu"]) + ":2",
             timeout=max(
                 1,
                 math.ceil(
