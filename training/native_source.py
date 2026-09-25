@@ -121,6 +121,7 @@ def record_navigation_checkpoint(checkpoint: Path, release_config: Path) -> dict
     converter = runpy.run_path(str(converter_path))
     expected = converter["build_expert_config"](release, actual["vlm_name_or_path"])
     comparison = "exact_native_conversion"
+    attention_normalization = None
     if actual != expected:
         # Official save_pretrained materializes default configuration fields and
         # changes path/version metadata. Canonicalize with NVIDIA's own config
@@ -132,6 +133,35 @@ def record_navigation_checkpoint(checkpoint: Path, release_config: Path) -> dict
         for metadata in ("_name_or_path", "transformers_version"):
             expected_canonical.pop(metadata, None)
             actual_canonical.pop(metadata, None)
+        if (
+            expected_canonical.get("attn_implementation") == "flash_attention_2"
+            and "attn_implementation" in actual_canonical
+            and actual_canonical["attn_implementation"] is None
+        ):
+            # The pinned Transformers from_pretrained path materializes null
+            # when no attention override is supplied during native export.
+            # NVIDIA's inference loader explicitly supplies sdpa for both the
+            # base and exported checkpoint. Prove the complete loaded configs
+            # agree under that exact native override, rather than ignoring a
+            # performance setting or accepting arbitrary backend changes.
+            expected_loaded = ExpertModelConfig.from_dict(
+                expected, attn_implementation="sdpa"
+            ).to_dict()
+            actual_loaded = ExpertModelConfig.from_dict(
+                actual, attn_implementation="sdpa"
+            ).to_dict()
+            for metadata in ("_name_or_path", "transformers_version"):
+                expected_loaded.pop(metadata, None)
+                actual_loaded.pop(metadata, None)
+            if expected_loaded == actual_loaded:
+                attention_normalization = {
+                    "source_serialized": "flash_attention_2",
+                    "export_serialized": None,
+                    "native_inference_override": "sdpa",
+                    "complete_loaded_configs_equal": True,
+                }
+                expected_canonical = expected_loaded
+                actual_canonical = actual_loaded
         if actual_canonical != expected_canonical:
             differences = sorted(
                 key
@@ -153,6 +183,7 @@ def record_navigation_checkpoint(checkpoint: Path, release_config: Path) -> dict
         source_config=str(release_config.absolute()),
         navigation_format="native_navigation_text_v1",
         comparison=comparison,
+        attention_normalization=attention_normalization,
     )
     if provenance["source_model_type"] != "alpamayo1_5" or provenance[
         "source_architectures"
