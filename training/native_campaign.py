@@ -69,6 +69,9 @@ def validated_prerequisites(
             "Campaign requires verified CUDA replay storage bounds and exact values"
         )
     launch = json.loads((validation_run / "launch_manifest.json").read_text())
+    handoff = report.get("weight_stream_verification", {})
+    if handoff.get("passed") is not True:
+        raise ValueError("Campaign requires verified native weight transfer stream ordering")
     camera = json.loads((validation_run / "camera-preflight/summary.json").read_text())
     adapter = camera.get("renderer", {}).get("adapter", "")
     if camera.get("ok") is not True or camera.get("views_per_observation") != 4:
@@ -104,6 +107,7 @@ def validated_prerequisites(
         native_source_patch=launch["native_source_patch"],
         padding_skip_verification=padding,
         replay_storage_verification=replay,
+        weight_stream_verification=handoff,
         reward_version=launch["reward_version"],
         renderer=adapter,
         topology=launch["topology"],

@@ -267,6 +267,14 @@ def validate(
                 stop_process_tree(process)
 
     try:
+        launch([
+            "tools.check_native_weight_stream", "--upstream", str(source),
+            "--output", str(run_dir / "weight-stream-verification.json"),
+        ], "weight-stream-verification.log")
+        handoff = json.loads((run_dir / "weight-stream-verification.json").read_text())
+        if handoff.get("passed") is not True:
+            raise RuntimeError("Native weight transfer stream ordering failed qualification")
+        report["weight_stream_verification"] = handoff
         if resume_run_dir is None:
             if replay_fixture is not None:
                 import hashlib
