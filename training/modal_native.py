@@ -193,3 +193,4 @@ def main(export_metadata: bool = False):
         print(prepare_export_metadata.remote())
     else:
         print(prepare_checkpoint.remote())
+        print(prepare_export_metadata.remote())
