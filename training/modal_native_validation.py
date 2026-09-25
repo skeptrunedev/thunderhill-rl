@@ -5,6 +5,10 @@ import modal
 from training.modal_native import REMOTE, ROOT, UPSTREAM, cache, image, runs
 
 app = modal.App("thunderhill-native-gpu-validation")
+# Half trains, a quarter renders. Six-rollout groups (NVIDIA's size) at four
+# concurrent rides need two ride waves per update: 27.5 training minutes ran out
+# during the final checkpoint save, so qualification gets 40.
+VALIDATION_BUDGET_SECONDS = 4800
 
 runtime_image = (
     image.env({
@@ -110,7 +114,7 @@ def _validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float
     import uuid
     from pathlib import Path
 
-    repair_deadline = time.monotonic() + 3450
+    repair_deadline = time.monotonic() + VALIDATION_BUDGET_SECONDS + 150
     os.chdir(REMOTE)
     os.environ["WANDB_MODE"] = "offline"
     if resume_run_dir and (not resume_run_dir.startswith("/runs/native-validation-") or ".." in Path(resume_run_dir).parts):
@@ -204,14 +208,14 @@ def _validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float
                     "--rollouts",
                     str(rollouts),
                     "--budget",
-                    "3300",
+                    str(VALIDATION_BUDGET_SECONDS),
                     *(["--resume-run-dir", resume_run_dir] if resume_run_dir else []),
                     *(["--scatter-diagnostics"] if scatter_diagnostics else []),
                 ],
                 check=True,
                 stdout=log,
                 stderr=subprocess.STDOUT,
-                timeout=3450,
+                timeout=VALIDATION_BUDGET_SECONDS + 150,
             )
         if repair_recordings:
             repair_archived_recordings(repair_recordings, destination, repair_deadline)
@@ -233,7 +237,7 @@ def _validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float
     gpu="H100!:2",
     cpu=16,
     memory=393216,
-    timeout=3600,
+    timeout=VALIDATION_BUDGET_SECONDS + 600,
     retries=0,
     volumes={"/model-cache": cache, "/runs": runs},
     include_source=False,
