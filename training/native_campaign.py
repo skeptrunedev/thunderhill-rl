@@ -19,7 +19,8 @@ import time
 from pathlib import Path
 
 TOTAL_SECONDS = 12 * 60 * 60
-FINAL_RESERVE_SECONDS = 2 * 60 * 60
+FINAL_RESERVE_SECONDS = int(3.5 * 60 * 60)
+EVALUATION_SECONDS = 2 * 60 * 60
 
 
 def write_json(path: Path, value: dict) -> None:
@@ -384,7 +385,7 @@ def run_campaign(
             "Validated navigation/reward contract differs from the campaign"
         )
     remaining = deadline_unix - time.time()
-    reserve = min(FINAL_RESERVE_SECONDS, remaining / 3)
+    reserve = min(FINAL_RESERVE_SECONDS, remaining / 2)
     video_budget = min(1800.0, reserve / 3)
     run_dir = prepare_campaign(
         source,
@@ -412,6 +413,7 @@ def run_campaign(
         checkpoint_every_steps=checkpoint_every,
         native_checkpoint_retention=5,
         reserved_final_seconds=reserve,
+        evaluation_phase_limit_seconds=EVALUATION_SECONDS,
         phases=[],
         training_outcome=None,
     )
@@ -494,10 +496,10 @@ def run_campaign(
                 "--episodes",
                 str(evaluation_episodes),
                 "--rpc-timeout-seconds",
-                "1740",
+                str(EVALUATION_SECONDS - 60),
             ],
             "baseline-evaluation",
-            1800,
+            EVALUATION_SECONDS,
         )
         # Charge startup and baseline against the total allowance, not to an
         # independent budget that could extend the billed GPU function.
@@ -611,10 +613,10 @@ def run_campaign(
                 "--episodes",
                 str(evaluation_episodes),
                 "--rpc-timeout-seconds",
-                "1740",
+                str(EVALUATION_SECONDS - 60),
             ],
             "final-evaluation",
-            1800,
+            EVALUATION_SECONDS,
         )
         report["checkpoint_reload_verified"] = True
         report["evaluation_comparison"] = compare_evaluations(
