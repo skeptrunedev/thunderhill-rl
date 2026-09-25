@@ -508,6 +508,8 @@ def main(
             indent=2,
         )
     )
+    if certificate.get("remote_renderer", False) != remote_godot:
+        raise ValueError("Campaign renderer location must match its qualification")
     remote_host = None
     if remote_godot:
         from training.modal_remote_godot import start_host

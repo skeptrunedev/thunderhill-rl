@@ -87,20 +87,29 @@ def validated_prerequisites(
     adapter = camera.get("renderer", {}).get("adapter", "")
     if camera.get("ok") is not True or camera.get("views_per_observation") != 4:
         raise ValueError("Validation lacks successful four camera hardware capture")
+    # Training GPUs are what the qualification container sampled with nvidia-smi;
+    # the renderer may be those GPUs or a remote rendering host (--remote-godot).
+    import csv
+
+    sampled = validation_run.parent / "gpu-resources.csv"
+    cuda = {row[2].strip() for row in csv.reader(sampled.open())
+            if len(row) > 2 and row[2].strip() not in ("", "name")}
     if gpu is None:
         matches = [
-            name for name in ("H100", "L40S") if name.casefold() in adapter.casefold()
+            name for name in ("H100", "L40S")
+            if any(name.casefold() in device.casefold() for device in cuda)
         ]
         if len(matches) != 1:
-            raise ValueError(f"No reviewed campaign GPU matches renderer {adapter!r}")
+            raise ValueError(f"No reviewed campaign GPU matches validation GPUs {cuda!r}")
         gpu = matches[0]
-    if gpu.casefold() not in adapter.casefold() or any(
+    if not any(gpu.casefold() in device.casefold() for device in cuda):
+        raise ValueError(f"Validation GPUs {cuda!r} do not establish {gpu} support")
+    if not adapter or any(
         word in adapter.casefold()
         for word in ("llvmpipe", "lavapipe", "software", "swiftshader")
     ):
-        raise ValueError(
-            f"Validation renderer {adapter!r} does not establish {gpu} support"
-        )
+        raise ValueError(f"Validation renderer {adapter!r} is not hardware rendering")
+    remote_renderer = gpu.casefold() not in adapter.casefold()
     if launch.get("topology") != "local_disaggregated_2gpu":
         raise ValueError("Campaign requires the validated native two GPU topology")
     from training.episode_config import game_scene_ids
@@ -132,6 +141,7 @@ def validated_prerequisites(
         weight_stream_verification=handoff,
         reward_version=launch["reward_version"],
         renderer=adapter,
+        remote_renderer=remote_renderer,
         topology=launch["topology"],
         gpu=gpu,
         initial_speed_m_s=game.get("initial_speed_m_s", 0.0),
