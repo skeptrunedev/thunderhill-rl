@@ -95,21 +95,79 @@ def prepare(payload, size):
     return {key: torch.stack([row[key] for row in rows]) for key in rows[0]}, labels
 
 
+def reconstruct_dispatch(path, config, device):
+    """Recreate captured native inputs with the original GPU preprocessing."""
+    import torch
+    from alpagym_runtime.inference.types import BatchedModelInput
+    from alpagym_runtime.inference_capture import restore_policy_input
+    from alpagym_runtime.policies.alpamayo.policy import AlpamayoPolicy
+
+    dispatch = json.loads(path.read_text())
+    rows, identities = [], dispatch["ordered_requests"]
+    if not 1 <= len(identities) <= 4:
+        raise ValueError("Captured dispatch must contain one to four rows")
+    for identity in identities:
+        source = Path(identity["path"])
+        if not source.is_file():
+            source = path.parent / source.name
+        if hashlib.sha256(source.read_bytes()).hexdigest() != identity["sha256"]:
+            raise ValueError("Session snapshot no longer matches captured dispatch")
+        payload = torch.load(source, map_location="cpu", weights_only=True)
+        expected_config = json.loads(
+            json.dumps(asdict(config.policy.model), default=str)
+        )
+        captured_config = dict(payload["model_config"])
+        expected_config.pop("path", None)
+        captured_config.pop("path", None)
+        if captured_config != expected_config:
+            raise ValueError(
+                "Capture model preprocessing config differs from supplied config"
+            )
+        policy = AlpamayoPolicy(
+            None,
+            identity["session_uuid"],
+            config.policy,
+            torch.device(device),
+            torch.bfloat16,
+            seed=payload["seed"],
+        )
+        seed = (
+            torch.tensor(payload["seed"], dtype=torch.int64, device=device)
+            if payload["seed"] is not None
+            else None
+        )
+        model_input = policy._preprocess(restore_policy_input(payload), seed=seed)
+        rows.append(model_input)
+        # Do not close: a capture-enabled process must not delete source evidence.
+    batch = BatchedModelInput.stack(rows)
+    return {
+        key: value.detach().cpu() if isinstance(value, torch.Tensor) else value
+        for key, value in asdict(batch).items()
+    }, [row["session_uuid"] for row in identities]
+
+
 def run(args):
     import torch
 
     args.output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
-    payload = torch.load(args.model_input, map_location="cpu", weights_only=True)
+    payload = (
+        torch.load(args.model_input, map_location="cpu", weights_only=True)
+        if args.model_input
+        else None
+    )
     report = {
         "diagnostic_only": True,
         "training_eligible": False,
         "actual_failed_campaign_batch": False,
-        "fixture_sha256": hashlib.sha256(args.model_input.read_bytes()).hexdigest(),
+        "fixture_sha256": hashlib.sha256(
+            (args.model_input or args.dispatch).read_bytes()
+        ).hexdigest(),
         "checkpoint": str(args.checkpoint),
         "config": str(args.config),
         "synchronization": args.synchronize,
         "prepare_only": args.prepare_only,
+        "captured_dispatch": str(args.dispatch) if args.dispatch else None,
         "limitation": "Instrumented execution changes timing; no reproduction does not rule out a race.",
         "batches": [],
         "status": "preparing",
@@ -139,6 +197,12 @@ def run(args):
         write_json(args.output / "report.json", report)
         raise
     try:
+        exact_batch = exact_labels = None
+        if args.dispatch:
+            exact_batch, exact_labels = reconstruct_dispatch(
+                args.dispatch, config, args.device
+            )
+            args.batch_sizes = [len(exact_labels)]
         for repeat in range(args.repeats):
             for size in args.batch_sizes:
                 if time.monotonic() - started >= args.max_seconds:
@@ -146,13 +210,19 @@ def run(args):
                     return
                 directory = args.output / f"repeat-{repeat:03d}-batch-{size}"
                 directory.mkdir()
-                cpu_batch, labels = prepare(payload, size)
+                cpu_batch, labels = (
+                    (exact_batch, exact_labels)
+                    if args.dispatch
+                    else prepare(payload, size)
+                )
                 torch.save(cpu_batch, directory / "model_input.pt")
                 record = {
                     "directory": directory.name,
                     "size": size,
                     "routes": labels,
-                    "session_ids": [
+                    "session_ids": labels
+                    if args.dispatch
+                    else [
                         f"diagnostic-{repeat}-{size}-{i}-{label}"
                         for i, label in enumerate(labels)
                     ],
@@ -190,7 +260,12 @@ def run(args):
                 )
                 write_json(directory / "identity.json", record)
                 batch = BatchedModelInput(
-                    **{key: value.to(args.device) for key, value in cpu_batch.items()}
+                    **{
+                        key: value.to(args.device)
+                        if isinstance(value, torch.Tensor)
+                        else value
+                        for key, value in cpu_batch.items()
+                    }
                 )
                 call_started = time.monotonic()
                 prefill_index = 0
@@ -251,7 +326,13 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model-input", required=True, type=Path)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--model-input", type=Path)
+    source.add_argument(
+        "--dispatch",
+        type=Path,
+        help="Exact saved ordered host dispatch, no route counterfactuals",
+    )
     parser.add_argument("--config", type=Path)
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--output", required=True, type=Path)
@@ -271,6 +352,10 @@ def main():
     args = parser.parse_args()
     if not 1 <= args.repeats <= 10 or not 1 <= args.max_seconds <= 1800:
         parser.error("repeats must be 1..10 and max-seconds 1..1800")
+    if args.dispatch and args.prepare_only:
+        parser.error(
+            "dispatch reconstruction uses native GPU preprocessing; omit --prepare-only"
+        )
     if not args.prepare_only and (args.config is None or args.checkpoint is None):
         parser.error("native inference requires --config and --checkpoint")
     run(args)
