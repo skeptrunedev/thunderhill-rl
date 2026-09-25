@@ -21,7 +21,7 @@ runtime_image = (
 
 @app.function(
     image=runtime_image,
-    gpu="H100:2",
+    gpu="L40S:2",
     cpu=16,
     memory=131072,
     timeout=3600,
@@ -101,7 +101,7 @@ def validate_gpu(source_revision: str):
                     "--seconds",
                     "5",
                     "--budget",
-                    "2700",
+                    "2400",
                 ],
                 check=True,
                 stdout=log,
