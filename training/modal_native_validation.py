@@ -11,6 +11,10 @@ runtime_image = (
         "NVIDIA_DRIVER_CAPABILITIES": "all", "NCCL_DEBUG": "INFO",
         "ALPAGYM_SKIP_ALL_PADDING_MINIBATCHES": "1",
     })
+    .add_local_file(
+        str(ROOT / "artifacts/native-navigation-verification/native_model_input.pt"),
+        REMOTE + "/native-replay-fixture.pt",
+    )
     .add_local_dir(
         str(ROOT / "training"),
         REMOTE + "/training",
@@ -26,13 +30,13 @@ runtime_image = (
     image=runtime_image,
     gpu="H100:2",
     cpu=16,
-    memory=131072,
+    memory=393216,
     timeout=3600,
     retries=0,
     volumes={"/model-cache": cache, "/runs": runs},
     include_source=False,
 )
-def validate_gpu(source_revision: str, resume_run_dir: str = ""):
+def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1):
     import json
     import os
     import subprocess
@@ -114,12 +118,16 @@ def validate_gpu(source_revision: str, resume_run_dir: str = ""):
                     "/model-cache/alpagym-converted-1.5",
                     "--output",
                     str(destination),
+                    "--replay-fixture",
+                    REMOTE + "/native-replay-fixture.pt",
                     "--seconds",
-                    "5",
+                    str(seconds),
+                    "--concurrency",
+                    str(concurrency),
                     "--initial-speed-m-s",
                     "8",
                     "--budget",
-                    "2400",
+                    "3300",
                     *(["--resume-run-dir", resume_run_dir] if resume_run_dir else []),
                 ],
                 check=True,
@@ -141,7 +149,7 @@ def validate_gpu(source_revision: str, resume_run_dir: str = ""):
 
 
 @app.local_entrypoint()
-def main(resume_run_dir: str = ""):
+def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1):
     import subprocess
 
     dirty = subprocess.check_output(
@@ -152,4 +160,4 @@ def main(resume_run_dir: str = ""):
     revision = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
-    print(validate_gpu.remote(revision, resume_run_dir))
+    print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency))

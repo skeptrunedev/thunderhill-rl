@@ -184,6 +184,7 @@ def evaluate(
 def validate(
     source: Path, model: Path, output: Path, *, seconds: float, budget: float,
     initial_speed_m_s: float = 0.0, resume_run_dir: Path | None = None,
+    concurrency: int = 1, replay_fixture: Path | None = None,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
     from training.nvidia_alpagym import prepare
@@ -200,7 +201,7 @@ def validate(
             max_steps=2,
             rollouts=4,
             episode_seconds=seconds,
-            concurrency=1,
+            concurrency=concurrency,
             max_wall_seconds=budget / 2,
             max_video_seconds=budget / 4,
             model_name="Alpamayo 1.5 native RL",
@@ -263,6 +264,16 @@ def validate(
 
     try:
         if resume_run_dir is None:
+            if replay_fixture is not None:
+                import hashlib
+
+                report["replay_fixture_sha256"] = hashlib.sha256(replay_fixture.read_bytes()).hexdigest()
+                launch([
+                    "tools.check_native_replay_storage", "--input", str(replay_fixture),
+                    "--output", str(run_dir / "replay-storage-verification.json"),
+                    "--device", "cuda:0", "--decisions", "64",
+                ], "replay-storage-verification.log")
+                report["replay_storage_verification"] = json.loads((run_dir / "replay-storage-verification.json").read_text())
             launch(
                 [
                     "tools.check_camera",
@@ -415,6 +426,9 @@ def validate(
         write_json(status_path, status)
         report["state"] = "completed"
     except BaseException as error:
+        report.update(state="failed", error_type=type(error).__name__, error=str(error))
+        write_json(run_dir / "validation.json", report)
+        print(json.dumps(report), flush=True)
         # Each child has been reaped by launch() before reaching this handler.
         # Even baseline failures may have flushed attempts worth preserving.
         from training.nvidia_alpagym import write_status
@@ -475,6 +489,8 @@ def main():
     run.add_argument("--budget", type=float, default=3300)
     run.add_argument("--initial-speed-m-s", type=float, default=0.0)
     run.add_argument("--resume-run-dir", type=Path)
+    run.add_argument("--concurrency", type=int, default=1)
+    run.add_argument("--replay-fixture", type=Path)
     args = parser.parse_args()
     if args.command == "evaluate":
         evaluate(
@@ -493,6 +509,8 @@ def main():
                     budget=args.budget,
                     initial_speed_m_s=args.initial_speed_m_s,
                     resume_run_dir=args.resume_run_dir,
+                    concurrency=args.concurrency,
+                    replay_fixture=args.replay_fixture,
                 )
             )
         )
