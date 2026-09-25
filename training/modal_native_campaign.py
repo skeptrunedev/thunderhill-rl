@@ -77,7 +77,7 @@ def prerequisites(validation_run: str):
 @app.function(
     image=runtime_image,
     cpu=16,
-    memory=262144,
+    memory=393216,
     timeout=43200,
     retries=0,
     max_containers=1,

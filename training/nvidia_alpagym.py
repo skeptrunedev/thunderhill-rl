@@ -122,6 +122,13 @@ def prepare(
     config.cosmos.rollout.backend = "thunderhill_alpagym_rollout"
     # Recording identity is published around each explicit generation call.
     config.cosmos.rollout.prefetch_rollout = False
+    # Full lap replay is much larger than the short native scene preset.
+    # Native on-policy dispatch bounds retained data to one sibling group and
+    # waits for its optimizer acknowledgment before issuing the next group.
+    config.cosmos.rollout.batch_size = 1
+    config.cosmos.train.train_policy.on_policy = True
+    config.cosmos.train.train_policy.allowed_outdated_steps = 0
+    # Cosmos validates that on_policy implies its default sync interval of one.
     config.cosmos.logging.logger = ["console", "wandb"]
     config.cosmos.logging.project_name = "thunderhill-rl"
     config.cosmos.logging.experiment_name = "thunderhill-alpagym"
@@ -174,6 +181,11 @@ def prepare(
 
 def validate_runtime_files(source: Path, config, game: dict) -> None:
     """Check local installation and assets before starting distributed workers."""
+    policy = config.cosmos.train.train_policy
+    if (not policy.on_policy or policy.allowed_outdated_steps != 0
+            or config.cosmos.rollout.batch_size != 1
+            or config.cosmos.rollout.prefetch_rollout):
+        raise ValueError("Full lap replay requires bounded native on-policy dispatch")
     seconds = float(game["episode_seconds"])
     if not math.isfinite(seconds) or seconds <= 0:
         raise ValueError("Game episode duration must be finite and positive")
