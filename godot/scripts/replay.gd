@@ -6,6 +6,7 @@ var manifest: Dictionary
 var finished := false
 var consumed_ticks := 0
 var pending_decisions: Array[Dictionary] = []
+var model_control_start_tick := -1
 
 
 func open_recording(path: String, expected_track_hash: String) -> String:
@@ -37,6 +38,7 @@ func open_recording(path: String, expected_track_hash: String) -> String:
 		return "Replay pit wall hash differs from loaded obstacle"
 	finished = false
 	consumed_ticks = 0
+	model_control_start_tick = int(manifest.get("initial_track", {}).get("model_control_start", {}).get("tick", -1))
 	return ""
 
 
@@ -46,6 +48,10 @@ func next_state() -> Dictionary:
 		var row: Variant = JSON.parse_string(file.get_line())
 		if row is Dictionary and row.get("type", "") == "model_decision":
 			pending_decisions.append(row)
+		if row is Dictionary and row.get("type", "") == "model_control_start":
+			# Accounting handoff is metadata at the existing physical tick. It
+			# neither adds a replay frame nor overwrites measured bike motion.
+			model_control_start_tick = int(row.handoff.tick)
 		if row is Dictionary and row.get("type", "") == "transition":
 			consumed_ticks += 1
 			return row

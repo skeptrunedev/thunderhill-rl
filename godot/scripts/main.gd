@@ -308,7 +308,7 @@ func _ready() -> void:
 			get_tree().quit(2)
 			return
 		replay.apply_state(sim, replay.manifest.initial_state)
-		lap_time = sim.elapsed
+		lap_time = (sim.tick - replay.model_control_start_tick) * DT if replay.model_control_start_tick >= 0 else sim.elapsed
 		paused = false
 	if not benchmark_path.is_empty():
 		benchmark = preload("res://scripts/control_benchmark.gd").new()
@@ -588,11 +588,13 @@ func _physics_process(_dt: float) -> void:
 		if row.is_empty():
 			paused = true
 			print("REPLAY_COMPLETE ticks=", replay.consumed_ticks)
+			if replay.model_control_start_tick >= 0:
+				print("REPLAY_HANDOFF tick=", replay.model_control_start_tick, " lap_seconds=", lap_time)
 			return
 		for decision in replay.pending_decisions:
 			_show_decision(decision)
 		replay.apply_state(sim, row.state)
-		lap_time = sim.elapsed
+		lap_time = (sim.tick - replay.model_control_start_tick) * DT if replay.model_control_start_tick >= 0 else sim.elapsed
 		wheel_rotation += sim.longitudinal_velocity * DT / 0.32
 		if not sim.collision_contact.is_empty():
 			wheel_rotation = float(sim.collision_contact.wheel_rotation)

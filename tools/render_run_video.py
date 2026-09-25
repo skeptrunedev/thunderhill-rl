@@ -31,6 +31,8 @@ def inspect_recording(source: Path, fps: int = 30) -> dict:
         if not math.isfinite(dt) or abs(dt - 1 / 120) > 1e-10:
             raise ValueError('Playback requires the game physics timestep of 1/120')
         initial = previous = header['initial_state']
+        previous_track = header.get('initial_track', {})
+        handoff = header.get('initial_track', {}).get('model_control_start') or None
         count = decisions = 0
         for line in stream:
             row = json.loads(line)
@@ -44,9 +46,27 @@ def inspect_recording(source: Path, fps: int = 30) -> dict:
                         or abs(state['elapsed'] - previous['elapsed'] - dt) > 1e-7):
                     raise ValueError('Recording transitions are discontinuous')
                 previous = state
+                previous_track = row['track']
                 count += 1
             elif kind == 'model_decision':
                 decisions += 1
+            elif kind == 'model_control_start':
+                value = row.get('handoff')
+                if (handoff is not None or not isinstance(value, dict)
+                        or set(row) != {'type', 'handoff'}
+                        or set(value) != {'tick', 'station_m', 'initial_legal_distance_m', 'speed_m_s'}):
+                    raise ValueError('Malformed or duplicate model control handoff')
+                if (type(value['tick']) is not int or value['tick'] != previous['tick']
+                        or any(type(value[key]) not in (int, float) or not math.isfinite(value[key])
+                               for key in ('station_m', 'initial_legal_distance_m', 'speed_m_s'))
+                        or value['station_m'] < 0 or value['speed_m_s'] < 0
+                        or not math.isclose(value['speed_m_s'], previous['speed'], abs_tol=1e-8)
+                        or not math.isclose(value['initial_legal_distance_m'],
+                                            previous_track['legal_distance'], abs_tol=1e-8)
+                        or previous.get('crashed', False)
+                        or not previous_track.get('lap_valid', False)):
+                    raise ValueError('Model control handoff does not match recorded state')
+                handoff = value
             elif kind not in ('snapshot', 'camera_observation', 'environment_failure'):
                 raise ValueError(f'Unknown recording row: {kind}')
     duration = count * dt
@@ -59,6 +79,7 @@ def inspect_recording(source: Path, fps: int = 30) -> dict:
         'initial_elapsed_seconds': initial['elapsed'],
         'final_elapsed_seconds': previous['elapsed'],
         'transitions': count, 'model_decisions': decisions,
+        'model_control_start': handoff,
         'simulation_duration_seconds': duration, 'fps': fps,
         'expected_frames': frames, 'expected_video_duration_seconds': frames / fps,
         'final_state_hold_seconds': 1,
@@ -90,6 +111,13 @@ def render_video(source: Path, output: Path, *, godot: str, ffmpeg: str,
     completed = re.findall(r'REPLAY_COMPLETE ticks=(\d+)', log_text)
     if completed != [str(info['transitions'])] or 'SCRIPT ERROR:' in log_text:
         raise RuntimeError('Godot did not complete the exact recorded replay; see godot.log')
+    if info['model_control_start'] is not None:
+        handoffs = re.findall(r'REPLAY_HANDOFF tick=(\d+) lap_seconds=([0-9.eE+\-]+)', log_text)
+        expected_tick = info['model_control_start']['tick']
+        if (len(handoffs) != 1 or int(handoffs[0][0]) != expected_tick
+                or not math.isclose(float(handoffs[0][1]),
+                                    (info['final_tick'] - expected_tick) / 120, abs_tol=1e-6)):
+            raise RuntimeError('Godot did not preserve the recorded model control handoff clock')
     encode_command = [str(ffmpeg), '-nostdin', '-n', '-i', str(avi), '-an',
                       '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
                       '-pix_fmt', 'yuv420p', '-movflags', '+faststart', str(output)]
