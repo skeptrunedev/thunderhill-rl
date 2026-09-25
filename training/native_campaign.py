@@ -70,7 +70,8 @@ def validated_prerequisites(
         )
     launch = json.loads((validation_run / "launch_manifest.json").read_text())
     handoff = report.get("weight_stream_verification", {})
-    if handoff.get("passed") is not True:
+    if (handoff.get("passed") is not True
+            or handoff.get("receive_lifetime", {}).get("passed") is not True):
         raise ValueError("Campaign requires verified native weight transfer stream ordering")
     camera = json.loads((validation_run / "camera-preflight/summary.json").read_text())
     adapter = camera.get("renderer", {}).get("adapter", "")
