@@ -21,19 +21,41 @@ index 04057af..ac7d799 100644
          fresh = [
              pose
 diff --git a/packages/runtime/src/alpagym_runtime/inference/inference_engine.py b/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
-index d2556c0..1764d9e 100644
+index d2556c0..12dc197 100644
 --- a/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
 +++ b/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
-@@ -18,6 +18,8 @@ dead rollout replica through heartbeat timeout and triggers mesh rebuild
+@@ -18,6 +18,9 @@ dead rollout replica through heartbeat timeout and triggers mesh rebuild
  on the surviving replicas.
  """
  
 +from alpagym_runtime.host_replay import host_snapshot
++from alpagym_runtime.inference_capture import record_dispatch
 +
  import logging
  import os
  import queue
-@@ -82,11 +84,14 @@ class InferenceEngine:
+@@ -43,6 +46,7 @@ class _PendingRequest:
+ 
+     model_input: ModelInput
+     result: Future[ModelOutput]
++    capture_identity: dict | None = None
+ 
+ 
+ class _Shutdown:
+@@ -69,10 +73,10 @@ class InferenceEngine:
+         self._max_batch_size = max_batch_size
+         self._queue: queue.SimpleQueue[_PendingRequest | _Shutdown] = queue.SimpleQueue()
+ 
+-    def infer(self, model_input: ModelInput) -> Future[ModelOutput]:
++    def infer(self, model_input: ModelInput, *, capture_identity: dict | None = None) -> Future[ModelOutput]:
+         """Enqueue one `ModelInput` and return its result handle."""
+         future: Future[ModelOutput] = Future()
+-        self._queue.put(_PendingRequest(model_input=model_input, result=future))
++        self._queue.put(_PendingRequest(model_input=model_input, result=future, capture_identity=capture_identity))
+         return future
+ 
+     def build_policy_replay_data(
+@@ -82,11 +86,14 @@ class InferenceEngine:
          action_selection: ActionSelection,
      ) -> PolicyReplayData:
          """Return the selected-action ``PolicyReplayData`` envelope for trainer-side scoring."""
@@ -51,6 +73,69 @@ index d2556c0..1764d9e 100644
  
      def get_model(self) -> torch.nn.Module:
          """Return the rollout-serving model object."""
+@@ -119,6 +126,7 @@ class InferenceEngine:
+             # --- Phase 2: dispatch through the model ---
+             # Forward-pass exceptions kill the process; see module docstring.
+             try:
++                record_dispatch([req.capture_identity for req in batch], "inflight")
+                 model_inputs = [req.model_input for req in batch]
+                 batched_model_input = BatchedModelInput.stack(model_inputs)
+                 with timed_scope(
+@@ -150,6 +158,8 @@ class InferenceEngine:
+                 sys.stderr.flush()
+                 os._exit(1)
+ 
++            record_dispatch([req.capture_identity for req in batch], "completed")
++
+             # --- Phase 3: resolve futures and honour shutdown ---
+             for req, model_output in zip(batch, model_outputs, strict=True):
+                 req.result.set_result(model_output)
+diff --git a/packages/runtime/src/alpagym_runtime/policies/alpamayo/policy.py b/packages/runtime/src/alpagym_runtime/policies/alpamayo/policy.py
+index f2fda8b..5e65e53 100644
+--- a/packages/runtime/src/alpagym_runtime/policies/alpamayo/policy.py
++++ b/packages/runtime/src/alpagym_runtime/policies/alpamayo/policy.py
+@@ -15,6 +15,8 @@ from alpagym_runtime.inference.types import NUM_ROUTE_WAYPOINTS, ModelInput, Mod
+ from alpagym_runtime.replay import ActionSelection, PolicyReplayData
+ from alpagym_runtime.types import ChosenTrajectory, EgoPose, PolicyInput, PolicyOutput
+ 
++from alpagym_runtime.inference_capture import HostInputCapture
++
+ from .buffers import ObservationBuffers
+ from .geometry_utils import (
+     pred_rot_to_quat,
+@@ -55,6 +57,7 @@ class AlpamayoPolicy:
+             frame_size=(config.model.input_size[0], config.model.input_size[1]),
+             frame_device=self._device,
+         )
++        self._input_capture = HostInputCapture(session_uuid, config.model.num_context_frames)
+         self._selector = build_selector(config.trajectory_selector)
+ 
+     def step(self, policy_input: PolicyInput) -> PolicyOutput:
+@@ -67,10 +70,15 @@ class AlpamayoPolicy:
+                 dtype=torch.int64,
+                 device=self._device,
+             )
++        capture_identity = self._input_capture.record(
++            policy_input, self._buffers.ego_history.poses,
++            (int(self._session_seed) + self._inference_step_counter) if seed is not None else None,
++            self._config.model,
++        )
+         model_input = self._preprocess(policy_input, seed=seed)
+         if seed is not None:
+             self._inference_step_counter += 1
+-        future = self._inference_engine.infer(model_input)
++        future = self._inference_engine.infer(model_input, capture_identity=capture_identity)
+         model_output = future.result()
+         return self._postprocess(
+             model_output=model_output,
+@@ -80,6 +88,7 @@ class AlpamayoPolicy:
+ 
+     def close(self) -> None:
+         """Release per-session resources."""
++        self._input_capture.close()
+ 
+     def _preprocess(
+         self,
 diff --git a/packages/runtime/src/alpagym_runtime/transport/nccl/endpoints.py b/packages/runtime/src/alpagym_runtime/transport/nccl/endpoints.py
 index a272c8d..a687355 100644
 --- a/packages/runtime/src/alpagym_runtime/transport/nccl/endpoints.py
@@ -140,3 +225,118 @@ index 0000000..1edd119
 +    if isinstance(value, tuple):
 +        return tuple(host_snapshot(item) for item in value)
 +    return value
+diff --git a/packages/runtime/src/alpagym_runtime/inference_capture.py b/packages/runtime/src/alpagym_runtime/inference_capture.py
+new file mode 100644
+index 0000000..7b73f9b
+--- /dev/null
++++ b/packages/runtime/src/alpagym_runtime/inference_capture.py
+@@ -0,0 +1,109 @@
++"""Bounded host observations for reconstructing a failed native inference batch.
++
++Only compressed simulator images and Python pose/route metadata are copied.
++No CUDA tensors are read, synchronized, decoded, or modified here.
++"""
++from collections import deque
++from dataclasses import asdict, replace
++import hashlib
++import json
++import os
++from pathlib import Path
++import threading
++
++import torch
++
++
++def capture_root():
++    value = os.environ.get("ALPAGYM_INFERENCE_CAPTURE_DIR")
++    if not value:
++        return None
++    path = Path(value) / str(os.getpid())
++    path.mkdir(parents=True, exist_ok=True)
++    return path
++
++
++def atomic_json(path, value):
++    temporary = path.with_suffix(".tmp")
++    temporary.write_text(json.dumps(value, indent=2) + "\n")
++    os.replace(temporary, path)
++
++
++class HostInputCapture:
++    def __init__(self, session_uuid, frame_capacity):
++        self.root = capture_root()
++        self.session_uuid = session_uuid
++        self.frames = {}
++        self.frame_capacity = frame_capacity
++        self.path = None
++        if self.root is not None:
++            # Never let external session identifiers become filesystem paths.
++            name = hashlib.sha256(session_uuid.encode()).hexdigest()
++            self.path = self.root / f"session-{name}.pt"
++
++    def record(self, policy_input, previous_poses, seed, config):
++        if self.path is None:
++            return None
++        for image in policy_input.camera_images:
++            self.frames.setdefault(image.logical_id, deque(maxlen=self.frame_capacity)).append(image)
++        cameras = tuple(image for ring in self.frames.values() for image in ring)
++        # Native ingestion trims the ego deque to this same capacity. Retain
++        # the original ordered history to preserve strict timestamp validation.
++        from alpagym_runtime.types import Trajectory
++        snapshot = replace(policy_input, camera_images=cameras,
++                           ego_trajectory=Trajectory(previous_poses + policy_input.ego_trajectory.poses))
++        payload = {"policy_input": asdict(snapshot), "session_uuid": self.session_uuid,
++                   "seed": seed, "model_config": json.loads(json.dumps(asdict(config), default=str)),
++                   "format": "native_host_policy_input_v1"}
++        temporary = self.path.with_suffix(".tmp")
++        torch.save(payload, temporary)
++        os.replace(temporary, self.path)
++        return {"path": str(self.path), "session_uuid": self.session_uuid,
++                "step_index": policy_input.step_index, "time_now_us": policy_input.time_now_us,
++                "sha256": hashlib.sha256(self.path.read_bytes()).hexdigest()}
++
++    def close(self):
++        if self.path is not None:
++            self.path.unlink(missing_ok=True)
++        self.frames.clear()
++
++
++def record_dispatch(identities, status):
++    root = capture_root()
++    if root is None:
++        return
++    # One dispatcher writes per process. Session files remain unchanged while
++    # their policies await these futures. On fatal failure, os._exit preserves
++    # the inflight manifest and its exact ordered session snapshots.
++    atomic_json(root / "dispatch.json", {
++        "status": status, "ordered_requests": identities,
++        "thread": threading.current_thread().name,
++        "limitation": "Host inputs require original native GPU preprocessing; not raw CUDA model tensors.",
++    })
++
++
++def restore_policy_input(payload):
++    """Rebuild only the typed host input; native preprocessing remains unchanged."""
++    from alpagym_runtime.types import (
++        CameraCalibration, CameraImage, CameraIntrinsics, EgoPose,
++        PolicyInput, Pose, Quaternion, RouteWaypoint, Trajectory, Vec3,
++    )
++
++    def pose(value):
++        return Pose(Vec3(**value["vec"]), Quaternion(**value["quat"]))
++
++    value = payload["policy_input"]
++    calibration = tuple(CameraCalibration(
++        name=item["name"], logical_id=item["logical_id"],
++        intrinsics=CameraIntrinsics(**item["intrinsics"]) if item["intrinsics"] else None,
++        extrinsic_pose=pose(item["extrinsic_pose"]) if item["extrinsic_pose"] else None,
++    ) for item in value["calibration"])
++    return PolicyInput(
++        step_index=value["step_index"], time_now_us=value["time_now_us"],
++        time_query_us=value["time_query_us"],
++        camera_images=tuple(CameraImage(**item) for item in value["camera_images"]),
++        ego_trajectory=Trajectory(tuple(EgoPose(item["timestamp_us"], pose(item["pose"]))
++                                       for item in value["ego_trajectory"]["poses"])),
++        route_waypoints=tuple(RouteWaypoint(**item) for item in value["route_waypoints"]),
++        route_timestamp_us=value["route_timestamp_us"], calibration=calibration,
++    )

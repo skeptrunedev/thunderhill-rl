@@ -116,23 +116,28 @@ def run(args):
     }
     write_json(args.output / "report.json", report)
     adapter = config = None
-    if not args.prepare_only:
-        from alpagym_alpamayo_r1.bundle import (
-            install_alpamayo_r1_runtime_bridge,
-            load_inference_model,
-        )
-        from alpagym_host.config import load_run_config
-        from alpagym_runtime.policies.determinism import set_deterministic
+    try:
+        if not args.prepare_only:
+            from alpagym_alpamayo_r1.bundle import (
+                install_alpamayo_r1_runtime_bridge,
+                load_inference_model,
+            )
+            from alpagym_host.config import load_run_config
+            from alpagym_runtime.policies.determinism import set_deterministic
 
-        install_alpamayo_r1_runtime_bridge()
-        config = load_run_config(args.config)
-        config.policy.model.path = str(args.checkpoint)
-        if config.policy.inference.sampling.force_determinism:
-            set_deterministic()
-        adapter = load_inference_model(
-            config, torch.device(args.device), torch.bfloat16
-        )
-        report["sampling"] = asdict(config.policy.inference.sampling)
+            install_alpamayo_r1_runtime_bridge()
+            config = load_run_config(args.config)
+            config.policy.model.path = str(args.checkpoint)
+            if config.policy.inference.sampling.force_determinism:
+                set_deterministic()
+            adapter = load_inference_model(
+                config, torch.device(args.device), torch.bfloat16
+            )
+            report["sampling"] = asdict(config.policy.inference.sampling)
+    except BaseException:
+        report.update(status="model_loading_failed", error=traceback.format_exc())
+        write_json(args.output / "report.json", report)
+        raise
     try:
         for repeat in range(args.repeats):
             for size in args.batch_sizes:
@@ -205,7 +210,9 @@ def run(args):
                             "video_grid_thw",
                         )
                     }
-                    torch.save(metadata, destination / f"prefill-{prefill_index:03d}.pt")
+                    torch.save(
+                        metadata, destination / f"prefill-{prefill_index:03d}.pt"
+                    )
 
                 hook = adapter._model.vlm.model.register_forward_pre_hook(
                     record_prefill, with_kwargs=True
