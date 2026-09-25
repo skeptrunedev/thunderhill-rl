@@ -1,0 +1,11 @@
+{
+  "version": "static_worker_failure_v1",
+  "upstream_revision": "d2a2c57c4bd6496482bc42da19a59b4432705eda",
+  "patch_sha256": "4ae9f3c5155131669ba0bd42e69a18a1cc31a063b4de7b498758ac7436b39240",
+  "files": {
+    "cosmos_rl/launcher/launch_all.py": {
+      "original_sha256": "a2949e910145e5dd33eeef7e814a2d23025deaa61ee671f183d0655d1c797667",
+      "patched_sha256": "4f98f5c13a9de74bc49bbf1d0d650e03ef5c97610bf71fb0d692f34d57543f41"
+    }
+  }
+}

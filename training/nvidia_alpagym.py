@@ -296,6 +296,7 @@ def cosmos_command(source: Path, config) -> list[str]:
         "python",
         "-m",
         "cosmos_rl.launcher.launch_all",
+        "--fail-fast-workers",
         "--config",
         str(config.artifact_paths.cosmos_config_path),
         "--policy",
@@ -581,7 +582,9 @@ def _run_owned(run_dir: Path) -> None:
             runtime
             + [
                 "-c",
-                ("import torch; import alpagym_runtime.cosmos.entrypoint; "
+                ("from training.native_cosmos_source import verify_installed; "
+                "verify_installed(apply_patch=True); "
+                "import torch; import alpagym_runtime.cosmos.entrypoint; "
                 "from alpagym_alpamayo_r1.bundle import install_alpamayo_r1_runtime_bridge; "
                 "install_alpamayo_r1_runtime_bridge(); "
                 "assert torch.cuda.is_available(), 'CUDA unavailable'; "

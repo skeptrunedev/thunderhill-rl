@@ -68,7 +68,14 @@ def verify_source(source: Path, *, apply_patch: bool = False) -> dict:
         raise ValueError(
             "NVIDIA checkout must contain exactly the reviewed patches; run tools/setup_alpagym.py"
         )
-    return {"version": "reviewed_native_adaptations_v1", "upstream_revision": head, "patches": manifests}
+    from training.native_cosmos_source import patch_manifest
+
+    return {
+        "version": "reviewed_native_adaptations_v1",
+        "upstream_revision": head,
+        "patches": manifests,
+        "cosmos_launcher": patch_manifest(),
+    }
 
 
 def validate_navigation_checkpoint(checkpoint: Path) -> dict:

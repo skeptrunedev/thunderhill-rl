@@ -1,0 +1,134 @@
+--- a/cosmos_rl/launcher/launch_all.py
++++ b/cosmos_rl/launcher/launch_all.py
+@@ -100,10 +100,56 @@
+         sys.exit(1)
+ 
+ 
++def wait_for_processes(processes, controller_process=None, *, fail_fast_workers=False):
++    """Monitor owned process handles; fixed jobs cannot survive a lost worker."""
++    # Wait for all processes to complete without blocking
++    while len(processes) > 0:
++        for i, process in enumerate(list(processes)):
++            try:
++                # Check if process has finished without blocking
++                if process.poll() is not None:
++                    returncode = process.returncode
++                    if returncode == 0:
++                        logger.info(f"Process {i} completed successfully")
++                    else:
++                        logger.error(
++                            f"Process {i} failed with return code {returncode}"
++                        )
++                        # Terminate all remaining processes
++                        if fail_fast_workers or controller_process is None or process is controller_process:
++                            for p in processes:
++                                try:
++                                    p.kill()
++                                except Exception as e:
++                                    logger.error(f"Error kill process {p}: {e}")
++                            logger.error("Terminated all processes due to failure")
++                            sys.exit(1)  # Exit with error code 1 if any process failed
++                    # Remove completed process from list
++                    processes.remove(process)
++            except Exception as e:
++                logger.error(f"Error monitoring process {i}: {e}")
++                # Terminate all remaining processes
++                if fail_fast_workers or controller_process is None or process is controller_process:
++                    for p in processes:
++                        try:
++                            p.kill()
++                        except Exception as e:
++                            logger.error(f"Error kill process {p}: {e}")
++                    logger.error("Terminated all processes due to error")
++                    sys.exit(1)
++        # Small sleep to prevent busy waiting
++        time.sleep(0.1)
++
++
+ def parse_args():
+     """Parse command line arguments."""
+     parser = argparse.ArgumentParser(
+         description="Launch multiple processes with GPU assignments"
++    )
++    parser.add_argument(
++        "--fail-fast-workers",
++        action="store_true",
++        help="Abort a fixed single-worker job when any managed worker exits with an error.",
+     )
+     parser.add_argument(
+         "--config",
+@@ -783,6 +829,8 @@
+     global_launch_settings = nodes_manager.finalize()
+ 
+     num_workers = len(global_launch_settings)
++    if args.fail_fast_workers and (num_workers != 1 or cur_work_idx != 0):
++        raise ValueError("--fail-fast-workers requires a fixed single-worker job")
+     logger.info(f"Number of workers required: {num_workers}")
+     if num_workers > 1:
+         logger.info(
+@@ -842,8 +890,6 @@
+ 
+     processes = []
+ 
+-    controller_id = -1
+-
+     if controller_cmd is not None:
+         command_collections = SingleWorkerCommands(cur_work_idx)
+         command_collections.append_command(
+@@ -856,7 +902,6 @@
+             env=None,
+         )
+         controller_process = launch_processes(command_collections)
+-        controller_id = len(processes)
+         processes.append(controller_process[0])
+ 
+     logger.info(f"Waiting for controller to be ready at {control_url}")
+@@ -894,43 +939,11 @@
+     # SIGUSR1 used for slurm jop timeout case ckpt saving therefore register signal handler for processing the ckpt handling.
+     DistributedSignalHandler.get_instance(["SIGUSR1"], policy_processes)
+ 
+-    # Wait for all processes to complete without blocking
+-    while len(processes) > 0:
+-        for i, process in enumerate(processes):
+-            try:
+-                # Check if process has finished without blocking
+-                if process.poll() is not None:
+-                    returncode = process.returncode
+-                    if returncode == 0:
+-                        logger.info(f"Process {i} completed successfully")
+-                    else:
+-                        logger.error(
+-                            f"Process {i} failed with return code {returncode}"
+-                        )
+-                        # Terminate all remaining processes
+-                        if controller_id == -1 or i == controller_id:
+-                            for p in processes:
+-                                try:
+-                                    p.kill()
+-                                except Exception as e:
+-                                    logger.error(f"Error kill process {p}: {e}")
+-                            logger.error("Terminated all processes due to failure")
+-                            sys.exit(1)  # Exit with error code 1 if any process failed
+-                    # Remove completed process from list
+-                    processes.remove(process)
+-            except Exception as e:
+-                logger.error(f"Error monitoring process {i}: {e}")
+-                # Terminate all remaining processes
+-                if controller_id == -1 or i == controller_id:
+-                    for p in processes:
+-                        try:
+-                            p.kill()
+-                        except Exception as e:
+-                            logger.error(f"Error kill process {p}: {e}")
+-                    logger.error("Terminated all processes due to error")
+-                    sys.exit(1)
+-        # Small sleep to prevent busy waiting
+-        time.sleep(0.1)
++    wait_for_processes(
++        processes,
++        controller_process[0] if controller_cmd is not None else None,
++        fail_fast_workers=args.fail_fast_workers,
++    )
+ 
+     if tmpfile_toml is not None and os.path.exists(tmpfile_toml):
+         # Clean up the temporary file
