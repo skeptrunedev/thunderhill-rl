@@ -125,7 +125,7 @@ class RealGameTests(unittest.TestCase):
             with grpc.insecure_channel(f"127.0.0.1:{runtime_port}") as channel:
                 stub = runtime_grpc.RuntimeServiceStub(channel)
                 info = stub.get_runtime_info(common.Empty())
-                self.assertEqual(info.scenes[0].scene_id, service.scene_id)
+                self.assertEqual(info.scenes[0].scene_id, service.scene_ids[0])
                 result = stub.simulate(
                     runtime.SimulationRequest(
                         available_drivers=[
@@ -135,7 +135,7 @@ class RealGameTests(unittest.TestCase):
                         ],
                         rollout_specs=[
                             runtime.RolloutSpec(
-                                scenario_id=service.scene_id,
+                                scenario_id=service.scene_ids[0],
                                 nr_rollouts=1,
                                 session_uuids=["fixture"],
                             )

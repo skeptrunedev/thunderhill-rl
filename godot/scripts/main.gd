@@ -7,6 +7,8 @@ const HudScript = preload("res://scripts/hud.gd")
 const AgentCameraScript = preload("res://scripts/agent_camera.gd")
 const DT: float = 1.0 / 120.0
 const MAX_AGENT_SNAPSHOTS := 64
+# Rolling starts up to racing straight speeds; training/episode_config.py mirrors it.
+const MAX_INITIAL_SPEED_M_S := 40.0
 # Simulation bookkeeping only. Rendering interpolation and static geometry caches
 # cannot influence an agent step; the collision sweep initializes its own cache.
 const SNAPSHOT_GAME_FIELDS := [
@@ -1265,9 +1267,9 @@ func _request(request: Dictionary) -> Dictionary:
 			not (initial_speed is float or initial_speed is int)
 			or not is_finite(float(initial_speed))
 			or initial_speed < 0
-			or initial_speed > 10
+			or initial_speed > MAX_INITIAL_SPEED_M_S
 		):
-			return {"error": "Invalid initial speed (expected 0 to 10 m/s)"}
+			return {"error": "Invalid initial speed (expected 0 to %s m/s)" % MAX_INITIAL_SPEED_M_S}
 		var station: Variant = request.get("station", 0.0)
 		if (
 			not (station is float or station is int)

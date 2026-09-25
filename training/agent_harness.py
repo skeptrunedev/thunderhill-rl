@@ -6,6 +6,8 @@ import json
 import math
 import secrets
 
+from episode_config import MAX_INITIAL_SPEED_M_S
+
 
 class ThunderhillEnv:
     """One simulator per rollout, with fresh observation receipts for actions.
@@ -76,14 +78,21 @@ class ThunderhillEnv:
             self._log("infrastructure_failure", error=self._fault)
             raise
 
-    def reset(self, *, policy_display=None, initial_speed_m_s=0.0, **kwargs) -> str:
+    def reset(
+        self, *, policy_display=None, initial_speed_m_s=0.0, station=None, **kwargs
+    ) -> str:
         self._fault = None
         if (type(initial_speed_m_s) not in (int, float)
-                or not math.isfinite(initial_speed_m_s) or not 0 <= initial_speed_m_s <= 10):
-            raise ValueError("Initial speed must be finite and in [0, 10] m/s")
+                or not math.isfinite(initial_speed_m_s)
+                or not 0 <= initial_speed_m_s <= MAX_INITIAL_SPEED_M_S):
+            raise ValueError(
+                f"Initial speed must be finite and in [0, {MAX_INITIAL_SPEED_M_S:g}] m/s"
+            )
         request = {"op": "reset", "policy_id": f"interactive-step-{self._step()}"}
         if initial_speed_m_s:
             request["initial_speed_m_s"] = initial_speed_m_s
+        if station:
+            request["station"] = station
         if policy_display is not None:
             request["policy_display"] = policy_display
         self._observation = self._request(request)
@@ -93,6 +102,7 @@ class ThunderhillEnv:
             "reset",
             observation=self._view(),
             initial_speed_m_s=initial_speed_m_s,
+            start_station_m=station or 0.0,
             observation_version=(
                 "privileged-road-telemetry-v1"
                 if self._road_telemetry is not None
