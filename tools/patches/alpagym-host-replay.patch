@@ -1,0 +1,142 @@
+diff --git a/packages/runtime/src/alpagym_runtime/alpasim/driver_server.py b/packages/runtime/src/alpagym_runtime/alpasim/driver_server.py
+index 04057af..ac7d799 100644
+--- a/packages/runtime/src/alpagym_runtime/alpasim/driver_server.py
++++ b/packages/runtime/src/alpagym_runtime/alpasim/driver_server.py
+@@ -1,6 +1,8 @@
+ # SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # SPDX-License-Identifier: Apache-2.0
+ 
++from alpagym_runtime.host_replay import host_snapshot
++
+ import logging
+ import threading
+ from concurrent import futures
+@@ -81,7 +83,7 @@ class _Session:
+         by timestamp. AlpaSim's drive only delivers one session at a time, so
+         this runs single-threaded per session and needs no extra lock.
+         """
+-        self.outputs.append(policy_output)
++        self.outputs.append(host_snapshot(policy_output))
+         last_us = self.executed_poses[-1].timestamp_us if self.executed_poses else None
+         fresh = [
+             pose
+diff --git a/packages/runtime/src/alpagym_runtime/inference/inference_engine.py b/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
+index d2556c0..1764d9e 100644
+--- a/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
++++ b/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
+@@ -18,6 +18,8 @@ dead rollout replica through heartbeat timeout and triggers mesh rebuild
+ on the surviving replicas.
+ """
+ 
++from alpagym_runtime.host_replay import host_snapshot
++
+ import logging
+ import os
+ import queue
+@@ -82,11 +84,14 @@ class InferenceEngine:
+         action_selection: ActionSelection,
+     ) -> PolicyReplayData:
+         """Return the selected-action ``PolicyReplayData`` envelope for trainer-side scoring."""
+-        return self._inference_model.build_policy_replay_data(
+-            model_input=model_input,
++        # The adapter uses dataclasses.asdict, which clones tensor leaves.
++        # Copy the raw replay input to host before that call, never on CUDA.
++        # Live inference and selected-action computation already completed.
++        return host_snapshot(self._inference_model.build_policy_replay_data(
++            model_input=host_snapshot(model_input),
+             model_output=model_output,
+             action_selection=action_selection,
+-        )
++        ))
+ 
+     def get_model(self) -> torch.nn.Module:
+         """Return the rollout-serving model object."""
+diff --git a/packages/runtime/src/alpagym_runtime/transport/nccl/endpoints.py b/packages/runtime/src/alpagym_runtime/transport/nccl/endpoints.py
+index a272c8d..a687355 100644
+--- a/packages/runtime/src/alpagym_runtime/transport/nccl/endpoints.py
++++ b/packages/runtime/src/alpagym_runtime/transport/nccl/endpoints.py
+@@ -284,7 +284,10 @@ class NcclDataPackerMixin:
+         # Triggers the rendezvous handshake and the matching nccl_send; blocks
+         # until every tensor arrives or the receiver's watchdog fires.
+         try:
+-            tensors = self._receiver.recv(transfer_id=transfer_id, tensor_specs=tensor_specs)
++            tensors = self._receiver.recv(
++                transfer_id=transfer_id, tensor_specs=tensor_specs,
++                storage_device=self._target_device,
++            )
+         except Exception:
+             self._store.delete_key(metadata_key)
+             raise
+diff --git a/packages/runtime/src/alpagym_runtime/transport/nccl/receiver.py b/packages/runtime/src/alpagym_runtime/transport/nccl/receiver.py
+index 95cb863..36af2d9 100644
+--- a/packages/runtime/src/alpagym_runtime/transport/nccl/receiver.py
++++ b/packages/runtime/src/alpagym_runtime/transport/nccl/receiver.py
+@@ -113,6 +113,7 @@ class NcclReceiver:
+         self,
+         transfer_id: str,
+         tensor_specs: dict[str, tuple[tuple[int, ...], str]],
++        storage_device: torch.device | None = None,
+     ) -> dict[str, torch.Tensor]:
+         """Block on rendezvous, then receive every tensor in ``tensor_specs``."""
+         resolved_rollout_idx = parse_transfer_rollout_idx(transfer_id)
+@@ -139,6 +140,7 @@ class NcclReceiver:
+                 transfer_id=transfer_id,
+                 comm_idx=comm_idx,
+                 tensor_specs=tensor_specs,
++                storage_device=storage_device,
+             )
+         except Exception:
+             # Any post-accept recv failure poisons this communicator. Abort it
+@@ -156,6 +158,7 @@ class NcclReceiver:
+         transfer_id: str,
+         comm_idx: int,
+         tensor_specs: dict[str, tuple[tuple[int, ...], str]],
++        storage_device: torch.device | None = None,
+     ) -> dict[str, torch.Tensor]:
+         """Run ``nccl_recv`` in a daemon thread guarded by a watchdog Event."""
+         received_tensors: dict[str, torch.Tensor] = {}
+@@ -180,7 +183,13 @@ class NcclReceiver:
+                             dtype = getattr(torch, dtype_str.split(".")[-1])
+                             tensor = torch.empty(shape, dtype=dtype, device=caller_device)
+                             self._nccl_recv(tensor, self._sender_rank, comm_idx, stream=stream)
+-                            received_tensors[key] = tensor
++                            # Keep only one NCCL CUDA staging tensor live when
++                            # the existing nccl_read_device requests host replay.
++                            # Blocking copy on this stream waits for nccl_recv.
++                            received_tensors[key] = (
++                                tensor.to(storage_device)
++                                if storage_device is not None else tensor
++                            )
+                     stream.synchronize()
+                 else:
+                     for key in sorted(tensor_specs.keys()):
+diff --git a/packages/runtime/src/alpagym_runtime/host_replay.py b/packages/runtime/src/alpagym_runtime/host_replay.py
+new file mode 100644
+index 0000000..1edd119
+--- /dev/null
++++ b/packages/runtime/src/alpagym_runtime/host_replay.py
+@@ -0,0 +1,24 @@
++# SPDX-License-Identifier: Apache-2.0
++"""Immutable host snapshots for saved replay, never live inference inputs."""
++
++from dataclasses import fields, is_dataclass, replace
++from typing import Any
++
++import torch
++
++
++def host_snapshot(value: Any) -> Any:
++    """Preserve every tensor value/dtype without first cloning CUDA storage."""
++    if isinstance(value, torch.Tensor):
++        return value.detach().to(device="cpu", copy=True)
++    if is_dataclass(value) and not isinstance(value, type):
++        return replace(value, **{
++            item.name: host_snapshot(getattr(value, item.name)) for item in fields(value)
++        })
++    if isinstance(value, dict):
++        return {key: host_snapshot(item) for key, item in value.items()}
++    if isinstance(value, list):
++        return [host_snapshot(item) for item in value]
++    if isinstance(value, tuple):
++        return tuple(host_snapshot(item) for item in value)
++    return value

@@ -1,0 +1,15 @@
+{
+  "version": "native_host_replay_v1",
+  "upstream_revision": "972d160eed0e23d388497851504a3a233fec5879",
+  "patch_sha256": "0140293246b3a64ec9915cfb76baee437f8d69f290c4ee79fb8c1d6a4c1247eb",
+  "files": {
+    "packages/runtime/src/alpagym_runtime/inference/inference_engine.py": "a5efaf73dd3d0923188603bc512fd465ad03408b45341bda0fe4981908c1add5",
+    "packages/runtime/src/alpagym_runtime/alpasim/driver_server.py": "3a6e5267998773c4821b79ed106b727553583ea4f4b81848786108155da20df1",
+    "packages/runtime/src/alpagym_runtime/transport/nccl/receiver.py": "3af46a146d2ea3544c4939ce15b646ef9500cb48f00a08b0f9171c6b4d9f67ee",
+    "packages/runtime/src/alpagym_runtime/transport/nccl/endpoints.py": "8ece5fd2ac10fc6018f8599178148b100bbd0b6668f8efe435ad9da0c819526c",
+    "packages/runtime/src/alpagym_runtime/host_replay.py": "3f0ee79c38db8a05528e7e43a2c718aebe3aec34c6da63c9308c012420cdec3e"
+  },
+  "added_files": [
+    "packages/runtime/src/alpagym_runtime/host_replay.py"
+  ]
+}

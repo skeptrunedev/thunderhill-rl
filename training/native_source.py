@@ -13,7 +13,11 @@ PATCH = (
     / "tools/patches/alpagym-native-navigation.patch"
 )
 MANIFEST = PATCH.with_suffix(".json")
-PATCHES = (PATCH, PATCH.with_name("alpagym-padding-skip.patch"))
+PATCHES = (
+    PATCH,
+    PATCH.with_name("alpagym-padding-skip.patch"),
+    PATCH.with_name("alpagym-host-replay.patch"),
+)
 
 
 def verify_source(source: Path, *, apply_patch: bool = False) -> dict:
