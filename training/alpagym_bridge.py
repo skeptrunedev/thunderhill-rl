@@ -388,7 +388,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
             failure = None
             metrics = None
             captures = []
-            tracker = TrajectoryTracker()
+            tracker = None
             stall_monitor = StallMonitor()
             baseline = None
             reward_metrics = None
@@ -526,6 +526,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 capture_and_submit()
                 speed_hold = WarmupSpeedHold(initial_speed) if initial_speed else None
                 warmup_speeds = [env._observation["state"]["speed"]]
+                handoff_controls = dict(throttle=0.0, front_brake=0.0)
                 for _ in range(WARMUP_TICKS // 12):
                     if speed_hold is None:
                         advance(
@@ -538,6 +539,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             env._observation["state"]["speed"]
                         )
                         advance(controls, "speed_hold_sensor_warmup", diagnostic)
+                        handoff_controls = controls
                     warmup_speeds.extend(
                         t["state"]["speed"] for t in env._observation["transitions"]
                     )
@@ -550,6 +552,11 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     raise RuntimeError("Standing warmup moved the motorcycle")
                 if initial_speed > 0 and env._observation["state"]["speed"] <= 0.01:
                     raise RuntimeError("Rolling scene stopped before model control began")
+                # The tracker's actuator model continues from the held controls.
+                tracker = TrajectoryTracker(
+                    throttle=handoff_controls["throttle"],
+                    front_brake=handoff_controls["front_brake"],
+                )
                 view = json.loads(env.begin_model_control())
                 provenance["model_control_start"] = env._observation["model_control_start"]
                 provenance["warmup_speed_m_s"] = dict(

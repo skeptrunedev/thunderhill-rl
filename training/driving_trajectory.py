@@ -232,20 +232,21 @@ class TrajectoryTracker:
     plan's curvature is the lean feedforward. Below the threshold Godot steers
     the wheel directly and pure pursuit on the plan's path is used.
 
-    Actuator slew state starts released, as after the neutral sensor warmup;
-    create a tracker per episode.
+    Actuator slew state starts from the controls held when the warmup hands
+    over (released unless a speed-hold warmup was running); create a tracker
+    per episode.
 
     The bike is forward only. Backward plan segments add no progress, so a
     genuinely reversing plan becomes a stop, while momentary backward noise in
     an otherwise forward plan only pauses the reference briefly.
     """
 
-    def __init__(self):
+    def __init__(self, *, throttle=0.0, front_brake=0.0):
         self.points = None
         self.step = 0
         # Actuator and disturbance state belongs to the bike, not the plan.
-        self.throttle_applied = 0.0
-        self.brake_applied = 0.0
+        self.throttle_applied = float(throttle)
+        self.brake_applied = float(front_brake)
         self.acceleration_state = 0.0
         self.disturbance = 0.0
         self.predicted_speed = None
