@@ -81,7 +81,7 @@ def prerequisites(validation_run: str):
     timeout=43200,
     retries=0,
     max_containers=1,
-    scaledown_window=1,
+    scaledown_window=2,
     volumes={"/model-cache": cache, "/runs": runs},
     secrets=[tracking_secret],
     include_source=False,
