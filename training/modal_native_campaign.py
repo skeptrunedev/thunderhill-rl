@@ -123,20 +123,7 @@ def prerequisites(
     return certificate
 
 
-@app.function(
-    image=runtime_image,
-    gpu="H100!:2",
-    cpu=16,
-    memory=393216,
-    timeout=43200,
-    retries=0,
-    max_containers=1,
-    scaledown_window=2,
-    volumes={"/model-cache": cache, "/runs": runs},
-    secrets=[tracking_secret],
-    include_source=False,
-)
-def campaign(campaign_id: str, source_revision: str, certificate: dict, settings: dict,
+def _campaign(campaign_id: str, source_revision: str, certificate: dict, settings: dict,
              scatter_diagnostics: bool = False):
     import json
     import os
@@ -344,6 +331,29 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
     return str(destination)
 
 
+@app.function(
+    image=runtime_image,
+    gpu="H100!:2",
+    cpu=16,
+    memory=393216,
+    timeout=43200,
+    retries=0,
+    max_containers=1,
+    scaledown_window=2,
+    volumes={"/model-cache": cache, "/runs": runs},
+    secrets=[tracking_secret],
+    include_source=False,
+)
+def campaign(campaign_id: str, source_revision: str, *args,
+             remote_host: dict | None = None, **kwargs):
+    from contextlib import nullcontext
+
+    from training.modal_remote_godot import remote_godot
+
+    with (remote_godot(source_revision, **remote_host) if remote_host else nullcontext()):
+        return _campaign(campaign_id, source_revision, *args, **kwargs)
+
+
 @app.local_entrypoint()
 def main(
     campaign_id: str,
@@ -365,6 +375,7 @@ def main(
     retry_failed_continuation: str = "",
     optimizer_retune: bool = False,
     scatter_diagnostics: bool = False,
+    remote_godot: bool = False,
 ):
     import json
     import math
@@ -497,6 +508,11 @@ def main(
             indent=2,
         )
     )
+    remote_host = None
+    if remote_godot:
+        from training.modal_remote_godot import start_host
+
+        remote_host = start_host(app.app_id)
     print(
         campaign.with_options(
             gpu=("H100!" if certificate["gpu"] == "H100" else certificate["gpu"]) + ":2",
@@ -508,7 +524,8 @@ def main(
             )
             if resume_campaign
             else 43200,
-        ).remote(campaign_id, revision, certificate, settings, scatter_diagnostics)
+        ).remote(campaign_id, revision, certificate, settings, scatter_diagnostics,
+                  remote_host=remote_host)
     )
 
 
