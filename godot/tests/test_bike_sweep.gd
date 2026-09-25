@@ -95,7 +95,17 @@ func _contact_case(
 	var started := Time.get_ticks_usec()
 	var result: Dictionary = solver.sweep(space, a, b, MASK)
 	var elapsed_ms := (Time.get_ticks_usec() - started) / 1000.0
-	print(label, " sweep ", JSON.stringify(result), " ms=", elapsed_ms)
+	print(
+		label,
+		" sweep ",
+		JSON.stringify(result),
+		" ms=",
+		elapsed_ms,
+		" vertices=",
+		solver.generated_vertices,
+		"/",
+		solver.original_vertices
+	)
 	_check(result.get("status", "") == "possible_contact", label + " catches intermediate contact")
 	if result.get("status", "") != "possible_contact":
 		return

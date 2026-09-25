@@ -25,9 +25,8 @@ var _poses: Dictionary = {}
 var _query := PhysicsShapeQueryParameters3D.new()
 var _intervals := 0
 var query_count := 0
-var generated_vertices := 0
-var original_vertices := 0
-var _endpoint_clouds: Dictionary = {}
+var profiling_enabled := false
+var profile: Dictionary = {}
 
 
 func build(source: RefCounted) -> String:
@@ -49,7 +48,6 @@ func build(source: RefCounted) -> String:
 		_parts.append(
 			{
 				"points": points,
-				"witnesses": _witness_indices(points),
 				"radius": radius,
 				"bounds": bounds,
 				"id": component.id,
@@ -76,9 +74,6 @@ func sweep(
 	space: PhysicsDirectSpaceState3D, start: Dictionary, finish: Dictionary, collision_mask: int
 ) -> Dictionary:
 	query_count = 0
-	generated_vertices = 0
-	original_vertices = 0
-	_endpoint_clouds.clear()
 	_intervals = 0
 	_poses.clear()
 	_motion_bounds.clear()
@@ -188,12 +183,13 @@ func _interval(a: float, b: float, candidates: Array[int], depth: int) -> Dictio
 			continue
 		var center := bounds.get_center()
 		var vertices := PackedVector3Array()
-		for endpoint in [a, b]:
-			var pose: Transform3D = from[part.joint] if endpoint == a else to[part.joint]
-			var cloud := _endpoint_cloud(i, endpoint, pose)
-			vertices.append_array(_expand_masked(cloud.points, cloud.masks, padding, center))
-		generated_vertices += vertices.size()
-		original_vertices += part.points.size() * 16
+		for pose: Transform3D in [from[part.joint], to[part.joint]]:
+			for p: Vector3 in part.points:
+				var point: Vector3 = pose * p - center
+				for x in [-1.0, 1.0]:
+					for y in [-1.0, 1.0]:
+						for z in [-1.0, 1.0]:
+							vertices.append(point + Vector3(x, y, z) * padding)
 		var shape := ConvexPolygonShape3D.new()
 		shape.margin = 0.0
 		shape.points = vertices
@@ -291,89 +287,3 @@ func pose_at(fraction: float) -> Dictionary:
 		"steering": lerpf(_start.steering, _finish.steering, fraction),
 		"wheel_rotation": lerpf(_start.wheel_rotation, _finish.wheel_rotation, fraction),
 	}
-
-
-static func _witness_indices(points: PackedVector3Array) -> Array[PackedInt32Array]:
-	var result: Array[PackedInt32Array] = []
-	var extreme := PackedInt32Array([0, 0, 0, 0, 0, 0])
-	for i in points.size():
-		for axis in 3:
-			if points[i][axis] < points[extreme[axis * 2]][axis]:
-				extreme[axis * 2] = i
-			if points[i][axis] > points[extreme[axis * 2 + 1]][axis]:
-				extreme[axis * 2 + 1] = i
-	for i in points.size():
-		var indices := PackedInt32Array()
-		for offset in [-2, -1, 1, 2]:
-			var j: int = posmod(i + offset, points.size())
-			if j != i and not indices.has(j):
-				indices.append(j)
-		for j in extreme:
-			if j != i and not indices.has(j):
-				indices.append(j)
-		result.append(indices)
-	return result
-
-
-# A strict coordinatewise dominator excludes this corner from the support
-# maximum in its entire direction octant. Keeping any unproven corner preserves
-# the original cube Minkowski hull. Witness choices only affect speed.
-# World coordinate comparison permits caching: subtracting a common center and
-# adding the same corner preserve weak coordinate ordering under float rounding.
-# Strict world dominance is acyclic, so some maximal witness always survives.
-static func _corner_masks(
-	points: PackedVector3Array, witnesses: Array[PackedInt32Array]
-) -> PackedInt32Array:
-	var masks := PackedInt32Array()
-	for i in points.size():
-		var p := points[i]
-		var mask := 255
-		for j in witnesses[i]:
-			var q := points[j]
-			if q.x == p.x or q.y == p.y or q.z == p.z:
-				continue
-			var corner := int(q.x > p.x) * 4 + int(q.y > p.y) * 2 + int(q.z > p.z)
-			mask &= ~(1 << corner)
-		masks.append(mask)
-	return masks
-
-
-static func _expand_masked(
-	points: PackedVector3Array, masks: PackedInt32Array, padding: float, center: Vector3
-) -> PackedVector3Array:
-	var result := PackedVector3Array()
-	var offsets := PackedVector3Array()
-	for corner in 8:
-		offsets.append(
-			(
-				Vector3(
-					1.0 if corner & 4 else -1.0,
-					1.0 if corner & 2 else -1.0,
-					1.0 if corner & 1 else -1.0
-				)
-				* padding
-			)
-		)
-	for i in points.size():
-		var p := points[i] - center
-		for corner in 8:
-			if masks[i] & (1 << corner):
-				result.append(p + offsets[corner])
-	return result
-
-
-func _endpoint_cloud(part_index: int, fraction: float, pose: Transform3D) -> Dictionary:
-	# Fractions retain float64 precision: Vector2 cache keys would alias beyond
-	# 24 subdivision bits even though the sweep supports 32 levels.
-	if not _endpoint_clouds.has(part_index):
-		_endpoint_clouds[part_index] = {}
-	var cache: Dictionary = _endpoint_clouds[part_index]
-	if not cache.has(fraction):
-		var part: Dictionary = _parts[part_index]
-		var transformed := PackedVector3Array()
-		for p: Vector3 in part.points:
-			transformed.append(pose * p)
-		cache[fraction] = {
-			"points": transformed, "masks": _corner_masks(transformed, part.witnesses)
-		}
-	return cache[fraction]

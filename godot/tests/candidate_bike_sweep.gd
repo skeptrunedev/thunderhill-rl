@@ -3,12 +3,14 @@ extends RefCounted
 ## Clear intervals are rejected by enclosing volumes. Possible contact is refined
 ## to a declared spatial bound, never presented as an exact physical impact.
 
-const MODEL_VERSION := "articulated-conservative-sweep-v1"
+const MODEL_VERSION := "articulated-conservative-sweep-v2"
 const SPATIAL_TOLERANCE_M := 0.002
 const NUMERICAL_PADDING_M := 0.0005
 const MAX_ROOT_COORDINATE_M := 4096.0
 const MAX_INTERVALS := 4096
 const MAX_DEPTH := 32
+const MAX_CACHED_POINTS := 131072
+const MAX_CACHED_ENDPOINTS := 2048
 
 var envelope: RefCounted
 var _parts: Array[Dictionary] = []
@@ -25,9 +27,13 @@ var _poses: Dictionary = {}
 var _query := PhysicsShapeQueryParameters3D.new()
 var _intervals := 0
 var query_count := 0
+var profiling_enabled := false
+var profile: Dictionary = {}
 var generated_vertices := 0
 var original_vertices := 0
 var _endpoint_clouds: Dictionary = {}
+var _cached_points := 0
+var _cached_endpoints := 0
 
 
 func build(source: RefCounted) -> String:
@@ -76,9 +82,12 @@ func sweep(
 	space: PhysicsDirectSpaceState3D, start: Dictionary, finish: Dictionary, collision_mask: int
 ) -> Dictionary:
 	query_count = 0
+	profile.clear()
 	generated_vertices = 0
 	original_vertices = 0
 	_endpoint_clouds.clear()
+	_cached_points = 0
+	_cached_endpoints = 0
 	_intervals = 0
 	_poses.clear()
 	_motion_bounds.clear()
@@ -101,9 +110,11 @@ func sweep(
 	)
 	if _box_hits(broad).is_empty():
 		return {"status": "clear", "safe_fraction": 1.0, "queries": query_count}
+	var overlap_started := Time.get_ticks_usec() if profiling_enabled else 0
 	var initial: Array = envelope.overlaps(
 		space, start.root, start.lean, start.steering, start.wheel_rotation, collision_mask
 	)
+	_profile_add("initial_overlap_us", overlap_started)
 	query_count += envelope.components.size()
 	if not initial.is_empty():
 		return {
@@ -187,20 +198,26 @@ func _interval(a: float, b: float, candidates: Array[int], depth: int) -> Dictio
 		if _box_hits(bounds).is_empty():
 			continue
 		var center := bounds.get_center()
+		var vertices_started := Time.get_ticks_usec() if profiling_enabled else 0
 		var vertices := PackedVector3Array()
 		for endpoint in [a, b]:
 			var pose: Transform3D = from[part.joint] if endpoint == a else to[part.joint]
 			var cloud := _endpoint_cloud(i, endpoint, pose)
 			vertices.append_array(_expand_masked(cloud.points, cloud.masks, padding, center))
+		_profile_add("hull_vertices_us", vertices_started)
 		generated_vertices += vertices.size()
 		original_vertices += part.points.size() * 16
+		var shape_started := Time.get_ticks_usec() if profiling_enabled else 0
 		var shape := ConvexPolygonShape3D.new()
 		shape.margin = 0.0
 		shape.points = vertices
 		_query.shape = shape
 		_query.transform = Transform3D(Basis.IDENTITY, center)
+		_profile_add("hull_shape_us", shape_started)
+		var query_started := Time.get_ticks_usec() if profiling_enabled else 0
 		query_count += 1
 		var hits := _space.intersect_shape(_query, 1)
+		_profile_add("hull_query_us", query_started)
 		if hits.is_empty():
 			continue
 		possible.append(i)
@@ -249,13 +266,16 @@ func _joint_poses(fraction: float) -> Dictionary:
 
 
 func _box_hits(bounds: AABB) -> Array[Dictionary]:
+	var started := Time.get_ticks_usec() if profiling_enabled else 0
 	var shape := BoxShape3D.new()
 	shape.size = bounds.size
 	shape.margin = 0.0
 	_query.shape = shape
 	_query.transform = Transform3D(Basis.IDENTITY, bounds.get_center())
 	query_count += 1
-	return _space.intersect_shape(_query, 1)
+	var hits := _space.intersect_shape(_query, 1)
+	_profile_add("box_query_us", started)
+	return hits
 
 
 static func _validate_pose(pose: Dictionary) -> String:
@@ -368,12 +388,25 @@ func _endpoint_cloud(part_index: int, fraction: float, pose: Transform3D) -> Dic
 	if not _endpoint_clouds.has(part_index):
 		_endpoint_clouds[part_index] = {}
 	var cache: Dictionary = _endpoint_clouds[part_index]
-	if not cache.has(fraction):
-		var part: Dictionary = _parts[part_index]
-		var transformed := PackedVector3Array()
-		for p: Vector3 in part.points:
-			transformed.append(pose * p)
-		cache[fraction] = {
-			"points": transformed, "masks": _corner_masks(transformed, part.witnesses)
-		}
-	return cache[fraction]
+	if cache.has(fraction):
+		return cache[fraction]
+	var part: Dictionary = _parts[part_index]
+	var transformed := PackedVector3Array()
+	for p: Vector3 in part.points:
+		transformed.append(pose * p)
+	var cloud := {"points": transformed, "masks": _corner_masks(transformed, part.witnesses)}
+	# Full caches only cause recomputation. They never change query coverage or
+	# turn a resource limit into a clear result.
+	if (
+		_cached_points + transformed.size() <= MAX_CACHED_POINTS
+		and _cached_endpoints < MAX_CACHED_ENDPOINTS
+	):
+		cache[fraction] = cloud
+		_cached_points += transformed.size()
+		_cached_endpoints += 1
+	return cloud
+
+
+func _profile_add(key: String, started: int) -> void:
+	if profiling_enabled:
+		profile[key] = profile.get(key, 0) + Time.get_ticks_usec() - started
