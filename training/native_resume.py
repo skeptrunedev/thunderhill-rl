@@ -12,8 +12,30 @@ from pathlib import Path
 import time
 
 
-def load_resume_plan(parent: Path, *, checkpoint_step: int, settings: dict) -> dict:
-    """Read a stopped campaign without resetting its original wall deadline."""
+OPTIMIZER_SETTINGS = {
+    "optimizer_lr": "optm_lr",
+    "optimizer_warmup_steps": "optm_warmup_steps",
+}
+
+
+def load_resume_plan(
+    parent: Path,
+    *,
+    checkpoint_step: int,
+    settings: dict,
+    optimizer_retune: bool = False,
+) -> dict:
+    """Read a stopped campaign without resetting its original wall deadline.
+
+    Native Cosmos resume rebuilds the LambdaLR from the current config and then
+    loads ``scheduler_rank_0.pth`` (``base_lrs``) and ``optimizer_rank_0.pth``
+    (param group ``lr``/``initial_lr``). A changed learning rate would therefore
+    be silently replaced by the checkpoint's. It is accepted only as an explicit
+    optimizer retune, which ``verify_restored_state`` applies after proving the
+    exact restore. Group size is never retunable: ``remain_samples_num`` counts
+    rollouts, so reinterpreting it under another n_generation moves the data
+    cursor and scheduler horizon.
+    """
     from training.native_campaign import completed_exports
 
     parent = parent.resolve()
@@ -25,14 +47,6 @@ def load_resume_plan(parent: Path, *, checkpoint_step: int, settings: dict) -> d
         raise ValueError(
             "The parent runtime must finish owned cleanup before continuation"
         )
-    expected = identity["settings"]
-    if settings != expected:
-        raise ValueError("Continuation must preserve all original campaign settings")
-    deadline = float(identity["hard_deadline_unix"])
-    if deadline - time.time() <= 3600:
-        raise ValueError(
-            "Original campaign deadline leaves insufficient continuation time"
-        )
     candidates = [
         row for row in completed_exports(run_dir) if row["step"] == checkpoint_step
     ]
@@ -40,6 +54,40 @@ def load_resume_plan(parent: Path, *, checkpoint_step: int, settings: dict) -> d
         raise ValueError("Requested native checkpoint and export are not complete")
     checkpoint = Path(candidates[0]["checkpoint"])
     saved = json.loads((checkpoint / "cosmos_config").read_text())
+    # Campaigns before these settings existed ran AlpaGym's defaults; the
+    # checkpoint's own Cosmos config is the authority for what trained it.
+    trained = {key: saved["train"][field] for key, field in OPTIMIZER_SETTINGS.items()}
+    expected = {**trained, **identity["settings"]}
+    if {key: expected[key] for key in trained} != trained:
+        raise ValueError("Parent campaign settings disagree with its checkpoint")
+    if settings.get("rollouts") != expected["rollouts"]:
+        raise ValueError(
+            f"Checkpoint group size is {expected['rollouts']} rollouts; its restored "
+            "remain_samples_num counts rollouts of that size, so continuation "
+            "cannot change n_generation. Start a fresh campaign for a new group size"
+        )
+    if set(settings) != set(expected) or any(
+        settings[key] != expected[key] for key in expected if key not in trained
+    ):
+        raise ValueError("Continuation must preserve all original campaign settings")
+    requested = {key: settings[key] for key in trained}
+    retune = None
+    if requested != trained:
+        if not optimizer_retune:
+            raise ValueError(
+                f"Checkpoint was trained with {trained} but {requested} was requested. "
+                "Native resume restores the checkpoint scheduler and optimizer "
+                "learning rate, so the new value would be silently ignored; pass "
+                "an explicit optimizer retune to apply it after exact restore"
+            )
+        retune = {"from": trained, "to": requested}
+    elif optimizer_retune:
+        raise ValueError("Optimizer retune requested without a changed optimizer setting")
+    deadline = float(identity["hard_deadline_unix"])
+    if deadline - time.time() <= 3600:
+        raise ValueError(
+            "Original campaign deadline leaves insufficient continuation time"
+        )
     if saved["train"]["train_policy"]["kl_beta"] != 0:
         raise ValueError(
             "Native checkpoints omit the KL reference model; exact continuation requires zero KL"
@@ -86,6 +134,7 @@ def load_resume_plan(parent: Path, *, checkpoint_step: int, settings: dict) -> d
             (checkpoint / "extra_info_rank_0.pth").read_bytes()
         ).hexdigest(),
         settings=settings,
+        optimizer_retune=retune,
         kl_beta=0.0,
         remain_samples_num=extra["remain_samples_num"],
     )
@@ -130,6 +179,8 @@ def verify_failed_continuation_retry(failed_campaign: Path, resume_plan: dict) -
             raise ValueError(
                 "Retry differs from the failed continuation's original lineage or budget"
             )
+    if previous.get("optimizer_retune") != resume_plan["optimizer_retune"]:
+        raise ValueError("Retry differs from the failed continuation's optimizer retune")
     run_dir = failed_campaign / Path(campaign["run_dir"]).name
     status = json.loads((run_dir / "run_status.json").read_text())
     if (
@@ -177,10 +228,19 @@ def verify_resume_configuration(config) -> None:
     plan = json.loads((run_dir / "resume_plan.json").read_text())
     saved = json.loads((Path(plan["checkpoint"]) / "cosmos_config").read_text())
     actual = json.loads(config.model_dump_json())
-    for item in (saved, actual):
+    retune = plan.get("optimizer_retune")
+    for item, values in ((saved, "from"), (actual, "to")):
         for key in ("resume", "output_dir", "timestamp"):
             item["train"].pop(key, None)
         item["train"]["train_policy"].pop("trainer_type", None)
+        if retune is not None:
+            # Only the declared optimizer fields may differ, and only to the
+            # exact values the continuation plan recorded.
+            for setting, field in OPTIMIZER_SETTINGS.items():
+                if item["train"].pop(field) != retune[values][setting]:
+                    raise ValueError(
+                        f"Native {field} differs from the planned optimizer retune"
+                    )
     for section in ("train", "policy", "rollout"):
         if saved[section] != actual[section]:
             raise ValueError(f"Continuation changed native {section} configuration")
@@ -239,6 +299,36 @@ def exact_resume_state_equal(left, right) -> bool:
     return type(left) is type(right) and left == right
 
 
+def apply_optimizer_retune(schedulers, learning_rate: float) -> dict:
+    """Move a verified restored LambdaLR onto a new base learning rate.
+
+    Cosmos builds each LambdaLR from the current config, so its lambda already
+    carries the new warmup/decay shape; only ``base_lrs`` and the optimizer
+    param group ``initial_lr``/``lr`` come from the checkpoint. Step count and
+    Adam moments are kept. The next optimizer step uses the returned rate.
+    """
+    before, after = [], []
+    for scheduler in schedulers:
+        groups = scheduler.optimizer.param_groups
+        if len(scheduler.base_lrs) != len(groups) or len(
+            scheduler.lr_lambdas
+        ) != len(groups):
+            raise ValueError("Restored scheduler does not match its optimizer groups")
+        before.extend(group["lr"] for group in groups)
+        scheduler.base_lrs = [learning_rate] * len(groups)
+        for group, factor in zip(groups, scheduler.lr_lambdas):
+            group["initial_lr"] = learning_rate
+            group["lr"] = learning_rate * factor(scheduler.last_epoch)
+        scheduler._last_lr = [group["lr"] for group in groups]
+        after.extend(scheduler.get_last_lr())
+    return dict(
+        target_base_lr=learning_rate,
+        restored_lrs=sorted(set(before)),
+        applied_lrs=sorted(set(after)),
+        applied=bool(after) and all(value > 0 for value in after),
+    )
+
+
 def verify_restored_state(trainer, extra: dict) -> dict:
     import torch
     from cosmos_rl.utils.checkpoint import CheckpointMananger
@@ -292,12 +382,19 @@ def verify_restored_state(trainer, extra: dict) -> dict:
         )
         checks[name + "_exact"] = exact_resume_state_equal(saved, current.state_dict())
         del saved
+    retune = plan.get("optimizer_retune")
+    learning_rate = None
     if all(checks.values()):
         # CheckpointMananger already rebuilt this scheduler using the saved
         # horizon and loaded its state before restoring the optimizer. Native
         # GRPO's first-batch rebuild would reset optimizer LR to warmup zero.
         # Retain the verified native scheduler instead of initializing it twice.
         trainer.lr_schedulers_updated = True
+        if retune is not None:
+            learning_rate = apply_optimizer_retune(
+                trainer.lr_schedulers, retune["to"]["optimizer_lr"]
+            )
+            checks["optimizer_retune_applied"] = learning_rate["applied"]
     report = dict(
         passed=all(checks.values()),
         checks=checks,
@@ -305,6 +402,8 @@ def verify_restored_state(trainer, extra: dict) -> dict:
         checkpoint_step=plan["checkpoint_step"],
         fallback_to_base_accepted=False,
         native_restored_scheduler_initialized=all(checks.values()),
+        optimizer_retune=retune,
+        learning_rate=learning_rate,
     )
     from training.native_campaign import write_json
 

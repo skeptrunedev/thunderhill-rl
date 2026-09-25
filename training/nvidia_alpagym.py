@@ -29,6 +29,17 @@ from training.native_source import validate_navigation_checkpoint, verify_source
 ALPAGYM_REVISION = "972d160eed0e23d388497851504a3a233fec5879"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = REPO_ROOT.parent / "thunderhill-references" / "alpagym"
+# NVIDIA's own Alpamayo 1.5 closed-loop RL experiment at the pinned revision.
+# AlpaGym's host default.yaml instead inherits Cosmos-RL's generic LLM values
+# (optm_lr 1e-6, 20 warmup steps starting from zero), which NVIDIA overrides
+# for this policy. prepare() records both the reference and the chosen values.
+NVIDIA_CLRL_EXPERIMENT = (
+    "packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/configs/experiment/"
+    "alpamayo_1_5_clrl_test_run.yaml"
+)
+NVIDIA_CLRL_LEARNING_RATE = 1.0e-4
+NVIDIA_CLRL_WARMUP_STEPS = 1
+NVIDIA_CLRL_GROUP_SIZE = 6
 
 
 def load_upstream(source: Path) -> Path:
@@ -48,7 +59,9 @@ def prepare(
     *,
     godot: str,
     max_steps: int = 1,
-    rollouts: int = 2,
+    rollouts: int = NVIDIA_CLRL_GROUP_SIZE,
+    learning_rate: float = NVIDIA_CLRL_LEARNING_RATE,
+    warmup_steps: int = NVIDIA_CLRL_WARMUP_STEPS,
     episode_seconds: float = 30,
     initial_speed_m_s: float = 0.0,
     concurrency: int = 1,
@@ -69,6 +82,17 @@ def prepare(
         )
     if not math.isfinite(episode_seconds) or episode_seconds <= 0:
         raise ValueError("Episode duration must be finite and positive")
+    if (
+        isinstance(learning_rate, bool)
+        or not isinstance(learning_rate, (int, float))
+        or not math.isfinite(learning_rate)
+        or learning_rate <= 0
+    ):
+        raise ValueError("Learning rate must be finite and positive")
+    # Cosmos-RL reads a float warmup <= 1.0 as a fraction of the horizon, so
+    # only an explicit integer step count is accepted here.
+    if type(warmup_steps) is not int or warmup_steps < 0:
+        raise ValueError("Warmup must be a non-negative integer step count")
     if not math.isfinite(max_wall_seconds) or max_wall_seconds <= 0:
         raise ValueError("Wall time budget must be finite and positive")
     if not math.isfinite(max_video_seconds) or max_video_seconds <= 0:
@@ -121,7 +145,42 @@ def prepare(
     config.cosmos.rollout.n_generation = rollouts
     # Keep the full sibling group, rather than the smoke preset's single episode.
     # NVIDIA owns advantage computation, minibatching and each optimizer step.
+    # With one policy replica and dp_shard_size 1, Cosmos fetches
+    # ceil(train_batch_per_replica / n_generation) = 1 prompt per policy step,
+    # so each optimizer step consumes exactly one complete GRPO group.
     config.cosmos.train.train_batch_per_replica = rollouts
+    config.cosmos.train.optm_lr = float(learning_rate)
+    config.cosmos.train.optm_warmup_steps = warmup_steps
+    reference = yaml.safe_load((source / NVIDIA_CLRL_EXPERIMENT).read_text())
+    reference_train = reference["cosmos"]["train"]
+    optimizer = {
+        "optm_lr": config.cosmos.train.optm_lr,
+        "optm_warmup_steps": config.cosmos.train.optm_warmup_steps,
+        # Cosmos-RL's default; the generated TOML does not override it.
+        "optm_warmup_start_factor": 0.0,
+        "optm_decay_type": config.cosmos.train.optm_decay_type,
+        "n_generation": config.cosmos.rollout.n_generation,
+        "train_batch_per_replica": config.cosmos.train.train_batch_per_replica,
+        "mini_batch": config.cosmos.train.train_policy.mini_batch,
+        "grpo_optimization_iterations": (
+            config.cosmos.train.train_policy.grpo_optimization_iterations
+        ),
+        "kl_beta": config.cosmos.train.train_policy.kl_beta,
+        # Cosmos-RL's DAPO variant drops only groups whose rewards are exactly
+        # equal, and it bypasses the per-weight-version prompt cap that bounds
+        # this run to one group per optimizer step. Plain GRPO stays selected.
+        "grpo_variant": "grpo",
+        "nvidia_reference": {
+            "experiment": NVIDIA_CLRL_EXPERIMENT,
+            "alpagym_revision": ALPAGYM_REVISION,
+            "optm_lr": reference_train["optm_lr"],
+            "optm_warmup_steps": reference_train["optm_warmup_steps"],
+            "n_generation": reference["cosmos"]["rollout"]["n_generation"],
+            "train_batch_per_replica": reference_train["train_batch_per_replica"],
+            "mini_batch": reference_train["train_policy"]["mini_batch"],
+            "kl_beta": reference_train["train_policy"]["kl_beta"],
+        },
+    }
     config.cosmos.rollout.backend = "thunderhill_alpagym_rollout"
     # Recording identity is published around each explicit generation call.
     config.cosmos.rollout.prefetch_rollout = False
@@ -173,6 +232,7 @@ def prepare(
                 "upstream_recommended_vram_gb_per_gpu": 40,
                 "trainer": "alpagym_runtime.cosmos.trainer.AlpagymGRPOTrainer",
                 "configuration_profile": "upstream_default_alpamayo_r1",
+                "optimizer": optimizer,
                 "training_scope": game["training_scope"],
                 "simulator": "Godot through the AlpaSim gRPC protocol",
             },
@@ -191,6 +251,8 @@ def validate_runtime_files(source: Path, config, game: dict) -> None:
         or policy.allowed_outdated_steps != 0
         or config.cosmos.rollout.batch_size != 1
         or config.cosmos.rollout.prefetch_rollout
+        or config.cosmos.train.train_batch_per_replica
+        != config.cosmos.rollout.n_generation
     ):
         raise ValueError("Full lap replay requires bounded native on-policy dispatch")
     seconds = float(game["episode_seconds"])
@@ -713,8 +775,20 @@ def main(argv: list[str] | None = None) -> None:
     prep.add_argument(
         "--rollouts",
         type=int,
-        default=2,
-        help="Sibling rollouts per scene, NVIDIA n_generation",
+        default=NVIDIA_CLRL_GROUP_SIZE,
+        help="Sibling rollouts per scene (one GRPO group), NVIDIA n_generation",
+    )
+    prep.add_argument(
+        "--learning-rate",
+        type=float,
+        default=NVIDIA_CLRL_LEARNING_RATE,
+        help="Cosmos optm_lr; defaults to NVIDIA's Alpamayo 1.5 closed-loop RL run",
+    )
+    prep.add_argument(
+        "--warmup-steps",
+        type=int,
+        default=NVIDIA_CLRL_WARMUP_STEPS,
+        help="Cosmos optm_warmup_steps (linear from zero); NVIDIA uses 1",
     )
     prep.add_argument("--episode-seconds", type=float, default=30)
     prep.add_argument("--initial-speed-m-s", type=float, default=0.0)
@@ -741,6 +815,8 @@ def main(argv: list[str] | None = None) -> None:
                 godot=args.godot,
                 max_steps=args.max_steps,
                 rollouts=args.rollouts,
+                learning_rate=args.learning_rate,
+                warmup_steps=args.warmup_steps,
                 episode_seconds=args.episode_seconds,
                 initial_speed_m_s=args.initial_speed_m_s,
                 scatter_diagnostics=args.scatter_diagnostics,

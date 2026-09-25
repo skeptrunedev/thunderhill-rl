@@ -83,7 +83,10 @@ RTX 2080 Ti with 11 GB cannot validate this native two GPU topology. Installatio
 on this machine also stopped at the missing `redis-server` prerequisite; it could
 not be installed without administrator access. Full GPU training remains unverified.
 
-`--rollouts` is the number of sibling attempts per scene. `--max-steps` bounds
+`--rollouts` is the number of sibling attempts per scene (one GRPO group).
+`--rollouts`, `--learning-rate` and `--warmup-steps` default to NVIDIA's own
+Alpamayo 1.5 closed-loop RL experiment (6, 1e-4, 1), not AlpaGym's generic
+host defaults (1e-6 with a 20 step warmup from zero). `--max-steps` bounds
 NVIDIA training steps. A step can contain several optimizer minibatches; it is
 not the old one update per generation loop. Video generations identify the actual
 Cosmos policy weight version, not an invented batch counter.
