@@ -18,7 +18,7 @@ import sys
 import threading
 from pathlib import Path
 
-TUNNEL_PORT = 2222
+TUNNEL_PORT = int(os.environ.get("THUNDERHILL_REMOTE_GODOT_PORT", "2222"))
 
 
 def _ssh(*extra: str) -> list[str]:
@@ -38,19 +38,30 @@ def _rsync(source: str, destination: str) -> None:
     )
 
 
-def pull(path: Path) -> None:
-    """Copy the host's copy of a container path back into the container."""
+def _remote(real: str) -> str:
+    return os.environ["THUNDERHILL_REMOTE_GODOT_USER"] + "@127.0.0.1:" + real
+
+
+def pull_dir(path: Path) -> None:
+    """Copy the host's copy of a container directory back into the container."""
     real = os.path.realpath(path)
-    remote = os.environ["THUNDERHILL_REMOTE_GODOT_USER"] + "@127.0.0.1:"
-    if Path(real).is_dir() or str(path).endswith("/"):
-        _rsync(remote + real + "/", real + "/")
-    else:
-        _rsync(remote + real, real)
+    _rsync(_remote(real) + "/", real + "/")
+
+
+def pull_file(path: Path) -> None:
+    real = os.path.realpath(path)
+    _rsync(_remote(real), real)
+
+
+def sync_if_remote(path: Path) -> None:
+    """Before reading Godot's data directory: pull it when Godot runs remotely."""
+    if os.environ.get("THUNDERHILL_REMOTE_GODOT") == "1":
+        pull_dir(path)
 
 
 def push(path: Path) -> None:
     real = os.path.realpath(path)
-    _rsync(real, os.environ["THUNDERHILL_REMOTE_GODOT_USER"] + "@127.0.0.1:" + real)
+    _rsync(real, _remote(real))
 
 
 def _argument_paths(args: list[str]) -> tuple[list[str], list[str], list[str]]:
@@ -121,9 +132,9 @@ def main(argv: list[str]) -> int:
     # pulled what it reads; only natural exits copy outputs back here.
     if not terminated.is_set():
         for path in outputs:
-            pull(Path(path))
+            pull_file(Path(path))
         if data:
-            pull(Path(data))
+            pull_dir(Path(data))
     return returncode
 
 

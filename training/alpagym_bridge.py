@@ -17,7 +17,6 @@ import hashlib
 import io
 import json
 import math
-import os
 from pathlib import Path
 import threading
 import time
@@ -39,6 +38,7 @@ from alpasim_grpc.v0 import sensorsim_pb2 as sensor
 
 from agent_harness import ThunderhillEnv
 from check_parallel import worker
+from remote_godot import sync_if_remote
 from driving_trajectory import TrajectoryTracker
 from lap_policy import RoadTelemetry
 from lap_episode import StallMonitor
@@ -776,11 +776,8 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     client.request(
                         dict(op="reset", policy_id="alpagym-recording-closed")
                     )
-                    if os.environ.get("THUNDERHILL_REMOTE_GODOT") == "1":
-                        # Godot wrote the recording on the rendering host.
-                        from remote_godot import pull
-
-                        pull(data)
+                    # Godot may have written the recording on a rendering host.
+                    sync_if_remote(data)
                     paths = list(data.rglob(f"{episode_id}.jsonl"))
                     if len(paths) != 1:
                         raise RuntimeError(

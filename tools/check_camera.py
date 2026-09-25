@@ -22,6 +22,7 @@ import time
 from PIL import Image, ImageChops
 
 from check_agent import Client
+from remote_godot import sync_if_remote
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -142,6 +143,7 @@ def validate_capture(response: dict, output: Path, label: str, episode: str, tic
         assert views[0]["camera"]["pose"] != views[2]["camera"]["pose"]
         assert views[1]["camera"]["rig"] == views[3]["camera"]["rig"]
     assert len(response["camera"]["pose"]["position"]) == 3
+    sync_if_remote(output / "userdata")
     artifacts = list((output / "userdata").rglob(digest + ".png"))
     assert len(artifacts) == 1 and artifacts[0].read_bytes() == png, "Recorded bytes differ from policy image"
     (output / f"{label}.png").write_bytes(png)
@@ -238,6 +240,7 @@ def main() -> None:
         unsupported = client.request({"op": "capture", "episode_id": initial["episode_id"], "expected_tick": 0})
         assert "headless" in unsupported["error"] and unsupported["failure_type"] == "infrastructure"
     records = []
+    sync_if_remote(output / "userdata")
     for path in (output / "userdata").rglob("*.jsonl"):
         records.extend(json.loads(line) for line in path.read_text().splitlines())
     observations = [row for row in records if row.get("type") == "camera_observation"]

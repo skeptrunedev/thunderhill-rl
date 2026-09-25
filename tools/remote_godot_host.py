@@ -21,16 +21,13 @@ import sys
 import threading
 from pathlib import Path
 
-CONTAINER_REPO = "/opt/thunderhill"
-
-
 def mirrored(mirror: Path, path: str) -> str:
     if not path.startswith("/") or ".." in Path(path).parts:
         raise ValueError(f"Expected a normalized absolute container path: {path!r}")
     return str(mirror / path.lstrip("/"))
 
 
-def run_godot(payload: dict, mirror: Path, worktrees: Path, godot: str) -> int:
+def run_godot(payload: dict, mirror: Path, worktrees: Path, godot: str, repo: str) -> int:
     worktree = worktrees / payload["revision"]
     if not (worktree / "godot/project.godot").is_file():
         raise RuntimeError(f"No prepared worktree for revision {payload['revision']}")
@@ -39,9 +36,9 @@ def run_godot(payload: dict, mirror: Path, worktrees: Path, godot: str) -> int:
     for arg in iterator:
         if arg == "--path":
             value = next(iterator)
-            if not value.startswith(CONTAINER_REPO + "/"):
+            if not value.startswith(repo + "/"):
                 raise ValueError(f"Godot project must be inside the repository: {value}")
-            args += [arg, str(worktree / value[len(CONTAINER_REPO) + 1:])]
+            args += [arg, str(worktree / value[len(repo) + 1:])]
         elif arg == "--write-movie":
             value = mirrored(mirror, next(iterator))
             Path(value).parent.mkdir(parents=True, exist_ok=True)
@@ -64,8 +61,10 @@ def run_godot(payload: dict, mirror: Path, worktrees: Path, godot: str) -> int:
     )
 
     def watch_stdin():
-        # The container closes the SSH session's stdin to stop the game.
-        sys.stdin.buffer.read()
+        # The container closes the SSH session's stdin to stop the game. Raw reads:
+        # a buffered reader blocked here would abort interpreter shutdown.
+        while os.read(0, 65536):
+            pass
         if process.poll() is None:
             os.killpg(process.pid, signal.SIGTERM)
 
@@ -82,11 +81,13 @@ def main() -> int:
     parser.add_argument("--mirror", type=Path, required=True)
     parser.add_argument("--worktrees", type=Path, required=True)
     parser.add_argument("--godot", required=True)
+    parser.add_argument("--container-repo", default="/opt/thunderhill")
     options = parser.parse_args()
     command = shlex.split(os.environ.get("SSH_ORIGINAL_COMMAND", ""))
     if len(command) == 2 and command[0] == "godot-run":
         payload = json.loads(base64.b64decode(command[1]))
-        return run_godot(payload, options.mirror, options.worktrees, options.godot)
+        return run_godot(payload, options.mirror, options.worktrees, options.godot,
+                         options.container_repo)
     if command[:2] == ["rsync", "--server"]:
         # rsync's server form ends with ". <path>"; confine that path to the mirror.
         if len(command) < 4 or command[-2] != ".":
@@ -100,4 +101,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    code = main()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # Skip finalization: the stdin watcher thread may still be blocked in read().
+    os._exit(code)
