@@ -76,6 +76,7 @@ def prerequisites(validation_run: str):
 
 @app.function(
     image=runtime_image,
+    gpu="H100:2",
     cpu=16,
     memory=393216,
     timeout=43200,
