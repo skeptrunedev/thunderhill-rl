@@ -50,7 +50,9 @@ def validated_prerequisites(
             "The native validation has not completed optimization and fresh reload"
         )
     padding = report.get("padding_skip_verification", {})
-    if padding.get("passed") is not True or padding.get("policy_world_size") != 1:
+    if (padding.get("passed") is not True
+            or padding.get("policy_world_size") != 1
+            or padding.get("inter_policy_world_size") != 1):
         raise ValueError("Campaign requires verified native padding state equivalence")
     launch = json.loads((validation_run / "launch_manifest.json").read_text())
     camera = json.loads((validation_run / "camera-preflight/summary.json").read_text())
