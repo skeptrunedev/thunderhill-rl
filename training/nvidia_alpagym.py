@@ -230,7 +230,7 @@ def validate_runtime_files(source: Path, config, game: dict) -> None:
     )
 
 
-def validate_godot_run_config(config) -> None:
+def validate_godot_run_config(config, game: dict) -> None:
     """Use NVIDIA's training checks without AlpaSim Wizard's GT warmup requirement.
 
     These validators are pinned together with the upstream checkout. The public
@@ -253,8 +253,13 @@ def validate_godot_run_config(config) -> None:
         raise ValueError("Godot episodes must not use recorded ground truth warmup")
     if config.alpasim.wizard_args.control_timestep_us != 200_000:
         raise ValueError("Godot bridge requires 0.2 second replanning")
+    from training.episode_config import scene_id
+
+    scenario = scene_id(game.get("initial_speed_m_s", 0.0))
+    if game.get("scenario_id", scenario) != scenario:
+        raise ValueError("Game scene identity differs from initial conditions")
     if (
-        list(config.dataset.scene_ids or []) != ["thunderhill-east-standing"]
+        list(config.dataset.scene_ids or []) != [scenario]
         or config.dataset.test_suite_id
     ):
         raise ValueError("Godot launcher requires the supported Thunderhill scene")
@@ -543,8 +548,8 @@ def _run_owned(run_dir: Path) -> None:
                 "Reward contract changed; prepare a fresh normalized reward run"
             )
         validate_reward_terms(config.reward.terms)
-        validate_godot_run_config(config)
         game = json.loads((run_dir / "game_config.json").read_text())
+        validate_godot_run_config(config, game)
         validate_runtime_files(source, config, game)
         registry = FileTopologyRegistry(config.artifact_paths.topology_registry_dir)
         if config.artifact_paths.topology_registry_dir.exists():

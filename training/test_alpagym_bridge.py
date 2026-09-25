@@ -91,7 +91,7 @@ class FixtureDriver(driver_grpc.EgodriverServiceServicer):
     "Set THUNDERHILL_GODOT for rendered Godot contract test",
 )
 class RealGameTests(unittest.TestCase):
-    def run_fixture(self, fail, fixture=None, *, seconds=0.6, validation=True, initial_speed_m_s=0.0):
+    def run_fixture(self, fail, fixture=None, *, seconds=0.6, validation=True, initial_speed_m_s=0.0, rpc_timeout_seconds=180):
         output = Path(tempfile.mkdtemp(prefix="thunderhill-alpagym-contract-"))
         fixture = fixture or FixtureDriver(fail)
         server = grpc.server(ThreadPoolExecutor(max_workers=4))
@@ -142,7 +142,7 @@ class RealGameTests(unittest.TestCase):
                         ],
                         n_concurrent_per_driver=1,
                     ),
-                    timeout=180,
+                    timeout=rpc_timeout_seconds,
                 ).rollout_returns[0]
             return output / "fixture", fixture, result
         finally:
