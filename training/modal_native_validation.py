@@ -369,7 +369,7 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
 
 
 @app.function(
-    image=runtime_image.apt_install("gdb"),
+    image=runtime_image,
     gpu="H100!",
     cpu=8,
     memory=32768,
@@ -388,6 +388,9 @@ def diagnose_camera(source_revision: str, hang_seconds: float = 180):
     from pathlib import Path
 
     os.chdir(REMOTE)
+    # gdb only for hang stacks; the shared runtime image cannot add build steps.
+    subprocess.run("apt-get update -qq && apt-get install -y -qq gdb", shell=True,
+                   check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     destination = Path("/runs/native-diagnostics") / ("camera-" + uuid.uuid4().hex)
     destination.mkdir(parents=True)
     receipt = {"diagnostic_only": True, "source_revision": source_revision,
