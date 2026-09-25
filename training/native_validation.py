@@ -67,8 +67,13 @@ def compare_exports(base: Path, trained: Path) -> dict:
     }
 
 
-def evaluate(run_dir: Path, model: Path, destination: Path, version: int) -> None:
+def evaluate(
+    run_dir: Path, model: Path, destination: Path, version: int,
+    *, episodes: int = 2,
+) -> None:
     """Freshly load native weights and drive the actual game with identical seeds."""
+    if episodes < 1:
+        raise ValueError("Evaluation requires at least one episode")
     import threading
     from concurrent.futures import ThreadPoolExecutor
 
@@ -137,8 +142,8 @@ def evaluate(run_dir: Path, model: Path, destination: Path, version: int) -> Non
                     rollout_specs=[
                         runtime.RolloutSpec(
                             scenario_id=SCENE_ID,
-                            nr_rollouts=2,
-                            session_uuids=["evaluation_seed_0", "evaluation_seed_1"],
+                            nr_rollouts=episodes,
+                            session_uuids=[f"evaluation_seed_{i}" for i in range(episodes)],
                         )
                     ],
                     n_concurrent_per_driver=1,
@@ -147,6 +152,7 @@ def evaluate(run_dir: Path, model: Path, destination: Path, version: int) -> Non
             )
         rows = [
             {
+                "session_uuid": row.rollout_uuid,
                 "success": row.success,
                 "error": row.error,
                 "metrics": dict(row.aggregated_metrics),
@@ -162,7 +168,7 @@ def evaluate(run_dir: Path, model: Path, destination: Path, version: int) -> Non
                 "episodes": rows,
             },
         )
-        if len(rows) != 2 or not all(row["success"] for row in rows):
+        if len(rows) != episodes or not all(row["success"] for row in rows):
             raise RuntimeError("Fresh native checkpoint evaluation failed")
     finally:
         runtime_server.stop(0).wait()
@@ -409,6 +415,7 @@ def main():
     ev.add_argument("model", type=Path)
     ev.add_argument("destination", type=Path)
     ev.add_argument("version", type=int)
+    ev.add_argument("--episodes", type=int, default=2)
     run = sub.add_parser("run")
     run.add_argument("--source", type=Path, required=True)
     run.add_argument("--model", type=Path, required=True)
@@ -417,7 +424,10 @@ def main():
     run.add_argument("--budget", type=float, default=3300)
     args = parser.parse_args()
     if args.command == "evaluate":
-        evaluate(args.run_dir, args.model, args.destination, args.version)
+        evaluate(
+            args.run_dir, args.model, args.destination, args.version,
+            episodes=args.episodes,
+        )
     else:
         print(
             json.dumps(
