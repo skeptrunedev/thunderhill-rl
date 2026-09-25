@@ -70,7 +70,12 @@ def validated_prerequisites(
         )
     if launch.get("topology") != "local_disaggregated_2gpu":
         raise ValueError("Campaign requires the validated native two GPU topology")
+    from training.episode_config import scene_id
+
     game = json.loads((validation_run / "game_config.json").read_text())
+    scenario = scene_id(game.get("initial_speed_m_s", 0.0))
+    if game.get("scenario_id", scenario) != scenario:
+        raise ValueError("Validated scene identity disagrees with its starting speed")
     if Path(game["model_path"]).resolve() != model.resolve():
         raise ValueError("Campaign initial model differs from the validated model")
     return dict(
@@ -83,7 +88,7 @@ def validated_prerequisites(
         topology=launch["topology"],
         gpu=gpu,
         initial_speed_m_s=game.get("initial_speed_m_s", 0.0),
-        scenario_id=game.get("scenario_id", "thunderhill-east-standing"),
+        scenario_id=scenario,
     )
 
 

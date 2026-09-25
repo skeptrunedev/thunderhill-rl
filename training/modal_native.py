@@ -131,6 +131,65 @@ def prepare_checkpoint():
     return str(checkpoint)
 
 
+@app.function(
+    image=image,
+    cpu=2,
+    memory=8192,
+    timeout=600,
+    retries=0,
+    volumes={"/model-cache": cache},
+    include_source=False,
+    serialized=True,
+)
+def prepare_export_metadata():
+    """Cache native HF default-config metadata and verify offline serialization.
+
+    Transformers constructs ExpertModelConfig() while serializing a config diff.
+    Its upstream default processor must therefore exist even when the actual
+    trained checkpoint uses Cosmos Reason2. No Qwen model weights are loaded.
+    """
+    import os
+    import subprocess
+
+    env = dict(os.environ, HF_HUB_OFFLINE="0")
+    script = """
+import json
+from pathlib import Path
+from huggingface_hub import snapshot_download
+revision = "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b"
+path = Path(snapshot_download(
+    "Qwen/Qwen3-VL-8B-Instruct", revision="main",
+    allow_patterns=["config.json", "generation_config.json", "chat_template.json",
+        "merges.txt", "preprocessor_config.json", "tokenizer.json",
+        "tokenizer_config.json", "video_preprocessor_config.json", "vocab.json"],
+))
+if path.name != revision:
+    raise ValueError(f"Default processor revision changed: {path.name}")
+print(json.dumps({"default_processor": str(path), "revision": revision,
+                  "weights_downloaded": False}))
+"""
+    subprocess.run([UPSTREAM + "/.venv/bin/python", "-c", script],
+                   env=env, check=True, timeout=480)
+    # Start a separate process so Hugging Face reads the restored offline flag.
+    verify = """
+import json
+from alpamayo1_x_rl.models.expert_model.config import ExpertModelConfig
+model = "/model-cache/alpagym-converted-1.5"
+config = ExpertModelConfig.from_pretrained(model, local_files_only=True)
+diff = config.to_diff_dict()
+assert diff["vlm_name_or_path"] == config.vlm_name_or_path
+print(json.dumps({"offline_native_config_export": "passed",
+                  "trained_processor": config.vlm_name_or_path}))
+"""
+    subprocess.run([UPSTREAM + "/.venv/bin/python", "-c", verify],
+                   check=True, timeout=90)
+    cache.commit()
+    return "Native config export verified offline"
+
+
 @app.local_entrypoint()
-def main():
-    print(prepare_checkpoint.remote())
+def main(export_metadata: bool = False):
+    if export_metadata:
+        print(prepare_export_metadata.remote())
+    else:
+        print(prepare_checkpoint.remote())
