@@ -244,7 +244,7 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
                        hard_deadline_unix: float,
                        checkpoint: str = "/model-cache/alpagym-converted-1.5",
                        threaded_stress: bool = False, stress_workers: int = 4,
-                       stress_iterations: int = 50):
+                       stress_iterations: int = 50, policy_step: bool = False):
     """One bounded exact observation replay, never an optimizer or a new campaign."""
     import json
     import os
@@ -254,6 +254,8 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
     import uuid
     from pathlib import Path
 
+    if policy_step and not threaded_stress:
+        raise ValueError("Full policy step requires threaded stress mode")
     if not 1 <= stress_workers <= 4 or not 1 <= stress_iterations <= 200:
         raise ValueError("Stress requires 1..4 workers and 1..200 iterations")
     os.chdir(REMOTE)
@@ -276,7 +278,8 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
         "checkpoint": checkpoint,
         "checkpoint_identity": "base expert with frozen VLM" if checkpoint == "/model-cache/alpagym-converted-1.5" else "explicit supplied native bundle",
         "exact_trained_expert_state_claimed": False,
-        "mode": "threaded_native_dispatch" if threaded_stress else "synchronous_exact_replay",
+        "mode": ("threaded_native_policy_step" if policy_step else "threaded_native_dispatch") if threaded_stress else "synchronous_exact_replay",
+        "full_policy_step": policy_step,
         "CUDA_LAUNCH_BLOCKING": None if threaded_stress else "1",
         "extra_cuda_synchronization": not threaded_stress,
         "operator_hooks": not threaded_stress,
@@ -315,6 +318,8 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
     if threaded_stress:
         command.extend(["--threaded-stress", "--stress-workers", str(stress_workers),
                         "--stress-iterations", str(stress_iterations)])
+        if policy_step:
+            command.append("--stress-policy-step")
         environment.pop("CUDA_LAUNCH_BLOCKING", None)
         environment.pop("ALPAGYM_INFERENCE_CAPTURE_DIR", None)
         environment["ALPAGYM_SCATTER_DIAGNOSTICS"] = "0"
@@ -353,9 +358,11 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_checkpoint: str = "/model-cache/alpagym-converted-1.5",
          repair_recordings: str = "", scatter_diagnostics: bool = False,
          diagnostic_threaded_stress: bool = False, diagnostic_stress_workers: int = 4,
-         diagnostic_stress_iterations: int = 50):
+         diagnostic_stress_iterations: int = 50, diagnostic_policy_step: bool = False):
     import subprocess
 
+    if diagnostic_policy_step and not diagnostic_threaded_stress:
+        raise ValueError("Full policy step requires threaded stress mode")
     if not 1 <= diagnostic_stress_workers <= 4 or not 1 <= diagnostic_stress_iterations <= 200:
         raise ValueError("Stress requires 1..4 workers and 1..200 iterations")
     if diagnostic_threaded_stress and not diagnostic_dispatch:
@@ -379,6 +386,6 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
         print(diagnose_inference.remote(revision, diagnostic_dispatch, diagnostic_config,
                                        hard_deadline_unix, diagnostic_checkpoint,
                                        diagnostic_threaded_stress, diagnostic_stress_workers,
-                                       diagnostic_stress_iterations))
+                                       diagnostic_stress_iterations, diagnostic_policy_step))
     else:
         print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings, scatter_diagnostics))

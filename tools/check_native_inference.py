@@ -164,6 +164,54 @@ def reconstruct_dispatch(path, config, device):
     }, [row["session_uuid"] for row in identities]
 
 
+def policy_step_result(policy, policy_input, trace_requested):
+    """Use the actual policy step and driver recording snapshot, retaining no replay pool."""
+    from dataclasses import fields, is_dataclass
+
+    import torch
+    from alpagym_runtime.host_replay import host_snapshot
+
+    saved = host_snapshot(policy.step(policy_input))
+
+    def tensor_leaves(value):
+        if isinstance(value, torch.Tensor):
+            yield value
+        elif is_dataclass(value) and not isinstance(value, type):
+            for item in fields(value):
+                yield from tensor_leaves(getattr(value, item.name))
+        elif isinstance(value, dict):
+            for item in value.values():
+                yield from tensor_leaves(item)
+        elif isinstance(value, (tuple, list)):
+            for item in value:
+                yield from tensor_leaves(item)
+
+    leaves = list(tensor_leaves(saved))
+    if not leaves or any(value.device.type != "cpu" for value in leaves):
+        raise RuntimeError("Native driver output snapshot retained non-CPU tensors")
+    replay = saved.replay_data
+    trace_present = (
+        replay is not None and saved.chosen_logprob is not None
+        and all(isinstance(replay.payload.get(key), torch.Tensor)
+                and replay.payload[key].numel() > 0
+                for key in ("samples_list", "timesteps"))
+        and isinstance(replay.payload.get("model_input"), dict)
+        and isinstance(replay.old_logprob, torch.Tensor)
+    )
+    if trace_requested != trace_present:
+        raise RuntimeError("Native policy output replay does not match requested trace mode")
+    prediction = {"chosen_xyz": saved.chosen_xyz, "chosen_quat": saved.chosen_quat,
+                  "chosen_dt_us": saved.chosen_dt_us}
+    finite = all(bool(torch.isfinite(value).all()) for value in prediction.values())
+    if saved.chosen_logprob is not None:
+        finite = finite and bool(torch.isfinite(saved.chosen_logprob).all())
+    return prediction, finite, {
+        "requested": trace_requested, "required_trace_present": trace_present,
+        "host_snapshot_all_tensors_cpu": True, "host_snapshot_tensor_count": len(leaves),
+        "replay_schema": replay.payload_schema if replay else None,
+    }
+
+
 def threaded_stress(args, adapter, config, report, started):
     """Exercise native dispatch and concurrent JPEG preprocessing without sync hooks."""
     import os
@@ -230,7 +278,8 @@ def threaded_stress(args, adapter, config, report, started):
     if set(expected) - {p.name for p in capsule_paths}:
         raise ValueError("Missing failed dispatch capsule")
     report.update(
-        mode="threaded_native_dispatch",
+        mode="threaded_native_policy_step" if args.stress_policy_step else "threaded_native_dispatch",
+        full_policy_step=args.stress_policy_step,
         capsules=capsule_receipts,
         workers=args.stress_workers,
         iterations_per_worker=args.stress_iterations,
@@ -275,32 +324,34 @@ def threaded_stress(args, adapter, config, report, started):
             if time.monotonic() >= deadline:
                 return
             policy = AlpamayoPolicy(
-                None,
+                engine if args.stress_policy_step else None,
                 payload["session_uuid"],
                 config.policy,
                 torch.device(args.device),
                 torch.bfloat16,
                 seed=payload["seed"],
             )
-            seed = (
-                torch.tensor(payload["seed"], dtype=torch.int64, device=args.device)
-                if payload["seed"] is not None
-                else None
-            )
             tick_started = time.monotonic()
-            model_input = policy._preprocess(restore_policy_input(payload), seed=seed)
-            future = engine.infer(model_input)
-            output = future.result(timeout=max(1, deadline - time.monotonic()))
-            trace = trace_receipt(output, config.policy.inference.return_trace_for_rl)
-            # Native gameplay also returns selected trajectories to host. Store
-            # only these small CPU outputs, not Futures or CUDA replay tensors.
-            prediction = {
-                "xyz": output.pred_xyz.detach().cpu(),
-                "rot": output.pred_rot.detach().cpu(),
-            }
-            finite = all(
-                bool(torch.isfinite(value).all()) for value in prediction.values()
-            )
+            if args.stress_policy_step:
+                prediction, finite, trace = policy_step_result(
+                    policy, restore_policy_input(payload),
+                    config.policy.inference.return_trace_for_rl,
+                )
+            else:
+                seed = (
+                    torch.tensor(payload["seed"], dtype=torch.int64, device=args.device)
+                    if payload["seed"] is not None else None
+                )
+                model_input = policy._preprocess(restore_policy_input(payload), seed=seed)
+                future = engine.infer(model_input)
+                output = future.result(timeout=max(1, deadline - time.monotonic()))
+                trace = trace_receipt(output, config.policy.inference.return_trace_for_rl)
+                prediction = {
+                    "xyz": output.pred_xyz.detach().cpu(),
+                    "rot": output.pred_rot.detach().cpu(),
+                }
+                finite = all(bool(torch.isfinite(value).all()) for value in prediction.values())
+                del output, future, model_input
             name = f"worker-{worker}-iteration-{iteration:03d}.pt"
             torch.save(prediction, args.output / name)
             row = {
@@ -316,7 +367,8 @@ def threaded_stress(args, adapter, config, report, started):
                 progress.write(json.dumps(row) + "\n")
                 progress.flush()
                 completions.append(row)
-            del output, future, model_input, policy, prediction
+            policy.close()
+            del policy, prediction
             if not finite:
                 raise RuntimeError("Native dispatcher returned nonfinite output")
 
@@ -558,9 +610,12 @@ def main():
     parser.add_argument("--synchronize", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--threaded-stress", action="store_true")
+    parser.add_argument("--stress-policy-step", action="store_true")
     parser.add_argument("--stress-workers", type=int, choices=range(1, 5), default=4)
     parser.add_argument("--stress-iterations", type=int, default=50)
     args = parser.parse_args()
+    if args.stress_policy_step and not args.threaded_stress:
+        parser.error("Full policy step requires threaded stress mode")
     if not 1 <= args.stress_iterations <= 200:
         parser.error("stress iterations must be 1..200")
     if args.threaded_stress and (
