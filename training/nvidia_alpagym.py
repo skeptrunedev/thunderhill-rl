@@ -56,10 +56,13 @@ def prepare(
     model_name: str | None = None,
     ffmpeg: str = "ffmpeg",
     max_video_seconds: float = 3600,
+    scatter_diagnostics: bool = False,
 ) -> Path:
     from training.episode_config import scene_id
 
     scenario = scene_id(initial_speed_m_s)
+    if type(scatter_diagnostics) is not bool:
+        raise ValueError("Scatter diagnostics must be an explicit boolean")
     if max_steps < 1 or rollouts < 2 or concurrency < 1:
         raise ValueError(
             "Require positive steps and concurrency, and at least two rollouts per group"
@@ -160,6 +163,7 @@ def prepare(
                 "alpagym_revision": ALPAGYM_REVISION,
                 "native_source_patch": verify_source(source),
                 "status": "prepared_only",
+                "scatter_diagnostics": scatter_diagnostics,
                 "max_wall_seconds": max_wall_seconds,
                 "max_video_seconds": max_video_seconds,
                 "gpu_training_verified": False,
@@ -418,7 +422,9 @@ def stop_bridge(process: subprocess.Popen) -> None:
 
 
 def write_status(run_dir: Path, state: str, **details) -> None:
+    manifest = json.loads((run_dir / "launch_manifest.json").read_text())
     status = {
+        "scatter_diagnostics": manifest.get("scatter_diagnostics", False),
         "run_id": run_dir.name,
         "state": state,
         "updated_at_unix": time.time(),
@@ -612,6 +618,9 @@ def _run_owned(run_dir: Path) -> None:
             if environment.get("PYTHONPATH")
             else ""
         )
+        environment["ALPAGYM_SCATTER_DIAGNOSTICS"] = (
+            "1" if manifest.get("scatter_diagnostics", False) else "0"
+        )
         environment["PYTHONUNBUFFERED"] = "1"
         environment["ALPAGYM_INFERENCE_CAPTURE_DIR"] = str(
             run_dir / "inference-capture"
@@ -709,6 +718,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     prep.add_argument("--episode-seconds", type=float, default=30)
     prep.add_argument("--initial-speed-m-s", type=float, default=0.0)
+    prep.add_argument("--scatter-diagnostics", action="store_true")
     prep.add_argument("--concurrency", type=int, default=1)
     prep.add_argument("--max-wall-seconds", type=float, default=3600)
     prep.add_argument(
@@ -733,6 +743,7 @@ def main(argv: list[str] | None = None) -> None:
                 rollouts=args.rollouts,
                 episode_seconds=args.episode_seconds,
                 initial_speed_m_s=args.initial_speed_m_s,
+                scatter_diagnostics=args.scatter_diagnostics,
                 concurrency=args.concurrency,
                 max_wall_seconds=args.max_wall_seconds,
                 model_name=args.model_name,

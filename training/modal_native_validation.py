@@ -110,7 +110,7 @@ def repair_archived_recordings(run_dir, destination, deadline):
     volumes={"/model-cache": cache, "/runs": runs},
     include_source=False,
 )
-def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1, repair_recordings: str = ""):
+def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1, repair_recordings: str = "", scatter_diagnostics: bool = False):
     import json
     import os
     import subprocess
@@ -133,6 +133,7 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
                 "clean_worktree_at_launch": True,
                 "resume_run_dir": resume_run_dir or None,
                 "repair_recordings": repair_recordings or None,
+                "scatter_diagnostics": scatter_diagnostics,
             },
             indent=2,
         )
@@ -206,6 +207,7 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
                     "--budget",
                     "3300",
                     *(["--resume-run-dir", resume_run_dir] if resume_run_dir else []),
+                    *(["--scatter-diagnostics"] if scatter_diagnostics else []),
                 ],
                 check=True,
                 stdout=log,
@@ -319,7 +321,7 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_dispatch: str = "", diagnostic_config: str = "",
          hard_deadline_unix: float = 0,
          diagnostic_checkpoint: str = "/model-cache/alpagym-converted-1.5",
-         repair_recordings: str = ""):
+         repair_recordings: str = "", scatter_diagnostics: bool = False):
     import subprocess
 
     dirty = subprocess.check_output(
@@ -331,7 +333,7 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
     if diagnostic_dispatch:
-        if repair_recordings:
+        if repair_recordings or scatter_diagnostics:
             raise ValueError("Recording repair runs only after successful full qualification")
         import time
         if not diagnostic_config or hard_deadline_unix - time.time() < 90:
@@ -339,4 +341,4 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
         print(diagnose_inference.remote(revision, diagnostic_dispatch, diagnostic_config,
                                        hard_deadline_unix, diagnostic_checkpoint))
     else:
-        print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings))
+        print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings, scatter_diagnostics))

@@ -101,7 +101,16 @@ def validated_prerequisites(
         raise ValueError("Validated scene identity disagrees with its starting speed")
     if Path(game["model_path"]).resolve() != model.resolve():
         raise ValueError("Campaign initial model differs from the validated model")
+    scatter_proof = None
+    if launch.get("scatter_diagnostics", False):
+        from training.native_validation import verify_scatter_diagnostics
+
+        scatter_proof = verify_scatter_diagnostics(validation_run)
+        if report.get("scatter_diagnostics_verification") != scatter_proof:
+            raise ValueError("Scatter qualification receipt changed after validation")
     return dict(
+        scatter_diagnostics=launch.get("scatter_diagnostics", False),
+        scatter_diagnostics_verification=scatter_proof,
         validation_run=str(validation_run),
         validation_report_sha256=hashlib.sha256(report_path.read_bytes()).hexdigest(),
         navigation_provenance=validate_navigation_checkpoint(model),
@@ -132,6 +141,7 @@ def prepare_campaign(
     initial_speed_m_s: float = 0.0,
     max_steps: int = 100_000,
     resume_plan: dict | None = None,
+    scatter_diagnostics: bool = False,
 ) -> Path:
     """CPU only preparation using NVIDIA's own config serialization."""
     from training.nvidia_alpagym import prepare, load_upstream
@@ -151,6 +161,7 @@ def prepare_campaign(
         rollouts=rollouts,
         episode_seconds=episode_seconds,
         initial_speed_m_s=initial_speed_m_s,
+        scatter_diagnostics=scatter_diagnostics,
         concurrency=concurrency,
         max_wall_seconds=training_seconds,
         max_video_seconds=video_seconds,
@@ -411,6 +422,7 @@ def run_campaign(
     evaluation_episodes: int = 8,
     resume_campaign: Path | None = None,
     resume_checkpoint_step: int = 0,
+    scatter_diagnostics: bool = False,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
     from training.nvidia_alpagym import owned_subreaper, stop_process_tree
@@ -425,6 +437,8 @@ def run_campaign(
     ):
         raise ValueError("Campaign deadline must leave between one and twelve hours")
     certificate = validated_prerequisites(validation_run, model)
+    if certificate.get("scatter_diagnostics", False) != scatter_diagnostics:
+        raise ValueError("Campaign diagnostic mode must match its qualification")
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
     patch = verify_source(source, apply_patch=True)
@@ -470,9 +484,11 @@ def run_campaign(
         video_seconds=video_budget,
         max_steps=max_steps,
         resume_plan=resume_plan,
+        scatter_diagnostics=scatter_diagnostics,
     )
     report = dict(
         state="starting",
+        scatter_diagnostics=scatter_diagnostics,
         run_dir=str(run_dir),
         started_at_unix=started,
         deadline_unix=deadline_unix,
@@ -781,6 +797,7 @@ def main():
         item.add_argument("--concurrency", type=int, required=True)
         item.add_argument("--checkpoint-every", type=int, default=2)
         item.add_argument("--max-steps", type=int, default=100_000)
+        item.add_argument("--scatter-diagnostics", action="store_true")
         if command == "run":
             item.add_argument("--validation-run", type=Path, required=True)
             item.add_argument("--deadline-unix", type=float, required=True)

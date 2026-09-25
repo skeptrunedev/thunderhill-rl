@@ -51,6 +51,7 @@ def prerequisites(
     resume_checkpoint_step: int = 0,
     settings: dict | None = None,
     retry_failed_continuation: str = "",
+    scatter_diagnostics: bool = False,
 ):
     import json
     import os
@@ -80,6 +81,8 @@ def prerequisites(
         timeout=150,
     )
     certificate = json.loads(result.stdout)
+    if certificate.get("scatter_diagnostics", False) != scatter_diagnostics:
+        raise ValueError("Campaign diagnostic mode must match its qualification")
     if resume_campaign:
         result = subprocess.run(
             [
@@ -131,7 +134,8 @@ def prerequisites(
     secrets=[tracking_secret],
     include_source=False,
 )
-def campaign(campaign_id: str, source_revision: str, certificate: dict, settings: dict):
+def campaign(campaign_id: str, source_revision: str, certificate: dict, settings: dict,
+             scatter_diagnostics: bool = False):
     import json
     import os
     import signal
@@ -162,6 +166,7 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
         commit=source_revision,
         clean_worktree_at_launch=True,
         campaign_id=campaign_id,
+        scatter_diagnostics=scatter_diagnostics,
         gpu=certificate["gpu"] + ":2",
         started_at_unix=started,
         hard_deadline_unix=hard_deadline,
@@ -191,7 +196,8 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
     )
     persistence.start()
     process = None
-    outcome = dict(state="starting", campaign_id=campaign_id)
+    outcome = dict(state="starting", campaign_id=campaign_id,
+                   scatter_diagnostics=scatter_diagnostics)
     try:
         if not os.environ.get("WANDB_API_KEY") or not os.environ.get("WANDB_ENTITY"):
             raise RuntimeError("Online W&B credentials are required for this campaign")
@@ -267,6 +273,8 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
             "--deadline-unix",
             str(resume_plan["deadline_unix"] if resume_plan else hard_deadline - 300),
         ]
+        if scatter_diagnostics:
+            command.append("--scatter-diagnostics")
         if resume_plan:
             command.extend(
                 [
@@ -345,6 +353,7 @@ def main(
     resume_campaign: str = "",
     resume_checkpoint_step: int = 0,
     retry_failed_continuation: str = "",
+    scatter_diagnostics: bool = False,
 ):
     import json
     import math
@@ -403,6 +412,7 @@ def main(
         resume_checkpoint_step,
         settings,
         retry_failed_continuation,
+        scatter_diagnostics,
     )
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
@@ -413,6 +423,7 @@ def main(
             commit=revision,
             reserved_at_unix=time.time(),
             settings=settings,
+            scatter_diagnostics=scatter_diagnostics,
             validated_prerequisites=certificate,
         ),
         skip_if_exists=True,
@@ -453,6 +464,7 @@ def main(
                     "hard_deadline_unix"
                 ),
                 settings=settings,
+                scatter_diagnostics=scatter_diagnostics,
             ),
             indent=2,
         )
@@ -468,7 +480,7 @@ def main(
             )
             if resume_campaign
             else 43200,
-        ).remote(campaign_id, revision, certificate, settings)
+        ).remote(campaign_id, revision, certificate, settings, scatter_diagnostics)
     )
 
 

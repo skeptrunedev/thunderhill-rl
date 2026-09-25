@@ -20,6 +20,36 @@ def write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2) + "\n")
 
 
+def verify_scatter_diagnostics(run_dir: Path) -> dict:
+    """Require actual completed native inference operators, never just an env flag."""
+    root = run_dir / "inference-capture"
+    if list(root.glob("*/scatter-failure.json")):
+        raise ValueError("Scatter diagnostic recorded a failed operator")
+    receipts = []
+    for path in sorted(root.glob("*/scatter-last-completed.json")):
+        marker = json.loads((path.parent / "scatter-mode.json").read_text())
+        receipt = json.loads(path.read_text())
+        if (
+            marker.get("enabled") is not True
+            or marker.get("mode") != "synchronous_scatter_attribution_v1"
+            or marker.get("performance_representative") is not False
+            or receipt.get("stage") != "operator_completed"
+            or receipt.get("thread") != "alpagym-infer"
+            or receipt.get("operator") not in {
+                "aten.masked_scatter.default", "aten.masked_scatter_.default"
+            }
+            or receipt.get("enough_source") is not True
+            or not 0 <= receipt["selected_elements"] <= receipt["source_numel"]
+            or not receipt.get("dispatch", {}).get("ordered_requests")
+        ):
+            raise ValueError(f"Invalid native scatter diagnostic receipt: {path}")
+        receipts.append(str(path.relative_to(run_dir)))
+    if not receipts:
+        raise ValueError("No completed native scatter diagnostic operators were observed")
+    return {"passed": True, "mode": "synchronous_scatter_attribution_v1",
+            "performance_representative": False, "completed_receipts": receipts}
+
+
 def compare_exports(base: Path, trained: Path) -> dict:
     """Compare every exported tensor, quantizing the baseline to export precision."""
     import torch
@@ -189,6 +219,7 @@ def validate(
     source: Path, model: Path, output: Path, *, seconds: float, budget: float,
     initial_speed_m_s: float = 0.0, resume_run_dir: Path | None = None,
     concurrency: int = 1, replay_fixture: Path | None = None,
+    scatter_diagnostics: bool = False,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
     from training.nvidia_alpagym import prepare
@@ -210,6 +241,7 @@ def validate(
             max_video_seconds=budget / 4,
             model_name="Alpamayo 1.5 native RL",
             initial_speed_m_s=initial_speed_m_s,
+            scatter_diagnostics=scatter_diagnostics,
         )
         report = {
             "run_dir": str(run_dir),
@@ -217,6 +249,7 @@ def validate(
             "optimizer_updates_verified": False,
             "checkpoint_reload_verified": False,
             "initial_speed_m_s": initial_speed_m_s,
+            "scatter_diagnostics": scatter_diagnostics,
         }
         write_json(run_dir / "validation.json", report)
 
@@ -225,6 +258,8 @@ def validate(
 
         run_dir = resume_run_dir.resolve(strict=True)
         manifest = json.loads((run_dir / "launch_manifest.json").read_text())
+        if manifest.get("scatter_diagnostics", False) != scatter_diagnostics:
+            raise ValueError("Resume must preserve the original diagnostic mode")
         if manifest["native_source_patch"] != verify_source(source):
             raise ValueError("Resume must use the original reviewed native source patches")
         previous = json.loads((run_dir / "validation.json").read_text())
@@ -239,6 +274,7 @@ def validate(
             "run_dir": str(run_dir), "state": "running",
             "optimizer_updates_verified": False, "checkpoint_reload_verified": False,
             "initial_speed_m_s": previous["initial_speed_m_s"],
+            "scatter_diagnostics": scatter_diagnostics,
             "resumed_from": str(archive / "validation.json"),
             "resume_attempt": attempt, "retrained": False,
             "verification_source_identity": json.loads((output / "source_identity.json").read_text()),
@@ -427,6 +463,8 @@ def validate(
             or not report["nonzero_gradient_minibatches"]
         ):
             raise RuntimeError("No verified nonzero native optimizer update")
+        if scatter_diagnostics:
+            report["scatter_diagnostics_verification"] = verify_scatter_diagnostics(run_dir)
         report["optimizer_updates_verified"] = True
         launch(
             [
@@ -531,6 +569,7 @@ def main():
     run.add_argument("--resume-run-dir", type=Path)
     run.add_argument("--concurrency", type=int, default=1)
     run.add_argument("--replay-fixture", type=Path)
+    run.add_argument("--scatter-diagnostics", action="store_true")
     args = parser.parse_args()
     if args.command == "evaluate":
         evaluate(
@@ -551,6 +590,7 @@ def main():
                     resume_run_dir=args.resume_run_dir,
                     concurrency=args.concurrency,
                     replay_fixture=args.replay_fixture,
+                    scatter_diagnostics=args.scatter_diagnostics,
                 )
             )
         )
