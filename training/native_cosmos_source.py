@@ -9,7 +9,9 @@ from pathlib import Path
 import subprocess
 
 REVISION = "d2a2c57c4bd6496482bc42da19a59b4432705eda"
-PATCH = Path(__file__).resolve().parents[1] / "tools/patches/cosmos-static-failfast.patch"
+PATCH = (
+    Path(__file__).resolve().parents[1] / "tools/patches/cosmos-static-failfast.patch"
+)
 
 
 def patch_manifest() -> dict:
@@ -35,10 +37,23 @@ def verify_launcher(root: Path, *, apply_patch: bool = False) -> dict:
             raise ValueError(f"Unreviewed Cosmos launcher source: {name}")
     if states != ["patched"] * len(states):
         if not apply_patch or states != ["original"] * len(states):
-            raise ValueError("Cosmos launcher requires the complete reviewed supervision patch")
-        command = ["git", "apply"]
-        subprocess.run([*command, "--check", str(PATCH)], cwd=root, check=True)
-        subprocess.run([*command, str(PATCH)], cwd=root, check=True)
+            raise ValueError(
+                "Cosmos launcher requires the complete reviewed supervision patch"
+            )
+        # Installed packages may live in a venv below a git worktree. Apply
+        # from the filesystem anchor with an explicit destination, not git's
+        # current-subdirectory prefix (which silently skips these paths).
+        destination = root.resolve()
+        command = [
+            "git",
+            "apply",
+            "--directory",
+            str(destination.relative_to(destination.anchor)),
+        ]
+        subprocess.run(
+            [*command, "--check", str(PATCH)], cwd=destination.anchor, check=True
+        )
+        subprocess.run([*command, str(PATCH)], cwd=destination.anchor, check=True)
         return verify_launcher(root)
     return manifest
 
