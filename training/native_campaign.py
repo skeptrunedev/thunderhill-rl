@@ -50,17 +50,24 @@ def validated_prerequisites(
             "The native validation has not completed optimization and fresh reload"
         )
     padding = report.get("padding_skip_verification", {})
-    if (padding.get("passed") is not True
-            or padding.get("policy_world_size") != 1
-            or padding.get("inter_policy_world_size") != 1):
+    if (
+        padding.get("passed") is not True
+        or padding.get("policy_world_size") != 1
+        or padding.get("inter_policy_world_size") != 1
+    ):
         raise ValueError("Campaign requires verified native padding state equivalence")
     replay = report.get("replay_storage_verification", {})
-    if not all(replay.get(key) is True for key in (
-        "cuda_retention_verified",
-        "all_retained_replay_tensors_on_cpu",
-        "exact_tensor_values_shapes_dtypes",
-    )):
-        raise ValueError("Campaign requires verified CUDA replay storage bounds and exact values")
+    if not all(
+        replay.get(key) is True
+        for key in (
+            "cuda_retention_verified",
+            "all_retained_replay_tensors_on_cpu",
+            "exact_tensor_values_shapes_dtypes",
+        )
+    ):
+        raise ValueError(
+            "Campaign requires verified CUDA replay storage bounds and exact values"
+        )
     launch = json.loads((validation_run / "launch_manifest.json").read_text())
     camera = json.loads((validation_run / "camera-preflight/summary.json").read_text())
     adapter = camera.get("renderer", {}).get("adapter", "")
@@ -119,6 +126,7 @@ def prepare_campaign(
     video_seconds: float,
     initial_speed_m_s: float = 0.0,
     max_steps: int = 100_000,
+    resume_plan: dict | None = None,
 ) -> Path:
     """CPU only preparation using NVIDIA's own config serialization."""
     from training.nvidia_alpagym import prepare, load_upstream
@@ -152,6 +160,18 @@ def prepare_campaign(
     config.cosmos.train.ckpt.max_keep = 5
     config.cosmos.logging.experiment_name = "thunderhill-campaign-" + run_dir.name
     write_run_artifacts(config)
+    if resume_plan is not None:
+        import tomllib
+        import tomli_w
+
+        native_path = config.artifact_paths.cosmos_config_path
+        native = tomllib.loads(native_path.read_text())
+        native["train"]["resume"] = resume_plan["checkpoint"]
+        native["train"]["train_policy"]["trainer_type"] = (
+            "thunderhill_verified_native_resume"
+        )
+        native_path.write_text(tomli_w.dumps(native))
+        write_json(run_dir / "resume_plan.json", resume_plan)
     return run_dir
 
 
@@ -293,7 +313,9 @@ def summarize(run_dir: Path) -> dict:
     )
 
 
-def compare_evaluations(run_dir: Path, expected_episodes: int) -> dict:
+def compare_evaluations(
+    run_dir: Path, expected_episodes: int, baseline_path: Path | None = None
+) -> dict:
     """Pair actual game outcomes by fixed seed and use NVIDIA's reward dispatcher."""
     from types import SimpleNamespace
     from alpagym_host.config import load_run_config
@@ -302,8 +324,11 @@ def compare_evaluations(run_dir: Path, expected_episodes: int) -> dict:
 
     reward_config = load_run_config(run_dir / "resolved_config.yaml").reward
     reports = [
-        json.loads((run_dir / "recordings" / stage / "evaluation.json").read_text())
-        for stage in ("baseline", "final")
+        json.loads(path.read_text())
+        for path in (
+            baseline_path or run_dir / "recordings/baseline/evaluation.json",
+            run_dir / "recordings/final/evaluation.json",
+        )
     ]
     episodes = [
         {row["session_uuid"]: row for row in report["episodes"]} for report in reports
@@ -379,6 +404,8 @@ def run_campaign(
     initial_speed_m_s: float = 0.0,
     max_steps: int = 100_000,
     evaluation_episodes: int = 8,
+    resume_campaign: Path | None = None,
+    resume_checkpoint_step: int = 0,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
     from training.nvidia_alpagym import owned_subreaper, stop_process_tree
@@ -396,9 +423,28 @@ def run_campaign(
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
     patch = verify_source(source, apply_patch=True)
+    resume_plan = None
+    if resume_campaign is not None:
+        from training.native_resume import load_resume_plan
+
+        resume_plan = load_resume_plan(
+            resume_campaign,
+            checkpoint_step=resume_checkpoint_step,
+            settings=dict(
+                episode_seconds=episode_seconds,
+                initial_speed_m_s=initial_speed_m_s,
+                rollouts=rollouts,
+                concurrency=concurrency,
+                checkpoint_every=checkpoint_every,
+                max_steps=max_steps,
+                evaluation_episodes=evaluation_episodes,
+            ),
+        )
+        if deadline_unix != resume_plan["deadline_unix"]:
+            raise ValueError("Continuation must retain the original campaign deadline")
     if (
-        certificate["native_source_patch"] != patch
-        or certificate["reward_version"] != REWARD_VERSION
+        certificate["reward_version"] != REWARD_VERSION
+        or certificate["native_source_patch"] != patch
     ):
         raise ValueError(
             "Validated navigation/reward contract differs from the campaign"
@@ -418,6 +464,7 @@ def run_campaign(
         training_seconds=remaining - reserve,
         video_seconds=video_budget,
         max_steps=max_steps,
+        resume_plan=resume_plan,
     )
     report = dict(
         state="starting",
@@ -426,8 +473,10 @@ def run_campaign(
         deadline_unix=deadline_unix,
         validated_prerequisites=certificate,
         evaluation_episodes=evaluation_episodes,
-        single_native_run=True,
-        optimizer_restarts=0,
+        single_native_run=resume_plan is None,
+        optimizer_restarts=int(resume_plan is not None),
+        native_resume=resume_plan,
+        source_contract=patch,
         max_steps=max_steps,
         checkpoint_every_steps=checkpoint_every,
         native_checkpoint_retention=5,
@@ -503,23 +552,24 @@ def run_campaign(
             "camera-preflight",
             900,
         )
-        launch(
-            [
-                "-m",
-                "training.native_validation",
-                "evaluate",
-                str(run_dir),
-                str(model),
-                str(run_dir / "recordings/baseline"),
-                "0",
-                "--episodes",
-                str(evaluation_episodes),
-                "--rpc-timeout-seconds",
-                str(EVALUATION_SECONDS - 60),
-            ],
-            "baseline-evaluation",
-            EVALUATION_SECONDS,
-        )
+        if resume_plan is None:
+            launch(
+                [
+                    "-m",
+                    "training.native_validation",
+                    "evaluate",
+                    str(run_dir),
+                    str(model),
+                    str(run_dir / "recordings/baseline"),
+                    "0",
+                    "--episodes",
+                    str(evaluation_episodes),
+                    "--rpc-timeout-seconds",
+                    str(EVALUATION_SECONDS - 60),
+                ],
+                "baseline-evaluation",
+                EVALUATION_SECONDS,
+            )
         # Charge startup and baseline against the total allowance, not to an
         # independent budget that could extend the billed GPU function.
         training_budget = deadline_unix - time.time() - reserve
@@ -538,6 +588,15 @@ def run_campaign(
         )
         status = json.loads((run_dir / "run_status.json").read_text())
         report["native_launcher_status"] = status
+        if resume_plan is not None:
+            verification = json.loads(
+                (run_dir / "resume_verification.json").read_text()
+            )
+            if verification.get("passed") is not True:
+                raise RuntimeError(
+                    "Native optimizer continuation did not verify exact restoration"
+                )
+            report["resume_verification"] = verification
         planned_stop = (
             status.get("runtime_stopped") is True
             and status.get("state") == "failed"
@@ -639,7 +698,9 @@ def run_campaign(
         )
         report["checkpoint_reload_verified"] = True
         report["evaluation_comparison"] = compare_evaluations(
-            run_dir, evaluation_episodes
+            run_dir,
+            evaluation_episodes,
+            Path(resume_plan["baseline_evaluation"]) if resume_plan else None,
         )
         report["state"] = report["training_outcome"]
     except BaseException as caught:
@@ -718,6 +779,8 @@ def main():
         if command == "run":
             item.add_argument("--validation-run", type=Path, required=True)
             item.add_argument("--deadline-unix", type=float, required=True)
+            item.add_argument("--resume-campaign", type=Path)
+            item.add_argument("--resume-checkpoint-step", type=int, default=0)
             item.add_argument(
                 "--evaluation-episodes", type=int, choices=(2, 4, 8), default=8
             )

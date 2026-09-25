@@ -16,11 +16,13 @@ reservations = modal.Dict.from_name(
     "thunderhill-native-campaign-reservations", create_if_missing=True
 )
 runtime_image = (
-    image.env({
-        "NVIDIA_DRIVER_CAPABILITIES": "all",
-        "NCCL_DEBUG": "INFO",
-        "ALPAGYM_SKIP_ALL_PADDING_MINIBATCHES": "1",
-    })
+    image.env(
+        {
+            "NVIDIA_DRIVER_CAPABILITIES": "all",
+            "NCCL_DEBUG": "INFO",
+            "ALPAGYM_SKIP_ALL_PADDING_MINIBATCHES": "1",
+        }
+    )
     .add_local_dir(
         str(ROOT / "training"),
         REMOTE + "/training",
@@ -43,7 +45,12 @@ tracking_secret = modal.Secret.from_name("thunderhill-wandb")
     secrets=[tracking_secret],
     include_source=False,
 )
-def prerequisites(validation_run: str):
+def prerequisites(
+    validation_run: str,
+    resume_campaign: str = "",
+    resume_checkpoint_step: int = 0,
+    settings: dict | None = None,
+):
     import json
     import os
     import subprocess
@@ -71,7 +78,26 @@ def prerequisites(validation_run: str):
         text=True,
         timeout=150,
     )
-    return json.loads(result.stdout)
+    certificate = json.loads(result.stdout)
+    if resume_campaign:
+        result = subprocess.run(
+            [
+                UPSTREAM + "/.venv/bin/python",
+                "-c",
+                "import json,sys; from pathlib import Path; from training.native_resume import load_resume_plan; "
+                "print(json.dumps(load_resume_plan(Path(sys.argv[1]),checkpoint_step=int(sys.argv[2]),settings=json.loads(sys.argv[3]))))",
+                resume_campaign,
+                str(resume_checkpoint_step),
+                json.dumps(settings),
+            ],
+            cwd=REMOTE,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=150,
+        )
+        certificate["resume_plan"] = json.loads(result.stdout)
+    return certificate
 
 
 @app.function(
@@ -96,7 +122,14 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
     import time
 
     started = time.time()
-    hard_deadline = started + 43200
+    resume_plan = certificate.get("resume_plan")
+    hard_deadline = (
+        resume_plan["hard_deadline_unix"] if resume_plan else started + 43200
+    )
+    if hard_deadline - started <= 3600:
+        raise RuntimeError(
+            "The original campaign deadline no longer leaves sufficient time"
+        )
     destination = Path("/runs/native-campaigns") / campaign_id
     destination.mkdir(parents=True, exist_ok=False)
     os.chdir(REMOTE)
@@ -114,9 +147,10 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
         gpu=certificate["gpu"] + ":2",
         started_at_unix=started,
         hard_deadline_unix=hard_deadline,
-        total_gpu_function_limit_seconds=43200,
+        total_gpu_function_limit_seconds=hard_deadline - started,
         settings=settings,
         validated_prerequisites=certificate,
+        native_resume=resume_plan,
     )
     (destination / "source_identity.json").write_text(
         json.dumps(identity, indent=2) + "\n"
@@ -187,7 +221,9 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
             text=True,
             timeout=120,
         )
-        if json.loads(check.stdout) != certificate:
+        if json.loads(check.stdout) != {
+            key: value for key, value in certificate.items() if key != "resume_plan"
+        }:
             raise RuntimeError("Validated model or receipt changed before allocation")
         command = [
             "xvfb-run",
@@ -208,8 +244,17 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
             certificate["validation_run"],
             # Five minutes remain for stopping/reaping and final volume persistence.
             "--deadline-unix",
-            str(hard_deadline - 300),
+            str(resume_plan["deadline_unix"] if resume_plan else hard_deadline - 300),
         ]
+        if resume_plan:
+            command.extend(
+                [
+                    "--resume-campaign",
+                    resume_plan["parent_campaign"],
+                    "--resume-checkpoint-step",
+                    str(resume_plan["checkpoint_step"]),
+                ]
+            )
         for key, value in settings.items():
             command.extend(["--" + key.replace("_", "-"), str(value)])
         with (destination / "supervisor.log").open("w") as log:
@@ -276,6 +321,8 @@ def main(
     checkpoint_every: int = 2,
     max_steps: int = 100000,
     evaluation_episodes: int = 8,
+    resume_campaign: str = "",
+    resume_checkpoint_step: int = 0,
 ):
     import json
     import math
@@ -317,7 +364,13 @@ def main(
         max_steps=max_steps,
         evaluation_episodes=evaluation_episodes,
     )
-    certificate = prerequisites.remote(validation_run)
+    if bool(resume_campaign) != (resume_checkpoint_step > 0):
+        raise ValueError(
+            "Explicit continuation requires both parent campaign and positive checkpoint step"
+        )
+    certificate = prerequisites.remote(
+        validation_run, resume_campaign, resume_checkpoint_step, settings
+    )
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
     reserved = reservations.put(
@@ -335,21 +388,44 @@ def main(
         raise RuntimeError(
             "This campaign ID was already attempted; refusing a duplicate GPU run"
         )
+    if resume_campaign:
+        continuation_key = (
+            "continuation:" + certificate["resume_plan"]["parent_campaign"]
+        )
+        if not reservations.put(
+            continuation_key,
+            dict(campaign_id=campaign_id, checkpoint_step=resume_checkpoint_step),
+            skip_if_exists=True,
+        ):
+            raise RuntimeError(
+                "This parent campaign already has a reserved continuation"
+            )
     print(
         json.dumps(
             dict(
                 campaign_id=campaign_id,
                 gpu=certificate["gpu"] + ":2",
                 total_limit_hours=12,
+                original_hard_deadline_unix=certificate.get("resume_plan", {}).get(
+                    "hard_deadline_unix"
+                ),
                 settings=settings,
             ),
             indent=2,
         )
     )
     print(
-        campaign.with_options(gpu=certificate["gpu"] + ":2").remote(
-            campaign_id, revision, certificate, settings
-        )
+        campaign.with_options(
+            gpu=certificate["gpu"] + ":2",
+            timeout=max(
+                1,
+                math.ceil(
+                    certificate["resume_plan"]["hard_deadline_unix"] - time.time()
+                ),
+            )
+            if resume_campaign
+            else 43200,
+        ).remote(campaign_id, revision, certificate, settings)
     )
 
 

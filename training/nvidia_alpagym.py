@@ -182,9 +182,12 @@ def prepare(
 def validate_runtime_files(source: Path, config, game: dict) -> None:
     """Check local installation and assets before starting distributed workers."""
     policy = config.cosmos.train.train_policy
-    if (not policy.on_policy or policy.allowed_outdated_steps != 0
-            or config.cosmos.rollout.batch_size != 1
-            or config.cosmos.rollout.prefetch_rollout):
+    if (
+        not policy.on_policy
+        or policy.allowed_outdated_steps != 0
+        or config.cosmos.rollout.batch_size != 1
+        or config.cosmos.rollout.prefetch_rollout
+    ):
         raise ValueError("Full lap replay requires bounded native on-policy dispatch")
     seconds = float(game["episode_seconds"])
     if not math.isfinite(seconds) or seconds <= 0:
@@ -551,7 +554,9 @@ def _run_owned(run_dir: Path) -> None:
     try:
         source = load_upstream(Path(manifest["alpagym_source"]))
         if manifest.get("native_source_patch") != verify_source(source):
-            raise ValueError("Native navigation input contract changed; prepare a fresh run")
+            raise ValueError(
+                "Native navigation input contract changed; prepare a fresh run"
+            )
         from alpagym_host.config import load_run_config
         from alpagym_host.endpoint_registry import FileTopologyRegistry
         from alpagym_host.transport_env import apply_transport_env_vars
@@ -582,13 +587,17 @@ def _run_owned(run_dir: Path) -> None:
             runtime
             + [
                 "-c",
-                ("from training.native_cosmos_source import verify_installed; "
-                "verify_installed(apply_patch=True); "
-                "import torch; import alpagym_runtime.cosmos.entrypoint; "
-                "from alpagym_alpamayo_r1.bundle import install_alpamayo_r1_runtime_bridge; "
-                "install_alpamayo_r1_runtime_bridge(); "
-                "assert torch.cuda.is_available(), 'CUDA unavailable'; "
-                "assert torch.cuda.device_count() >= 2, 'The official topology requires two CUDA GPUs'"),
+                (
+                    "from training.native_cosmos_source import verify_installed; "
+                    "verify_installed(apply_patch=True); "
+                    "from training.native_recipe_source import verify_installed as verify_recipe; "
+                    "verify_recipe(apply_patch=True); "
+                    "import torch; import alpagym_runtime.cosmos.entrypoint; "
+                    "from alpagym_alpamayo_r1.bundle import install_alpamayo_r1_runtime_bridge; "
+                    "install_alpamayo_r1_runtime_bridge(); "
+                    "assert torch.cuda.is_available(), 'CUDA unavailable'; "
+                    "assert torch.cuda.device_count() >= 2, 'The official topology requires two CUDA GPUs'"
+                ),
             ],
             start_new_session=True,
         )
@@ -604,6 +613,9 @@ def _run_owned(run_dir: Path) -> None:
             else ""
         )
         environment["PYTHONUNBUFFERED"] = "1"
+        environment["ALPAGYM_INFERENCE_CAPTURE_DIR"] = str(
+            run_dir / "inference-capture"
+        )
         # Render requested observations, not unused presentation frames between RPCs.
         environment.setdefault("THUNDERHILL_AGENT_OFFSCREEN", "1")
         environment.setdefault("WANDB_ENTITY", "skeptrune-org")

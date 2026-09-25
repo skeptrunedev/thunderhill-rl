@@ -302,6 +302,9 @@ def main():
     from alpagym_runtime.cosmos.entrypoint import main as nvidia_main
 
     register_recorded_rollout()
+    from training.native_resume import register_verified_resume_trainer
+
+    register_verified_resume_trainer()
     nvidia_main()
 
 
