@@ -646,6 +646,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     tracker.replan(
                         (np.asarray(xyz) @ rotation.T + position).tolist(),
                         origin=position.tolist(),
+                        forward=rotation[:, 0].tolist(),
                     )
                     model_decisions += 1
                     plans.write(
@@ -672,6 +673,9 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             state["speed"],
                             position=captures[-1][1].tolist(),
                             forward=captures[-1][2][:, 0].tolist(),
+                            gear=state["gear"],
+                            lean=state["lean"],
+                            lean_rate=state["lean_rate"],
                         )
                         advance(controls, "model_trajectory_controller", diagnostic)
                         capture_and_submit()

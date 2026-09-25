@@ -169,8 +169,10 @@ def audit_lap(
             start, end, controls = actions[action_index]
             if setup_tracker is not None and start < scenario_setup_ticks and count == start + 1:
                 state = last["state"] if last else header["initial_state"]
-                setup_tracker.replan([[(i + 1) * .1 * initial_speed_m_s, 0., 0.] for i in range(64)], origin=[0., 0., 0.])
-                expected, _ = setup_tracker.next_controls(state["speed"], position=[0., 0., 0.], forward=[1., 0., 0.])
+                setup_tracker.replan([[(i + 1) * .1 * initial_speed_m_s, 0., 0.] for i in range(64)], origin=[0., 0., 0.], forward=[1., 0., 0.])
+                expected, _ = setup_tracker.next_controls(state["speed"], position=[0., 0., 0.], forward=[1., 0., 0.],
+                                                          gear=state["gear"], lean=state["lean"],
+                                                          lean_rate=state["lean_rate"])
                 expected = decode_controller_controls(encode_controller_controls(expected))
                 require(recorded_controls_match(controls, expected), "setup controls differ from speed hold controller")
             require(start < count <= end, "transition outside decision interval")
