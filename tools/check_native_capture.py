@@ -15,7 +15,6 @@ from pathlib import Path
 
 def run(args):
     import torch
-    from alpagym_alpamayo_r1.bundle import install_alpamayo_r1_runtime_bridge
     from alpagym_host.config import load_run_config
     from alpagym_runtime.inference.types import NUM_ROUTE_WAYPOINTS
     from alpagym_runtime.inference_capture import HostInputCapture, restore_policy_input
@@ -31,7 +30,6 @@ def run(args):
     )
     from torchvision.io import encode_jpeg
 
-    install_alpamayo_r1_runtime_bridge()
     args.output.mkdir(parents=True, exist_ok=False)
     os.environ["ALPAGYM_INFERENCE_CAPTURE_DIR"] = str(args.output / "capture")
     config = load_run_config(args.config)
@@ -92,8 +90,9 @@ def run(args):
         restored = restore_policy_input(snapshot)
         reconstructed = policy(f"capture-reconstruction-{step}")
         actual = reconstructed._preprocess(restored, seed=seed)
+        actual_fields = asdict(actual)
         equality = {
-            key: torch.equal(value, asdict(actual)[key])
+            key: torch.equal(value, actual_fields[key])
             for key, value in asdict(expected).items()
         }
         report["steps"].append(
