@@ -148,8 +148,98 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
     return str(destination)
 
 
+@app.function(
+    image=runtime_image,
+    gpu="H100",
+    cpu=8,
+    memory=65536,
+    timeout=600,
+    retries=0,
+    volumes={"/model-cache": cache, "/runs": runs},
+    include_source=False,
+)
+def diagnose_inference(source_revision: str, dispatch: str, config: str,
+                       hard_deadline_unix: float,
+                       checkpoint: str = "/model-cache/alpagym-converted-1.5"):
+    """One bounded exact observation replay, never an optimizer or a new campaign."""
+    import json
+    import os
+    import subprocess
+    import time
+    import traceback
+    import uuid
+    from pathlib import Path
+
+    os.chdir(REMOTE)
+    for value in (dispatch, config):
+        if not value.startswith("/runs/") or ".." in Path(value).parts:
+            raise ValueError("Diagnostic observation/config must be existing /runs artifacts")
+        if not Path(value).is_file():
+            raise FileNotFoundError(value)
+    if not checkpoint.startswith(("/runs/", "/model-cache/")) or ".." in Path(checkpoint).parts:
+        raise ValueError("Checkpoint must be an existing mounted native bundle")
+    started = time.time()
+    remaining = min(570, int(hard_deadline_unix - started - 30))
+    if remaining < 60:
+        raise ValueError("Original campaign deadline leaves insufficient diagnostic time")
+    destination = Path("/runs/native-diagnostics") / ("exact-" + uuid.uuid4().hex)
+    destination.mkdir(parents=True)
+    receipt = {
+        "diagnostic_only": True, "training_eligible": False,
+        "source_revision": source_revision, "dispatch": dispatch, "config": config,
+        "checkpoint": checkpoint,
+        "checkpoint_identity": "base expert with frozen VLM" if checkpoint == "/model-cache/alpagym-converted-1.5" else "explicit supplied native bundle",
+        "exact_trained_expert_state_claimed": False,
+        "CUDA_LAUNCH_BLOCKING": "1 (isolated diagnostic process only)",
+        "hard_deadline_unix": hard_deadline_unix,
+        "subprocess_budget_seconds": remaining, "status": "starting",
+    }
+    receipt_path = destination / "supervisor.json"
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+    print(f"Inference diagnostic artifacts: {destination}", flush=True)
+    # Apply exactly the reviewed source and recipe adaptations before any model
+    # imports. This mirrors native_validation without starting its trainer/game.
+    bootstrap = (
+        "import json,runpy,sys; from pathlib import Path; "
+        "from training.native_source import verify_source; "
+        "from training.native_recipe_source import verify_installed; "
+        f"proof={{'runtime':verify_source(Path({UPSTREAM!r}),apply_patch=True),"
+        "'recipe':verify_installed(apply_patch=True)}; "
+        f"Path({str(destination / 'native-source.json')!r}).write_text(json.dumps(proof,indent=2)); "
+        "sys.argv=['tools.check_native_inference',*sys.argv[1:]]; "
+        "runpy.run_module('tools.check_native_inference',run_name='__main__')"
+    )
+    command = [
+        UPSTREAM + "/.venv/bin/python", "-c", bootstrap,
+        "--dispatch", dispatch, "--config", config, "--checkpoint", checkpoint,
+        "--output", str(destination / "inference"), "--device", "cuda:0",
+        "--repeats", "10", "--max-seconds", str(remaining), "--synchronize",
+    ]
+    try:
+        with (destination / "inference.log").open("w") as log:
+            process = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT,
+                                     timeout=remaining, check=False,
+                                     env={**os.environ, "CUDA_LAUNCH_BLOCKING": "1"})
+        receipt.update(status="completed" if process.returncode == 0 else "failed",
+                       returncode=process.returncode)
+    except subprocess.TimeoutExpired:
+        receipt.update(status="bounded_timeout")
+    except BaseException:
+        receipt.update(status="supervisor_failed", error=traceback.format_exc())
+        raise
+    finally:
+        receipt["elapsed_seconds"] = time.time() - started
+        receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+        runs.commit()
+        print(f"Inference diagnostic artifacts: {destination}", flush=True)
+    return {"artifacts": str(destination), **receipt}
+
+
 @app.local_entrypoint()
-def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1):
+def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
+         diagnostic_dispatch: str = "", diagnostic_config: str = "",
+         hard_deadline_unix: float = 0,
+         diagnostic_checkpoint: str = "/model-cache/alpagym-converted-1.5"):
     import subprocess
 
     dirty = subprocess.check_output(
@@ -160,4 +250,11 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1):
     revision = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
-    print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency))
+    if diagnostic_dispatch:
+        import time
+        if not diagnostic_config or hard_deadline_unix - time.time() < 90:
+            raise ValueError("Diagnostic mode requires config and original campaign deadline")
+        print(diagnose_inference.remote(revision, diagnostic_dispatch, diagnostic_config,
+                                       hard_deadline_unix, diagnostic_checkpoint))
+    else:
+        print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency))
