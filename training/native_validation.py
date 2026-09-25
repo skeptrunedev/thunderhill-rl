@@ -22,13 +22,17 @@ def write_json(path: Path, data: dict) -> None:
 
 def verify_scatter_diagnostics(run_dir: Path) -> dict:
     """Require actual completed native inference operators, never just an env flag."""
+    import hashlib
+
     root = run_dir / "inference-capture"
     if list(root.glob("*/scatter-failure.json")):
         raise ValueError("Scatter diagnostic recorded a failed operator")
     receipts = []
     for path in sorted(root.glob("*/scatter-last-completed.json")):
-        marker = json.loads((path.parent / "scatter-mode.json").read_text())
-        receipt = json.loads(path.read_text())
+        marker_bytes = (path.parent / "scatter-mode.json").read_bytes()
+        receipt_bytes = path.read_bytes()
+        marker = json.loads(marker_bytes)
+        receipt = json.loads(receipt_bytes)
         if (
             marker.get("enabled") is not True
             or marker.get("mode") != "synchronous_scatter_attribution_v1"
@@ -43,7 +47,11 @@ def verify_scatter_diagnostics(run_dir: Path) -> dict:
             or not receipt.get("dispatch", {}).get("ordered_requests")
         ):
             raise ValueError(f"Invalid native scatter diagnostic receipt: {path}")
-        receipts.append(str(path.relative_to(run_dir)))
+        receipts.append({
+            "path": str(path.relative_to(run_dir)),
+            "receipt_sha256": hashlib.sha256(receipt_bytes).hexdigest(),
+            "marker_sha256": hashlib.sha256(marker_bytes).hexdigest(),
+        })
     if not receipts:
         raise ValueError("No completed native scatter diagnostic operators were observed")
     return {"passed": True, "mode": "synchronous_scatter_attribution_v1",
