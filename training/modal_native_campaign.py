@@ -52,6 +52,7 @@ def prerequisites(
     settings: dict | None = None,
     retry_failed_continuation: str = "",
     scatter_diagnostics: bool = False,
+    optimizer_retune: bool = False,
 ):
     import json
     import os
@@ -89,10 +90,11 @@ def prerequisites(
                 UPSTREAM + "/.venv/bin/python",
                 "-c",
                 "import json,sys; from pathlib import Path; from training.native_resume import load_resume_plan; "
-                "print(json.dumps(load_resume_plan(Path(sys.argv[1]),checkpoint_step=int(sys.argv[2]),settings=json.loads(sys.argv[3]))))",
+                "print(json.dumps(load_resume_plan(Path(sys.argv[1]),checkpoint_step=int(sys.argv[2]),settings=json.loads(sys.argv[3]),optimizer_retune=json.loads(sys.argv[4]))))",
                 resume_campaign,
                 str(resume_checkpoint_step),
                 json.dumps(settings),
+                json.dumps(optimizer_retune),
             ],
             cwd=REMOTE,
             check=True,
@@ -285,6 +287,8 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
                     str(resume_plan["checkpoint_step"]),
                 ]
             )
+            if resume_plan.get("optimizer_retune"):
+                command.append("--optimizer-retune")
         for key, value in settings.items():
             command.extend(["--" + key.replace("_", "-"), str(value)])
         with (destination / "supervisor.log").open("w") as log:
@@ -345,15 +349,21 @@ def main(
     campaign_id: str,
     validation_run: str,
     episode_seconds: float,
-    rollouts: int,
     concurrency: int,
+    # NVIDIA's Alpamayo 1.5 closed-loop RL values (training/nvidia_alpagym.py).
+    rollouts: int = 6,
+    optimizer_lr: float = 1.0e-4,
+    optimizer_warmup_steps: int = 1,
     initial_speed_m_s: float = 0.0,
+    randomized_starts: int = 0,
+    start_seed: int = 0,
     checkpoint_every: int = 2,
     max_steps: int = 100000,
     evaluation_episodes: int = 8,
     resume_campaign: str = "",
     resume_checkpoint_step: int = 0,
     retry_failed_continuation: str = "",
+    optimizer_retune: bool = False,
     scatter_diagnostics: bool = False,
 ):
     import json
@@ -362,17 +372,25 @@ def main(
     import subprocess
     import time
 
+    from training.episode_config import MAX_INITIAL_SPEED_M_S
+
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{2,79}", campaign_id):
         raise ValueError(
             "Use a stable campaign ID with 3 to 80 lowercase letters, digits, underscores or hyphens"
         )
     if (
         not math.isfinite(initial_speed_m_s)
-        or not 0 <= initial_speed_m_s <= 10
+        or not 0 <= initial_speed_m_s <= MAX_INITIAL_SPEED_M_S
+        or randomized_starts < 0
+        or start_seed < 0
         or not math.isfinite(episode_seconds)
         or episode_seconds <= 0
         or abs(round(episode_seconds * 10) - episode_seconds * 10) > 1e-8
         or rollouts < 2
+        or not math.isfinite(optimizer_lr)
+        or optimizer_lr <= 0
+        or optimizer_warmup_steps < 0
+        or (optimizer_retune and not resume_campaign)
         or concurrency < 1
         or checkpoint_every < 1
         or max_steps < checkpoint_every
@@ -390,11 +408,15 @@ def main(
     settings = dict(
         episode_seconds=episode_seconds,
         initial_speed_m_s=initial_speed_m_s,
+        randomized_starts=randomized_starts,
+        start_seed=start_seed,
         rollouts=rollouts,
         concurrency=concurrency,
         checkpoint_every=checkpoint_every,
         max_steps=max_steps,
         evaluation_episodes=evaluation_episodes,
+        optimizer_lr=optimizer_lr,
+        optimizer_warmup_steps=optimizer_warmup_steps,
     )
     if bool(resume_campaign) != (resume_checkpoint_step > 0):
         raise ValueError(
@@ -414,9 +436,14 @@ def main(
         settings,
         retry_failed_continuation,
         scatter_diagnostics,
+        optimizer_retune,
     )
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
+    spread = certificate.get("randomized_start")
+    validated = (spread["count"], spread["seed"]) if spread else None
+    if validated != ((randomized_starts, start_seed) if randomized_starts else None):
+        raise ValueError("Campaign start positions differ from validated initial state")
     reserved = reservations.put(
         campaign_id,
         dict(

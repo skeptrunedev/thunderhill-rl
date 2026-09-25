@@ -47,8 +47,10 @@ class NativeSpeedControllerTests(unittest.TestCase):
                         points = [[position[0] + forward[0] * x - forward[1] * y,
                                    position[1] + forward[1] * x + forward[0] * y,
                                    position[2] + z] for x, y, z in recorded_plan]
-                    tracker.replan(points, origin=position)
-                controls, diagnostics = tracker.next_controls(state['speed'], position=position, forward=forward)
+                    tracker.replan(points, origin=position, forward=forward)
+                controls, diagnostics = tracker.next_controls(state['speed'], position=position, forward=forward,
+                                                                gear=state['gear'], lean=state['lean'],
+                                                                lean_rate=state['lean_rate'])
                 episode.apply(encode_controller_controls(controls), [], [])
                 rows.append({'tick': episode.observation['tick'], 'target': target,
                                  'speed': episode.observation['state']['speed'],

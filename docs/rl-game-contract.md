@@ -10,7 +10,7 @@ Each rollout owns a Godot process, episode identity, controller state and record
 
 Requests identify the episode, expected tick and action. Stale requests are rejected. Repeating an accepted action identifier returns its recorded response instead of applying the action twice. Termination, truncation and infrastructure failure must remain distinguishable. Driving failures are valid RL experience; renderer, protocol and unsupported dynamics failures invalidate the attempt.
 
-Current episodes begin from a standing start. A measured 1.5 second stationary warmup supplies history and is excluded from progress reward. Episode duration is configured before launch. The default 30 second validation horizon is not sufficient evidence of a full lap.
+Episodes begin from a standing start, a rolling start on the start line, or (with `--randomized-starts N --start-seed S`) one of N seeded track positions spread around the circuit. Each start is its own scene ID, so a GRPO sibling group shares one initial condition. A randomized start is a straight track sample whose speed is the configured cap limited by curvature (5 m/s² lateral) and braking (4 m/s²) over the warmup and past handoff (`training/episode_config.py`). A measured 1.5 second warmup supplies history and is excluded from progress reward: stationary braking for standing starts, otherwise a throttle/brake speed hold with zero steer, so the ego history shows steady motion rather than a coast-down. Warmup controls are initial-condition setup, recorded as `speed_hold_sensor_warmup`, and never a model action or label. `tools/check_rolling_start.py` qualifies warmups in the real simulator. Episode duration is configured before launch. The default 30 second validation horizon is not sufficient evidence of a full lap.
 
 ## Observation and action boundary
 
@@ -26,11 +26,11 @@ The controller consumes native world XYZ and measured current position and forwa
 
 ## Reward and lap validity
 
-The current [reward contract](../training/README.md#reward-contract) normalizes signed legal progress by full circuit length and accumulates actual collision, offroad and motorcycle fall events across executed ticks. Warmup is excluded. Raw measurements accompany the aggregate metrics. Progress measurement uses existing track geometry and does not reward staying near the centerline. No optimized racing line has been chosen.
+The current [reward contract](../training/README.md#reward-contract) credits signed legal progress over a fixed episode horizon, with unexecuted horizon earning zero, and charges actual collision, offroad and motorcycle fall events by the rider's kinetic energy at onset, accumulated across executed ticks. Warmup is excluded. Raw measurements accompany the aggregate metrics. Progress measurement uses existing track geometry and does not reward staying near the centerline. No optimized racing line has been chosen.
 
 Ordered gates and lap validity determine circuit completion. Incomplete trajectories, brief offroad events, reversals and crashes must not be reported as successful laps. Stall detection ends an attempt that makes insufficient legal progress. A completed lap terminates the current episode; continuous multiple lap episodes are not implemented.
 
-This reward is an explicit motorcycle adaptation of NVIDIA's metric reward, not full parity with its recorded trajectory and vehicle footprint scoring. A safe completed lap adds `max(0, 1 - elapsed_sim_seconds / episode_budget_seconds)`, distinguishing faster finishes. The bonus is zero for incomplete attempts and any collision, offroad event or fall. Faster progress within a fixed horizon can score higher before completion; equally complete legal laps receive the same progress term but different speed bonuses.
+This reward is an explicit motorcycle adaptation of NVIDIA's metric reward, not full parity with its recorded trajectory and vehicle footprint scoring. A safe completed lap is credited at its own mean lap speed for the whole horizon, so faster finishes score strictly higher; there is no separate completion bonus. Faster legal progress within the fixed horizon scores higher before completion, and an attempt that stops early forfeits the rest of the horizon.
 
 ## Required records
 

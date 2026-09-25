@@ -18,6 +18,12 @@ import sys
 import time
 from pathlib import Path
 
+from training.nvidia_alpagym import (
+    NVIDIA_CLRL_GROUP_SIZE,
+    NVIDIA_CLRL_LEARNING_RATE,
+    NVIDIA_CLRL_WARMUP_STEPS,
+)
+
 TOTAL_SECONDS = 12 * 60 * 60
 FINAL_RESERVE_SECONDS = int(3.5 * 60 * 60)
 EVALUATION_SECONDS = 2 * 60 * 60
@@ -93,12 +99,14 @@ def validated_prerequisites(
         )
     if launch.get("topology") != "local_disaggregated_2gpu":
         raise ValueError("Campaign requires the validated native two GPU topology")
-    from training.episode_config import scene_id
+    from training.episode_config import game_scene_ids
 
     game = json.loads((validation_run / "game_config.json").read_text())
-    scenario = scene_id(game.get("initial_speed_m_s", 0.0))
-    if game.get("scenario_id", scenario) != scenario:
-        raise ValueError("Validated scene identity disagrees with its starting speed")
+    scenarios = game_scene_ids(game)
+    if game.get("scenario_ids", scenarios) != scenarios or game.get(
+        "scenario_id", scenarios[0]
+    ) != scenarios[0]:
+        raise ValueError("Validated scene identity disagrees with its initial conditions")
     if Path(game["model_path"]).resolve() != model.resolve():
         raise ValueError("Campaign initial model differs from the validated model")
     scatter_proof = None
@@ -123,7 +131,15 @@ def validated_prerequisites(
         topology=launch["topology"],
         gpu=gpu,
         initial_speed_m_s=game.get("initial_speed_m_s", 0.0),
-        scenario_id=scenario,
+        randomized_start=game.get("randomized_start"),
+        scenario_ids=scenarios,
+    )
+
+
+def _randomized_start_matches(certificate, count, seed):
+    spread = certificate.get("randomized_start")
+    return (spread is None and count == 0) or (
+        spread is not None and (spread["count"], spread["seed"]) == (count, seed)
     )
 
 
@@ -139,7 +155,11 @@ def prepare_campaign(
     training_seconds: float,
     video_seconds: float,
     initial_speed_m_s: float = 0.0,
+    randomized_starts: int = 0,
+    start_seed: int = 0,
     max_steps: int = 100_000,
+    optimizer_lr: float = NVIDIA_CLRL_LEARNING_RATE,
+    optimizer_warmup_steps: int = NVIDIA_CLRL_WARMUP_STEPS,
     resume_plan: dict | None = None,
     scatter_diagnostics: bool = False,
 ) -> Path:
@@ -159,8 +179,12 @@ def prepare_campaign(
         godot="godot",
         max_steps=max_steps,
         rollouts=rollouts,
+        learning_rate=optimizer_lr,
+        warmup_steps=optimizer_warmup_steps,
         episode_seconds=episode_seconds,
         initial_speed_m_s=initial_speed_m_s,
+        randomized_start_count=randomized_starts,
+        randomized_start_seed=start_seed,
         scatter_diagnostics=scatter_diagnostics,
         concurrency=concurrency,
         max_wall_seconds=training_seconds,
@@ -414,14 +438,19 @@ def run_campaign(
     *,
     deadline_unix: float,
     episode_seconds: float,
-    rollouts: int,
     concurrency: int,
     checkpoint_every: int,
+    rollouts: int = NVIDIA_CLRL_GROUP_SIZE,
+    optimizer_lr: float = NVIDIA_CLRL_LEARNING_RATE,
+    optimizer_warmup_steps: int = NVIDIA_CLRL_WARMUP_STEPS,
     initial_speed_m_s: float = 0.0,
+    randomized_starts: int = 0,
+    start_seed: int = 0,
     max_steps: int = 100_000,
     evaluation_episodes: int = 8,
     resume_campaign: Path | None = None,
     resume_checkpoint_step: int = 0,
+    optimizer_retune: bool = False,
     scatter_diagnostics: bool = False,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
@@ -441,7 +470,11 @@ def run_campaign(
         raise ValueError("Campaign diagnostic mode must match its qualification")
     if certificate["initial_speed_m_s"] != initial_speed_m_s:
         raise ValueError("Campaign initial speed differs from validated initial state")
+    if not _randomized_start_matches(certificate, randomized_starts, start_seed):
+        raise ValueError("Campaign start positions differ from validated initial state")
     patch = verify_source(source, apply_patch=True)
+    if optimizer_retune and resume_campaign is None:
+        raise ValueError("An optimizer retune applies only to an explicit continuation")
     resume_plan = None
     if resume_campaign is not None:
         from training.native_resume import load_resume_plan
@@ -457,7 +490,10 @@ def run_campaign(
                 checkpoint_every=checkpoint_every,
                 max_steps=max_steps,
                 evaluation_episodes=evaluation_episodes,
+                optimizer_lr=optimizer_lr,
+                optimizer_warmup_steps=optimizer_warmup_steps,
             ),
+            optimizer_retune=optimizer_retune,
         )
         if deadline_unix != resume_plan["deadline_unix"]:
             raise ValueError("Continuation must retain the original campaign deadline")
@@ -477,12 +513,16 @@ def run_campaign(
         model,
         episode_seconds=episode_seconds,
         initial_speed_m_s=initial_speed_m_s,
+        randomized_starts=randomized_starts,
+        start_seed=start_seed,
         rollouts=rollouts,
         concurrency=concurrency,
         checkpoint_every=checkpoint_every,
         training_seconds=remaining - reserve,
         video_seconds=video_budget,
         max_steps=max_steps,
+        optimizer_lr=optimizer_lr,
+        optimizer_warmup_steps=optimizer_warmup_steps,
         resume_plan=resume_plan,
         scatter_diagnostics=scatter_diagnostics,
     )
@@ -498,6 +538,9 @@ def run_campaign(
         optimizer_restarts=int(resume_plan is not None),
         native_resume=resume_plan,
         source_contract=patch,
+        optimizer=json.loads((run_dir / "launch_manifest.json").read_text())[
+            "optimizer"
+        ],
         max_steps=max_steps,
         checkpoint_every_steps=checkpoint_every,
         native_checkpoint_retention=5,
@@ -793,7 +836,20 @@ def main():
             item.add_argument("--" + name, type=Path, required=True)
         item.add_argument("--episode-seconds", type=float, required=True)
         item.add_argument("--initial-speed-m-s", type=float, default=0.0)
-        item.add_argument("--rollouts", type=int, required=True)
+        item.add_argument("--randomized-starts", type=int, default=0)
+        item.add_argument("--start-seed", type=int, default=0)
+        item.add_argument(
+            "--rollouts",
+            type=int,
+            default=NVIDIA_CLRL_GROUP_SIZE,
+            help="GRPO group size (NVIDIA n_generation)",
+        )
+        item.add_argument(
+            "--optimizer-lr", type=float, default=NVIDIA_CLRL_LEARNING_RATE
+        )
+        item.add_argument(
+            "--optimizer-warmup-steps", type=int, default=NVIDIA_CLRL_WARMUP_STEPS
+        )
         item.add_argument("--concurrency", type=int, required=True)
         item.add_argument("--checkpoint-every", type=int, default=2)
         item.add_argument("--max-steps", type=int, default=100_000)
@@ -803,6 +859,12 @@ def main():
             item.add_argument("--deadline-unix", type=float, required=True)
             item.add_argument("--resume-campaign", type=Path)
             item.add_argument("--resume-checkpoint-step", type=int, default=0)
+            item.add_argument(
+                "--optimizer-retune",
+                action="store_true",
+                help="Continue a checkpoint under a new learning rate/warmup; "
+                "rewrites the restored scheduler base LR explicitly",
+            )
             item.add_argument(
                 "--evaluation-episodes", type=int, choices=(2, 4, 8), default=8
             )
