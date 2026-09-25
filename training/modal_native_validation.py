@@ -406,7 +406,7 @@ def diagnose_camera(source_revision: str, hang_seconds: float = 180):
     if process.poll() is None:
         # Still inside the first capture: record where Godot is before it times out.
         # The game process itself, not xvfb-run or the Python checker.
-        pids = [p for p in subprocess.run(["pgrep", "-f", "--agent-port"], capture_output=True,
+        pids = [p for p in subprocess.run(["pgrep", "-f", "--", "--agent-port"], capture_output=True,
                                           text=True).stdout.split()
                 if "odot" in os.path.realpath(f"/proc/{p}/exe")]
         for pid in pids:
