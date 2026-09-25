@@ -522,6 +522,8 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 reward_metrics = EpisodeMetrics(
                     track_length_m=self.road.length,
                     start_legal_distance_m=baseline,
+                    horizon_seconds=self.game["episode_seconds"],
+                    start_speed_m_s=env._observation["state"]["speed"],
                 )
                 stall_monitor.observe(0, baseline)
                 first = captures[0]
@@ -659,14 +661,19 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 final = env._observation
                 elapsed = (final["tick"] - WARMUP_TICKS) / 120.0
                 completed = reason == "lap_completed" and final["track"]["lap_valid"]
+                # A stall still ends the attempt (a stopped bike would spend the
+                # remaining inference budget standing still), but the reward is
+                # a fixed-horizon rate: the unexecuted horizon earns zero progress,
+                # exactly what a bike that stays stopped would have earned.
                 metrics = reward_metrics.values(
                     elapsed_seconds=elapsed,
-                    episode_seconds=self.game["episode_seconds"],
                     lap_completed=completed,
                 )
                 metrics.update(
                     sim_seconds=elapsed,
                     legal_progress_m=reward_metrics.distance,
+                    credited_progress_m=reward_metrics.summary["credited_progress_m"],
+                    horizon_progress_rate_m_s=reward_metrics.summary["horizon_progress_rate_m_s"],
                     mean_progress_speed_m_s=reward_metrics.distance / max(elapsed, 1 / 120),
                     lap_completed=float(completed),
                     stalled=float(reason == "stalled"),
