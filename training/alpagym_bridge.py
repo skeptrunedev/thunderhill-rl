@@ -19,6 +19,7 @@ import json
 import math
 from pathlib import Path
 import threading
+import time
 import uuid
 import signal
 
@@ -555,6 +556,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                         ),
                         timeout=120,
                     )
+                    inference_started = time.perf_counter()
                     call = stub.drive.future(
                         driver.DriveRequest(
                             session_uuid=session, time_now_us=now, time_query_us=now
@@ -590,6 +592,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                                 timestamp_us=now,
                                 session_uuid=session,
                                 xyz_rig=xyz,
+                                decision_rpc_seconds=time.perf_counter() - inference_started,
                                 route_rig=route_rig.tolist(),
                                 navigation_instruction=navigation_instruction(
                                     torch.as_tensor(route_rig[:, :2], dtype=torch.float32)

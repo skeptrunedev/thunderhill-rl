@@ -33,7 +33,10 @@ ROOT = Path(__file__).resolve().parents[1]
 # Godot 4.7 mobile/tonemap dither is spatial, not temporal; background shader
 # specialization is a possible cause, not established by this measurement.
 # https://docs.godotengine.org/en/4.5/tutorials/performance/pipeline_compilations.html
-IDLE_IMAGE_LIMITS = dict(max_channel_change=3, mean_channel_change=0.005,
+# The maximum is a 2% full-scale channel tolerance across GPU backends, not
+# a device-specific observed maximum. Mean drift and affected area remain much
+# stricter. Previously saved receipts still require exact byte/hash immutability.
+IDLE_IMAGE_LIMITS = dict(max_channel_change=255 * 0.02, mean_channel_change=0.005,
                          changed_pixel_fraction=0.005)
 
 

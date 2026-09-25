@@ -52,6 +52,11 @@ def validate_gpu(source_revision: str):
         + "\n"
     )
     print(f"Validation artifacts: {destination}", flush=True)
+    resources = (destination / "gpu-resources.csv").open("w")
+    sampler = subprocess.Popen([
+        "nvidia-smi", "--query-gpu=timestamp,index,name,memory.used,memory.total,utilization.gpu",
+        "--format=csv", "-l", "5",
+    ], stdout=resources, stderr=subprocess.STDOUT)
     try:
         with (destination / "gpu-topology.txt").open("w") as log:
             topology = subprocess.run(
@@ -109,6 +114,13 @@ def validate_gpu(source_revision: str):
                 timeout=3450,
             )
     finally:
+        sampler.terminate()
+        try:
+            sampler.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            sampler.kill()
+            sampler.wait()
+        resources.close()
         runs.commit()
         print(f"Validation artifacts: {destination}")
     return str(destination)
