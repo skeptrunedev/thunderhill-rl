@@ -42,6 +42,7 @@ from driving_trajectory import TrajectoryTracker
 from lap_policy import RoadTelemetry
 from lap_episode import StallMonitor
 from video_jobs import enqueue_video
+from training.episode_config import scene_id
 from training.alpagym_metrics import EpisodeMetrics, validate_reward_terms
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -141,6 +142,10 @@ def camera_calibration(capture, position, rotation):
 class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
     def __init__(self, game, identity_root, *, identity_provider=None):
         self.game = dict(game)
+        self.initial_speed_m_s = game.get("initial_speed_m_s", 0.0)
+        self.scene_id = scene_id(self.initial_speed_m_s)
+        if game.get("scenario_id", self.scene_id) != self.scene_id:
+            raise ValueError("Configured scene differs from initial speed")
         if not isinstance(game.get("model_name"), str) or not game["model_name"].strip():
             raise ValueError("Game configuration requires the actual model label")
         if Path(game["project_path"]).resolve() != ROOT / "godot":
@@ -169,10 +174,10 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
             renderer_type="godot",
             scenes=[
                 runtime.SceneInfo(
-                    scene_id=SCENE_ID,
+                    scene_id=self.scene_id,
                     provider_kind="godot",
                     metadata=runtime.SceneMetadata(
-                        uuid=SCENE_ID,
+                        uuid=self.scene_id,
                         camera_ids=list(CAMERA_IDS),
                         start_time_us=0,
                         end_time_us=int((self.game["episode_seconds"] + 1.5) * 1e6),
@@ -209,7 +214,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
             )
         jobs = []
         for spec in request.rollout_specs:
-            if spec.scenario_id != SCENE_ID or spec.nr_rollouts < 1:
+            if spec.scenario_id != self.scene_id or spec.nr_rollouts < 1:
                 context.abort(
                     grpc.StatusCode.INVALID_ARGUMENT,
                     "Unknown scene or empty rollout spec",
@@ -271,10 +276,12 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 session_uuid=session,
                 rollout_number=rollout,
                 driver_port=address.port,
-                scenario_id=SCENE_ID,
+                scenario_id=self.scene_id,
                 control_period_seconds=0.2,
                 sensor_period_seconds=0.1,
                 warmup_seconds=1.5,
+                initial_speed_m_s=self.initial_speed_m_s,
+                warmup_controls="neutral_coasting" if self.initial_speed_m_s else "stationary_braking",
                 action_semantics="native_trajectory_with_fixed_motorcycle_controller",
                 model_name=self.game["model_name"],
                 model_path=self.game.get("model_path"),
@@ -334,7 +341,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 lambda: session,
                 road_telemetry=self.road,
             )
-            env.reset(policy_display=display)
+            env.reset(policy_display=display, initial_speed_m_s=self.initial_speed_m_s)
             view = json.loads(env.observe())
             episode_id = env._observation["episode_id"]
             channel = stack.enter_context(
@@ -489,16 +496,19 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 capture_and_submit()
                 for _ in range(WARMUP_TICKS // 12):
                     advance(
-                        dict(throttle=0.0, steer=0.0, front_brake=1.0, rear_brake=1.0),
-                        "stationary_sensor_warmup",
+                        dict(throttle=0.0, steer=0.0, front_brake=0.0 if self.initial_speed_m_s else 1.0, rear_brake=0.0 if self.initial_speed_m_s else 1.0),
+                        "neutral_coasting_sensor_warmup" if self.initial_speed_m_s else "stationary_sensor_warmup",
                     )
                     if view["done"]:
                         raise RuntimeError(
-                            "Simulator terminated during stationary sensor warmup"
+                            "Simulator terminated during measured sensor warmup"
                         )
                     capture_and_submit()
-                if env._observation["state"]["speed"] > 0.01:
+                if self.initial_speed_m_s == 0 and env._observation["state"]["speed"] > 0.01:
                     raise RuntimeError("Standing warmup moved the motorcycle")
+                view = json.loads(env.begin_model_control())
+                provenance["model_control_start"] = env._observation["model_control_start"]
+                _write_json(output / "provenance.json", provenance)
                 baseline = env._observation["track"]["legal_distance"]
                 reward_metrics = EpisodeMetrics(
                     track_length_m=self.road.length,
@@ -513,7 +523,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             hashlib.sha256(session.encode()).hexdigest()[:8], 16
                         ),
                         debug_info=driver.DriveSessionRequest.DebugInfo(
-                            scene_id=SCENE_ID
+                            scene_id=self.scene_id
                         ),
                         rollout_spec=driver.DriveSessionRequest.RolloutSpec(
                             vehicle=driver.DriveSessionRequest.RolloutSpec.VehicleDefinition(

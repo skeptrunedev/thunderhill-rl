@@ -81,6 +81,8 @@ def validated_prerequisites(
         renderer=adapter,
         topology=launch["topology"],
         gpu=gpu,
+        initial_speed_m_s=game.get("initial_speed_m_s", 0.0),
+        scenario_id=game.get("scenario_id", "thunderhill-east-standing"),
     )
 
 
@@ -95,6 +97,7 @@ def prepare_campaign(
     checkpoint_every: int,
     training_seconds: float,
     video_seconds: float,
+    initial_speed_m_s: float = 0.0,
     max_steps: int = 100_000,
 ) -> Path:
     """CPU only preparation using NVIDIA's own config serialization."""
@@ -114,6 +117,7 @@ def prepare_campaign(
         max_steps=max_steps,
         rollouts=rollouts,
         episode_seconds=episode_seconds,
+        initial_speed_m_s=initial_speed_m_s,
         concurrency=concurrency,
         max_wall_seconds=training_seconds,
         max_video_seconds=video_seconds,
@@ -352,6 +356,7 @@ def run_campaign(
     rollouts: int,
     concurrency: int,
     checkpoint_every: int,
+    initial_speed_m_s: float = 0.0,
     max_steps: int = 100_000,
     evaluation_episodes: int = 8,
 ) -> dict:
@@ -368,6 +373,8 @@ def run_campaign(
     ):
         raise ValueError("Campaign deadline must leave between one and twelve hours")
     certificate = validated_prerequisites(validation_run, model)
+    if certificate["initial_speed_m_s"] != initial_speed_m_s:
+        raise ValueError("Campaign initial speed differs from validated initial state")
     patch = verify_source(source, apply_patch=True)
     if (
         certificate["native_source_patch"] != patch
@@ -384,6 +391,7 @@ def run_campaign(
         output,
         model,
         episode_seconds=episode_seconds,
+        initial_speed_m_s=initial_speed_m_s,
         rollouts=rollouts,
         concurrency=concurrency,
         checkpoint_every=checkpoint_every,
@@ -681,6 +689,7 @@ def main():
         for name in ("source", "model", "output"):
             item.add_argument("--" + name, type=Path, required=True)
         item.add_argument("--episode-seconds", type=float, required=True)
+        item.add_argument("--initial-speed-m-s", type=float, default=0.0)
         item.add_argument("--rollouts", type=int, required=True)
         item.add_argument("--concurrency", type=int, required=True)
         item.add_argument("--checkpoint-every", type=int, default=2)

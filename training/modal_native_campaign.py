@@ -16,7 +16,7 @@ reservations = modal.Dict.from_name(
     "thunderhill-native-campaign-reservations", create_if_missing=True
 )
 runtime_image = (
-    image.env({"NVIDIA_DRIVER_CAPABILITIES": "all"})
+    image.env({"NVIDIA_DRIVER_CAPABILITIES": "all", "NCCL_DEBUG": "INFO"})
     .add_local_dir(
         str(ROOT / "training"),
         REMOTE + "/training",
@@ -267,6 +267,7 @@ def main(
     episode_seconds: float,
     rollouts: int,
     concurrency: int,
+    initial_speed_m_s: float = 0.0,
     checkpoint_every: int = 2,
     max_steps: int = 100000,
     evaluation_episodes: int = 8,
@@ -282,7 +283,9 @@ def main(
             "Use a stable campaign ID with 3 to 80 lowercase letters, digits, underscores or hyphens"
         )
     if (
-        not math.isfinite(episode_seconds)
+        not math.isfinite(initial_speed_m_s)
+        or not 0 <= initial_speed_m_s <= 10
+        or not math.isfinite(episode_seconds)
         or episode_seconds <= 0
         or abs(round(episode_seconds * 10) - episode_seconds * 10) > 1e-8
         or rollouts < 2
@@ -302,6 +305,7 @@ def main(
     ).strip()
     settings = dict(
         episode_seconds=episode_seconds,
+        initial_speed_m_s=initial_speed_m_s,
         rollouts=rollouts,
         concurrency=concurrency,
         checkpoint_every=checkpoint_every,
@@ -309,6 +313,8 @@ def main(
         evaluation_episodes=evaluation_episodes,
     )
     certificate = prerequisites.remote(validation_run)
+    if certificate["initial_speed_m_s"] != initial_speed_m_s:
+        raise ValueError("Campaign initial speed differs from validated initial state")
     reserved = reservations.put(
         campaign_id,
         dict(

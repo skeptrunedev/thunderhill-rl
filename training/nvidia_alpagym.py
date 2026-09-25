@@ -50,12 +50,16 @@ def prepare(
     max_steps: int = 1,
     rollouts: int = 2,
     episode_seconds: float = 30,
+    initial_speed_m_s: float = 0.0,
     concurrency: int = 1,
     max_wall_seconds: float = 3600,
     model_name: str | None = None,
     ffmpeg: str = "ffmpeg",
     max_video_seconds: float = 3600,
 ) -> Path:
+    from training.episode_config import scene_id
+
+    scenario = scene_id(initial_speed_m_s)
     if max_steps < 1 or rollouts < 2 or concurrency < 1:
         raise ValueError(
             "Require positive steps and concurrency, and at least two rollouts per group"
@@ -99,7 +103,7 @@ def prepare(
     config.run_root = str(output.resolve())
     config.policy.model.path = str(model.resolve())
     config.expected_valid_steps = math.ceil(episode_seconds / 0.2)
-    config.dataset.scene_ids = ["thunderhill-east-standing"]
+    config.dataset.scene_ids = [scenario]
     # No prerecorded driving or ground truth actions are used for warmup/reward.
     config.alpasim.wizard_args.force_gt_duration_us = 0
     config.alpasim.wizard_args.control_timestep_us = 200_000
@@ -131,6 +135,8 @@ def prepare(
         "ffmpeg_binary": ffmpeg,
         "project_path": str(REPO_ROOT / "godot"),
         "episode_seconds": episode_seconds,
+        "initial_speed_m_s": initial_speed_m_s,
+        "scenario_id": scenario,
         "concurrency": concurrency,
         "recording_root": str(paths.run_dir / "recordings"),
         "model_name": model_name or model.resolve().name,
@@ -669,6 +675,7 @@ def main(argv: list[str] | None = None) -> None:
         help="Sibling rollouts per scene, NVIDIA n_generation",
     )
     prep.add_argument("--episode-seconds", type=float, default=30)
+    prep.add_argument("--initial-speed-m-s", type=float, default=0.0)
     prep.add_argument("--concurrency", type=int, default=1)
     prep.add_argument("--max-wall-seconds", type=float, default=3600)
     prep.add_argument(
@@ -692,6 +699,7 @@ def main(argv: list[str] | None = None) -> None:
                 max_steps=args.max_steps,
                 rollouts=args.rollouts,
                 episode_seconds=args.episode_seconds,
+                initial_speed_m_s=args.initial_speed_m_s,
                 concurrency=args.concurrency,
                 max_wall_seconds=args.max_wall_seconds,
                 model_name=args.model_name,
