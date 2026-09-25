@@ -151,9 +151,14 @@ steps, checkpoint output and evaluated gameplay recordings.
 
 ## Reward contract
 
-Progress is signed legal forward distance since the end of warmup divided by the
-full circuit length, clamped to [0, 1]. Raw meters remain in each summary for
-inspection. This fixes the former unit mismatch with NVIDIA's normalized progress.
+All reward terms share one unit: metres divided by `20 m/s * episode_seconds`,
+the distance a rider averaging 20 m/s covers in the fixed horizon (warmup
+excluded). `progress` is credited signed legal distance in that unit, so it is a
+progress rate over a fixed horizon. Horizon time not executed because the
+attempt stopped early (stall, crash, track limits) earns zero progress. A safe
+completed lap is credited at its own mean lap speed for the whole horizon, so a
+faster lap always scores higher. Raw metres, credited metres and the horizon
+progress rate remain in each summary.
 The existing centerline measures route position; proximity to it earns no reward.
 No optimized racing line has been selected. Preview the reference with:
 
@@ -161,11 +166,15 @@ No optimized racing line has been selected. Preview the reference with:
 uv run tools/plot_track_reference.py --output artifacts/track-reference.png
 ```
 
-NVIDIA's metric dispatcher applies +1 times progress, minus 10 for an obstacle
-collision and minus 5 for any offroad event. A motorcycle fall without a collision
-has a separate penalty of 10, so falls are neither free nor double counted as
-collisions. Events are accumulated across every executed physics tick, including
-brief excursions between observations. An invalid lap alone is not an offroad event.
+Obstacle collisions, offroad excursions and falls without a collision each cost
+the rider's kinetic energy as metres of 0.25 g braking, `v^2 / (2 * 2.45)`,
+charged once at the onset of each incident (`collision_cost`, `offroad_cost`,
+`fall_cost`, scale minus one). A slow incident is cheap and a fast one is
+expensive. Fixed penalties taught racing agents to brake and stand still.
+Events are accumulated across every executed physics tick, including brief
+excursions between observations. An invalid lap alone is not an offroad event.
+The 0/1 flags `collision_any`, `offroad` and `fall_without_collision` are still
+reported under NVIDIA's names but are not reward terms.
 
 This is an adaptation, not exact reward parity. NVIDIA projects position onto a
 recorded scene trajectory and tests vehicle footprint geometry. We use legal
@@ -174,9 +183,7 @@ trajectory distance penalty is omitted; there is no recorded expert trajectory o
 imitation target. New summaries and prepared runs identify the reward version;
 stale prepared configurations are rejected. Historical results are unchanged.
 
-A safe completed lap also earns `max(0, 1 - elapsed_sim_seconds / episode_budget_seconds)`.
-The episode budget is fixed across siblings and warmup is excluded. Incomplete
-attempts and any collision, offroad event or fall receive no speed bonus. This
-rewards faster legal finishes without an accumulating time cost that early
-failure could evade. Partial attempts retain their normalized progress signal.
+The stall monitor still ends an attempt with under 1 m of legal progress in a
+5 s window after 5 s grace. Because unexecuted horizon earns nothing, the stalled
+attempt scores what a bike that stayed stopped would score over the full horizon.
 See [reward details](../docs/reward-references.md).

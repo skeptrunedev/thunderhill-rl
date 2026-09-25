@@ -26,11 +26,11 @@ The controller consumes native world XYZ and measured current position and forwa
 
 ## Reward and lap validity
 
-The current [reward contract](../training/README.md#reward-contract) normalizes signed legal progress by full circuit length and accumulates actual collision, offroad and motorcycle fall events across executed ticks. Warmup is excluded. Raw measurements accompany the aggregate metrics. Progress measurement uses existing track geometry and does not reward staying near the centerline. No optimized racing line has been chosen.
+The current [reward contract](../training/README.md#reward-contract) credits signed legal progress over a fixed episode horizon, with unexecuted horizon earning zero, and charges actual collision, offroad and motorcycle fall events by the rider's kinetic energy at onset, accumulated across executed ticks. Warmup is excluded. Raw measurements accompany the aggregate metrics. Progress measurement uses existing track geometry and does not reward staying near the centerline. No optimized racing line has been chosen.
 
 Ordered gates and lap validity determine circuit completion. Incomplete trajectories, brief offroad events, reversals and crashes must not be reported as successful laps. Stall detection ends an attempt that makes insufficient legal progress. A completed lap terminates the current episode; continuous multiple lap episodes are not implemented.
 
-This reward is an explicit motorcycle adaptation of NVIDIA's metric reward, not full parity with its recorded trajectory and vehicle footprint scoring. A safe completed lap adds `max(0, 1 - elapsed_sim_seconds / episode_budget_seconds)`, distinguishing faster finishes. The bonus is zero for incomplete attempts and any collision, offroad event or fall. Faster progress within a fixed horizon can score higher before completion; equally complete legal laps receive the same progress term but different speed bonuses.
+This reward is an explicit motorcycle adaptation of NVIDIA's metric reward, not full parity with its recorded trajectory and vehicle footprint scoring. A safe completed lap is credited at its own mean lap speed for the whole horizon, so faster finishes score strictly higher; there is no separate completion bonus. Faster legal progress within the fixed horizon scores higher before completion, and an attempt that stops early forfeits the rest of the horizon.
 
 ## Required records
 

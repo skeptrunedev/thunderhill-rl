@@ -60,11 +60,10 @@ including after a failed training attempt. Rendering status is separate in
 `video_status.json`. Historic runs retain their original provenance
 and are not relabeled as runs from the replacement stack.
 
-Reward metrics use full circuit normalized legal progress, excluding warmup.
-Every executed physics tick contributes collision and offroad events. Motorcycle
-falls without obstacle contact have a separate penalty. Clean completed laps also
-receive a bounded bonus for finishing sooner within the fixed episode budget.
-Incomplete or unsafe attempts receive no speed bonus. Invalid lap status alone
-is not an offroad event. See [the reward contract](README.md#reward-contract) for
+Reward metrics use legal progress over the fixed episode horizon, excluding
+warmup, with unexecuted horizon earning zero. Every executed physics tick
+contributes collision, offroad and fall events, each costing the rider's kinetic
+energy at onset. Safe completed laps are credited at their own lap pace. Invalid
+lap status alone is not an offroad event. See [the reward contract](README.md#reward-contract) for
 coefficients and the remaining differences from NVIDIA. No reward targets an
 optimized racing line or closeness to the centerline.

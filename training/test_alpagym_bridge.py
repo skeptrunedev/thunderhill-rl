@@ -154,8 +154,10 @@ class RealGameTests(unittest.TestCase):
         self.assertTrue(result.success, result.error)
         self.assertEqual(
             set(result.aggregated_metrics),
-            {"progress", "collision_any", "offroad", "fall_without_collision", "completed_lap_speed",
-             "sim_seconds", "legal_progress_m", "mean_progress_speed_m_s",
+            {"progress", "collision_cost", "offroad_cost", "fall_cost",
+             "collision_any", "offroad", "fall_without_collision",
+             "sim_seconds", "legal_progress_m", "credited_progress_m",
+             "horizon_progress_rate_m_s", "mean_progress_speed_m_s",
              "lap_completed", "stalled", "crashed"},
         )
         self.assertGreater(result.aggregated_metrics["progress"], 0)
@@ -175,9 +177,9 @@ class RealGameTests(unittest.TestCase):
         definition = summary["reward_definition"]
         self.assertAlmostEqual(
             result.aggregated_metrics["progress"],
-            definition["legal_progress_m"] / definition["progress_normalizer_m"],
+            definition["legal_progress_m"] / definition["reference_distance_m"],
         )
-        self.assertGreater(definition["progress_normalizer_m"], 1000)
+        self.assertGreater(definition["track_length_m"], 1000)
         self.assertEqual(result.aggregated_metrics["offroad"], 0)
         self.assertEqual(result.aggregated_metrics["fall_without_collision"], 0)
 
