@@ -109,16 +109,21 @@ def main():
                 done.synchronize()  # Fixture cleanup after result, not a production fence.
                 observed = result[0]["completions"][0]
                 rows.append(
-                    dict(version=name, trial=trial, observed=observed, seconds=elapsed)
+                    {
+                        "version": name,
+                        "trial": trial,
+                        "observed": observed,
+                        "seconds": elapsed,
+                    }
                 )
     assert all(r["observed"] == 0 for r in rows if r["version"] == "original"), rows
     assert all(r["observed"] == 37 for r in rows if r["version"] == "patched"), rows
-    report = dict(
-        passed=True,
-        device=torch.cuda.get_device_name(),
-        diagnostic="native method body with synthetic delayed weight copies, not model training",
-        trials=rows,
-    )
+    report = {
+        "passed": True,
+        "device": torch.cuda.get_device_name(),
+        "diagnostic": "native method body with synthetic delayed weight copies, not model training",
+        "trials": rows,
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))
