@@ -586,6 +586,9 @@ func _physics_process(_dt: float) -> void:
 	if replay != null:
 		var row: Dictionary = replay.next_state()
 		if row.is_empty():
+			# A terminal handoff is metadata at the last physical tick. It may
+			# arrive without another transition when inference fails immediately.
+			lap_time = (sim.tick - replay.model_control_start_tick) * DT if replay.model_control_start_tick >= 0 else sim.elapsed
 			paused = true
 			print("REPLAY_COMPLETE ticks=", replay.consumed_ticks)
 			if replay.model_control_start_tick >= 0:

@@ -26,6 +26,80 @@ runtime_image = (
 )
 
 
+def repair_archived_recordings(run_dir, destination, deadline):
+    """Retry reviewed video failures only in a stopped archive, within this allocation."""
+    import hashlib
+    import json
+    import os
+    import signal
+    import subprocess
+    import time
+    from pathlib import Path
+
+    from training.native_campaign import summarize
+
+    run_dir = Path(run_dir).resolve()
+    if not run_dir.is_relative_to(Path("/runs/native-campaigns").resolve()):
+        raise ValueError("Repair target must be an archived native campaign")
+    status_path = run_dir / "run_status.json"
+    original_status = status_path.read_bytes()
+    status = json.loads(original_status)
+    launch = json.loads((run_dir / "launch_manifest.json").read_text())
+    if (status.get("runtime_stopped") is not True
+            or status.get("state") not in {"completed", "failed"}
+            or not status.get("run_id") or status["run_id"] != launch.get("run_id")):
+        raise ValueError("Recording repair requires a matching stopped terminal campaign")
+    remaining = deadline - time.monotonic()
+    receipt = {"run_dir": str(run_dir), "status": "starting",
+               "original_run_status_sha256": hashlib.sha256(original_status).hexdigest(),
+               "before": summarize(run_dir), "budget_seconds": max(0, remaining)}
+    receipt_path = destination / "recording-repair.json"
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+    process = None
+    try:
+        if remaining <= 1:
+            raise TimeoutError("Fresh validation left no recording repair budget")
+        command = ["xvfb-run", "-a", "-s", "-screen 0 800x600x24",
+                   UPSTREAM + "/.venv/bin/python", REMOTE + "/tools/render_video_queue.py",
+                   str(run_dir), "--godot", "godot", "--ffmpeg", "ffmpeg",
+                   "--retry-failed", "--workers", "2"]
+        with (destination / "recording-repair.log").open("w") as log:
+            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT,
+                                       start_new_session=True)
+            process.wait(timeout=max(0.1, deadline - time.monotonic()))
+        receipt["returncode"] = process.returncode
+        if process.returncode:
+            raise subprocess.CalledProcessError(process.returncode, command)
+        if not summarize(run_dir)["complete_video_coverage"]:
+            raise RuntimeError("Recording repair finished without complete coverage")
+        receipt["status"] = "completed"
+    except BaseException as error:
+        receipt.update(status="failed", error_type=type(error).__name__, error=str(error))
+        raise
+    finally:
+        if process is not None:
+            # Godot/ffmpeg inherit this dedicated process group. Stop the group
+            # even if its wrapper already exited; never leave a timed out render.
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=5)
+        receipt["after"] = summarize(run_dir)
+        receipt["original_run_status_unchanged"] = status_path.read_bytes() == original_status
+        receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+        if not receipt["original_run_status_unchanged"]:
+            raise RuntimeError("Archived campaign status changed during recording repair")
+
+
 @app.function(
     image=runtime_image,
     gpu="H100:2",
@@ -36,13 +110,15 @@ runtime_image = (
     volumes={"/model-cache": cache, "/runs": runs},
     include_source=False,
 )
-def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1):
+def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1, repair_recordings: str = ""):
     import json
     import os
     import subprocess
+    import time
     import uuid
     from pathlib import Path
 
+    repair_deadline = time.monotonic() + 3450
     os.chdir(REMOTE)
     os.environ["WANDB_MODE"] = "offline"
     if resume_run_dir and (not resume_run_dir.startswith("/runs/native-validation-") or ".." in Path(resume_run_dir).parts):
@@ -56,6 +132,7 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
                 "commit": source_revision,
                 "clean_worktree_at_launch": True,
                 "resume_run_dir": resume_run_dir or None,
+                "repair_recordings": repair_recordings or None,
             },
             indent=2,
         )
@@ -135,6 +212,8 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
                 stderr=subprocess.STDOUT,
                 timeout=3450,
             )
+        if repair_recordings:
+            repair_archived_recordings(repair_recordings, destination, repair_deadline)
     finally:
         sampler.terminate()
         try:
@@ -239,7 +318,8 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
 def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_dispatch: str = "", diagnostic_config: str = "",
          hard_deadline_unix: float = 0,
-         diagnostic_checkpoint: str = "/model-cache/alpagym-converted-1.5"):
+         diagnostic_checkpoint: str = "/model-cache/alpagym-converted-1.5",
+         repair_recordings: str = ""):
     import subprocess
 
     dirty = subprocess.check_output(
@@ -251,10 +331,12 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
     if diagnostic_dispatch:
+        if repair_recordings:
+            raise ValueError("Recording repair runs only after successful full qualification")
         import time
         if not diagnostic_config or hard_deadline_unix - time.time() < 90:
             raise ValueError("Diagnostic mode requires config and original campaign deadline")
         print(diagnose_inference.remote(revision, diagnostic_dispatch, diagnostic_config,
                                        hard_deadline_unix, diagnostic_checkpoint))
     else:
-        print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency))
+        print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings))
