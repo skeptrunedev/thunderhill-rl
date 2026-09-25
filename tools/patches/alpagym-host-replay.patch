@@ -91,7 +91,7 @@ index d2556c0..12dc197 100644
              for req, model_output in zip(batch, model_outputs, strict=True):
                  req.result.set_result(model_output)
 diff --git a/packages/runtime/src/alpagym_runtime/policies/alpamayo/policy.py b/packages/runtime/src/alpagym_runtime/policies/alpamayo/policy.py
-index f2fda8b..5e65e53 100644
+index f2fda8b..da97b63 100644
 --- a/packages/runtime/src/alpagym_runtime/policies/alpamayo/policy.py
 +++ b/packages/runtime/src/alpagym_runtime/policies/alpamayo/policy.py
 @@ -15,6 +15,8 @@ from alpagym_runtime.inference.types import NUM_ROUTE_WAYPOINTS, ModelInput, Mod
@@ -116,7 +116,7 @@ index f2fda8b..5e65e53 100644
                  device=self._device,
              )
 +        capture_identity = self._input_capture.record(
-+            policy_input, self._buffers.ego_history.poses,
++            policy_input, self._buffers.ego_history,
 +            (int(self._session_seed) + self._inference_step_counter) if seed is not None else None,
 +            self._config.model,
 +        )

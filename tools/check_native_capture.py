@@ -82,7 +82,7 @@ def run(args):
             (),
         )
         identity = capture.record(
-            value, original._buffers.ego_history.poses, 1000 + step, config.policy.model
+            value, original._buffers.ego_history, 1000 + step, config.policy.model
         )
         seed = torch.tensor(1000 + step, device=device)
         expected = original._preprocess(value, seed=seed)
@@ -108,7 +108,9 @@ def run(args):
             raise AssertionError(f"Native preprocessing mismatch: {equality}")
         reconstructed.close()
     report["passed"] = True
-    report["device"] = torch.cuda.get_device_name(device)
+    report["device"] = (
+        torch.cuda.get_device_name(device) if device.type == "cuda" else "cpu"
+    )
     (args.output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))
 
