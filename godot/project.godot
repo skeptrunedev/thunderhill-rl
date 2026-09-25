@@ -6,6 +6,7 @@ config/name="Thunderhill"
 config/icon="res://icon.svg"
 config/version="0.1.0"
 run/main_scene="res://main.tscn"
+run/flush_stdout_on_print=true
 config/features=PackedStringArray("4.7", "Mobile")
 
 [display]

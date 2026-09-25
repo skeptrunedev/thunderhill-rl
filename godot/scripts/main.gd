@@ -83,6 +83,7 @@ var benchmark: RefCounted
 var benchmark_path := ""
 var frame_times: Array = []
 var agent_camera: Node
+var _heartbeat_second := -1
 var agent_request_pending := false
 var startup_profile: FileAccess
 var startup_started_usec: int
@@ -921,6 +922,12 @@ func observation() -> Dictionary:
 func _process(dt: float) -> void:
 	if benchmark != null and not paused:
 		benchmark.record_frame(get_viewport())
+	if agent_mode and OS.get_environment("THUNDERHILL_CAPTURE_DIAGNOSTICS") == "1":
+		var second := Time.get_ticks_msec() / 1000
+		if second != _heartbeat_second:
+			_heartbeat_second = second
+			print("THUNDERHILL_HEARTBEAT " + JSON.stringify({
+				"frame": Engine.get_process_frames(), "request_pending": agent_request_pending}))
 	_poll_agent()
 	if engine_audio != null:
 		engine_audio.muted = paused or agent_mode
