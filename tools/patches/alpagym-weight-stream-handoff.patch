@@ -1,0 +1,62 @@
+diff --git a/packages/runtime/src/alpagym_runtime/cosmos/rollout_backend.py b/packages/runtime/src/alpagym_runtime/cosmos/rollout_backend.py
+index c9135aa..1b4abd8 100644
+--- a/packages/runtime/src/alpagym_runtime/cosmos/rollout_backend.py
++++ b/packages/runtime/src/alpagym_runtime/cosmos/rollout_backend.py
+@@ -26,6 +26,7 @@ from cosmos_rl.rollout.rollout_base import RolloutBase, RolloutRegistry
+ from cosmos_rl.rollout.schema import RolloutResult
+ 
+ from alpagym_runtime.alpasim.driver_server import EgodriverServer
++from alpagym_runtime.cuda_handoff import wait_for_weight_updates
+ from alpagym_runtime.episode_runner.streaming_worker import StreamingRolloutWorker
+ from alpagym_runtime.inference.inference_engine import InferenceEngine
+ from alpagym_runtime.perf.instrument.lifecycle import initialize_perf
+@@ -176,11 +177,10 @@ class AlpagymRollout(RolloutBase):
+         ``submit_payload``; the discarded return value is recovered by
+         the later matching ``rollout_generation`` call.
+         """
+-        if not self._engine_initialized or self._worker is None:
+-            logger.info("[Prefetch] skipped (engine not initialized)")
+-            return
+-        for payload in payloads:
+-            self._worker.submit_payload(payload)
++        raise RuntimeError(
++            "AlpaGym CUDA weight handoff requires rollout.prefetch_rollout=false; "
++            "prefetch submits sessions before the native generation stream fence"
++        )
+ 
+     @measure_perf(
+         "rollout/generate",
+@@ -213,7 +213,10 @@ class AlpagymRollout(RolloutBase):
+         # deleting the unused kwargs is preferred over a `**kwargs` shim so a
+         # new Cosmos kwarg surfaces as a loud TypeError instead of being
+         # silently absorbed.
+-        del stream, data_fetcher, current_weight_version, data_packer
++        # Cosmos fences P2R copies on this stream. The inference thread uses
++        # the shared default stream; preserve that dependency before dispatch.
++        wait_for_weight_updates(stream)
++        del data_fetcher, current_weight_version, data_packer
+         if self._worker is None:
+             raise RuntimeError("rollout_generation called before init_engine")
+         logger.info(
+diff --git a/packages/runtime/src/alpagym_runtime/cuda_handoff.py b/packages/runtime/src/alpagym_runtime/cuda_handoff.py
+new file mode 100644
+--- /dev/null
++++ b/packages/runtime/src/alpagym_runtime/cuda_handoff.py
+@@ -0,0 +1,17 @@
++# SPDX-License-Identifier: Apache-2.0
++"""Carry the native Cosmos weight-copy fence into AlpaGym inference."""
++
++import torch
++
++
++def wait_for_weight_updates(source: torch.cuda.Stream) -> None:
++    """Order default-stream inference after native copies without blocking CPU.
++
++    Pinned AlpaGym engine and gRPC threads use the shared per-device default
++    stream. Cosmos supplies a dedicated stream already waiting for its P2R
++    copy completion event. Preserve that dependency before submitting sessions.
++    This does not synchronize the device or change execution backends.
++    """
++    if not isinstance(source, torch.cuda.Stream):
++        raise TypeError("Native CUDA rollout requires the Cosmos inference stream")
++    torch.cuda.default_stream(source.device).wait_stream(source)

@@ -1,0 +1,12 @@
+{
+  "version": "native_weight_stream_handoff_v1",
+  "upstream_revision": "972d160eed0e23d388497851504a3a233fec5879",
+  "patch_sha256": "fd8349e2ffa49843d54f62eaaa9e48314aa8222745ebd5bd3799b90cf65daffd",
+  "files": {
+    "packages/runtime/src/alpagym_runtime/cosmos/rollout_backend.py": "8a2b30f4172d1c9630457dbe4d11ff0ae6958d8f023910f530ac028da2f971d5",
+    "packages/runtime/src/alpagym_runtime/cuda_handoff.py": "99c3e862f13e1edad55b9c16a050186e835fa8e8ce5fa78847445c45397a4c23"
+  },
+  "added_files": [
+    "packages/runtime/src/alpagym_runtime/cuda_handoff.py"
+  ]
+}
