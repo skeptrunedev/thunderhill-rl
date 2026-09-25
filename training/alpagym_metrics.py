@@ -8,29 +8,25 @@ incident costs are directly comparable to the progress they trade against.
 
 Time not executed because the episode ended early (stall, crash, track limits)
 earns zero progress. A safe completed lap is credited at its own mean lap speed
-for the whole horizon, so a faster lap is always worth more. Incidents cost the
-rider's kinetic energy expressed as metres of gentle braking (Fuchs et al.,
-GT Sport: fixed wall penalties taught agents to brake and stand still, kinetic
-penalties did not). Motorcycle falls are an explicit extension, not mislabeled
-obstacle collisions.
+for the whole horizon, so a faster lap is always worth more.
+
+Progress is the only reward term. Every incident already terminates the
+episode and forfeits the rest of the horizon, so an extra incident cost would
+charge it twice and rank braking to a stall before a corner above attempting
+the corner and running wide (observed in the v4 qualification). Incident
+kinetic costs are still reported as diagnostics.
 """
 
 import math
 
-REWARD_VERSION = "thunderhill-horizon-progress-rate-kinetic-incidents-v4"
+REWARD_VERSION = "thunderhill-horizon-progress-rate-v5"
 # Unit only: GRPO normalizes each sibling group, so this sets readable magnitudes
 # (1.0 = averaging 20 m/s for the whole horizon, a 230 s lap) and no trade-off.
 REFERENCE_SPEED_M_S = 20.0
-# Incident cost = v^2 / (2 a): the distance a 0.25 g brake needs to remove the
-# impact speed. Braking to a stop instead of crashing is roughly distance
-# neutral; the crash additionally forfeits the rest of the horizon.
+# Diagnostic only: v^2 / (2 a), the distance a 0.25 g brake needs to remove the
+# impact speed.
 INCIDENT_DECELERATION_M_S2 = 0.25 * 9.80665
-REWARD_SCALES = {
-    "progress": 1.0,
-    "collision_cost": -1.0,
-    "offroad_cost": -1.0,
-    "fall_cost": -1.0,
-}
+REWARD_SCALES = {"progress": 1.0}
 
 
 def validate_reward_terms(terms):
@@ -170,7 +166,7 @@ class EpisodeMetrics:
             "reward_unit": "metres / (reference_speed_m_s * horizon_seconds)",
             "reference_speed_m_s": REFERENCE_SPEED_M_S,
             "progress_formula": "credited_progress_m / reference_distance_m; unexecuted horizon earns 0; a safe lap is credited track_length * horizon / lap_time",
-            "incident_cost_formula": "speed_m_s^2 / (2 * incident_deceleration_m_s2) at each incident onset",
+            "incident_cost_formula": "diagnostic only, not rewarded: speed_m_s^2 / (2 * incident_deceleration_m_s2) at each incident onset",
             "incident_deceleration_m_s2": INCIDENT_DECELERATION_M_S2,
             "legal_progress_m": self.distance,
             "track_length_m": self.track_length_m,
