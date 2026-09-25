@@ -13,7 +13,6 @@ from scipy.spatial.transform import Rotation
 from training.alpagym_bridge import (
     ROOT,
     CAMERA_IDS,
-    SCENE_ID,
     GodotRuntime,
     pose_proto,
     common,
@@ -92,7 +91,7 @@ class FixtureDriver(driver_grpc.EgodriverServiceServicer):
     "Set THUNDERHILL_GODOT for rendered Godot contract test",
 )
 class RealGameTests(unittest.TestCase):
-    def run_fixture(self, fail, fixture=None, *, seconds=0.6, validation=True):
+    def run_fixture(self, fail, fixture=None, *, seconds=0.6, validation=True, initial_speed_m_s=0.0):
         output = Path(tempfile.mkdtemp(prefix="thunderhill-alpagym-contract-"))
         fixture = fixture or FixtureDriver(fail)
         server = grpc.server(ThreadPoolExecutor(max_workers=4))
@@ -105,6 +104,7 @@ class RealGameTests(unittest.TestCase):
                 model_name="synthetic protocol fixture",
                 project_path=str(ROOT / "godot"),
                 episode_seconds=seconds,
+                initial_speed_m_s=initial_speed_m_s,
                 concurrency=1,
                 recording_root=str(output),
             ),
@@ -125,7 +125,7 @@ class RealGameTests(unittest.TestCase):
             with grpc.insecure_channel(f"127.0.0.1:{runtime_port}") as channel:
                 stub = runtime_grpc.RuntimeServiceStub(channel)
                 info = stub.get_runtime_info(common.Empty())
-                self.assertEqual(info.scenes[0].scene_id, SCENE_ID)
+                self.assertEqual(info.scenes[0].scene_id, service.scene_id)
                 result = stub.simulate(
                     runtime.SimulationRequest(
                         available_drivers=[
@@ -135,7 +135,7 @@ class RealGameTests(unittest.TestCase):
                         ],
                         rollout_specs=[
                             runtime.RolloutSpec(
-                                scenario_id=SCENE_ID,
+                                scenario_id=service.scene_id,
                                 nr_rollouts=1,
                                 session_uuids=["fixture"],
                             )

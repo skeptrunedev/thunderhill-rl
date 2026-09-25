@@ -496,8 +496,15 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 capture_and_submit()
                 for _ in range(WARMUP_TICKS // 12):
                     advance(
-                        dict(throttle=0.0, steer=0.0, front_brake=0.0 if self.initial_speed_m_s else 1.0, rear_brake=0.0 if self.initial_speed_m_s else 1.0),
-                        "neutral_coasting_sensor_warmup" if self.initial_speed_m_s else "stationary_sensor_warmup",
+                        dict(
+                            throttle=0.0,
+                            steer=0.0,
+                            front_brake=0.0 if self.initial_speed_m_s else 1.0,
+                            rear_brake=0.0 if self.initial_speed_m_s else 1.0,
+                        ),
+                        "neutral_coasting_sensor_warmup"
+                        if self.initial_speed_m_s
+                        else "stationary_sensor_warmup",
                     )
                     if view["done"]:
                         raise RuntimeError(
@@ -506,6 +513,8 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     capture_and_submit()
                 if self.initial_speed_m_s == 0 and env._observation["state"]["speed"] > 0.01:
                     raise RuntimeError("Standing warmup moved the motorcycle")
+                if self.initial_speed_m_s > 0 and env._observation["state"]["speed"] <= 0.01:
+                    raise RuntimeError("Rolling scene stopped before model control began")
                 view = json.loads(env.begin_model_control())
                 provenance["model_control_start"] = env._observation["model_control_start"]
                 _write_json(output / "provenance.json", provenance)
