@@ -146,6 +146,170 @@ def reconstruct_dispatch(path, config, device):
     }, [row["session_uuid"] for row in identities]
 
 
+def threaded_stress(args, adapter, config, report, started):
+    """Exercise native dispatch and concurrent JPEG preprocessing without sync hooks."""
+    import os
+    import shutil
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    import torch
+    from alpagym_host.config import load_run_config
+    from alpagym_runtime.inference.inference_engine import InferenceEngine
+    from alpagym_runtime.inference_capture import restore_policy_input
+    from alpagym_runtime.policies.alpamayo.policy import AlpamayoPolicy
+
+    if os.environ.get("CUDA_LAUNCH_BLOCKING") not in (None, "", "0"):
+        raise ValueError("Threaded stress requires normal asynchronous CUDA launches")
+    if os.environ.get("ALPAGYM_INFERENCE_CAPTURE_DIR"):
+        raise ValueError(
+            "Use preserved capsules, never overwrite a production capture directory"
+        )
+    config = config or load_run_config(args.config)
+    capsule_dir = args.dispatch.parent
+    dispatch = json.loads(args.dispatch.read_text())
+    expected = {
+        Path(row["path"]).name: row["sha256"] for row in dispatch["ordered_requests"]
+    }
+    capsule_paths = sorted(capsule_dir.glob("session-*.pt"))
+    if not 1 <= len(capsule_paths) <= 4 or len(capsule_paths) < args.stress_workers:
+        raise ValueError(
+            "Stress needs one preserved capsule per producer, at most four"
+        )
+    archived = args.output / "source-capsules"
+    archived.mkdir()
+    shutil.copyfile(args.dispatch, archived / "dispatch.json")
+    payloads, capsule_receipts = [], []
+    expected_config = json.loads(json.dumps(asdict(config.policy.model), default=str))
+    expected_config.pop("path", None)
+    for source in capsule_paths:
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        if source.name in expected and digest != expected[source.name]:
+            raise ValueError("Failed dispatch capsule changed")
+        payload = torch.load(source, map_location="cpu", weights_only=True)
+        captured_config = dict(payload["model_config"])
+        captured_config.pop("path", None)
+        if captured_config != expected_config:
+            raise ValueError("Captured native preprocessing config differs")
+        restore_policy_input(payload)
+        shutil.copyfile(source, archived / source.name)
+        payloads.append(payload)
+        capsule_receipts.append(
+            {
+                "path": source.name,
+                "sha256": digest,
+                "session_uuid": payload["session_uuid"],
+                "in_failed_dispatch": source.name in expected,
+            }
+        )
+    if set(expected) - {p.name for p in capsule_paths}:
+        raise ValueError("Missing failed dispatch capsule")
+    report.update(
+        mode="threaded_native_dispatch",
+        capsules=capsule_receipts,
+        workers=args.stress_workers,
+        iterations_per_worker=args.stress_iterations,
+        production_equivalence_limit="Fresh policy buffers per repeated recorded observation; no simulator progression or weight transfer.",
+        extra_cuda_synchronization=False,
+        operator_hooks=False,
+    )
+    write_json(args.output / "report.json", report)
+    if args.prepare_only:
+        report["status"] = "prepared_capsules_only"
+        return
+    report["status"] = "running_native_dispatch"
+    write_json(args.output / "report.json", report)
+    batch_sizes = []
+    original_sample = adapter.sample_trajectories_from_data
+
+    def count_batch(model_input, *positional, **keywords):
+        batch_sizes.append(int(model_input.camera_frames.shape[0]))
+        return original_sample(model_input, *positional, **keywords)
+
+    adapter.sample_trajectories_from_data = count_batch
+    engine = InferenceEngine(adapter, config.policy.inference.sampling, False, 4)
+    thread = threading.Thread(
+        target=engine.run_loop, name="diagnostic-native-dispatch", daemon=True
+    )
+    thread.start()
+    deadline = started + args.max_seconds
+    output_lock = threading.Lock()
+    progress = (args.output / "completed.jsonl").open("x")
+    completions = []
+
+    def produce(worker):
+        payload = payloads[worker]
+        for iteration in range(args.stress_iterations):
+            if time.monotonic() >= deadline:
+                return
+            policy = AlpamayoPolicy(
+                None,
+                payload["session_uuid"],
+                config.policy,
+                torch.device(args.device),
+                torch.bfloat16,
+                seed=payload["seed"],
+            )
+            seed = (
+                torch.tensor(payload["seed"], dtype=torch.int64, device=args.device)
+                if payload["seed"] is not None
+                else None
+            )
+            tick_started = time.monotonic()
+            model_input = policy._preprocess(restore_policy_input(payload), seed=seed)
+            future = engine.infer(model_input)
+            output = future.result(timeout=max(1, deadline - time.monotonic()))
+            # Native gameplay also returns selected trajectories to host. Store
+            # only these small CPU outputs, not Futures or CUDA replay tensors.
+            prediction = {
+                "xyz": output.pred_xyz.detach().cpu(),
+                "rot": output.pred_rot.detach().cpu(),
+            }
+            finite = all(
+                bool(torch.isfinite(value).all()) for value in prediction.values()
+            )
+            name = f"worker-{worker}-iteration-{iteration:03d}.pt"
+            torch.save(prediction, args.output / name)
+            row = {
+                "worker": worker,
+                "iteration": iteration,
+                "session_uuid": payload["session_uuid"],
+                "finite": finite,
+                "seconds": time.monotonic() - tick_started,
+                "prediction": name,
+            }
+            with output_lock:
+                progress.write(json.dumps(row) + "\n")
+                progress.flush()
+                completions.append(row)
+            del output, future, model_input, policy, prediction
+            if not finite:
+                raise RuntimeError("Native dispatcher returned nonfinite output")
+
+    try:
+        with ThreadPoolExecutor(max_workers=args.stress_workers) as pool:
+            futures = [
+                pool.submit(produce, worker) for worker in range(args.stress_workers)
+            ]
+            for future in futures:
+                future.result()
+        report["status"] = (
+            "completed"
+            if len(completions) == args.stress_workers * args.stress_iterations
+            else "bounded_stop"
+        )
+    finally:
+        engine.shutdown()
+        thread.join(timeout=5)
+        adapter.sample_trajectories_from_data = original_sample
+        progress.close()
+        report.update(
+            completed_requests=len(completions),
+            observed_batch_sizes=batch_sizes,
+            all_completed_finite=all(row["finite"] for row in completions),
+        )
+
+
 def run(args):
     import torch
 
@@ -159,7 +323,8 @@ def run(args):
     report = {
         "diagnostic_only": True,
         "training_eligible": False,
-        "actual_failed_campaign_batch": False,
+        "captured_host_dispatch": args.dispatch is not None,
+        "original_cuda_tensors_captured": False,
         "fixture_sha256": hashlib.sha256(
             (args.model_input or args.dispatch).read_bytes()
         ).hexdigest(),
@@ -197,6 +362,9 @@ def run(args):
         write_json(args.output / "report.json", report)
         raise
     try:
+        if args.threaded_stress:
+            threaded_stress(args, adapter, config, report, started)
+            return
         exact_batch = exact_labels = None
         if args.dispatch:
             exact_batch, exact_labels = reconstruct_dispatch(
@@ -349,10 +517,21 @@ def main():
     )
     parser.add_argument("--synchronize", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument("--threaded-stress", action="store_true")
+    parser.add_argument("--stress-workers", type=int, choices=range(1, 5), default=4)
+    parser.add_argument("--stress-iterations", type=int, default=50)
     args = parser.parse_args()
+    if not 1 <= args.stress_iterations <= 200:
+        parser.error("stress iterations must be 1..200")
+    if args.threaded_stress and (
+        not args.dispatch or not args.config or args.synchronize
+    ):
+        parser.error(
+            "threaded stress requires dispatch/config and prohibits synchronization hooks"
+        )
     if not 1 <= args.repeats <= 10 or not 1 <= args.max_seconds <= 1800:
         parser.error("repeats must be 1..10 and max-seconds 1..1800")
-    if args.dispatch and args.prepare_only:
+    if args.dispatch and args.prepare_only and not args.threaded_stress:
         parser.error(
             "dispatch reconstruction uses native GPU preprocessing; omit --prepare-only"
         )
