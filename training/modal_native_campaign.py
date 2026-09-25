@@ -73,7 +73,7 @@ def prerequisites(validation_run: str):
 @app.function(
     image=runtime_image,
     cpu=16,
-    memory=131072,
+    memory=262144,
     timeout=43200,
     retries=0,
     max_containers=1,
@@ -137,6 +137,11 @@ def campaign(campaign_id: str, source_revision: str, certificate: dict, settings
     try:
         if not os.environ.get("WANDB_API_KEY") or not os.environ.get("WANDB_ENTITY"):
             raise RuntimeError("Online W&B credentials are required for this campaign")
+        from training.native_network import configure_container_hostname
+
+        (destination / "container-network.json").write_text(
+            json.dumps(configure_container_hostname(), indent=2) + "\n"
+        )
         # Placement can change between validation and this allocation. Reject any
         # pair lacking actual CUDA peer access; there is no software fallback.
         with (destination / "gpu-topology.json").open("w") as log:
