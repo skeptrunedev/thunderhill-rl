@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import subprocess
 import sys
@@ -89,7 +90,6 @@ def evaluate(
     )
 
     from training.alpagym_bridge import (
-        SCENE_ID,
         GodotRuntime,
         driver_grpc,
         runtime,
@@ -143,7 +143,7 @@ def evaluate(
                     ],
                     rollout_specs=[
                         runtime.RolloutSpec(
-                            scenario_id=SCENE_ID,
+                            scenario_id=service.scene_id,
                             nr_rollouts=episodes,
                             session_uuids=[f"evaluation_seed_{i}" for i in range(episodes)],
                         )
@@ -167,6 +167,8 @@ def evaluate(
                 "model": str(model),
                 "policy_version": version,
                 "policy_version_source": "evaluation_identity_not_live_cosmos_version",
+                "scenario_id": service.scene_id,
+                "initial_speed_m_s": game.get("initial_speed_m_s", 0.0),
                 "episodes": rows,
             },
         )
@@ -180,7 +182,8 @@ def evaluate(
 
 
 def validate(
-    source: Path, model: Path, output: Path, *, seconds: float, budget: float
+    source: Path, model: Path, output: Path, *, seconds: float, budget: float,
+    initial_speed_m_s: float = 0.0,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
     from training.nvidia_alpagym import prepare
@@ -199,12 +202,14 @@ def validate(
         max_wall_seconds=budget / 2,
         max_video_seconds=budget / 4,
         model_name="Alpamayo 1.5 native RL",
+        initial_speed_m_s=initial_speed_m_s,
     )
     report = {
         "run_dir": str(run_dir),
         "state": "running",
         "optimizer_updates_verified": False,
         "checkpoint_reload_verified": False,
+        "initial_speed_m_s": initial_speed_m_s,
     }
     write_json(run_dir / "validation.json", report)
 
@@ -258,6 +263,13 @@ def validate(
             "baseline-evaluation.log",
         )
         launch(["training.nvidia_alpagym", "run", str(run_dir)], "native-training.log")
+        if os.environ.get("ALPAGYM_SKIP_ALL_PADDING_MINIBATCHES") == "1":
+            padding_reports = list(run_dir.glob("cosmos/**/padding_skip_verification.json"))
+            if len(padding_reports) != 1:
+                raise RuntimeError("Missing unique native padding state equivalence proof")
+            report["padding_skip_verification"] = json.loads(padding_reports[0].read_text())
+            if not report["padding_skip_verification"]["passed"]:
+                raise RuntimeError("Native padding state equivalence proof failed")
         exports = sorted(
             run_dir.glob("cosmos/**/safetensors/step_*"),
             key=lambda p: int(p.name.split("_")[-1]),
@@ -310,15 +322,19 @@ def validate(
         comparison["frozen_vlm_unchanged"] = not frozen_changes
         write_json(run_dir / "weight_comparison.json", comparison)
         gradients = []
+        padding_skipped = 0
         for logfile in (run_dir / "logs").rglob("*.log"):
+            log_text = logfile.read_text(errors="replace")
+            padding_skipped += log_text.count("AlpaGym skipped all-padding minibatch")
             gradients.extend(
                 float(x)
                 for x in re.findall(
                     r"AlpaGym trainer minibatch[^\n]*grad_norm=([0-9.eE+\-]+)",
-                    logfile.read_text(errors="replace"),
+                    log_text,
                 )
             )
         report.update(
+            padding_minibatches_skipped=padding_skipped,
             export=str(trained),
             weights_changed=comparison["weights_changed"],
             nonzero_gradient_minibatches=sum(
@@ -426,6 +442,7 @@ def main():
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--seconds", type=float, default=5)
     run.add_argument("--budget", type=float, default=3300)
+    run.add_argument("--initial-speed-m-s", type=float, default=0.0)
     args = parser.parse_args()
     if args.command == "evaluate":
         evaluate(
@@ -442,6 +459,7 @@ def main():
                     args.output,
                     seconds=args.seconds,
                     budget=args.budget,
+                    initial_speed_m_s=args.initial_speed_m_s,
                 )
             )
         )

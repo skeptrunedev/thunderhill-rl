@@ -1,0 +1,154 @@
+diff --git a/packages/runtime/src/alpagym_runtime/cosmos/trainer.py b/packages/runtime/src/alpagym_runtime/cosmos/trainer.py
+index 71edf3e..ed7ac59 100644
+--- a/packages/runtime/src/alpagym_runtime/cosmos/trainer.py
++++ b/packages/runtime/src/alpagym_runtime/cosmos/trainer.py
+@@ -377,6 +377,33 @@ class AlpagymGRPOTrainer(_grpo_trainer.GRPOTrainer):
+         minibatch_samples: list[Any],
+         minibatch_advantages: torch.Tensor,
+         inter_policy_nccl: dist_util.HighAvailabilitylNccl,
++    ) -> tuple[float, float, float, float, float, float]:
++        """Skip only verified no-op padding on a single policy rank."""
++        if os.environ.get("ALPAGYM_SKIP_ALL_PADDING_MINIBATCHES") == "1":
++            inter_policy_nccl.wait_comm_ready()
++            if inter_policy_nccl.world_size() != 1:
++                raise ValueError("Padding skip requires exactly one policy replica")
++            if self.parallel_dims.world_size != 1:
++                raise ValueError("Padding skip requires exactly one policy rank")
++            if not getattr(self, "_padding_skip_verified", False):
++                from alpagym_runtime.cosmos.padding_skip import verify_padding_skip
++
++                report = verify_padding_skip(self, minibatch_samples[0], inter_policy_nccl)
++                self._padding_skip_verified = True
++                logger.info("AlpaGym padding skip verification: %s", report)
++            if all(bool(row.training_signal.is_padding.all()) for row in minibatch_samples):
++                self.optimizers.zero_grad()
++                logger.info("AlpaGym skipped all-padding minibatch rows=%d", len(minibatch_samples))
++                return 0.0, 0.0, 1.0, 1.0, 0.0, 0.0
++        return self._train_minibatch_full(
++            minibatch_samples, minibatch_advantages, inter_policy_nccl
++        )
++
++    def _train_minibatch_full(
++        self,
++        minibatch_samples: list[Any],
++        minibatch_advantages: torch.Tensor,
++        inter_policy_nccl: dist_util.HighAvailabilitylNccl,
+     ) -> tuple[float, float, float, float, float, float]:
+         """Train on a single step-level minibatch and apply gradient.
+ 
+--- /dev/null
++++ b/packages/runtime/src/alpagym_runtime/cosmos/padding_skip.py
+@@ -0,0 +1,113 @@
++"""Verify an all-padding native forward is state neutral before skipping it."""
++
++import json
++import random
++import time
++from dataclasses import replace
++from pathlib import Path
++
++import numpy as np
++import torch
++
++
++def _snapshot(value):
++    if isinstance(value, torch.Tensor):
++        if isinstance(value, torch.distributed.tensor.DTensor):
++            value = value.to_local()
++        return value.detach().cpu().clone()
++    if isinstance(value, dict):
++        return {key: _snapshot(item) for key, item in value.items()}
++    if isinstance(value, (tuple, list)):
++        return type(value)(_snapshot(item) for item in value)
++    if isinstance(value, np.ndarray):
++        return value.copy()
++    return value
++
++
++def _equal(left, right):
++    if isinstance(left, torch.Tensor):
++        return (isinstance(right, torch.Tensor) and left.dtype == right.dtype
++                and left.shape == right.shape and torch.equal(left, _snapshot(right)))
++    if isinstance(left, dict):
++        return left.keys() == right.keys() and all(_equal(left[k], right[k]) for k in left)
++    if isinstance(left, (tuple, list)):
++        return len(left) == len(right) and all(_equal(a, b) for a, b in zip(left, right))
++    if isinstance(left, np.ndarray):
++        return np.array_equal(left, right)
++    return left == right
++
++
++def verify_padding_skip(trainer, sample, inter_policy_nccl):
++    """Run the unchanged native masked forward/backward on genuine replay inputs.
++
++    Fail closed if parameters, optimizer state, buffers or RNG change. The
++    ordinary next valid minibatch then starts from the exact same persistent
++    state as a skipped padding minibatch. The probe never applies a reward or
++    optimizer update and does not restore or overwrite any training state.
++    """
++    if trainer.parallel_dims.world_size != 1:
++        raise ValueError("Padding skip requires exactly one policy rank")
++    inter_policy_nccl.wait_comm_ready()
++    if inter_policy_nccl.world_size() != 1:
++        raise ValueError("Padding skip requires exactly one policy replica")
++    if torch.cuda.current_stream() != trainer.train_stream:
++        raise ValueError("Padding skip requires forward and optimizer on the native training stream")
++    for module in trainer.model.modules():
++        if isinstance(module, torch.nn.modules.dropout._DropoutNd) and module.p != 0:
++            raise ValueError("Padding skip does not support stochastic dropout")
++        if getattr(module, "attention_dropout", 0.0) != 0.0:
++            raise ValueError("Padding skip does not support attention dropout")
++    started = time.monotonic()
++    torch.cuda.synchronize()
++    parameters = _snapshot(dict(trainer.model.named_parameters()))
++    buffers = _snapshot(dict(trainer.model.named_buffers()))
++    optimizer = _snapshot([item.state_dict() for item in trainer.optimizers])
++    cpu_rng = torch.get_rng_state().clone()
++    cuda_rng = [state.clone() for state in torch.cuda.get_rng_state_all()]
++    python_rng = random.getstate()
++    numpy_rng = _snapshot(np.random.get_state())
++    padding = replace(
++        sample,
++        training_signal=replace(
++            sample.training_signal,
++            old_logprobs=torch.zeros_like(sample.training_signal.old_logprobs),
++            is_padding=torch.ones_like(sample.training_signal.is_padding),
++        ),
++    )
++    forward_started = time.monotonic()
++    result = trainer._train_minibatch_full(
++        [padding], torch.zeros(1, dtype=torch.float32), inter_policy_nccl
++    )
++    torch.cuda.synchronize()
++    forward_seconds = time.monotonic() - forward_started
++    checks = {
++        "neutral_metrics": result == (0.0, 0.0, 1.0, 1.0, 0.0, 0.0),
++        "parameters_exact": _equal(parameters, dict(trainer.model.named_parameters())),
++        "buffers_exact": _equal(buffers, dict(trainer.model.named_buffers())),
++        "optimizer_exact": _equal(optimizer, [item.state_dict() for item in trainer.optimizers]),
++        "cpu_rng_exact": torch.equal(cpu_rng, torch.get_rng_state()),
++        "cuda_rng_exact": _equal(cuda_rng, torch.cuda.get_rng_state_all()),
++        "python_rng_exact": python_rng == random.getstate(),
++        "numpy_rng_exact": _equal(numpy_rng, np.random.get_state()),
++        "gradients_cleared": all(p.grad is None for p in trainer.model.parameters()),
++    }
++    report = {
++        "schema": "native_padding_skip_verification_v1",
++        "checks": checks,
++        "passed": all(checks.values()),
++        "native_padding_forward_seconds": forward_seconds,
++        "audit_seconds": time.monotonic() - started,
++        "parameters_checked": len(parameters),
++        "buffers_checked": len(buffers),
++        "rollout_id": sample.rollout_id,
++        "policy_world_size": trainer.parallel_dims.world_size,
++        "inter_policy_world_size": inter_policy_nccl.world_size(),
++        "forward_optimizer_same_stream": True,
++        "note": "Exact persistent-state equivalence; no RNG restoration or optimizer state repair.",
++    }
++    destination = Path(trainer.config.train.output_dir) / "padding_skip_verification.json"
++    destination.parent.mkdir(parents=True, exist_ok=True)
++    destination.write_text(json.dumps(report, indent=2) + "\n")
++    if not report["passed"]:
++        raise RuntimeError(f"Native padding skip state verification failed: {checks}")
++    return report

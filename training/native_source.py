@@ -1,4 +1,4 @@
-"""Verify the pinned NVIDIA source plus our explicit navigation transport patch."""
+"""Verify pinned NVIDIA source plus individually reviewed, versioned patches."""
 
 from __future__ import annotations
 
@@ -13,14 +13,18 @@ PATCH = (
     / "tools/patches/alpagym-native-navigation.patch"
 )
 MANIFEST = PATCH.with_suffix(".json")
+PATCHES = (PATCH, PATCH.with_name("alpagym-padding-skip.patch"))
 
 
 def verify_source(source: Path, *, apply_patch: bool = False) -> dict:
     """Accept only the pinned base with the exact reviewed patch, never arbitrary dirt."""
     source = source.resolve()
-    manifest = json.loads(MANIFEST.read_text())
-    if hashlib.sha256(PATCH.read_bytes()).hexdigest() != manifest["patch_sha256"]:
-        raise ValueError("Navigation patch does not match its manifest")
+    manifests = [json.loads(patch.with_suffix(".json").read_text()) for patch in PATCHES]
+    for patch, manifest in zip(PATCHES, manifests):
+        if hashlib.sha256(patch.read_bytes()).hexdigest() != manifest["patch_sha256"]:
+            raise ValueError(f"Native patch does not match its manifest: {patch.name}")
+        if manifest["upstream_revision"] != ALPAGYM_REVISION:
+            raise ValueError(f"Native patch targets a different revision: {patch.name}")
     head = subprocess.check_output(
         ["git", "-C", str(source), "rev-parse", "HEAD"], text=True
     ).strip()
@@ -31,30 +35,36 @@ def verify_source(source: Path, *, apply_patch: bool = False) -> dict:
             ["git", "-C", str(source), "diff", "HEAD", "--name-only"], text=True
         ).splitlines()
     )
-    expected = set(manifest["files"])
+    expected = set().union(*(set(item["files"]) for item in manifests))
     untracked = set(
         subprocess.check_output(
             ["git", "-C", str(source), "ls-files", "--others", "--exclude-standard"],
             text=True,
         ).splitlines()
     )
-    if untracked - set(manifest.get("added_files", [])):
+    allowed_added = set().union(*(set(item.get("added_files", [])) for item in manifests))
+    if untracked - allowed_added:
         raise ValueError("NVIDIA checkout contains unreviewed untracked files")
     changed.update(untracked)
-    if not changed and apply_patch:
-        subprocess.run(
-            ["git", "-C", str(source), "apply", "--check", str(PATCH)], check=True
-        )
-        subprocess.run(["git", "-C", str(source), "apply", str(PATCH)], check=True)
-        changed = expected
+    if changed - expected:
+        raise ValueError("NVIDIA checkout contains unreviewed modifications")
+    for patch, manifest in zip(PATCHES, manifests):
+        patch_files = set(manifest["files"])
+        present = changed & patch_files
+        if not present and apply_patch:
+            subprocess.run(
+                ["git", "-C", str(source), "apply", "--check", str(patch)], check=True
+            )
+            subprocess.run(["git", "-C", str(source), "apply", str(patch)], check=True)
+            changed.update(patch_files)
+        for name, digest in manifest["files"].items():
+            if not (source / name).is_file() or hashlib.sha256((source / name).read_bytes()).hexdigest() != digest:
+                raise ValueError(f"Unreviewed or missing NVIDIA source modification: {name}")
     if changed != expected:
         raise ValueError(
-            "NVIDIA checkout must contain exactly the reviewed navigation patch; run tools/setup_alpagym.py"
+            "NVIDIA checkout must contain exactly the reviewed patches; run tools/setup_alpagym.py"
         )
-    for name, digest in manifest["files"].items():
-        if hashlib.sha256((source / name).read_bytes()).hexdigest() != digest:
-            raise ValueError(f"Unreviewed NVIDIA source modification: {name}")
-    return manifest
+    return {"version": "reviewed_native_adaptations_v1", "upstream_revision": head, "patches": manifests}
 
 
 def validate_navigation_checkpoint(checkpoint: Path) -> dict:
