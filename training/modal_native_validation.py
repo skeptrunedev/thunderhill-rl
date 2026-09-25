@@ -11,7 +11,7 @@ runtime_image = (
     .add_local_dir(
         str(ROOT / "training"),
         REMOTE + "/training",
-        ignore=["alpamayo", "__pycache__", "results", "*.md"],
+        ignore=["alpamayo", ".venv", "__pycache__", "results", "*.md"],
     )
     .add_local_dir(
         str(ROOT / "tools"), REMOTE + "/tools", ignore=["__pycache__", "*.md"]
