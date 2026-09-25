@@ -26,9 +26,16 @@ WARMUP_SECONDS = 1.5
 START_LATERAL_ACCELERATION_M_S2 = 5.0
 START_BRAKING_M_S2 = 4.0
 # The warmup rides straight with zero steer, so a start must have a straight
-# enough centerline over the whole warmup distance plus a short margin.
+# enough centerline over the whole warmup distance. It must then stay straight
+# for a lead time after handoff, so the policy makes several decisions before
+# its first corner instead of inheriting one it can no longer make.
 START_STRAIGHT_TOLERANCE_M = 0.5
 START_MARGIN_M = 10.0
+START_LEAD_SECONDS = 2.0
+
+
+def _straight_distance(speed):
+    return speed * WARMUP_SECONDS + max(START_MARGIN_M, speed * START_LEAD_SECONDS)
 _ROLLING = re.compile(
     r"thunderhill-east(?:-station-(?P<station>\d+\.\d+)m)?-rolling-(?P<speed>\d+\.\d+)mps"
 )
@@ -128,7 +135,7 @@ def start_candidates(road, max_speed: float) -> list[dict]:
     count = len(road.samples)
     candidates = []
     for index, row in enumerate(road.samples):
-        warmup = max_speed * WARMUP_SECONDS + START_MARGIN_M
+        warmup = _straight_distance(max_speed)
         # Hold a speed that is safe everywhere along the warmup and at handoff.
         speed = limits[index]
         travelled, cursor = 0.0, index
@@ -142,7 +149,7 @@ def start_candidates(road, max_speed: float) -> list[dict]:
         speed = math.floor(speed * 10) / 10
         if speed <= 0:
             continue
-        deviation = _straight_deviation(road, index, speed * WARMUP_SECONDS + START_MARGIN_M)
+        deviation = _straight_deviation(road, index, _straight_distance(speed))
         if deviation <= START_STRAIGHT_TOLERANCE_M:
             candidates.append(
                 dict(

@@ -16,9 +16,12 @@ fixed episode horizon (`episode_seconds`, warmup excluded).
 | Metric | Scale | Meaning |
 | --- | --- | --- |
 | progress | 1 | Credited legal progress over the fixed horizon, in reference distances |
-| collision_cost | negative 1 | Obstacle contact, `v^2 / (2 * 0.25 g)` metres at contact onset |
-| offroad_cost | negative 1 | Leaving the track surface, same kinetic cost at each excursion onset |
-| fall_cost | negative 1 | Motorcycle fall without obstacle contact, same kinetic cost |
+
+v5 removed v4's kinetic incident costs (`collision_cost`, `offroad_cost`,
+`fall_cost`, still reported as diagnostics). Every incident already ends the
+episode and forfeits the rest of the horizon, so charging it again made the v4
+qualification rank a stall before a corner above attempting the corner and
+running wide.
 
 `progress` keeps NVIDIA's name, but it is a progress rate over a fixed horizon,
 not a fraction of the full circuit. Credited progress is signed legal distance
