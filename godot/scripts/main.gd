@@ -15,6 +15,8 @@ const SNAPSHOT_GAME_FIELDS := [
 	"lap_valid",
 	"last_progress",
 	"legal_distance",
+	"lap_distance_origin",
+	"model_control_start",
 	"next_gate",
 	"passed_gates",
 	"wheel_rotation",
@@ -40,6 +42,8 @@ var completed_laps := 0
 var lap_valid := true
 var last_progress := 0.0
 var legal_distance := 0.0
+var lap_distance_origin := 0.0
+var model_control_start: Dictionary = {}
 var next_gate := 1
 var passed_gates := 0
 var episode_id: String
@@ -468,6 +472,8 @@ func reset_episode(
 	lap_time = 0
 	completed_laps = 0
 	legal_distance = 0
+	lap_distance_origin = 0
+	model_control_start = {}
 	passed_gates = 0
 	last_progress = float(track.samples[index].s) / track.length_m
 	next_gate = (int(last_progress * 32) + 1) % 32
@@ -804,18 +810,22 @@ func _step(action: Dictionary) -> Dictionary:
 		passed_gates += 1
 		next_gate = (next_gate + 1) % 32
 		events.append({"type": "gate", "gate": gate})
-		if passed_gates >= 32:
-			completed_laps += 1
-			events.append({"type": "lap", "time": lap_time, "valid": lap_valid})
-			passed_gates = 0
-			if agent_mode:
-				terminated = true
-				termination_reason = "lap_completed"
-			else:
-				lap_time = 0
-				lap_valid = true
 	if after.on_track and absf(moved) < 5.0:
 		legal_distance += moved
+	# Fixed track gates can all be passed before a full circuit when the lap
+	# begins partway through a gate sector. Retain the gate count until the
+	# measured legal distance also reaches a full circuit from its origin.
+	if passed_gates >= 32 and legal_distance - lap_distance_origin >= track.length_m:
+		completed_laps += 1
+		events.append({"type": "lap", "time": lap_time, "valid": lap_valid})
+		passed_gates = 0
+		lap_distance_origin = legal_distance
+		if agent_mode:
+			terminated = true
+			termination_reason = "lap_completed"
+		else:
+			lap_time = 0
+			lap_valid = true
 	last_progress = after.progress
 	if sim.crashed:
 		lap_valid = false
@@ -1268,6 +1278,38 @@ func _request(request: Dictionary) -> Dictionary:
 		)
 	if request.get("episode_id", "") != episode_id:
 		return {"error": "Episode mismatch"}
+	if op == "begin_model_control":
+		for key: Variant in request:
+			if key not in ["op", "episode_id", "expected_tick"]:
+				return {"error": "Unknown model control handoff field: " + str(key)}
+		if request.get("expected_tick", -1) != sim.tick:
+			return {"error": "Model control handoff tick mismatch"}
+		if not model_control_start.is_empty():
+			return {"error": "Model control already started"}
+		if terminated or not truncation_reason.is_empty() or not environment_failure.is_empty():
+			return {"error": "Cannot hand off a finished episode"}
+		if not lap_valid or sim.crashed or not sim.on_track:
+			return {"error": "Cannot hand off an invalid warmup"}
+		model_control_start = {
+			"tick": sim.tick,
+			"station_m": last_progress * track.length_m,
+			"initial_legal_distance_m": legal_distance,
+			"speed_m_s": sim.speed,
+		}
+		# Only lap accounting changes. Physics, sensor identity and the absolute
+		# episode tick budget retain the complete measured warmup history.
+		legal_distance = 0.0
+		lap_distance_origin = 0.0
+		lap_time = 0.0
+		completed_laps = 0
+		passed_gates = 0
+		next_gate = (int(last_progress * 32) + 1) % 32
+		_record({"type": "model_control_start", "handoff": model_control_start.duplicate(true)})
+		if recorder:
+			recorder.flush()
+		var handoff_observation := observation()
+		handoff_observation["model_control_start"] = model_control_start.duplicate(true)
+		return handoff_observation
 	if op == "observe":
 		return observation()
 	if op == "snapshot":

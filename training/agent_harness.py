@@ -114,6 +114,22 @@ class ThunderhillEnv:
             + json.dumps(self._view())
         )
 
+    def begin_model_control(self) -> str:
+        """Trainer-only handoff after measured history; never a policy action."""
+        before = self._observation
+        observation = self._request({
+            "op": "begin_model_control",
+            "episode_id": before["episode_id"],
+            "expected_tick": before["tick"],
+        })
+        if observation["tick"] != before["tick"] or observation["state"] != before["state"]:
+            self._fault = "Model control handoff changed physical state"
+            raise RuntimeError(self._fault)
+        self._observation = observation
+        self._receipt = secrets.token_hex(4)
+        self._log("model_control_start", handoff=observation["model_control_start"])
+        return json.dumps(self._view())
+
     def observe(self) -> str:
         """Read the current observation without advancing simulation time.
 
