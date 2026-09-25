@@ -278,6 +278,26 @@ def validate(
                     "--device", "cuda:0", "--decisions", "64",
                 ], "replay-storage-verification.log")
                 report["replay_storage_verification"] = json.loads((run_dir / "replay-storage-verification.json").read_text())
+                launch([
+                    "tools.check_native_capture", "--model-input", str(replay_fixture),
+                    "--config", str(run_dir / "resolved_config.yaml"),
+                    "--output", str(run_dir / "capture-verification"), "--device", "cuda:0",
+                ], "capture-verification.log")
+                capture = json.loads((run_dir / "capture-verification/report.json").read_text())
+                if capture.get("passed") is not True:
+                    raise RuntimeError("Native observation capture did not reconstruct exactly")
+                report["capture_verification"] = capture
+                launch([
+                    "tools.check_native_padding_replay", "--model-input", str(replay_fixture),
+                    "--config", str(run_dir / "resolved_config.yaml"),
+                    "--checkpoint", str(model),
+                    "--output", str(run_dir / "padding-replay-verification"), "--device", "cuda:0",
+                ], "padding-replay-verification.log")
+                padding_replay = json.loads((run_dir / "padding-replay-verification/report.json").read_text())
+                if (padding_replay.get("status") != "completed"
+                        or padding_replay.get("mixed_batch_singleton_within_tolerance") is not True):
+                    raise RuntimeError("Native padded batch replay failed qualification")
+                report["padding_replay_verification"] = padding_replay
             launch(
                 [
                     "tools.check_camera",
