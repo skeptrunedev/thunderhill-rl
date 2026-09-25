@@ -177,12 +177,19 @@ def verify_restored_state(trainer, extra: dict) -> dict:
         )
         checks[name + "_exact"] = bool(_equal(saved, current.state_dict()))
         del saved
+    if all(checks.values()):
+        # CheckpointMananger already rebuilt this scheduler using the saved
+        # horizon and loaded its state before restoring the optimizer. Native
+        # GRPO's first-batch rebuild would reset optimizer LR to warmup zero.
+        # Retain the verified native scheduler instead of initializing it twice.
+        trainer.lr_schedulers_updated = True
     report = dict(
         passed=all(checks.values()),
         checks=checks,
         checkpoint=str(checkpoint),
         checkpoint_step=plan["checkpoint_step"],
         fallback_to_base_accepted=False,
+        native_restored_scheduler_initialized=all(checks.values()),
     )
     from training.native_campaign import write_json
 
