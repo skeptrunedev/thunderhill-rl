@@ -7,7 +7,7 @@ from training.modal_native import REMOTE, ROOT, UPSTREAM, cache, image, runs
 app = modal.App("thunderhill-native-gpu-validation")
 
 runtime_image = (
-    image.env({"NVIDIA_DRIVER_CAPABILITIES": "all"})
+    image.env({"NVIDIA_DRIVER_CAPABILITIES": "all", "NCCL_DEBUG": "INFO"})
     .add_local_dir(
         str(ROOT / "training"),
         REMOTE + "/training",
