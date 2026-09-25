@@ -17,6 +17,7 @@ import hashlib
 import io
 import json
 import math
+import os
 from pathlib import Path
 import threading
 import time
@@ -775,6 +776,11 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     client.request(
                         dict(op="reset", policy_id="alpagym-recording-closed")
                     )
+                    if os.environ.get("THUNDERHILL_REMOTE_GODOT") == "1":
+                        # Godot wrote the recording on the rendering host.
+                        from remote_godot import pull
+
+                        pull(data)
                     paths = list(data.rglob(f"{episode_id}.jsonl"))
                     if len(paths) != 1:
                         raise RuntimeError(

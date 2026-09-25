@@ -100,17 +100,7 @@ def repair_archived_recordings(run_dir, destination, deadline):
             raise RuntimeError("Archived campaign status changed during recording repair")
 
 
-@app.function(
-    image=runtime_image,
-    gpu="H100!:2",
-    cpu=16,
-    memory=393216,
-    timeout=3600,
-    retries=0,
-    volumes={"/model-cache": cache, "/runs": runs},
-    include_source=False,
-)
-def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1, repair_recordings: str = "", scatter_diagnostics: bool = False,
+def _validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1, repair_recordings: str = "", scatter_diagnostics: bool = False,
                  initial_speed_m_s: float = 8.0, randomized_starts: int = 0, start_seed: int = 0,
                  rollouts: int = 6):
     import json
@@ -236,6 +226,25 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
         runs.commit()
         print(f"Validation artifacts: {destination}")
     return str(destination)
+
+
+@app.function(
+    image=runtime_image,
+    gpu="H100!:2",
+    cpu=16,
+    memory=393216,
+    timeout=3600,
+    retries=0,
+    volumes={"/model-cache": cache, "/runs": runs},
+    include_source=False,
+)
+def validate_gpu(source_revision: str, *args, remote_host: dict | None = None, **kwargs):
+    from contextlib import nullcontext
+
+    from training.modal_remote_godot import remote_godot
+
+    with (remote_godot(source_revision, **remote_host) if remote_host else nullcontext()):
+        return _validate_gpu(source_revision, *args, **kwargs)
 
 
 @app.function(
@@ -368,17 +377,7 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
     return {"artifacts": str(destination), **receipt}
 
 
-@app.function(
-    image=runtime_image,
-    gpu="H100!",
-    cpu=8,
-    memory=32768,
-    timeout=900,
-    retries=0,
-    volumes={"/runs": runs},
-    include_source=False,
-)
-def diagnose_camera(source_revision: str, hang_seconds: float = 180):
+def _diagnose_camera(source_revision: str, hang_seconds: float = 180):
     """Run only the rendered camera preflight; dump Godot stacks if it hangs."""
     import json
     import os
@@ -430,6 +429,25 @@ def diagnose_camera(source_revision: str, hang_seconds: float = 180):
     return {"artifacts": str(destination), **receipt}
 
 
+@app.function(
+    image=runtime_image,
+    gpu="H100!",
+    cpu=8,
+    memory=32768,
+    timeout=900,
+    retries=0,
+    volumes={"/runs": runs},
+    include_source=False,
+)
+def diagnose_camera(source_revision: str, *args, remote_host: dict | None = None, **kwargs):
+    from contextlib import nullcontext
+
+    from training.modal_remote_godot import remote_godot
+
+    with (remote_godot(source_revision, **remote_host) if remote_host else nullcontext()):
+        return _diagnose_camera(source_revision, *args, **kwargs)
+
+
 @app.local_entrypoint()
 def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_dispatch: str = "", diagnostic_config: str = "",
@@ -440,7 +458,7 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_stress_iterations: int = 50, diagnostic_policy_step: bool = False,
          diagnostic_model_input: str = "",
          initial_speed_m_s: float = 8.0, randomized_starts: int = 0, start_seed: int = 0,
-         rollouts: int = 6, camera_preflight_only: bool = False):
+         rollouts: int = 6, camera_preflight_only: bool = False, remote_godot: bool = False):
     import subprocess
 
     if diagnostic_policy_step and not diagnostic_threaded_stress:
@@ -459,8 +477,13 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
     revision = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
+    remote_host = None
+    if remote_godot:
+        from training.modal_remote_godot import start_host
+
+        remote_host = start_host(app.app_id)
     if camera_preflight_only:
-        print(diagnose_camera.remote(revision))
+        print(diagnose_camera.remote(revision, remote_host=remote_host))
         return
     if diagnostic_dispatch or diagnostic_model_input:
         if repair_recordings or scatter_diagnostics:
@@ -475,4 +498,5 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
                                        diagnostic_model_input))
     else:
         print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings, scatter_diagnostics,
-                                  initial_speed_m_s, randomized_starts, start_seed, rollouts))
+                                  initial_speed_m_s, randomized_starts, start_seed, rollouts,
+                                  remote_host=remote_host))
