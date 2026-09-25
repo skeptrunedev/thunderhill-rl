@@ -368,6 +368,65 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
     return {"artifacts": str(destination), **receipt}
 
 
+@app.function(
+    image=runtime_image.apt_install("gdb"),
+    gpu="H100!",
+    cpu=8,
+    memory=32768,
+    timeout=900,
+    retries=0,
+    volumes={"/runs": runs},
+    include_source=False,
+)
+def diagnose_camera(source_revision: str, hang_seconds: float = 180):
+    """Run only the rendered camera preflight; dump Godot stacks if it hangs."""
+    import json
+    import os
+    import subprocess
+    import time
+    import uuid
+    from pathlib import Path
+
+    os.chdir(REMOTE)
+    destination = Path("/runs/native-diagnostics") / ("camera-" + uuid.uuid4().hex)
+    destination.mkdir(parents=True)
+    receipt = {"diagnostic_only": True, "source_revision": source_revision,
+               "hang_seconds": hang_seconds}
+    log = (destination / "check_camera.log").open("w")
+    process = subprocess.Popen([
+        "xvfb-run", "-a", "-s", "-screen 0 800x600x24",
+        UPSTREAM + "/.venv/bin/python", "-m", "tools.check_camera", "--godot", "godot",
+        "--offscreen", "--rendering-method", "mobile", "--require-hardware",
+        "--initial-capture-timeout", str(hang_seconds), "--trace-render",
+        "--output", str(destination / "camera"),
+    ], stdout=log, stderr=subprocess.STDOUT)
+    started = time.monotonic()
+    while process.poll() is None and time.monotonic() - started < hang_seconds - 30:
+        time.sleep(2)
+    if process.poll() is None:
+        # Still inside the first capture: record where Godot is before it times out.
+        # The game process itself, not xvfb-run or the Python checker.
+        pids = [p for p in subprocess.run(["pgrep", "-f", "--agent-port"], capture_output=True,
+                                          text=True).stdout.split()
+                if "odot" in os.path.realpath(f"/proc/{p}/exe")]
+        for pid in pids:
+            with (destination / f"godot-{pid}-stacks.txt").open("w") as out:
+                subprocess.run(["gdb", "-p", pid, "-batch", "-ex", "thread apply all bt 30"],
+                               stdout=out, stderr=subprocess.STDOUT, timeout=120)
+        with (destination / "nvidia-smi.txt").open("w") as out:
+            subprocess.run(["nvidia-smi"], stdout=out, stderr=subprocess.STDOUT)
+        receipt["hung_pids"] = pids
+    try:
+        process.wait(timeout=hang_seconds + 120)
+    except subprocess.TimeoutExpired:
+        process.kill()
+    receipt.update(returncode=process.returncode, elapsed_seconds=time.monotonic() - started)
+    (destination / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    runs.commit()
+    print(f"Camera diagnostic artifacts: {destination}", flush=True)
+    return {"artifacts": str(destination), **receipt}
+
+
 @app.local_entrypoint()
 def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_dispatch: str = "", diagnostic_config: str = "",
@@ -378,7 +437,7 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_stress_iterations: int = 50, diagnostic_policy_step: bool = False,
          diagnostic_model_input: str = "",
          initial_speed_m_s: float = 8.0, randomized_starts: int = 0, start_seed: int = 0,
-         rollouts: int = 6):
+         rollouts: int = 6, camera_preflight_only: bool = False):
     import subprocess
 
     if diagnostic_policy_step and not diagnostic_threaded_stress:
@@ -397,6 +456,9 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
     revision = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
+    if camera_preflight_only:
+        print(diagnose_camera.remote(revision))
+        return
     if diagnostic_dispatch or diagnostic_model_input:
         if repair_recordings or scatter_diagnostics:
             raise ValueError("Recording repair runs only after successful full qualification")
