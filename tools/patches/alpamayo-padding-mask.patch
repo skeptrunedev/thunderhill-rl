@@ -1,0 +1,232 @@
+diff --git a/alpamayo1_x_rl/models/expert_model/model.py b/alpamayo1_x_rl/models/expert_model/model.py
+index c6a07d5..311b630 100644
+--- a/alpamayo1_x_rl/models/expert_model/model.py
++++ b/alpamayo1_x_rl/models/expert_model/model.py
+@@ -38,6 +38,9 @@ from alpamayo_r1.models.token_utils import (
+     replace_padding_after_eos,
+ )
+ from alpamayo1_x_rl.models.expert_model.expert_model import ExpertModel
++from alpamayo1_x_rl.models.expert_model.padding_mask import (
++    prompt_mask, extend_prompt_mask, mask_expert_prefix,
++)
+ from alpamayo1_x_rl.utils.logit_processor import MaskDiscreteTrajectoryLogitsProcessor
+ from transformers import StoppingCriteriaList
+ from transformers.generation.logits_process import LogitsProcessorList
+@@ -60,7 +63,7 @@ class ExpertModelRL(ExpertModel):
+     def _vlm_prefill(
+         self,
+         data: dict[str, Any],
+-    ) -> tuple[Any, Any, torch.Tensor | None, int]:
++    ) -> tuple[Any, Any, torch.Tensor | None, int, torch.Tensor]:
+         """Run VLM prefill and build action history embeddings.
+ 
+         Extracts common prefill logic shared by sampling and cfm_logprob_sde.
+@@ -71,13 +74,15 @@ class ExpertModelRL(ExpertModel):
+             vlm_outputs: VLM model outputs (carries rope_deltas).
+             action_history_embeds: [B, n_hist, hidden] or None.
+             prefill_seq_len: int, number of VLM prefill tokens.
++            prefix_mask: bool tensor excluding padding from cached prompt keys.
+         """
+         ego_history_xyz = data["ego_history_xyz"]
+         ego_history_rot = data["ego_history_rot"]
+ 
+         tokenized_data = copy.deepcopy(data["tokenized_data"])
+         input_ids = tokenized_data.pop("input_ids")
+-        tokenized_data.pop("attention_mask", None)
++        prefix_mask = prompt_mask(input_ids, tokenized_data.get("attention_mask"))
++        tokenized_data["attention_mask"] = prefix_mask
+         tokenized_data.pop("text", None)
+ 
+         traj_data_vlm = {
+@@ -108,7 +113,7 @@ class ExpertModelRL(ExpertModel):
+         else:
+             action_history_embeds = None
+ 
+-        return prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len
++        return prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len, prefix_mask
+ 
+     def _run_vlm_prefill_with_cache(
+         self,
+@@ -152,7 +157,7 @@ class ExpertModelRL(ExpertModel):
+         self,
+         data: dict[str, Any],
+         vlm_generated_ids: torch.Tensor,
+-    ) -> tuple[Any, Any, torch.Tensor | None, int]:
++    ) -> tuple[Any, Any, torch.Tensor | None, int, torch.Tensor]:
+         """Run VLM prefill with the rollout's generated token IDs appended.
+ 
+         Reconstructs the full sequence that the rollout VLM saw:
+@@ -166,7 +171,8 @@ class ExpertModelRL(ExpertModel):
+ 
+         tokenized_data = copy.deepcopy(data["tokenized_data"])
+         input_ids = tokenized_data.pop("input_ids")
+-        tokenized_data.pop("attention_mask", None)
++        prefix_mask = prompt_mask(input_ids, tokenized_data.get("attention_mask"))
++        tokenized_data["attention_mask"] = prefix_mask
+         tokenized_data.pop("text", None)
+ 
+         traj_data_vlm = {
+@@ -178,8 +184,13 @@ class ExpertModelRL(ExpertModel):
+         future_start_id = self.config.traj_token_ids["future_start"]
+         if input_ids[0, -1] == future_start_id:
+             input_ids = input_ids[:, :-1]
++            prefix_mask = prefix_mask[:, :-1]
+ 
+         input_ids = torch.cat([input_ids, vlm_generated_ids], dim=1)
++        prefix_mask = torch.cat(
++            [prefix_mask, vlm_generated_ids != self.tokenizer.pad_token_id], dim=1
++        )
++        tokenized_data["attention_mask"] = prefix_mask
+ 
+         vlm_outputs = self._run_vlm_prefill_with_cache(
+             input_ids=input_ids,
+@@ -201,7 +212,7 @@ class ExpertModelRL(ExpertModel):
+         else:
+             action_history_embeds = None
+ 
+-        return prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len
++        return prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len, prefix_mask
+ 
+     # ------------------------------------------------------------------
+     # Parallel denoise for cfm_logprob_sde
+@@ -213,6 +224,7 @@ class ExpertModelRL(ExpertModel):
+         vlm_outputs: Any,
+         action_history_embeds: torch.Tensor | None,
+         n_traj_chunks: int,
++        prefix_mask: torch.Tensor,
+     ) -> Any:
+         """Build a closure that denoises all timestep chunks in a single Expert forward pass.
+ 
+@@ -266,9 +278,13 @@ class ExpertModelRL(ExpertModel):
+                 device=device,
+                 dtype=_kv_dtype,
+             )
+-            attention_mask = torch.cat([left, attention_mask], dim=3)
++            attention_mask = mask_expert_prefix(
++                torch.cat([left, attention_mask], dim=3), prefix_mask
++            )
+         else:
+-            attention_mask = None
++            attention_mask = extend_prompt_mask(
++                prefix_mask, prefill_seq_len + n_traj_chunks * tpc
++            )
+ 
+         if action_history_embeds is not None:
+             hist_tiled = action_history_embeds.unsqueeze(1).expand(-1, n_traj_chunks, -1, -1)
+@@ -351,11 +367,11 @@ class ExpertModelRL(ExpertModel):
+         )
+ 
+         if vlm_generated_ids is not None:
+-            prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len = (
++            prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len, prefix_mask = (
+                 self._vlm_prefill_with_generated_ids(data, vlm_generated_ids)
+             )
+         else:
+-            prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len = self._vlm_prefill(
++            prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len, prefix_mask = self._vlm_prefill(
+                 data
+             )
+ 
+@@ -366,6 +382,7 @@ class ExpertModelRL(ExpertModel):
+             vlm_outputs,
+             action_history_embeds,
+             n_traj_chunks,
++            prefix_mask,
+         )
+         model_output = denoise_fn(samples_list[:, :-1], timesteps[:, :-1])
+ 
+@@ -376,6 +393,7 @@ class ExpertModelRL(ExpertModel):
+                 vlm_outputs,
+                 action_history_embeds,
+                 n_traj_chunks,
++                prefix_mask,
+             )
+             ref_model_output = teacher_denoise(samples_list[:, :-1], timesteps[:, :-1])
+ 
+@@ -414,11 +432,12 @@ class ExpertModelRL(ExpertModel):
+         B, n_traj_group, _, _ = ego_history_xyz.shape
+         assert n_traj_group == 1, "Only one trajectory group is supported for inference."
+ 
+-        prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len = self._vlm_prefill(data)
++        prompt_cache, vlm_outputs, action_history_embeds, prefill_seq_len, prefix_mask = self._vlm_prefill(data)
+         device = prompt_cache.layers[0].keys.device
+         _attn_dtype = prompt_cache.layers[0].keys.dtype
+ 
+         prompt_cache.batch_repeat_interleave(n_samples_total)
++        prefix_mask = prefix_mask.repeat_interleave(n_samples_total, dim=0)
+         if action_history_embeds is not None:
+             action_history_embeds = torch.repeat_interleave(
+                 action_history_embeds, n_samples_total, dim=0
+@@ -464,6 +483,8 @@ class ExpertModelRL(ExpertModel):
+                 device=device,
+             )
+ 
++        attention_mask = mask_expert_prefix(attention_mask, prefix_mask)
++
+         forward_kwargs = {}
+         if self.config.expert_non_causal_attention:
+             forward_kwargs["is_causal"] = False
+@@ -584,6 +605,7 @@ class ExpertModelRL(ExpertModel):
+ 
+         tokenized_data = copy.deepcopy(data["tokenized_data"])
+         input_ids = tokenized_data.pop("input_ids")
++        prefix_mask = prompt_mask(input_ids, tokenized_data.get("attention_mask"))
+         tokenized_data.pop("text", None)
+         traj_data_vlm = {
+             "ego_history_xyz": ego_history_xyz,
+@@ -633,6 +655,9 @@ class ExpertModelRL(ExpertModel):
+         )
+         prompt_cache = vlm_outputs.past_key_values
+         prefill_seq_len = prompt_cache.get_seq_length()
++        prefix_mask = extend_prompt_mask(
++            prefix_mask.repeat_interleave(num_traj_samples, dim=0), prefill_seq_len
++        )
+ 
+         if self.expert_hist_traj_tokenizer is not None:
+             action_history_embeds = self.expert_hist_traj_tokenizer(
+@@ -681,6 +706,8 @@ class ExpertModelRL(ExpertModel):
+                 attention_mask.dtype
+             ).min
+ 
++        attention_mask = mask_expert_prefix(attention_mask, prefix_mask)
++
+         forward_kwargs = {}
+         if self.config.expert_non_causal_attention:
+             forward_kwargs["is_causal"] = False
+diff --git a/alpamayo1_x_rl/models/expert_model/padding_mask.py b/alpamayo1_x_rl/models/expert_model/padding_mask.py
+new file mode 100644
+index 0000000..e8a422e
+--- /dev/null
++++ b/alpamayo1_x_rl/models/expert_model/padding_mask.py
+@@ -0,0 +1,31 @@
++# SPDX-License-Identifier: Apache-2.0
++"""Keep actual prompt padding excluded from both prefill and expert KV attention."""
++
++import torch
++
++
++def prompt_mask(input_ids: torch.Tensor, attention_mask: torch.Tensor | None) -> torch.Tensor:
++    if attention_mask is None:
++        return torch.ones_like(input_ids, dtype=torch.bool)
++    if attention_mask.shape != input_ids.shape or attention_mask.ndim != 2:
++        raise ValueError("Prompt padding mask must match the input token grid")
++    return attention_mask.to(device=input_ids.device, dtype=torch.bool)
++
++
++def extend_prompt_mask(mask: torch.Tensor, total_length: int) -> torch.Tensor:
++    if mask.ndim != 2 or total_length < mask.shape[1]:
++        raise ValueError("KV prefix cannot be shorter than the prompt mask")
++    return torch.cat((mask, mask.new_ones((mask.shape[0], total_length - mask.shape[1]))), dim=1)
++
++
++def mask_expert_prefix(attention_mask: torch.Tensor, prefix_mask: torch.Tensor) -> torch.Tensor:
++    """Preserve native suffix/block masks; exclude only padded cached keys."""
++    if (attention_mask.ndim != 4 or prefix_mask.ndim != 2
++            or attention_mask.shape[0] != prefix_mask.shape[0]
++            or attention_mask.shape[-1] < prefix_mask.shape[-1]):
++        raise ValueError("Expert attention and cached prefix mask shapes disagree")
++    attention_mask[..., :prefix_mask.shape[-1]].masked_fill_(
++        ~prefix_mask[:, None, None, :].to(device=attention_mask.device, dtype=torch.bool),
++        torch.finfo(attention_mask.dtype).min,
++    )
++    return attention_mask

@@ -69,12 +69,14 @@ def verify_source(source: Path, *, apply_patch: bool = False) -> dict:
             "NVIDIA checkout must contain exactly the reviewed patches; run tools/setup_alpagym.py"
         )
     from training.native_cosmos_source import patch_manifest
+    from training.native_recipe_source import patch_manifest as recipe_patch_manifest
 
     return {
         "version": "reviewed_native_adaptations_v1",
         "upstream_revision": head,
         "patches": manifests,
         "cosmos_launcher": patch_manifest(),
+        "recipe_padding_mask": recipe_patch_manifest(),
     }
 
 

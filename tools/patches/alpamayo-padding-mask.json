@@ -1,0 +1,15 @@
+{
+  "version": "native_prompt_padding_mask_v1",
+  "upstream_revision": "1d99fc50370c96637157455da386323a44663c9d",
+  "patch_sha256": "fd25d1a1354878affd6d3fd98d5f9bfc34d4acf10bc4988845d02ab541e8c796",
+  "files": {
+    "alpamayo1_x_rl/models/expert_model/model.py": {
+      "original_sha256": "6799ec92596a70aee5479c622175f0e90e5e4dd3df37e980cad16f04e7d95760",
+      "patched_sha256": "0887aab4eecd1f6348e528fe320d97af07c09aaa9fb4e0be5a56a705bd03f370"
+    },
+    "alpamayo1_x_rl/models/expert_model/padding_mask.py": {
+      "original_sha256": null,
+      "patched_sha256": "56165f1c04c056f743f6858b4b9ea0eb438695361ab5edd42980a7e3fd81314e"
+    }
+  }
+}
