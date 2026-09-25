@@ -116,6 +116,7 @@ func _contact_case(
 			hi = mid
 		else:
 			lo = mid
+	print(label, " actual_first=", hi, " distance_bound=", maxf(0.0, hi - result.safe_fraction) * speed_bound, " declared=", result.spatial_uncertainty_m)
 	_check(result.safe_fraction <= hi, label + " safe bound precedes actual overlap")
 	_check(
 		not _hits(envelope, _interpolate(a, b, result.safe_fraction)),

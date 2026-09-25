@@ -1,0 +1,26 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+THUNDERHILL_READY {"episode_id":"1789909047_1047438_1","port":0,"track_samples":1536}
+ERROR: Failed to build Jolt Physics convex polygon shape with {vertex_count=520 margin=0.000000}. It returned the following error: 'Hull building failed, point 53 had an error of 0.0253519 (relative to tolerance: 25.3519)'. This shape belongs to '<unknown>' and 0 other object(s).
+   at: _build (modules/jolt_physics/shapes/jolt_convex_polygon_shape_3d.cpp:62)
+   GDScript backtrace (most recent call first):
+       [0] _interval (res://scripts/bike_sweep.gd:195)
+       [1] sweep (res://scripts/bike_sweep.gd:153)
+       [2] _sample_ground_after_step (res://scripts/main.gd:500)
+       [3] step (res://scripts/motorcycle.gd:220)
+       [4] _step (res://scripts/main.gd:575)
+       [5] check_historical_wall (res://tests/test_wall_contact.gd:248)
+       [6] run (res://tests/test_wall_contact.gd:404)
+ERROR: Parameter "jolt_shape" is null.
+   at: intersect_shape (modules/jolt_physics/spaces/jolt_physics_direct_space_state_3d.cpp:565)
+   GDScript backtrace (most recent call first):
+       [0] _interval (res://scripts/bike_sweep.gd:195)
+       [1] sweep (res://scripts/bike_sweep.gd:153)
+       [2] _sample_ground_after_step (res://scripts/main.gd:500)
+       [3] step (res://scripts/motorcycle.gd:220)
+       [4] _step (res://scripts/main.gd:575)
+       [5] check_historical_wall (res://tests/test_wall_contact.gd:248)
+       [6] run (res://tests/test_wall_contact.gd:404)
+HISTORICAL_WALL_STEP_MS 54.241
+HISTORICAL_WALL_CONTACT {"candidate_preimpact_state":{"assist_enabled":true,"auto_shift":true,"automatic_launch_clutch":true,"collision_contact":{},"combined_force_policy":"lateral_priority","crash_reason":"","crashed":false,"dynamics_version":"reduced-order-combined-assist-v5","elapsed":0.00833333333333333,"front_brake_applied":0.0,"front_force_n":0.0,"front_lateral_capacity_n":1601.89349712668,"front_lateral_force_n":1.13375676526294,"front_load_n":1456.26681556971,"gear":6,"gravity_forward_m_s2":-0.215824347697198,"gravity_normal_m_s2":9.80762252211571,"gravity_right_m_s2":-0.00818596829543822,"grip_utilization":0.000829853600736967,"heading":-1.59689548727185,"ideal_tire_force_limiter":true,"last_shift_command":0,"lateral_acceleration":0.00000000112884290977278,"lateral_capacity_n":2732.4259706919,"lateral_force_n":2.26751353052587,"lean":0.0,"lean_rate":0.0,"lean_relative_road_rad":0.000834653607937367,"longitudinal_acceleration":-7.72557406459031,"longitudinal_force_scale":1.0,"longitudinal_velocity":79.9356202161284,"on_track":true,"position":[0.210673868656158,1.5583233833313,237.145065307617],"rear_brake_applied":0.0,"rear_force_n":-236.25,"rear_lateral_capacity_n":1366.21298534595,"rear_lateral_force_n":1.13375676526294,"rear_load_n":1260.44462305634,"requested_controls":{"throttle":0.0},"requested_lateral_force_n":2.26751353052587,"road_bank_rad":-0.000834653607937367,"rpm":15040.1421221841,"shift_remaining":0.0,"speed":79.9356202161284,"steering":0.000000000000263867030159386,"target_lean":0.0,"throttle_applied":0.0,"tick":1,"unsupported":["suspension","wheel_slip","yaw_inertia","steered_tire_force_rotation","tire_temperature","pitch_dynamics","wheelies","airborne_motion","crash_contacts","surface_curvature_normal_load","surface_frame_rotation_dynamics"]},"component_id":"root/1/0/0","interval_end_fraction":0.39111328125,"intervals":15,"obstacle_kind":"pit_wall","queries":738,"root_rotation":[0.0220023300498724,1.5968953371048,0.00000000186309612182356],"safe_fraction":0.390625,"spatial_uncertainty_m":0.00149631096317336,"status":"possible_contact","type":"obstacle_contact","wheel_rotation":0.813147178305343}
+WALL_CONTACT_CHECK checks=91 failures=0

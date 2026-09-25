@@ -1,0 +1,5 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PIT_WALL_COLLISION_ENGINE Jolt Physics
+PIT_WALL_COLLISION_PROFILE construction_usec=36451 query_usec=328
+PIT_WALL_COLLISION_CHECK checks=124 failures=0

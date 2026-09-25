@@ -1,0 +1,20 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+fast translation sweep {"collider_id":27430749644,"component_id":"test/box","interval_end_fraction":0.496978759765625,"intervals":26,"queries":44,"safe_fraction":0.4969482421875,"spatial_uncertainty_m":0.00147637696628444,"status":"possible_contact"} ms=0.827
+clear broadphase mean ms=0.01093 queries=1
+near miss mean ms=0.03987 queries=3
+root yaw sweep {"collider_id":27430749644,"component_id":"test/box","interval_end_fraction":0.45166015625,"intervals":20,"queries":35,"safe_fraction":0.451416015625,"spatial_uncertainty_m":0.00148273154865991,"status":"possible_contact"} ms=0.773
+body lean sweep {"collider_id":27430749644,"component_id":"test/box","interval_end_fraction":0.45166015625,"intervals":20,"queries":35,"safe_fraction":0.451416015625,"spatial_uncertainty_m":0.00148273154865375,"status":"possible_contact"} ms=0.716
+front steering sweep {"collider_id":27430749644,"component_id":"test/box","interval_end_fraction":0.45166015625,"intervals":20,"queries":35,"safe_fraction":0.451416015625,"spatial_uncertainty_m":0.00148273154865375,"status":"possible_contact"} ms=0.745
+unwrapped wheel revolution sweep {"collider_id":27430749644,"component_id":"test/box","interval_end_fraction":0.2315673828125,"intervals":20,"queries":34,"safe_fraction":0.2314453125,"spatial_uncertainty_m":0.00167332350234816,"status":"possible_contact"} ms=0.764
+precision exhaustion: {"error":"Motorcycle sweep motion exceeds attainable precision"}
+authored hidden helmet lean sweep {"collider_id":27430749644,"component_id":"root/89/4","interval_end_fraction":0.440673828125,"intervals":18,"queries":739,"safe_fraction":0.4404296875,"spatial_uncertainty_m":0.00151375530906921,"status":"possible_contact"} ms=67.965
+ERROR: authored hidden helmet lean first actual overlap agrees with uncertainty
+   at: push_error (core/variant/variant_utility.cpp:1023)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/test_bike_sweep.gd:22)
+       [1] _contact_case (res://tests/test_bike_sweep.gd:130)
+       [2] _run (res://tests/test_bike_sweep.gd:249)
+       [3] _place (res://tests/test_bike_sweep.gd:80)
+authored parallel wall 10 steps median ms=1.744 max ms=1.851 mean queries=601.0
+Bike sweep: 96 checks, 1 failures
