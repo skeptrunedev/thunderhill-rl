@@ -138,11 +138,17 @@ def check_receive_lifetime(root):
             namespace["completion_lambda"]([(target, tensor, event, "fixture")], [], [])
         del tensor
         replacements = []
+        copy_pending_at_allocation = []
+        reused_while_copy_pending = False
         with torch.cuda.stream(receive):
             for _ in range(12):
                 replacement = torch.empty(
                     (2048, 2048), device="cuda", dtype=torch.float32
                 )
+                pending = not event.query()
+                copy_pending_at_allocation.append(pending)
+                if replacement.data_ptr() == pointer and pending:
+                    reused_while_copy_pending = True
                 replacement.fill_(91)
                 replacements.append(replacement)
         reused = any(t.data_ptr() == pointer for t in replacements)
@@ -155,12 +161,21 @@ def check_receive_lifetime(root):
                 "unrecorded_event_popped": popped_unrecorded,
                 "allocation_reused": reused,
                 "observed": observed,
+                "corruption_observed": observed != 37,
+                "copy_pending_at_allocation": copy_pending_at_allocation,
+                "reused_while_copy_pending": reused_while_copy_pending,
             }
         )
         queue.queue.clear()
         del replacements, replacement, other, target, spare
-    assert rows[0]["allocation_reused"] and rows[0]["observed"] == 91, rows
-    assert not rows[1]["allocation_reused"] and rows[1]["observed"] == 37, rows
+    # The defect is allocator reuse while a recorded copy remains incomplete.
+    # Which writer wins that race is nondeterministic; corruption is evidence,
+    # not a required negative-control outcome. The patched value must be exact.
+    assert (
+        rows[0]["unrecorded_event_popped"] and rows[0]["reused_while_copy_pending"]
+    ), rows
+    assert any(rows[1]["copy_pending_at_allocation"]), rows
+    assert not rows[1]["reused_while_copy_pending"] and rows[1]["observed"] == 37, rows
     return {
         "passed": True,
         "transfer_dtype": "float32",
