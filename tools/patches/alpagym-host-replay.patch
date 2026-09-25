@@ -21,20 +21,21 @@ index 04057af..ac7d799 100644
          fresh = [
              pose
 diff --git a/packages/runtime/src/alpagym_runtime/inference/inference_engine.py b/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
-index d2556c0..12dc197 100644
+index d2556c0..8e18e25 100644
 --- a/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
 +++ b/packages/runtime/src/alpagym_runtime/inference/inference_engine.py
-@@ -18,6 +18,9 @@ dead rollout replica through heartbeat timeout and triggers mesh rebuild
+@@ -18,6 +18,10 @@ dead rollout replica through heartbeat timeout and triggers mesh rebuild
  on the surviving replicas.
  """
  
 +from alpagym_runtime.host_replay import host_snapshot
++from alpagym_runtime.scatter_diagnostics import scatter_diagnostics
 +from alpagym_runtime.inference_capture import record_dispatch
 +
  import logging
  import os
  import queue
-@@ -43,6 +46,7 @@ class _PendingRequest:
+@@ -43,6 +47,7 @@ class _PendingRequest:
  
      model_input: ModelInput
      result: Future[ModelOutput]
@@ -42,7 +43,7 @@ index d2556c0..12dc197 100644
  
  
  class _Shutdown:
-@@ -69,10 +73,10 @@ class InferenceEngine:
+@@ -69,10 +74,10 @@ class InferenceEngine:
          self._max_batch_size = max_batch_size
          self._queue: queue.SimpleQueue[_PendingRequest | _Shutdown] = queue.SimpleQueue()
  
@@ -55,7 +56,7 @@ index d2556c0..12dc197 100644
          return future
  
      def build_policy_replay_data(
-@@ -82,11 +86,14 @@ class InferenceEngine:
+@@ -82,11 +87,14 @@ class InferenceEngine:
          action_selection: ActionSelection,
      ) -> PolicyReplayData:
          """Return the selected-action ``PolicyReplayData`` envelope for trainer-side scoring."""
@@ -73,7 +74,7 @@ index d2556c0..12dc197 100644
  
      def get_model(self) -> torch.nn.Module:
          """Return the rollout-serving model object."""
-@@ -119,6 +126,7 @@ class InferenceEngine:
+@@ -119,11 +127,12 @@ class InferenceEngine:
              # --- Phase 2: dispatch through the model ---
              # Forward-pass exceptions kill the process; see module docstring.
              try:
@@ -81,7 +82,13 @@ index d2556c0..12dc197 100644
                  model_inputs = [req.model_input for req in batch]
                  batched_model_input = BatchedModelInput.stack(model_inputs)
                  with timed_scope(
-@@ -150,6 +158,8 @@ class InferenceEngine:
+                     "rollout/inference_forward", category="compute_gpu_wall", gpu_snapshot=True
+-                ):
++                ), scatter_diagnostics():
+                     batched_model_output: BatchedModelOutput = (
+                         self._inference_model.sample_trajectories_from_data(
+                             batched_model_input,
+@@ -150,6 +159,8 @@ class InferenceEngine:
                  sys.stderr.flush()
                  os._exit(1)
  
@@ -197,7 +204,6 @@ index 95cb863..36af2d9 100644
                      for key in sorted(tensor_specs.keys()):
 diff --git a/packages/runtime/src/alpagym_runtime/host_replay.py b/packages/runtime/src/alpagym_runtime/host_replay.py
 new file mode 100644
-index 0000000..1edd119
 --- /dev/null
 +++ b/packages/runtime/src/alpagym_runtime/host_replay.py
 @@ -0,0 +1,24 @@
@@ -227,7 +233,6 @@ index 0000000..1edd119
 +    return value
 diff --git a/packages/runtime/src/alpagym_runtime/inference_capture.py b/packages/runtime/src/alpagym_runtime/inference_capture.py
 new file mode 100644
-index 0000000..7b73f9b
 --- /dev/null
 +++ b/packages/runtime/src/alpagym_runtime/inference_capture.py
 @@ -0,0 +1,109 @@
@@ -340,3 +345,133 @@ index 0000000..7b73f9b
 +        route_waypoints=tuple(RouteWaypoint(**item) for item in value["route_waypoints"]),
 +        route_timestamp_us=value["route_timestamp_us"], calibration=calibration,
 +    )
+diff --git a/packages/runtime/src/alpagym_runtime/scatter_diagnostics.py b/packages/runtime/src/alpagym_runtime/scatter_diagnostics.py
+new file mode 100644
+--- /dev/null
++++ b/packages/runtime/src/alpagym_runtime/scatter_diagnostics.py
+@@ -0,0 +1,125 @@
++"""Explicit, bounded operator attribution for diagnostic gameplay only."""
++
++from contextlib import contextmanager
++import logging
++import os
++import threading
++import time
++
++import torch
++from torch.utils._python_dispatch import TorchDispatchMode
++
++from alpagym_runtime.inference_capture import atomic_json, capture_root
++
++logger = logging.getLogger(__name__)
++
++
++class ScatterDiagnostics(TorchDispatchMode):
++    """Thread-local dispatcher observer; never replaces a global torch function."""
++
++    def __init__(self, root):
++        super().__init__()
++        self.root = root
++        self.index = 0
++        self.started_ns = time.time_ns()
++
++    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
++        kwargs = kwargs or {}
++        if func not in (
++            torch.ops.aten.masked_scatter.default,
++            torch.ops.aten.masked_scatter_.default,
++        ):
++            return func(*args, **kwargs)
++        tensor, mask, source = args[:3]
++        self.index += 1
++        import traceback
++
++        record = {
++            "diagnostic": "synchronous_scatter_attribution_v1",
++            "dispatch_started_ns": self.started_ns,
++            "operator_index": self.index,
++            "operator": str(func),
++            "thread": threading.current_thread().name,
++            "input_shape": list(tensor.shape),
++            "mask_shape": list(mask.shape),
++            "source_shape": list(source.shape),
++            "source_numel": source.numel(),
++            "device": str(tensor.device),
++            "stream": torch.cuda.current_stream(tensor.device).cuda_stream
++            if tensor.is_cuda
++            else None,
++            "stack": traceback.format_stack(limit=12),
++            "stage": "before_count",
++            "limitation": "Count readback and stream synchronization alter timing; passing is not a production correctness claim.",
++        }
++        # Preserve current dispatch identities before another dispatch can overwrite them.
++        import json
++
++        dispatch = self.root / "dispatch.json"
++        if dispatch.is_file():
++            record["dispatch"] = json.loads(dispatch.read_text())
++        path = self.root / "scatter-inflight.json"
++        atomic_json(path, record)
++        started = time.monotonic()
++        try:
++            selected = int(torch.broadcast_to(mask, tensor.shape).sum().cpu().item())
++            record.update(
++                stage="before_operator",
++                selected_elements=selected,
++                enough_source=selected <= source.numel(),
++            )
++            atomic_json(path, record)
++            # The original primitive executes unchanged, even for malformed input.
++            result = func(*args, **kwargs)
++            record["stage"] = "operator_enqueued"
++            atomic_json(path, record)
++            if tensor.is_cuda:
++                torch.cuda.current_stream(tensor.device).synchronize()
++            record.update(
++                stage="operator_completed", elapsed_seconds=time.monotonic() - started
++            )
++            atomic_json(path, record)
++            atomic_json(self.root / "scatter-last-completed.json", record)
++            return result
++        except BaseException as error:
++            record.update(
++                failed_stage=record["stage"],
++                stage="failed",
++                error_type=type(error).__name__,
++                error=str(error),
++                elapsed_seconds=time.monotonic() - started,
++            )
++            atomic_json(path, record)
++            atomic_json(self.root / "scatter-failure.json", record)
++            raise
++
++
++@contextmanager
++def scatter_diagnostics():
++    """Activate only inside the inference thread and only under explicit opt-in."""
++    enabled = os.environ.get("ALPAGYM_SCATTER_DIAGNOSTICS", "0")
++    if enabled == "0":
++        yield
++        return
++    if enabled != "1":
++        raise ValueError("ALPAGYM_SCATTER_DIAGNOSTICS must be 0 or 1")
++    root = capture_root()
++    if root is None:
++        raise ValueError("Scatter diagnostics require ALPAGYM_INFERENCE_CAPTURE_DIR")
++    marker = root / "scatter-mode.json"
++    if not marker.exists():
++        logger.warning(
++            "Scatter diagnostic mode active: synchronous count readback and per-operator CUDA stream synchronization alter timing and add overhead; this is not a production fix"
++        )
++        atomic_json(
++            marker,
++            {
++                "enabled": True,
++                "mode": "synchronous_scatter_attribution_v1",
++                "thread": threading.current_thread().name,
++                "bounded_files": True,
++                "performance_representative": False,
++            },
++        )
++    with ScatterDiagnostics(root):
++        yield
