@@ -30,7 +30,7 @@ def write_json(path: Path, value: dict) -> None:
 
 
 def validated_prerequisites(
-    validation_run: Path, model: Path, gpu: str = "L40S"
+    validation_run: Path, model: Path, gpu: str | None = None
 ) -> dict:
     """Require observed optimization, fresh reload, and hardware rendered gameplay."""
     from training.native_source import validate_navigation_checkpoint
@@ -53,6 +53,13 @@ def validated_prerequisites(
     adapter = camera.get("renderer", {}).get("adapter", "")
     if camera.get("ok") is not True or camera.get("views_per_observation") != 4:
         raise ValueError("Validation lacks successful four camera hardware capture")
+    if gpu is None:
+        matches = [
+            name for name in ("H100", "L40S") if name.casefold() in adapter.casefold()
+        ]
+        if len(matches) != 1:
+            raise ValueError(f"No reviewed campaign GPU matches renderer {adapter!r}")
+        gpu = matches[0]
     if gpu.casefold() not in adapter.casefold() or any(
         word in adapter.casefold()
         for word in ("llvmpipe", "lavapipe", "software", "swiftshader")
@@ -133,32 +140,37 @@ def completed_exports(run_dir: Path) -> list[dict]:
     """
     result = []
     for policy in run_dir.glob("cosmos/**/checkpoints/step_*/policy"):
-        files = [
-            "cosmos_config",
-            "model_rank_0.pth",
-            "optimizer_rank_0.pth",
-            "scheduler_rank_0.pth",
-            "extra_info_rank_0.pth",
-        ]
-        if not (policy / ".rank_0_complete").is_file():
-            continue
-        if any(
-            not (policy / name).is_file() or (policy / name).stat().st_size == 0
-            for name in files
-        ):
-            continue
-        exported = policy.parents[2] / "safetensors" / policy.parent.name
-        if not (exported / "config.json").is_file() or not list(
-            exported.glob("*.safetensors")
-        ):
-            continue
-        result.append(
-            dict(
-                step=int(policy.parent.name.removeprefix("step_")),
-                checkpoint=str(policy),
-                export=str(exported),
+        try:
+            files = [
+                "cosmos_config",
+                "model_rank_0.pth",
+                "optimizer_rank_0.pth",
+                "scheduler_rank_0.pth",
+                "extra_info_rank_0.pth",
+            ]
+            if not (policy / ".rank_0_complete").is_file():
+                continue
+            if any(
+                not (policy / name).is_file() or (policy / name).stat().st_size == 0
+                for name in files
+            ):
+                continue
+            exported = policy.parents[2] / "safetensors" / policy.parent.name
+            if not (exported / "config.json").is_file() or not list(
+                exported.glob("*.safetensors")
+            ):
+                continue
+            result.append(
+                dict(
+                    step=int(policy.parent.name.removeprefix("step_")),
+                    checkpoint=str(policy),
+                    export=str(exported),
+                )
             )
-        )
+        except FileNotFoundError:
+            # Native checkpoint pruning can remove a candidate during diagnostics.
+            # Missing candidates are incomplete/unavailable, never selected.
+            continue
     return sorted(result, key=lambda row: row["step"])
 
 
@@ -257,7 +269,7 @@ def summarize(run_dir: Path) -> dict:
     )
 
 
-def compare_evaluations(run_dir: Path) -> dict:
+def compare_evaluations(run_dir: Path, expected_episodes: int) -> dict:
     """Pair actual game outcomes by fixed seed and use NVIDIA's reward dispatcher."""
     from types import SimpleNamespace
     from alpagym_host.config import load_run_config
@@ -272,9 +284,12 @@ def compare_evaluations(run_dir: Path) -> dict:
     episodes = [
         {row["session_uuid"]: row for row in report["episodes"]} for report in reports
     ]
-    if episodes[0].keys() != episodes[1].keys() or len(episodes[0]) != 8:
+    if (
+        episodes[0].keys() != episodes[1].keys()
+        or len(episodes[0]) != expected_episodes
+    ):
         raise ValueError(
-            "Baseline/final evaluation seeds do not match all eight episodes"
+            "Baseline/final evaluation seeds do not match the requested episodes"
         )
     pairs = []
     metric_names = (
@@ -322,7 +337,7 @@ def compare_evaluations(run_dir: Path) -> dict:
             for name in pairs[0]["delta"]
         },
         improvement_claimed=False,
-        limitation="Eight matched episodes are a diagnostic comparison, not proof of general improvement.",
+        limitation="Matched episodes are a diagnostic comparison, not proof of general improvement.",
     )
 
 
@@ -338,12 +353,15 @@ def run_campaign(
     concurrency: int,
     checkpoint_every: int,
     max_steps: int = 100_000,
+    evaluation_episodes: int = 8,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
     from training.nvidia_alpagym import owned_subreaper, stop_process_tree
     from training.alpagym_metrics import REWARD_VERSION
 
     started = time.time()
+    if evaluation_episodes not in (2, 4, 8):
+        raise ValueError("Choose 2, 4, or 8 matched evaluation episodes")
     if (
         not math.isfinite(deadline_unix)
         or not 3600 < deadline_unix - started <= TOTAL_SECONDS
@@ -379,6 +397,7 @@ def run_campaign(
         started_at_unix=started,
         deadline_unix=deadline_unix,
         validated_prerequisites=certificate,
+        evaluation_episodes=evaluation_episodes,
         single_native_run=True,
         optimizer_restarts=0,
         max_steps=max_steps,
@@ -465,7 +484,9 @@ def run_campaign(
                 str(run_dir / "recordings/baseline"),
                 "0",
                 "--episodes",
-                "8",
+                str(evaluation_episodes),
+                "--rpc-timeout-seconds",
+                "1740",
             ],
             "baseline-evaluation",
             1800,
@@ -494,10 +515,18 @@ def run_campaign(
             and status.get("error_type") == "TimeoutError"
             and status.get("error") == "Prepared wall time budget exhausted"
         )
-        if code and not planned_stop:
+        native_completed = (
+            status.get("state") == "completed" and status.get("runtime_stopped") is True
+        )
+        report["native_process_exit_code"] = code
+        if code and not planned_stop and not native_completed:
             raise RuntimeError(
                 f"Native trainer failed outside its planned budget: {status}"
             )
+        if code and native_completed:
+            # The native launcher renders after marking training complete. Keep
+            # a rendering failure separate from the actual optimizer outcome.
+            report["native_postprocessing_failed"] = True
         report["training_outcome"] = (
             "planned_budget_stop" if planned_stop else "native_completed"
         )
@@ -572,13 +601,17 @@ def run_campaign(
                 str(run_dir / "recordings/final"),
                 str(chosen["step"]),
                 "--episodes",
-                "8",
+                str(evaluation_episodes),
+                "--rpc-timeout-seconds",
+                "1740",
             ],
             "final-evaluation",
             1800,
         )
         report["checkpoint_reload_verified"] = True
-        report["evaluation_comparison"] = compare_evaluations(run_dir)
+        report["evaluation_comparison"] = compare_evaluations(
+            run_dir, evaluation_episodes
+        )
         report["state"] = report["training_outcome"]
     except BaseException as caught:
         error = caught
@@ -598,7 +631,10 @@ def run_campaign(
                 runtime_stopped=True,
                 error="Campaign stopped before native trainer startup",
             )
-        if deadline_unix - time.time() > 60:
+        if (
+            not isinstance(error, (KeyboardInterrupt, SystemExit))
+            and deadline_unix - time.time() > 60
+        ):
             try:
                 launch(
                     [
@@ -652,6 +688,9 @@ def main():
         if command == "run":
             item.add_argument("--validation-run", type=Path, required=True)
             item.add_argument("--deadline-unix", type=float, required=True)
+            item.add_argument(
+                "--evaluation-episodes", type=int, choices=(2, 4, 8), default=8
+            )
         else:
             item.add_argument("--training-seconds", type=float, default=36000)
             item.add_argument("--video-seconds", type=float, default=1800)
@@ -668,6 +707,12 @@ def main():
     elif command == "prepare":
         print(prepare_campaign(**args))
     else:
+        import signal
+
+        def terminate(signum, frame):
+            raise KeyboardInterrupt(f"Campaign interrupted by signal {signum}")
+
+        signal.signal(signal.SIGTERM, terminate)
         print(json.dumps(run_campaign(**args)))
 
 
