@@ -97,6 +97,7 @@ def prepare(
                 "policy=alpamayo_r1",
                 "topology=local_disaggregated_2gpu",
                 "transport=nccl",
+                "transport.nccl_env.NCCL_DEBUG=INFO",
                 "reward=metrics",
             ],
         )
