@@ -49,6 +49,9 @@ def validated_prerequisites(
         raise ValueError(
             "The native validation has not completed optimization and fresh reload"
         )
+    padding = report.get("padding_skip_verification", {})
+    if padding.get("passed") is not True or padding.get("policy_world_size") != 1:
+        raise ValueError("Campaign requires verified native padding state equivalence")
     launch = json.loads((validation_run / "launch_manifest.json").read_text())
     camera = json.loads((validation_run / "camera-preflight/summary.json").read_text())
     adapter = camera.get("renderer", {}).get("adapter", "")
@@ -83,6 +86,7 @@ def validated_prerequisites(
         validation_report_sha256=hashlib.sha256(report_path.read_bytes()).hexdigest(),
         navigation_provenance=validate_navigation_checkpoint(model),
         native_source_patch=launch["native_source_patch"],
+        padding_skip_verification=padding,
         reward_version=launch["reward_version"],
         renderer=adapter,
         topology=launch["topology"],

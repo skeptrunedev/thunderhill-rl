@@ -16,7 +16,11 @@ reservations = modal.Dict.from_name(
     "thunderhill-native-campaign-reservations", create_if_missing=True
 )
 runtime_image = (
-    image.env({"NVIDIA_DRIVER_CAPABILITIES": "all", "NCCL_DEBUG": "INFO"})
+    image.env({
+        "NVIDIA_DRIVER_CAPABILITIES": "all",
+        "NCCL_DEBUG": "INFO",
+        "ALPAGYM_SKIP_ALL_PADDING_MINIBATCHES": "1",
+    })
     .add_local_dir(
         str(ROOT / "training"),
         REMOTE + "/training",
