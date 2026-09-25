@@ -44,7 +44,9 @@ def load_method(source, fence):
         ],
         type_ignores=[],
     )
-    exec(
+    # Execute only the inspected native method AST; source provenance is checked
+    # by the qualification launcher before this diagnostic is invoked.
+    exec(  # noqa: S102
         compile(
             ast.fix_missing_locations(module), "<native rollout_generation>", "exec"
         ),
@@ -90,7 +92,7 @@ def main():
                     done.record()
                 cosmos.wait_event(done)
 
-                def submit(_):
+                def submit(_, weights=weights):
                     future = Future()
                     observed = pool.submit(
                         lambda: float(weights.clone().cpu().item())
