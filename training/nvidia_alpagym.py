@@ -514,16 +514,65 @@ def write_status(run_dir: Path, state: str, **details) -> None:
     temporary.replace(target)
 
 
+# Files that change only when the run moves forward: a flushed model decision, a
+# new rollout, a trainer log line (silent while it waits for rollouts), or a
+# native checkpoint/export write.
+PROGRESS_SIGNALS = (
+    "recordings/*/trajectory_decisions.jsonl",
+    "recordings/*/provenance.json",
+    "logs/*/policy_*.log",
+    "cosmos/*/checkpoints/step_*/policy/*",
+    "cosmos/*/safetensors/step_*/*",
+)
+
+
+def check_progress(run_dir: Path, window: float, since: float) -> None:
+    """Fail when no progress signal changed within the window after `since`."""
+    newest = {}
+    for pattern in PROGRESS_SIGNALS:
+        for path in run_dir.glob(pattern):
+            try:
+                mtime = path.stat().st_mtime
+            except FileNotFoundError:  # native checkpoint pruning
+                continue
+            if mtime > newest.get(pattern, (0.0,))[0]:
+                newest[pattern] = (mtime, str(path.relative_to(run_dir)))
+    now = time.time()
+    last = max([since, *(mtime for mtime, _ in newest.values())])
+    if now - last < window:
+        return
+    evidence = dict(
+        detected_at_unix=now,
+        window_seconds=window,
+        watch_started_at_unix=since,
+        last_progress_at_unix=last,
+        signals={
+            pattern: dict(path=path, mtime_unix=mtime, age_seconds=now - mtime)
+            for pattern, (mtime, path) in newest.items()
+        },
+    )
+    (run_dir / "liveness_stall.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    raise RuntimeError(
+        f"No run progress for {now - last:.0f}s (window {window:.0f}s); "
+        f"inspect {run_dir / 'liveness_stall.json'}"
+    )
+
+
 def wait_process(
     process: subprocess.Popen,
     deadline: float,
     companion: subprocess.Popen | None = None,
+    progress=None,
 ) -> None:
+    next_check = time.monotonic()
     while process.poll() is None:
         if companion is not None and companion.poll() is not None:
             raise RuntimeError("Godot bridge exited while Cosmos was running")
         if time.monotonic() >= deadline:
             raise TimeoutError("Prepared wall time budget exhausted")
+        if progress is not None and time.monotonic() >= next_check:
+            progress()
+            next_check = time.monotonic() + 30
         time.sleep(0.1)
     if process.returncode:
         raise subprocess.CalledProcessError(process.returncode, process.args)
@@ -739,7 +788,15 @@ def _run_owned(run_dir: Path) -> None:
                 start_new_session=True,
             )
             processes.append(cosmos)
-            wait_process(cosmos, deadline, companion=bridge)
+            window, since = manifest.get("liveness_window_seconds"), time.time()
+            wait_process(
+                cosmos,
+                deadline,
+                companion=bridge,
+                progress=None
+                if window is None
+                else lambda: check_progress(run_dir, window, since),
+            )
     except BaseException as error:
         write_status(
             run_dir,

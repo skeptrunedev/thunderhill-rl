@@ -27,6 +27,10 @@ from training.nvidia_alpagym import (
 TOTAL_SECONDS = 12 * 60 * 60
 FINAL_RESERVE_SECONDS = int(3.5 * 60 * 60)
 EVALUATION_SECONDS = 2 * 60 * 60
+# Observed H100 campaigns go quiet for at most ~110 s on the combined progress
+# signals (272 s on decisions alone, across checkpoint saves) and ~4 min at
+# startup, so ten quiet minutes means a hung trainer or rollout worker.
+LIVENESS_WINDOW_SECONDS = 600
 
 
 def write_json(path: Path, value: dict) -> None:
@@ -452,6 +456,7 @@ def run_campaign(
     resume_checkpoint_step: int = 0,
     optimizer_retune: bool = False,
     scatter_diagnostics: bool = False,
+    liveness_window_seconds: float = LIVENESS_WINDOW_SECONDS,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
     from training.nvidia_alpagym import owned_subreaper, stop_process_tree
@@ -460,6 +465,8 @@ def run_campaign(
     started = time.time()
     if evaluation_episodes not in (2, 4, 8):
         raise ValueError("Choose 2, 4, or 8 matched evaluation episodes")
+    if not math.isfinite(liveness_window_seconds) or liveness_window_seconds <= 0:
+        raise ValueError("Liveness window must be finite and positive")
     if (
         not math.isfinite(deadline_unix)
         or not 3600 < deadline_unix - started <= TOTAL_SECONDS
@@ -546,6 +553,7 @@ def run_campaign(
         native_checkpoint_retention=5,
         reserved_final_seconds=reserve,
         evaluation_phase_limit_seconds=EVALUATION_SECONDS,
+        liveness_window_seconds=liveness_window_seconds,
         phases=[],
         training_outcome=None,
     )
@@ -642,6 +650,7 @@ def run_campaign(
         manifest_path = run_dir / "launch_manifest.json"
         manifest = json.loads(manifest_path.read_text())
         manifest["max_wall_seconds"] = training_budget
+        manifest["liveness_window_seconds"] = liveness_window_seconds
         write_json(manifest_path, manifest)
         report["state"] = "training"
         code = launch(
@@ -867,6 +876,13 @@ def main():
             )
             item.add_argument(
                 "--evaluation-episodes", type=int, choices=(2, 4, 8), default=8
+            )
+            item.add_argument(
+                "--liveness-window-seconds",
+                type=float,
+                default=LIVENESS_WINDOW_SECONDS,
+                help="Stop training after this long without decisions, rollouts, "
+                "trainer log output or checkpoint writes",
             )
         else:
             item.add_argument("--training-seconds", type=float, default=36000)
