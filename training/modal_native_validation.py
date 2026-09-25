@@ -242,7 +242,9 @@ def validate_gpu(source_revision: str, resume_run_dir: str = "", seconds: float 
 )
 def diagnose_inference(source_revision: str, dispatch: str, config: str,
                        hard_deadline_unix: float,
-                       checkpoint: str = "/model-cache/alpagym-converted-1.5"):
+                       checkpoint: str = "/model-cache/alpagym-converted-1.5",
+                       threaded_stress: bool = False, stress_workers: int = 4,
+                       stress_iterations: int = 50):
     """One bounded exact observation replay, never an optimizer or a new campaign."""
     import json
     import os
@@ -252,6 +254,8 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
     import uuid
     from pathlib import Path
 
+    if not 1 <= stress_workers <= 4 or not 1 <= stress_iterations <= 200:
+        raise ValueError("Stress requires 1..4 workers and 1..200 iterations")
     os.chdir(REMOTE)
     for value in (dispatch, config):
         if not value.startswith("/runs/") or ".." in Path(value).parts:
@@ -272,7 +276,17 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
         "checkpoint": checkpoint,
         "checkpoint_identity": "base expert with frozen VLM" if checkpoint == "/model-cache/alpagym-converted-1.5" else "explicit supplied native bundle",
         "exact_trained_expert_state_claimed": False,
-        "CUDA_LAUNCH_BLOCKING": "1 (isolated diagnostic process only)",
+        "mode": "threaded_native_dispatch" if threaded_stress else "synchronous_exact_replay",
+        "CUDA_LAUNCH_BLOCKING": None if threaded_stress else "1",
+        "extra_cuda_synchronization": not threaded_stress,
+        "operator_hooks": not threaded_stress,
+        "stress_workers": stress_workers if threaded_stress else None,
+        "stress_iterations": stress_iterations if threaded_stress else None,
+        "limitation": (
+            "Repeated recorded observations with fresh policy buffers, no simulator progression or weight transfer; a passing stress run does not prove correctness."
+            if threaded_stress else
+            "Synchronous operator instrumentation changes timing; a passing replay does not exclude a race."
+        ),
         "hard_deadline_unix": hard_deadline_unix,
         "subprocess_budget_seconds": remaining, "status": "starting",
     }
@@ -295,15 +309,30 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
         UPSTREAM + "/.venv/bin/python", "-c", bootstrap,
         "--dispatch", dispatch, "--config", config, "--checkpoint", checkpoint,
         "--output", str(destination / "inference"), "--device", "cuda:0",
-        "--repeats", "10", "--max-seconds", str(remaining), "--synchronize",
+        "--max-seconds", str(remaining),
     ]
+    environment = os.environ.copy()
+    if threaded_stress:
+        command.extend(["--threaded-stress", "--stress-workers", str(stress_workers),
+                        "--stress-iterations", str(stress_iterations)])
+        environment.pop("CUDA_LAUNCH_BLOCKING", None)
+        environment.pop("ALPAGYM_INFERENCE_CAPTURE_DIR", None)
+        environment["ALPAGYM_SCATTER_DIAGNOSTICS"] = "0"
+    else:
+        command.extend(["--repeats", "10", "--synchronize"])
+        environment["CUDA_LAUNCH_BLOCKING"] = "1"
     try:
         with (destination / "inference.log").open("w") as log:
             process = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT,
                                      timeout=remaining, check=False,
-                                     env={**os.environ, "CUDA_LAUNCH_BLOCKING": "1"})
+                                     env=environment)
         receipt.update(status="completed" if process.returncode == 0 else "failed",
                        returncode=process.returncode)
+        inference_report = destination / "inference/report.json"
+        if inference_report.is_file():
+            receipt["inference_status"] = json.loads(inference_report.read_text()).get("status")
+            if process.returncode == 0 and receipt["inference_status"] == "bounded_stop":
+                receipt["status"] = "bounded_stop"
     except subprocess.TimeoutExpired:
         receipt.update(status="bounded_timeout")
     except BaseException:
@@ -322,9 +351,17 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          diagnostic_dispatch: str = "", diagnostic_config: str = "",
          hard_deadline_unix: float = 0,
          diagnostic_checkpoint: str = "/model-cache/alpagym-converted-1.5",
-         repair_recordings: str = "", scatter_diagnostics: bool = False):
+         repair_recordings: str = "", scatter_diagnostics: bool = False,
+         diagnostic_threaded_stress: bool = False, diagnostic_stress_workers: int = 4,
+         diagnostic_stress_iterations: int = 50):
     import subprocess
 
+    if not 1 <= diagnostic_stress_workers <= 4 or not 1 <= diagnostic_stress_iterations <= 200:
+        raise ValueError("Stress requires 1..4 workers and 1..200 iterations")
+    if diagnostic_threaded_stress and not diagnostic_dispatch:
+        raise ValueError("Threaded stress requires an explicit captured diagnostic dispatch")
+    if not diagnostic_threaded_stress and (diagnostic_stress_workers != 4 or diagnostic_stress_iterations != 50):
+        raise ValueError("Stress settings require explicit threaded diagnostic mode")
     dirty = subprocess.check_output(
         ["git", "status", "--porcelain", "--untracked-files=all"], cwd=ROOT, text=True
     ).strip()
@@ -340,6 +377,8 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
         if not diagnostic_config or hard_deadline_unix - time.time() < 90:
             raise ValueError("Diagnostic mode requires config and original campaign deadline")
         print(diagnose_inference.remote(revision, diagnostic_dispatch, diagnostic_config,
-                                       hard_deadline_unix, diagnostic_checkpoint))
+                                       hard_deadline_unix, diagnostic_checkpoint,
+                                       diagnostic_threaded_stress, diagnostic_stress_workers,
+                                       diagnostic_stress_iterations))
     else:
         print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings, scatter_diagnostics))
