@@ -1,0 +1,11 @@
+{
+  "version": "native_receive_copy_lifetime_v1",
+  "upstream_revision": "d2a2c57c4bd6496482bc42da19a59b4432705eda",
+  "patch_sha256": "cbef409891f340230049473171a0b03558b01ac51c346d61cd2beb82e342c2b5",
+  "files": {
+    "cosmos_rl/rollout/worker/rollout_control.py": {
+      "original_sha256": "0c75fafd5e7a6eb92f009682ee7f638c0a17f20b02e06d4122cbc2f1dc4db08c",
+      "patched_sha256": "6cfe0794d91af4553b2634f82abdf7ccb01236b70358a416d8b72c7c8097126e"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+--- a/cosmos_rl/rollout/worker/rollout_control.py
++++ b/cosmos_rl/rollout/worker/rollout_control.py
+@@ -625,6 +625,10 @@
+                 recv_complete_event,
+                 inst_dest_name,
+             ) in all_tensor_views_to_copy:
++                # Receive storage was allocated on the NCCL stream. This
++                # completion runs on a separate copy stream; register its use
++                # before enqueueing the read so allocator reuse cannot race it.
++                recv_tensor.record_stream(torch.cuda.current_stream(recv_tensor.device))
+                 self.weight_mapper.update_tensor_view(
+                     view, recv_tensor, inst_dest_name, parallel_dims=self.parallel_dims
+                 )

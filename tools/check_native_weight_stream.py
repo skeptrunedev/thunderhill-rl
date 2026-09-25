@@ -6,12 +6,14 @@ minimal session worker to isolate the cross-thread weight-copy dependency.
 
 import argparse
 import ast
+import hashlib
 import importlib.util
 import json
 import subprocess
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
+from queue import Queue
 from types import SimpleNamespace
 
 import torch
@@ -55,10 +57,123 @@ def load_method(source, fence):
     return namespace["rollout_generation"]
 
 
+def check_receive_lifetime(root):
+    """Run exact native temp allocation and completion bodies with dtype conversion."""
+    source = (root / "cosmos_rl/rollout/worker/rollout_control.py").read_text()
+    manifest_path = Path(__file__).parent / "patches/cosmos-receive-lifetime.json"
+    manifest = json.loads(manifest_path.read_text())
+    expected = manifest["files"]["cosmos_rl/rollout/worker/rollout_control.py"]
+    assert hashlib.sha256(source.encode()).hexdigest() == expected["patched_sha256"]
+    inserted = """                # Receive storage was allocated on the NCCL stream. This
+                # completion runs on a separate copy stream; register its use
+                # before enqueueing the read so allocator reuse cannot race it.
+                recv_tensor.record_stream(torch.cuda.current_stream(recv_tensor.device))
+"""
+    original = source.replace(inserted, "")
+    assert hashlib.sha256(original.encode()).hexdigest() == expected["original_sha256"]
+    rows = []
+    for version, body in (("original", original), ("patched", source)):
+        tree = ast.parse(body)
+        method = next(
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "recv_weight_shard"
+        )
+        nested = [
+            n
+            for n in method.body
+            if isinstance(n, ast.FunctionDef)
+            and n.name in ("recv_tensor_creator", "completion_lambda")
+        ]
+        queue = Queue()
+        worker = SimpleNamespace(
+            temp_recv_tensor_queue=queue,
+            device=torch.device("cuda:0"),
+            quantization_type=None,
+            parallel_dims=None,
+            weight_mapper=SimpleNamespace(
+                update_tensor_view=lambda view, recv, name, **kw: view.copy_(recv)
+            ),
+        )
+        namespace = {
+            "torch": torch,
+            "self": worker,
+            "target_dtype": torch.float32,
+            "constant": SimpleNamespace(COSMOS_RECV_TENSOR_QUEUE_SIZE=10000),
+        }
+        # Both method bodies above are authenticated against reviewed pinned hashes.
+        exec(
+            compile(
+                ast.Module(body=nested, type_ignores=[]),
+                "<native recv functions>",
+                "exec",
+            ),
+            namespace,
+        )  # noqa: S102
+        target = torch.zeros((2048, 2048), device="cuda", dtype=torch.bfloat16)
+        spare = torch.zeros_like(target)
+        torch.cuda.synchronize()  # Diagnostic initialization only.
+        receive = torch.cuda.Stream()
+        copy = torch.cuda.Stream()
+        # Warm the allocator before delaying copies: cudaMalloc itself can
+        # synchronize streams and hide the lifetime error under investigation.
+        with torch.cuda.stream(receive):
+            reserve = [
+                torch.empty((2048, 2048), device="cuda", dtype=torch.float32)
+                for _ in range(16)
+            ]
+        receive.synchronize()
+        del reserve
+        with torch.cuda.stream(receive):
+            tensor, event, _ = namespace["recv_tensor_creator"](target)
+            tensor.fill_(37)
+            pointer = tensor.data_ptr()
+            other, _, _ = namespace["recv_tensor_creator"](spare)
+            popped_unrecorded = queue.qsize() == 1
+            ready = torch.cuda.Event()
+            ready.record()
+        copy.wait_event(ready)
+        with torch.cuda.stream(copy):
+            torch.cuda._sleep(1_000_000_000)
+            namespace["completion_lambda"]([(target, tensor, event, "fixture")], [], [])
+        del tensor
+        replacements = []
+        with torch.cuda.stream(receive):
+            for _ in range(12):
+                replacement = torch.empty(
+                    (2048, 2048), device="cuda", dtype=torch.float32
+                )
+                replacement.fill_(91)
+                replacements.append(replacement)
+        reused = any(t.data_ptr() == pointer for t in replacements)
+        copy.synchronize()  # Observe completed diagnostic, not production synchronization.
+        receive.synchronize()
+        observed = float(target[0, 0].item())
+        rows.append(
+            {
+                "version": version,
+                "unrecorded_event_popped": popped_unrecorded,
+                "allocation_reused": reused,
+                "observed": observed,
+            }
+        )
+        queue.queue.clear()
+        del replacements, replacement, other, target, spare
+    assert rows[0]["allocation_reused"] and rows[0]["observed"] == 91, rows
+    assert not rows[1]["allocation_reused"] and rows[1]["observed"] == 37, rows
+    return {
+        "passed": True,
+        "transfer_dtype": "float32",
+        "target_dtype": "bfloat16",
+        "trials": rows,
+    }
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--upstream", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--cosmos-source", type=Path)
     args = p.parse_args()
     path = "packages/runtime/src/alpagym_runtime/cosmos/rollout_backend.py"
     spec = importlib.util.spec_from_file_location(
@@ -124,6 +239,8 @@ def main():
         "diagnostic": "native method body with synthetic delayed weight copies, not model training",
         "trials": rows,
     }
+    if args.cosmos_source is not None:
+        report["receive_lifetime"] = check_receive_lifetime(args.cosmos_source)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))
