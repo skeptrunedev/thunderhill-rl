@@ -21,6 +21,24 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2, default=str) + "\n")
 
 
+def trace_receipt(output, requested):
+    """Inspect the native output schema without copying or synchronizing CUDA data."""
+    import torch
+
+    fields = {"logprob": output.logprob,
+              "samples_list": output.extra.get("samples_list"),
+              "timesteps": output.extra.get("timesteps")}
+    present = all(isinstance(value, torch.Tensor) and value.numel() > 0
+                  for value in fields.values())
+    if requested and not present:
+        raise RuntimeError("Native traced inference omitted logprob or required SDE trace tensors")
+    if not requested and (output.logprob is not None or output.extra):
+        raise RuntimeError("Native trace-disabled inference unexpectedly returned trace fields")
+    return {"requested": requested, "required_trace_present": present,
+            "tensor_shapes": {key: list(value.shape) for key, value in fields.items()
+                              if isinstance(value, torch.Tensor)}}
+
+
 @contextmanager
 def scatter_diagnostics(directory, synchronize):
     """Observe the unchanged tensor operator in this isolated diagnostic process."""
@@ -171,7 +189,13 @@ def threaded_stress(args, adapter, config, report, started):
     expected = {
         Path(row["path"]).name: row["sha256"] for row in dispatch["ordered_requests"]
     }
-    capsule_paths = sorted(capsule_dir.glob("session-*.pt"))
+    dispatch_order = {name: index for index, name in enumerate(expected)}
+    capsule_paths = sorted(
+        capsule_dir.glob("session-*.pt"),
+        key=lambda path: (dispatch_order.get(path.name, len(expected)), path.name),
+    )
+    if len(expected) > args.stress_workers:
+        raise ValueError("Stress workers must include every failed dispatch capsule")
     if not 1 <= len(capsule_paths) <= 4 or len(capsule_paths) < args.stress_workers:
         raise ValueError(
             "Stress needs one preserved capsule per producer, at most four"
@@ -182,7 +206,7 @@ def threaded_stress(args, adapter, config, report, started):
     payloads, capsule_receipts = [], []
     expected_config = json.loads(json.dumps(asdict(config.policy.model), default=str))
     expected_config.pop("path", None)
-    for source in capsule_paths:
+    for capsule_index, source in enumerate(capsule_paths):
         digest = hashlib.sha256(source.read_bytes()).hexdigest()
         if source.name in expected and digest != expected[source.name]:
             raise ValueError("Failed dispatch capsule changed")
@@ -200,6 +224,7 @@ def threaded_stress(args, adapter, config, report, started):
                 "sha256": digest,
                 "session_uuid": payload["session_uuid"],
                 "in_failed_dispatch": source.name in expected,
+                "selected_for_stress": capsule_index < args.stress_workers,
             }
         )
     if set(expected) - {p.name for p in capsule_paths}:
@@ -212,6 +237,8 @@ def threaded_stress(args, adapter, config, report, started):
         production_equivalence_limit="Fresh policy buffers per repeated recorded observation; no simulator progression or weight transfer.",
         extra_cuda_synchronization=False,
         operator_hooks=False,
+        return_trace_for_rl=config.policy.inference.return_trace_for_rl,
+        max_batch_size=config.policy.inference.max_batch_size,
     )
     write_json(args.output / "report.json", report)
     if args.prepare_only:
@@ -227,7 +254,12 @@ def threaded_stress(args, adapter, config, report, started):
         return original_sample(model_input, *positional, **keywords)
 
     adapter.sample_trajectories_from_data = count_batch
-    engine = InferenceEngine(adapter, config.policy.inference.sampling, False, 4)
+    engine = InferenceEngine(
+        inference_model=adapter,
+        sampling=config.policy.inference.sampling,
+        return_trace_for_rl=config.policy.inference.return_trace_for_rl,
+        max_batch_size=config.policy.inference.max_batch_size,
+    )
     thread = threading.Thread(
         target=engine.run_loop, name="diagnostic-native-dispatch", daemon=True
     )
@@ -259,6 +291,7 @@ def threaded_stress(args, adapter, config, report, started):
             model_input = policy._preprocess(restore_policy_input(payload), seed=seed)
             future = engine.infer(model_input)
             output = future.result(timeout=max(1, deadline - time.monotonic()))
+            trace = trace_receipt(output, config.policy.inference.return_trace_for_rl)
             # Native gameplay also returns selected trajectories to host. Store
             # only these small CPU outputs, not Futures or CUDA replay tensors.
             prediction = {
@@ -275,6 +308,7 @@ def threaded_stress(args, adapter, config, report, started):
                 "iteration": iteration,
                 "session_uuid": payload["session_uuid"],
                 "finite": finite,
+                "trace": trace,
                 "seconds": time.monotonic() - tick_started,
                 "prediction": name,
             }
@@ -307,6 +341,9 @@ def threaded_stress(args, adapter, config, report, started):
             completed_requests=len(completions),
             observed_batch_sizes=batch_sizes,
             all_completed_finite=all(row["finite"] for row in completions),
+            trace_verified_requests=sum(
+                row["trace"]["required_trace_present"] for row in completions
+            ),
         )
 
 
@@ -357,6 +394,8 @@ def run(args):
                 config, torch.device(args.device), torch.bfloat16
             )
             report["sampling"] = asdict(config.policy.inference.sampling)
+            report["return_trace_for_rl"] = config.policy.inference.return_trace_for_rl
+            report["max_batch_size"] = config.policy.inference.max_batch_size
     except BaseException:
         report.update(status="model_loading_failed", error=traceback.format_exc())
         write_json(args.output / "report.json", report)
@@ -465,7 +504,7 @@ def run(args):
                         output = adapter.sample_trajectories_from_data(
                             batch,
                             config.policy.inference.sampling,
-                            return_trace_for_rl=False,
+                            return_trace_for_rl=config.policy.inference.return_trace_for_rl,
                         )
                         torch.cuda.synchronize(torch.device(args.device))
                 finally:
@@ -479,6 +518,7 @@ def run(args):
                 )
                 record.update(
                     status="completed",
+                    trace=trace_receipt(output, config.policy.inference.return_trace_for_rl),
                     seconds=time.monotonic() - call_started,
                     finite=bool(torch.isfinite(output.pred_xyz).all().item()),
                 )
