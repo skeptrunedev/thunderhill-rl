@@ -61,7 +61,8 @@ def game(args, output: Path, headless: bool = False):
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
-    env = dict(os.environ, DISPLAY=args.display, XDG_DATA_HOME=str(output / "userdata"))
+    env = dict(os.environ, DISPLAY=args.display, XDG_DATA_HOME=str(output / "userdata"),
+               THUNDERHILL_CAPTURE_DIAGNOSTICS="1" if args.trace_render else "0")
     command = [args.godot, "--path", str(ROOT / "godot"), "--audio-driver", "Dummy"]
     if headless:
         command.append("--headless")
@@ -158,6 +159,8 @@ def main() -> None:
                         default="gl_compatibility")
     parser.add_argument("--offscreen", action="store_true")
     parser.add_argument("--require-hardware", action="store_true")
+    parser.add_argument("--initial-capture-timeout", type=float, default=30)
+    parser.add_argument("--trace-render", action="store_true")
     args = parser.parse_args()
     if not args.godot:
         parser.error("Provide --godot")
@@ -168,7 +171,9 @@ def main() -> None:
         initial = client.request({"op": "reset", "policy_id": "camera-qa"})
         episode = initial["episode_id"]
         capture = {"op": "capture", "episode_id": episode, "expected_tick": 0}
+        client.connection.settimeout(args.initial_capture_timeout)
         first = client.request(capture)
+        client.connection.settimeout(30)
         first_info = validate_capture(first, output, "tick0", episode, 0)
         assert first["camera"]["renderer"]["offscreen"] is args.offscreen
         assert first["camera"]["renderer"]["method"] == args.rendering_method

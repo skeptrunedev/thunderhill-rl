@@ -21,7 +21,7 @@ runtime_image = (
 
 @app.function(
     image=runtime_image,
-    gpu="L40S:2",
+    gpu="H100:2",
     cpu=16,
     memory=131072,
     timeout=3600,

@@ -68,6 +68,8 @@ func capture(sim: RefCounted, normal: Vector3, episode_id: String, folder: Strin
 
 
 func _capture_view(sim: RefCounted, normal: Vector3, episode_id: String, folder: String, spec: Dictionary) -> Dictionary:
+	var trace_started := Time.get_ticks_usec()
+	_trace_capture(spec.logical_id, "begin", trace_started)
 	if (
 		DisplayServer.get_name() == "headless"
 		or (
@@ -100,20 +102,26 @@ func _capture_view(sim: RefCounted, normal: Vector3, episode_id: String, folder:
 		if not renderer_warmed:
 			# Ordinary rendering initializes scene/shadow resources before an
 			# observation arrives. On demand rendering needs the same initial pass.
+			_trace_capture(spec.logical_id, "warm_draw_begin", trace_started)
 			RenderingServer.force_draw(false)
+			_trace_capture(spec.logical_id, "warm_draw_end", trace_started)
 			await get_tree().process_frame
 			camera.force_update_transform()
 			renderer_warmed = true
 			viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 		# Readback synchronizes this draw; no X11 surface is presented.
+		_trace_capture(spec.logical_id, "draw_begin", trace_started)
 		RenderingServer.force_draw(false)
+		_trace_capture(spec.logical_id, "draw_end", trace_started)
 	else:
 		await RenderingServer.frame_post_draw
 	if sim.tick != capture_tick:
 		return {
 			"error": "Simulation changed during camera capture", "failure_type": "infrastructure"
 		}
+	_trace_capture(spec.logical_id, "readback_begin", trace_started)
 	var image := _read_image()
+	_trace_capture(spec.logical_id, "readback_end", trace_started)
 	var validation := preload("res://scripts/image_validation.gd").classify(
 		image, Vector2i(WIDTH, HEIGHT)
 	)
@@ -208,3 +216,11 @@ func _read_image() -> Image:
 
 func _vector(value: Vector3) -> Array:
 	return [value.x, value.y, value.z]
+
+
+func _trace_capture(view: String, stage: String, started_usec: int) -> void:
+	if OS.get_environment("THUNDERHILL_CAPTURE_DIAGNOSTICS") == "1":
+		print("THUNDERHILL_CAPTURE " + JSON.stringify({
+			"view": view, "stage": stage,
+			"elapsed_ms": (Time.get_ticks_usec() - started_usec) / 1000.0,
+		}))
