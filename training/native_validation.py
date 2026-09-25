@@ -183,35 +183,61 @@ def evaluate(
 
 def validate(
     source: Path, model: Path, output: Path, *, seconds: float, budget: float,
-    initial_speed_m_s: float = 0.0,
+    initial_speed_m_s: float = 0.0, resume_run_dir: Path | None = None,
 ) -> dict:
     from training.native_source import record_navigation_checkpoint, verify_source
     from training.nvidia_alpagym import prepare
 
     verify_source(source, apply_patch=True)
     started = time.monotonic()
-    run_dir = prepare(
-        source,
-        output,
-        model,
-        godot="godot",
-        max_steps=2,
-        rollouts=4,
-        episode_seconds=seconds,
-        concurrency=1,
-        max_wall_seconds=budget / 2,
-        max_video_seconds=budget / 4,
-        model_name="Alpamayo 1.5 native RL",
-        initial_speed_m_s=initial_speed_m_s,
-    )
-    report = {
-        "run_dir": str(run_dir),
-        "state": "running",
-        "optimizer_updates_verified": False,
-        "checkpoint_reload_verified": False,
-        "initial_speed_m_s": initial_speed_m_s,
-    }
-    write_json(run_dir / "validation.json", report)
+    attempt = ""
+    if resume_run_dir is None:
+        run_dir = prepare(
+            source,
+            output,
+            model,
+            godot="godot",
+            max_steps=2,
+            rollouts=4,
+            episode_seconds=seconds,
+            concurrency=1,
+            max_wall_seconds=budget / 2,
+            max_video_seconds=budget / 4,
+            model_name="Alpamayo 1.5 native RL",
+            initial_speed_m_s=initial_speed_m_s,
+        )
+        report = {
+            "run_dir": str(run_dir),
+            "state": "running",
+            "optimizer_updates_verified": False,
+            "checkpoint_reload_verified": False,
+            "initial_speed_m_s": initial_speed_m_s,
+        }
+        write_json(run_dir / "validation.json", report)
+
+    else:
+        import uuid
+
+        run_dir = resume_run_dir.resolve(strict=True)
+        manifest = json.loads((run_dir / "launch_manifest.json").read_text())
+        if manifest["native_source_patch"] != verify_source(source):
+            raise ValueError("Resume must use the original reviewed native source patches")
+        previous = json.loads((run_dir / "validation.json").read_text())
+        if previous.get("state") != "failed":
+            raise ValueError("Resume requires a previously failed validation")
+        attempt = "resume-" + uuid.uuid4().hex
+        archive = run_dir / attempt
+        archive.mkdir()
+        for name in ("validation.json", "run_status.json"):
+            (archive / name).write_bytes((run_dir / name).read_bytes())
+        report = {
+            "run_dir": str(run_dir), "state": "running",
+            "optimizer_updates_verified": False, "checkpoint_reload_verified": False,
+            "initial_speed_m_s": previous["initial_speed_m_s"],
+            "resumed_from": str(archive / "validation.json"),
+            "resume_attempt": attempt, "retrained": False,
+            "verification_source_identity": json.loads((output / "source_identity.json").read_text()),
+        }
 
     def launch(arguments, logfile, *, module=True):
         remaining = budget - (time.monotonic() - started)
@@ -223,7 +249,7 @@ def validate(
             wait_process,
         )
 
-        with owned_subreaper(), (run_dir / "logs" / logfile).open("w") as log:
+        with owned_subreaper(), (run_dir / "logs" / (f"{attempt}-{logfile}" if attempt else logfile)).open("w") as log:
             process = subprocess.Popen(
                 [sys.executable, *(["-m"] if module else []), *arguments],
                 stdout=log,
@@ -236,33 +262,34 @@ def validate(
                 stop_process_tree(process)
 
     try:
-        launch(
-            [
-                "tools.check_camera",
-                "--godot",
-                "godot",
-                "--offscreen",
-                "--rendering-method",
-                "mobile",
-                "--require-hardware",
-                "--initial-capture-timeout", "120", "--trace-render",
-                "--output",
-                str(run_dir / "camera-preflight"),
-            ],
-            "camera-preflight.log",
-        )
-        launch(
-            [
-                "training.native_validation",
-                "evaluate",
-                str(run_dir),
-                str(model),
-                str(run_dir / "recordings/baseline"),
-                "0",
-            ],
-            "baseline-evaluation.log",
-        )
-        launch(["training.nvidia_alpagym", "run", str(run_dir)], "native-training.log")
+        if resume_run_dir is None:
+            launch(
+                [
+                    "tools.check_camera",
+                    "--godot",
+                    "godot",
+                    "--offscreen",
+                    "--rendering-method",
+                    "mobile",
+                    "--require-hardware",
+                    "--initial-capture-timeout", "120", "--trace-render",
+                    "--output",
+                    str(run_dir / "camera-preflight"),
+                ],
+                "camera-preflight.log",
+            )
+            launch(
+                [
+                    "training.native_validation",
+                    "evaluate",
+                    str(run_dir),
+                    str(model),
+                    str(run_dir / "recordings/baseline"),
+                    "0",
+                ],
+                "baseline-evaluation.log",
+            )
+            launch(["training.nvidia_alpagym", "run", str(run_dir)], "native-training.log")
         if os.environ.get("ALPAGYM_SKIP_ALL_PADDING_MINIBATCHES") == "1":
             padding_reports = list(run_dir.glob("cosmos/**/padding_skip_verification.json"))
             if len(padding_reports) != 1:
@@ -280,8 +307,10 @@ def validate(
         # Native export flattens VLM keys. Use NVIDIA's official inverse and
         # forward converters to reload in the exact native rollout keyspace.
         scripts = source / "packages/policies/alpamayo_r1/scripts"
-        inference = run_dir / "converted-inference"
-        reloaded = run_dir / "reloaded-checkpoint"
+        conversion_root = run_dir / attempt if attempt else run_dir
+        inference = conversion_root / "converted-inference"
+        reloaded = conversion_root / "reloaded-checkpoint"
+        report["reloaded_checkpoint"] = str(reloaded)
         launch(
             [
                 str(scripts / "convert_alpagym_checkpoint_to_inference.py"),
@@ -354,7 +383,7 @@ def validate(
                 "evaluate",
                 str(run_dir),
                 str(reloaded),
-                str(run_dir / "recordings/reloaded"),
+                str(run_dir / "recordings" / (attempt or "reloaded")),
                 "0",
             ],
             "reload-evaluation.log",
@@ -443,6 +472,7 @@ def main():
     run.add_argument("--seconds", type=float, default=5)
     run.add_argument("--budget", type=float, default=3300)
     run.add_argument("--initial-speed-m-s", type=float, default=0.0)
+    run.add_argument("--resume-run-dir", type=Path)
     args = parser.parse_args()
     if args.command == "evaluate":
         evaluate(
@@ -460,6 +490,7 @@ def main():
                     seconds=args.seconds,
                     budget=args.budget,
                     initial_speed_m_s=args.initial_speed_m_s,
+                    resume_run_dir=args.resume_run_dir,
                 )
             )
         )

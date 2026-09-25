@@ -32,7 +32,7 @@ runtime_image = (
     volumes={"/model-cache": cache, "/runs": runs},
     include_source=False,
 )
-def validate_gpu(source_revision: str):
+def validate_gpu(source_revision: str, resume_run_dir: str = ""):
     import json
     import os
     import subprocess
@@ -41,6 +41,8 @@ def validate_gpu(source_revision: str):
 
     os.chdir(REMOTE)
     os.environ["WANDB_MODE"] = "offline"
+    if resume_run_dir and (not resume_run_dir.startswith("/runs/native-validation-") or ".." in Path(resume_run_dir).parts):
+        raise ValueError("Resume path must identify an existing native validation run")
     destination = Path("/runs") / ("native-validation-" + uuid.uuid4().hex)
     destination.mkdir()
     (destination / "source_identity.json").write_text(
@@ -49,6 +51,7 @@ def validate_gpu(source_revision: str):
                 "repository": "skeptrunedev/thunderhill-rl",
                 "commit": source_revision,
                 "clean_worktree_at_launch": True,
+                "resume_run_dir": resume_run_dir or None,
             },
             indent=2,
         )
@@ -117,6 +120,7 @@ def validate_gpu(source_revision: str):
                     "8",
                     "--budget",
                     "2400",
+                    *(["--resume-run-dir", resume_run_dir] if resume_run_dir else []),
                 ],
                 check=True,
                 stdout=log,
@@ -137,7 +141,7 @@ def validate_gpu(source_revision: str):
 
 
 @app.local_entrypoint()
-def main():
+def main(resume_run_dir: str = ""):
     import subprocess
 
     dirty = subprocess.check_output(
@@ -148,4 +152,4 @@ def main():
     revision = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
-    print(validate_gpu.remote(revision))
+    print(validate_gpu.remote(revision, resume_run_dir))
