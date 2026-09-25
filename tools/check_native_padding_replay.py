@@ -49,6 +49,18 @@ def run(args):
     adapter = load_inference_model(config, torch.device(args.device), torch.bfloat16)
     model = adapter._model
     model.eval()
+    report["prefills"] = []
+
+    def record_mask(module, positional, keywords):
+        mask = keywords.get("attention_mask")
+        if mask is None:
+            raise AssertionError("Native prefill discarded its padding mask")
+        lengths = mask.detach().sum(-1).cpu().tolist()
+        report["prefills"].append(
+            dict(mask_shape=list(mask.shape), valid_tokens=lengths)
+        )
+
+    hook = model.vlm.model.register_forward_pre_hook(record_mask, with_kwargs=True)
     report["attention_backends"] = dict(
         vlm=model.vlm.config._attn_implementation,
         expert=model.expert.config._attn_implementation,
@@ -131,6 +143,9 @@ def run(args):
             tolerance = args.atol + args.rtol * singles.abs()
             report.update(
                 replay_finite=True,
+                mixed_padding_observed=any(
+                    len(set(row["valid_tokens"])) > 1 for row in report["prefills"]
+                ),
                 mixed_batch_singleton_abs_error=differences.tolist(),
                 mixed_batch_singleton_allowed_error=tolerance.tolist(),
                 mixed_batch_singleton_within_tolerance=bool(
@@ -158,6 +173,7 @@ def run(args):
         )
         save()
         raise
+    hook.remove()
     print(json.dumps(report, indent=2))
 
 
