@@ -39,8 +39,8 @@ def app_running(app_id: str) -> bool:
     if listing.returncode != 0:
         return True  # Transient CLI failure: do not tear the tunnel down.
     for app in json.loads(listing.stdout or "[]"):
-        if app_id in json.dumps(app):
-            return "stopped" not in json.dumps(app).lower()
+        if app.get("app_id") == app_id:
+            return app.get("stopped_at") is None and "stopped" not in app.get("state", "")
     return False
 
 
