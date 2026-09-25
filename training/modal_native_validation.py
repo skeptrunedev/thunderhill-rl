@@ -52,6 +52,11 @@ def validate_gpu(source_revision: str):
         + "\n"
     )
     print(f"Validation artifacts: {destination}", flush=True)
+    from training.native_network import configure_container_hostname
+
+    (destination / "container-network.json").write_text(
+        json.dumps(configure_container_hostname(), indent=2) + "\n"
+    )
     resources = (destination / "gpu-resources.csv").open("w")
     sampler = subprocess.Popen([
         "nvidia-smi", "--query-gpu=timestamp,index,name,memory.used,memory.total,utilization.gpu",
