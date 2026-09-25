@@ -276,6 +276,8 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	_startup_mark("environment_and_bike_complete")
+	# Policy cameras use a car rig: no motorcycle, rider or instruments in view.
+	AgentCameraScript.assign_rider_layer(bike, AgentCameraScript.BIKE_LAYER)
 	AgentCameraScript.assign_rider_layer(bike.rider)
 	AgentCameraScript.assign_rider_layer(bike._arms, AgentCameraScript.RIDER_LIMB_LAYER)
 	preload("res://scripts/rider_shadows.gd").install(bike.rider)

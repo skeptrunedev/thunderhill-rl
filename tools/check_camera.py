@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import io
-import math
 import json
 import os
 from pathlib import Path
@@ -119,11 +118,12 @@ def validate_capture(response: dict, output: Path, label: str, episode: str, tic
     assert decoded.convert("RGB").entropy() > 3.0, "Observation appears blank"
     assert response["camera"]["hud_visible"] is False
     assert response["camera"]["rider_mesh_visible"] is False
-    horizontal_fov = 30 if response["logical_id"] == "camera_front_tele_30fov" else 120
-    expected_vertical = math.degrees(2 * math.atan(math.tan(math.radians(horizontal_fov / 2)) * 320 / 512))
-    assert math.isclose(response["camera"]["vertical_fov_degrees"], expected_vertical, abs_tol=1e-4)
-    expected_focal = 512 / (2 * math.tan(math.radians(horizontal_fov / 2)))
-    assert math.isclose(response["camera"]["intrinsics"]["fx"], expected_focal, rel_tol=1e-6)
+    assert response["camera"]["bike_mesh_visible"] is False
+    intrinsics = response["camera"]["intrinsics"]
+    assert intrinsics["model"] == "ftheta" and (intrinsics["width"], intrinsics["height"]) == (512, 320)
+    assert 0 < intrinsics["cx"] < 512 and 0 < intrinsics["cy"] < 320
+    rig = response["camera"]["rig"]
+    assert rig["up"] == [0.0, 1.0, 0.0] and abs(rig["forward"][1]) < 1e-9, "Policy rig must be level"
     if not view_only:
         views = response["views"]
         assert [view["logical_id"] for view in views] == [
@@ -134,9 +134,8 @@ def validate_capture(response: dict, output: Path, label: str, episode: str, tic
             validate_capture(view, output, label + "_" + view["logical_id"], episode, tick, view_only=True)
         assert views[1]["image"] == response["image"]
         assert views[0]["camera"]["pose"] != views[2]["camera"]["pose"]
-        assert views[1]["camera"]["pose"] == views[3]["camera"]["pose"]
+        assert views[1]["camera"]["rig"] == views[3]["camera"]["rig"]
     assert len(response["camera"]["pose"]["position"]) == 3
-    assert response["camera"]["intrinsics"]["fx"] > 0
     artifacts = list((output / "userdata").rglob(digest + ".png"))
     assert len(artifacts) == 1 and artifacts[0].read_bytes() == png, "Recorded bytes differ from policy image"
     (output / f"{label}.png").write_bytes(png)

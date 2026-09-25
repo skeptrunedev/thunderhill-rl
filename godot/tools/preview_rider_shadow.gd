@@ -53,27 +53,14 @@ func _run() -> void:
 		game.sim.lean = view.lean
 		game._update_visual(1.0)
 		if view.name == "policy":
-			# Use the policy pose and lens in this presentation viewport so the
+			# Use the policy front wide mount in this presentation viewport so the
 			# paired diagnostic can compare full size images without recording episodes.
-			var normal: Vector3 = game.track.sample_world(game.sim.position).normal
-			var forward: Vector3 = game.sim.surface_forward(normal)
-			var upright := Vector3.UP.slide(forward).normalized()
-			game.camera.position = (
-				game.sim.position
-				+ upright * AgentCamera.EYE_HEIGHT_M
-				+ forward * AgentCamera.EYE_FORWARD_M
-			)
-			game.camera.look_at(
-				(
-					game.camera.position
-					+ forward * cos(AgentCamera.LOOK_DOWN_RAD)
-					- upright * sin(AgentCamera.LOOK_DOWN_RAD)
-				),
-				upright
-			)
+			# The presentation camera is a pinhole, not the policy F-theta lens.
+			game.camera.global_transform = AgentCamera.view_transform(game.sim, AgentCamera.VIEWS[1])
 			game.camera.fov = 74.0
 			game.camera.cull_mask = (
-				((1 << 20) - 1) & ~(AgentCamera.RIDER_LAYER | AgentCamera.RIDER_LIMB_LAYER)
+				((1 << 20) - 1)
+				& ~(AgentCamera.BIKE_LAYER | AgentCamera.RIDER_LAYER | AgentCamera.RIDER_LIMB_LAYER)
 			)
 		else:
 			game.camera.set_cull_mask_value(19, true)

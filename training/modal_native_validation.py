@@ -252,8 +252,13 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
                        hard_deadline_unix: float,
                        checkpoint: str = "/model-cache/alpagym-converted-1.5",
                        threaded_stress: bool = False, stress_workers: int = 4,
-                       stress_iterations: int = 50, policy_step: bool = False):
-    """One bounded exact observation replay, never an optimizer or a new campaign."""
+                       stress_iterations: int = 50, policy_step: bool = False,
+                       model_input: str = ""):
+    """One bounded exact observation replay, never an optimizer or a new campaign.
+
+    With model_input, dispatch is unused: one batch of that captured ModelInput
+    with its own route and straight/left/right route counterfactuals.
+    """
     import json
     import os
     import subprocess
@@ -266,8 +271,10 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
         raise ValueError("Full policy step requires threaded stress mode")
     if not 1 <= stress_workers <= 4 or not 1 <= stress_iterations <= 200:
         raise ValueError("Stress requires 1..4 workers and 1..200 iterations")
+    if model_input and threaded_stress:
+        raise ValueError("Captured ModelInput mode is a synchronous replay")
     os.chdir(REMOTE)
-    for value in (dispatch, config):
+    for value in (model_input or dispatch, config):
         if not value.startswith("/runs/") or ".." in Path(value).parts:
             raise ValueError("Diagnostic observation/config must be existing /runs artifacts")
         if not Path(value).is_file():
@@ -282,7 +289,8 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
     destination.mkdir(parents=True)
     receipt = {
         "diagnostic_only": True, "training_eligible": False,
-        "source_revision": source_revision, "dispatch": dispatch, "config": config,
+        "source_revision": source_revision, "dispatch": None if model_input else dispatch,
+        "model_input": model_input or None, "config": config,
         "checkpoint": checkpoint,
         "checkpoint_identity": "base expert with frozen VLM" if checkpoint == "/model-cache/alpagym-converted-1.5" else "explicit supplied native bundle",
         "exact_trained_expert_state_claimed": False,
@@ -318,7 +326,8 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
     )
     command = [
         UPSTREAM + "/.venv/bin/python", "-c", bootstrap,
-        "--dispatch", dispatch, "--config", config, "--checkpoint", checkpoint,
+        *(["--model-input", model_input, "--batch-sizes", "4"] if model_input else ["--dispatch", dispatch]),
+        "--config", config, "--checkpoint", checkpoint,
         "--output", str(destination / "inference"), "--device", "cuda:0",
         "--max-seconds", str(remaining),
     ]
@@ -332,7 +341,7 @@ def diagnose_inference(source_revision: str, dispatch: str, config: str,
         environment.pop("ALPAGYM_INFERENCE_CAPTURE_DIR", None)
         environment["ALPAGYM_SCATTER_DIAGNOSTICS"] = "0"
     else:
-        command.extend(["--repeats", "10", "--synchronize"])
+        command.extend(["--repeats", "1" if model_input else "10", "--synchronize"])
         environment["CUDA_LAUNCH_BLOCKING"] = "1"
     try:
         with (destination / "inference.log").open("w") as log:
@@ -367,6 +376,7 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
          repair_recordings: str = "", scatter_diagnostics: bool = False,
          diagnostic_threaded_stress: bool = False, diagnostic_stress_workers: int = 4,
          diagnostic_stress_iterations: int = 50, diagnostic_policy_step: bool = False,
+         diagnostic_model_input: str = "",
          initial_speed_m_s: float = 8.0, randomized_starts: int = 0, start_seed: int = 0,
          rollouts: int = 6):
     import subprocess
@@ -387,7 +397,7 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
     revision = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
-    if diagnostic_dispatch:
+    if diagnostic_dispatch or diagnostic_model_input:
         if repair_recordings or scatter_diagnostics:
             raise ValueError("Recording repair runs only after successful full qualification")
         import time
@@ -396,7 +406,8 @@ def main(resume_run_dir: str = "", seconds: float = 5, concurrency: int = 1,
         print(diagnose_inference.remote(revision, diagnostic_dispatch, diagnostic_config,
                                        hard_deadline_unix, diagnostic_checkpoint,
                                        diagnostic_threaded_stress, diagnostic_stress_workers,
-                                       diagnostic_stress_iterations, diagnostic_policy_step))
+                                       diagnostic_stress_iterations, diagnostic_policy_step,
+                                       diagnostic_model_input))
     else:
         print(validate_gpu.remote(revision, resume_run_dir, seconds, concurrency, repair_recordings, scatter_diagnostics,
                                   initial_speed_m_s, randomized_starts, start_seed, rollouts))

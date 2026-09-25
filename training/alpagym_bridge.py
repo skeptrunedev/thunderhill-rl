@@ -70,19 +70,15 @@ def _write_json(path, value):
 
 
 def measured_rig(observation, capture):
-    """Return position and full measured bank/pitch orientation in AlpaSim axes.
+    """Return position and the level, yaw-only rig orientation in AlpaSim axes.
 
-    Camera's fixed downward pitch is removed to recover the rider rig. Keeping
-    measured roll avoids pairing a leaned image with invented level egomotion.
+    The policy cameras are mounted on this rig (godot/scripts/agent_camera.gd),
+    so the images and the egomotion share one car-like frame without lean.
     """
-    camera = capture["camera"]["pose"]
-    forward = -np.asarray(camera["basis_z"], dtype=float)
-    camera_up = np.asarray(camera["basis_y"], dtype=float)
-    down = 0.08  # agent_camera.gd LOOK_DOWN_RAD
-    tangent = forward * math.cos(down) + camera_up * math.sin(down)
-    up = -forward * math.sin(down) + camera_up * math.cos(down)
-    left = -np.asarray(camera["basis_x"], dtype=float)
-    rotation = GODOT_TO_LOCAL @ np.column_stack((tangent, left, up))
+    rig = capture["camera"]["rig"]
+    rotation = GODOT_TO_LOCAL @ np.column_stack(
+        [np.asarray(rig[axis], dtype=float) for axis in ("forward", "left", "up")]
+    )
     position = GODOT_TO_LOCAL @ np.asarray(
         observation["state"]["position"], dtype=float
     )
@@ -123,12 +119,17 @@ def camera_calibration(capture, position, rotation):
     spec = sensor.CameraSpec(
         logical_id=capture["logical_id"], resolution_w=image["width"], resolution_h=image["height"]
     )
-    pinhole = spec.opencv_pinhole_param
-    pinhole.focal_length_x, pinhole.focal_length_y = intrinsics["fx"], intrinsics["fy"]
-    pinhole.principal_point_x, pinhole.principal_point_y = (
-        intrinsics["cx"],
-        intrinsics["cy"],
-    )
+    ftheta = spec.ftheta_param
+    ftheta.principal_point_x, ftheta.principal_point_y = intrinsics["cx"], intrinsics["cy"]
+    if intrinsics["polynomial_type"] == "pixeldistance-to-angle":
+        ftheta.reference_poly = sensor.FthetaCameraParam.PolynomialType.PIXELDIST_TO_ANGLE
+        ftheta.pixeldist_to_angle_poly.extend(intrinsics["polynomial"])
+    else:
+        ftheta.reference_poly = sensor.FthetaCameraParam.PolynomialType.ANGLE_TO_PIXELDIST
+        ftheta.angle_to_pixeldist_poly.extend(intrinsics["polynomial"])
+    ftheta.linear_cde.linear_c = intrinsics["linear_c"]
+    ftheta.linear_cde.linear_d = intrinsics["linear_d"]
+    ftheta.linear_cde.linear_e = intrinsics["linear_e"]
     pose = camera["pose"]
     # Camera optical axes: X right, Y down, Z forward. Proto field is named
     # rig_to_camera but upstream explicitly documents camera_to_rig semantics.
