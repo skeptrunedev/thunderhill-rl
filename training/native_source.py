@@ -18,6 +18,7 @@ PATCHES = (
     PATCH.with_name("alpagym-padding-skip.patch"),
     PATCH.with_name("alpagym-host-replay.patch"),
     PATCH.with_name("alpagym-weight-stream-handoff.patch"),
+    PATCH.with_name("alpagym-unbiased-advantage.patch"),
 )
 
 
