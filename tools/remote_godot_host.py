@@ -16,6 +16,7 @@ import json
 import os
 import shlex
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -45,6 +46,14 @@ def run_godot(payload: dict, mirror: Path, worktrees: Path, godot: str, repo: st
             args += [arg, value]
         elif arg.startswith("--replay="):
             args.append("--replay=" + mirrored(mirror, arg.split("=", 1)[1]))
+        elif arg.startswith("--agent-port="):
+            # The container chose a port free in its own namespace; choose one free
+            # here and tell the container which local port to forward to.
+            with socket.socket() as reservation:
+                reservation.bind(("127.0.0.1", 0))
+                local_port = reservation.getsockname()[1]
+            print(f"THUNDERHILL_REMOTE_PORT {local_port}", flush=True)
+            args.append(f"--agent-port={local_port}")
         else:
             args.append(arg)
     env = dict(os.environ)

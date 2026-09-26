@@ -98,6 +98,7 @@ def main(argv: list[str]) -> int:
     process = subprocess.Popen(_ssh() + ["godot-run " + payload], stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     port = next((a.split("=", 1)[1] for a in args if a.startswith("--agent-port=")), None)
+    local_port = None
     forward = None
     terminated = threading.Event()
 
@@ -114,6 +115,9 @@ def main(argv: list[str]) -> int:
     signal.signal(signal.SIGINT, terminate)
     try:
         for line in process.stdout:
+            if line.startswith(b"THUNDERHILL_REMOTE_PORT "):
+                local_port = int(line.split()[1])
+                continue
             sys.stdout.buffer.write(line)
             sys.stdout.buffer.flush()
             if port and forward is None and line.startswith(b"THUNDERHILL_READY"):
@@ -121,7 +125,7 @@ def main(argv: list[str]) -> int:
                 # and immediately drop the caller's connection attempts.
                 forward = subprocess.Popen(
                     _ssh("-N", "-o", "ExitOnForwardFailure=yes",
-                         "-L", f"127.0.0.1:{port}:127.0.0.1:{port}"))
+                         "-L", f"127.0.0.1:{port}:127.0.0.1:{local_port}"))
         returncode = process.wait()
     finally:
         stop()
