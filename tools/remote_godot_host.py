@@ -28,7 +28,8 @@ def mirrored(mirror: Path, path: str) -> str:
     return str(mirror / path.lstrip("/"))
 
 
-def run_godot(payload: dict, mirror: Path, worktrees: Path, godot: str, repo: str) -> int:
+def run_godot(payload: dict, mirror: Path, worktrees: Path, godot: str, repo: str,
+              app_id: str) -> int:
     worktree = worktrees / payload["revision"]
     if not (worktree / "godot/project.godot").is_file():
         raise RuntimeError(f"No prepared worktree for revision {payload['revision']}")
@@ -61,6 +62,9 @@ def run_godot(payload: dict, mirror: Path, worktrees: Path, godot: str, repo: st
         if not (key.startswith("THUNDERHILL_") or key == "XDG_DATA_HOME"):
             raise ValueError(f"Unexpected environment variable {key}")
         env[key] = value
+    # Tags every process of this launch so the tunnel host can stop them when the
+    # app ends even if sshd never notices the dropped connection.
+    env["THUNDERHILL_REMOTE_APP"] = app_id
     if "XDG_DATA_HOME" in payload["env"]:
         env["XDG_DATA_HOME"] = mirrored(mirror, payload["env"]["XDG_DATA_HOME"])
         Path(env["XDG_DATA_HOME"]).mkdir(parents=True, exist_ok=True)
@@ -91,12 +95,13 @@ def main() -> int:
     parser.add_argument("--worktrees", type=Path, required=True)
     parser.add_argument("--godot", required=True)
     parser.add_argument("--container-repo", default="/opt/thunderhill")
+    parser.add_argument("--app-id", default="")
     options = parser.parse_args()
     command = shlex.split(os.environ.get("SSH_ORIGINAL_COMMAND", ""))
     if len(command) == 2 and command[0] == "godot-run":
         payload = json.loads(base64.b64decode(command[1]))
         return run_godot(payload, options.mirror, options.worktrees, options.godot,
-                         options.container_repo)
+                         options.container_repo, options.app_id)
     if command[:2] == ["rsync", "--server"]:
         # rsync's server form ends with ". <path>"; confine that path to the mirror.
         if len(command) < 4 or command[-2] != ".":

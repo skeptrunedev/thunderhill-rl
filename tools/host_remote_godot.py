@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import signal
 import shutil
 import subprocess
 import sys
@@ -85,15 +87,30 @@ def prepare_worktree(revision: str) -> Path:
     return worktree
 
 
-def authorize(container_key: str, marker: str, worktree: Path) -> None:
+def authorize(container_key: str, marker: str, worktree: Path, app_id: str) -> None:
     command = (f"python3 {worktree / 'tools/remote_godot_host.py'} --mirror {STATE / 'mirror'} "
-               f"--worktrees {STATE / 'worktrees'} --godot {GODOT}")
+               f"--worktrees {STATE / 'worktrees'} --godot {GODOT} --app-id {app_id}")
     options = (f'restrict,port-forwarding,permitopen="127.0.0.1:*",from="127.0.0.1,::1",'
                f'command="{command}"')
     lines = AUTHORIZED_KEYS.read_text().splitlines() if AUTHORIZED_KEYS.exists() else []
     lines = [line for line in lines if not line.endswith(" " + marker)]
     lines.append(f"{options} {container_key.split()[0]} {container_key.split()[1]} {marker}")
     AUTHORIZED_KEYS.write_text("\n".join(lines) + "\n")
+
+
+def stop_app_processes(app_id: str) -> None:
+    """Terminate launches still running for a stopped app (sshd may never notice
+    a dropped container, so their stdin never closes)."""
+    tag = f"THUNDERHILL_REMOTE_APP={app_id}".encode()
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            if tag in (proc / "environ").read_bytes().split(b"\0"):
+                os.kill(int(proc.name), signal.SIGTERM)
+                log(f"stopped leftover process {proc.name}")
+        except (OSError, ProcessLookupError):
+            continue
 
 
 def revoke(marker: str) -> None:
@@ -114,7 +131,7 @@ def main() -> int:
     log(f"endpoint {remote['host']}:{remote['port']} revision {remote['revision']}")
     worktree = prepare_worktree(remote["revision"])
     marker = "thunderhill-remote-godot:" + args.app_id
-    authorize(remote["container_key"], marker, worktree)
+    authorize(remote["container_key"], marker, worktree, args.app_id)
     try:
         while app_running(args.app_id):
             log("opening reverse tunnel")
@@ -131,6 +148,7 @@ def main() -> int:
         log(f"{args.app_id} stopped")
     finally:
         revoke(marker)
+        stop_app_processes(args.app_id)
     return 0
 
 
