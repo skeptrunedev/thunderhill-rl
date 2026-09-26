@@ -1,0 +1,15 @@
+diff --git a/packages/host/src/alpagym_host/config.py b/packages/host/src/alpagym_host/config.py
+index 4147297..4e95731 100644
+--- a/packages/host/src/alpagym_host/config.py
++++ b/packages/host/src/alpagym_host/config.py
+@@ -209,6 +209,10 @@ class CosmosRLTrainPolicyConfig:
+     grpo_optimization_iterations: int
+     kl_beta: float
+     reference_reset_interval: int
++    # Passed through unchanged to Cosmos-RL `GrpoConfig.unbiased_advantage`:
++    # true computes group advantages as reward - group mean (Dr. GRPO) instead
++    # of dividing by the group reward std. False keeps upstream behavior.
++    unbiased_advantage: bool = False
+ 
+ 
+ @dataclass

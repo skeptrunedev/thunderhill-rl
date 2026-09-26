@@ -168,6 +168,12 @@ def prepare(
         RewardTermConfig(kind="metric", metric_name=name, scale=scale)
         for name, scale in REWARD_SCALES.items()
     ]
+    # Dr. GRPO (arXiv:2503.20783): advantage = reward - group mean, without
+    # dividing by the group reward std. Siblings that all crash at the same
+    # corner differ by noise, and std division inflates that noise to +/-1.
+    # Nothing divides by the spread, so an all-identical group gets ~0 (at most
+    # float32 mean rounding, ~1e-8) instead of upstream's rounding / 1e-6.
+    config.cosmos.train.train_policy.unbiased_advantage = True
     config.cosmos.train.max_num_steps = max_steps
     config.cosmos.train.num_epochs = max_steps
     config.cosmos.rollout.n_generation = rollouts
@@ -202,6 +208,7 @@ def prepare(
         # equal, and it bypasses the per-weight-version prompt cap that bounds
         # this run to one group per optimizer step. Plain GRPO stays selected.
         "grpo_variant": "grpo",
+        "unbiased_advantage": config.cosmos.train.train_policy.unbiased_advantage,
         "nvidia_reference": {
             "experiment": NVIDIA_CLRL_EXPERIMENT,
             "alpagym_revision": ALPAGYM_REVISION,
