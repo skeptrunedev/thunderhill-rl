@@ -40,6 +40,13 @@ NVIDIA_CLRL_EXPERIMENT = (
 NVIDIA_CLRL_LEARNING_RATE = 1.0e-4
 NVIDIA_CLRL_WARMUP_STEPS = 1
 NVIDIA_CLRL_GROUP_SIZE = 6
+# Flow SDE exploration scale a (std_dev_t = sqrt(sigma / (1 - sigma)) * a) for
+# the trajectory expert. NVIDIA's recipe uses a = 0.2; piRL
+# (arXiv:2510.25889), which RL-trains flow-matching VLA actions with the same
+# SDE sampling, found a = 0.2 gave much higher clip fraction and unstable
+# training and a = 0.5 worked best. The rollout persists the value with each
+# replayed trajectory, so the trainer log-prob uses the sampling value.
+SDE_NOISE_LEVEL = 0.5
 
 
 def load_upstream(source: Path) -> Path:
@@ -62,6 +69,7 @@ def prepare(
     rollouts: int = NVIDIA_CLRL_GROUP_SIZE,
     learning_rate: float = NVIDIA_CLRL_LEARNING_RATE,
     warmup_steps: int = NVIDIA_CLRL_WARMUP_STEPS,
+    noise_level: float = SDE_NOISE_LEVEL,
     episode_seconds: float = 30,
     initial_speed_m_s: float = 0.0,
     randomized_start_count: int = 0,
@@ -106,6 +114,13 @@ def prepare(
     # only an explicit integer step count is accepted here.
     if type(warmup_steps) is not int or warmup_steps < 0:
         raise ValueError("Warmup must be a non-negative integer step count")
+    if (
+        isinstance(noise_level, bool)
+        or not isinstance(noise_level, (int, float))
+        or not math.isfinite(noise_level)
+        or noise_level <= 0
+    ):
+        raise ValueError("SDE noise level must be finite and positive")
     if not math.isfinite(max_wall_seconds) or max_wall_seconds <= 0:
         raise ValueError("Wall time budget must be finite and positive")
     if not math.isfinite(max_video_seconds) or max_video_seconds <= 0:
@@ -164,6 +179,10 @@ def prepare(
     config.cosmos.train.train_batch_per_replica = rollouts
     config.cosmos.train.optm_lr = float(learning_rate)
     config.cosmos.train.optm_warmup_steps = warmup_steps
+    diffusion = config.policy.inference.sampling.diffusion_kwargs
+    if diffusion.int_method != "sde":
+        raise ValueError("RL log-probs require the upstream SDE trajectory sampler")
+    diffusion.noise_level = float(noise_level)
     reference = yaml.safe_load((source / NVIDIA_CLRL_EXPERIMENT).read_text())
     reference_train = reference["cosmos"]["train"]
     optimizer = {
@@ -246,6 +265,14 @@ def prepare(
                 "trainer": "alpagym_runtime.cosmos.trainer.AlpagymGRPOTrainer",
                 "configuration_profile": "upstream_default_alpamayo_r1",
                 "optimizer": optimizer,
+                "sampling": {
+                    "int_method": diffusion.int_method,
+                    "noise_level": diffusion.noise_level,
+                    "inference_step": diffusion.inference_step,
+                    "nvidia_reference_noise_level": reference["policy"]["inference"][
+                        "sampling"
+                    ]["diffusion_kwargs"]["noise_level"],
+                },
                 "training_scope": game["training_scope"],
                 "simulator": "Godot through the AlpaSim gRPC protocol",
             },
@@ -862,6 +889,13 @@ def main(argv: list[str] | None = None) -> None:
         default=NVIDIA_CLRL_WARMUP_STEPS,
         help="Cosmos optm_warmup_steps (linear from zero); NVIDIA uses 1",
     )
+    prep.add_argument(
+        "--noise-level",
+        type=float,
+        default=SDE_NOISE_LEVEL,
+        help="Trajectory SDE noise level a; piRL (arXiv:2510.25889) found 0.5 "
+        "stabler than NVIDIA's 0.2",
+    )
     prep.add_argument("--episode-seconds", type=float, default=30)
     prep.add_argument(
         "--initial-speed-m-s",
@@ -901,6 +935,7 @@ def main(argv: list[str] | None = None) -> None:
                 rollouts=args.rollouts,
                 learning_rate=args.learning_rate,
                 warmup_steps=args.warmup_steps,
+                noise_level=args.noise_level,
                 episode_seconds=args.episode_seconds,
                 initial_speed_m_s=args.initial_speed_m_s,
                 randomized_start_count=args.randomized_starts,
