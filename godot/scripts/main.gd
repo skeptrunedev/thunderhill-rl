@@ -1127,9 +1127,31 @@ func _poll_agent() -> void:
 					agent_request_pending = true
 					response = await _capture_request(request)
 					agent_request_pending = false
+				elif request.get("op", "") == "advance" and request.get("capture", false) == true:
+					agent_request_pending = true
+					response = await _advance_and_capture(request)
+					agent_request_pending = false
 				else:
 					response = _request(request)
 			peer.put_data((JSON.stringify(response, "", true, true) + "\n").to_utf8_buffer())
+
+
+## One round trip for a control step: advance, then capture the resulting tick.
+## The cached advance response stays unchanged; the capture rides on a copy.
+func _advance_and_capture(request: Dictionary) -> Dictionary:
+	var advance := request.duplicate(true)
+	advance.erase("capture")
+	advance.erase("format")
+	var result: Dictionary = _request(advance)
+	if result.has("error"):
+		return result
+	var captured := await _capture_request({
+		"op": "capture", "episode_id": episode_id, "expected_tick": sim.tick,
+		"format": request.get("format", "png"),
+	})
+	result = result.duplicate(true)
+	result["capture"] = captured
+	return result
 
 
 func _capture_request(request: Dictionary) -> Dictionary:
@@ -1139,6 +1161,9 @@ func _capture_request(request: Dictionary) -> Dictionary:
 		return {"error": "Episode mismatch"}
 	if request.get("expected_tick", -1) != sim.tick:
 		return {"error": "Tick mismatch"}
+	var format: String = request.get("format", "png")
+	if format not in ["png", "jpeg"]:
+		return {"error": "Unsupported capture format: " + format}
 	if not environment_failure.is_empty():
 		return serializable(environment_failure)
 	if agent_camera == null:
@@ -1150,7 +1175,7 @@ func _capture_request(request: Dictionary) -> Dictionary:
 	_update_visual(0.0)
 	var road: Dictionary = track.sample_world(sim.position)
 	var captured: Dictionary = await agent_camera.capture(
-		sim, road.normal, episode_id, "user://runs/" + run_id
+		sim, road.normal, episode_id, "user://runs/" + run_id, format
 	)
 	if captured.has("error"):
 		return serializable(_fail_environment(captured, {"operation": "capture"}))

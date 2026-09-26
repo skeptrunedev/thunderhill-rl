@@ -53,6 +53,7 @@ const DATASET_SIZE := Vector2(1920, 1080)
 const WIDTH := 512
 const HEIGHT := 320
 const BIKE_LAYER := 1 << 17
+const JPEG_QUALITY := 0.95
 const RIDER_LAYER := 1 << 19
 const RIDER_LIMB_LAYER := 1 << 18
 const LENS_SHADER := """
@@ -255,11 +256,11 @@ static func assign_rider_layer(node: Node, layer: int = RIDER_LAYER) -> void:
 		assign_rider_layer(child, layer)
 
 
-func capture(sim: RefCounted, _normal: Vector3, episode_id: String, folder: String) -> Dictionary:
+func capture(sim: RefCounted, _normal: Vector3, episode_id: String, folder: String, format: String = "png") -> Dictionary:
 	var tick: int = sim.tick
 	var views: Array[Dictionary] = []
 	for index in VIEWS.size():
-		var view := await _capture_view(sim, episode_id, folder, VIEWS[index], pipelines[index])
+		var view := await _capture_view(sim, episode_id, folder, VIEWS[index], pipelines[index], format)
 		if view.has("error"):
 			return view
 		if sim.tick != tick:
@@ -271,7 +272,7 @@ func capture(sim: RefCounted, _normal: Vector3, episode_id: String, folder: Stri
 	return receipt
 
 
-func _capture_view(sim: RefCounted, episode_id: String, folder: String, spec: Dictionary, pipeline: Dictionary) -> Dictionary:
+func _capture_view(sim: RefCounted, episode_id: String, folder: String, spec: Dictionary, pipeline: Dictionary, format: String) -> Dictionary:
 	var trace_started := Time.get_ticks_usec()
 	_trace_capture(spec.logical_id, "begin", trace_started)
 	if (
@@ -332,12 +333,13 @@ func _capture_view(sim: RefCounted, episode_id: String, folder: String, spec: Di
 			"failure_type": "infrastructure",
 			"validation": validation
 		}
-	var png := image.save_png_to_buffer()
-	if png.is_empty():
+	# JPEG is what the policy decodes; sending it avoids a PNG transfer and re-encode.
+	var encoded := image.save_jpg_to_buffer(JPEG_QUALITY) if format == "jpeg" else image.save_png_to_buffer()
+	if encoded.is_empty():
 		return {"error": "Cannot encode observation image", "failure_type": "infrastructure"}
 	var hash_context := HashingContext.new()
 	hash_context.start(HashingContext.HASH_SHA256)
-	hash_context.update(png)
+	hash_context.update(encoded)
 	var digest := hash_context.finish().hex_encode()
 	var image_folder := folder + "/observations"
 	var mkdir_error := DirAccess.make_dir_recursive_absolute(image_folder)
@@ -346,7 +348,7 @@ func _capture_view(sim: RefCounted, episode_id: String, folder: String, spec: Di
 			"error": "Cannot create observation artifact directory",
 			"failure_type": "infrastructure"
 		}
-	var artifact := image_folder + "/" + digest + ".png"
+	var artifact := image_folder + "/" + digest + ("." + ("jpg" if format == "jpeg" else "png"))
 	if FileAccess.file_exists(artifact):
 		if FileAccess.get_sha256(artifact) != digest:
 			return {
@@ -357,7 +359,7 @@ func _capture_view(sim: RefCounted, episode_id: String, folder: String, spec: Di
 		var output_file := FileAccess.open(artifact, FileAccess.WRITE)
 		if output_file == null:
 			return {"error": "Cannot write observation artifact", "failure_type": "infrastructure"}
-		output_file.store_buffer(png)
+		output_file.store_buffer(encoded)
 		output_file.flush()
 		var write_error := output_file.get_error()
 		output_file.close()
@@ -374,8 +376,8 @@ func _capture_view(sim: RefCounted, episode_id: String, folder: String, spec: Di
 		"observation_id": "%s_%d_%s" % [episode_id, capture_tick, digest],
 		"image":
 		{
-			"mime_type": "image/png",
-			"base64": Marshalls.raw_to_base64(png),
+			"mime_type": "image/jpeg" if format == "jpeg" else "image/png",
+			"base64": Marshalls.raw_to_base64(encoded),
 			"sha256": digest,
 			"width": WIDTH,
 			"height": HEIGHT

@@ -14,7 +14,6 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 import hashlib
-import io
 import json
 import math
 from pathlib import Path
@@ -27,7 +26,6 @@ import grpc
 import numpy as np
 import torch
 from alpagym_alpamayo_r1.navigation import navigation_instruction
-from PIL import Image
 from scipy.spatial.transform import Rotation
 from alpasim_grpc.v0 import common_pb2 as common
 from alpasim_grpc.v0 import egodriver_pb2 as driver
@@ -368,6 +366,8 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 lambda: session,
                 road_telemetry=self.road,
             )
+            # Advance and capture in one round trip; the game encodes the JPEG.
+            env.capture_format = "jpeg"
             initial_speed = provenance["initial_speed_m_s"]
             env.reset(
                 policy_display=display,
@@ -397,11 +397,13 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
             model_decisions = 0
             reason = "episode_tick_limit"
 
-            def capture_and_submit():
+            def capture_and_submit(receipt=None):
                 obs = env._observation
-                receipt = client.request(
-                    dict(op="capture", episode_id=episode_id, expected_tick=obs["tick"])
-                )
+                if receipt is None:
+                    receipt = client.request(dict(
+                        op="capture", episode_id=episode_id, expected_tick=obs["tick"],
+                        format="jpeg",
+                    ))
                 if (
                     receipt.get("tick") != obs["tick"]
                     or receipt.get("episode_id") != episode_id
@@ -421,12 +423,11 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     pixels = base64.b64decode(camera_view["image"]["base64"], validate=True)
                     if hashlib.sha256(pixels).hexdigest() != camera_view["image"]["sha256"]:
                         raise ValueError("Image digest mismatch")
-                    # Native CUDA image decoding expects JPEG. Preserve exact sent bytes.
-                    encoded = io.BytesIO()
-                    with Image.open(io.BytesIO(pixels)) as image:
-                        image.convert("RGB").save(encoded, format="JPEG", quality=95, subsampling=0)
-                    jpeg = encoded.getvalue()
-                    jpeg_digest = hashlib.sha256(jpeg).hexdigest()
+                    if camera_view["image"]["mime_type"] != "image/jpeg":
+                        raise ValueError("Native CUDA image decoding expects the game's JPEG")
+                    # Preserve the exact bytes the game encoded and the policy decodes.
+                    jpeg = pixels
+                    jpeg_digest = camera_view["image"]["sha256"]
                     (image_directory / f"{jpeg_digest}.jpg").write_bytes(jpeg)
                     encoded_views.append((camera_view["logical_id"], jpeg))
                     view_records.append(dict(
@@ -447,8 +448,8 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             image_sha256=receipt["image"]["sha256"],
                             driver_jpeg_sha256=view_records[1]["driver_jpeg_sha256"],
                             views=view_records,
+                            jpeg_encoder="godot_save_jpg_to_buffer",
                             jpeg_quality=95,
-                            jpeg_subsampling=0,
                             local_position=position.tolist(),
                             local_rotation=rotation.tolist(),
                             camera=receipt["camera"],
@@ -502,6 +503,7 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 view = json.loads(
                     env.control_bike(view["observation_token"], **command)
                 )
+                capture = env.last_capture
                 if reward_metrics is not None:
                     transitions = env._observation["transitions"]
                     if not transitions:
@@ -523,6 +525,9 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                     + "\n"
                 )
                 decisions.flush()
+                if capture is None:
+                    raise RuntimeError("The game returned no capture for a control step")
+                capture_and_submit(capture)
 
             try:
                 capture_and_submit()
@@ -549,7 +554,6 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                         raise RuntimeError(
                             "Simulator terminated during measured sensor warmup"
                         )
-                    capture_and_submit()
                 if initial_speed == 0 and env._observation["state"]["speed"] > 0.01:
                     raise RuntimeError("Standing warmup moved the motorcycle")
                 if initial_speed > 0 and env._observation["state"]["speed"] <= 0.01:
@@ -687,7 +691,6 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                             lean_rate=state["lean_rate"],
                         )
                         advance(controls, "model_trajectory_controller", diagnostic)
-                        capture_and_submit()
                         obs = env._observation
                         if stall_monitor.observe(
                             obs["tick"] - WARMUP_TICKS, obs["track"]["legal_distance"]

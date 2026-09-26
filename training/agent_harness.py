@@ -24,6 +24,10 @@ class ThunderhillEnv:
         self._calls = 0
         self._receipt = ""
         self._fault = None
+        # Harness callers that need camera frames set this ("png" or "jpeg") so each
+        # control step also captures the resulting tick in the same round trip.
+        self.capture_format = None
+        self.last_capture = None
 
     def _log(self, kind, **fields):
         self._trace.write(
@@ -202,15 +206,17 @@ class ThunderhillEnv:
             self._log("invalid_action", reason="invalid_shift")
             raise ValueError("Shift must be minus one, zero or one")
         before = self._view()
-        result = self._request(
-            {
-                "op": "advance",
-                "episode_id": self._observation["episode_id"],
-                "expected_tick": before["tick"],
-                "action_id": self._receipt,
-                "controls": controls,
-            }
-        )
+        request = {
+            "op": "advance",
+            "episode_id": self._observation["episode_id"],
+            "expected_tick": before["tick"],
+            "action_id": self._receipt,
+            "controls": controls,
+        }
+        if self.capture_format:
+            request.update(capture=True, format=self.capture_format)
+        result = self._request(request)
+        self.last_capture = result.pop("capture", None)
         try:
             increment = sum(
                 row["reward_components"]["legal_progress_m"]
