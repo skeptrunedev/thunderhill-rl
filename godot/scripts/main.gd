@@ -864,6 +864,7 @@ func _step(action: Dictionary) -> Dictionary:
 		{
 			"progress": after.progress,
 			"lateral_m": after.distance,
+			"half_width_m": float(after.width) * 0.5,
 			"on_track": after.on_track,
 			"on_curb": after.on_curb,
 			"on_pavement": after.on_pavement,

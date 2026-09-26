@@ -155,24 +155,25 @@ steps, checkpoint output and evaluated gameplay recordings.
 
 All reward terms share one unit: metres divided by `20 m/s * episode_seconds`,
 the distance a rider averaging 20 m/s covers in the fixed horizon (warmup
-excluded). `progress` is credited signed legal distance in that unit, so it is a
+excluded). `progress` (v6) is legal distance with each physics tick weighted by
+`max(0, 1 - |lateral_m| / half_width_m)`, so it is a centering weighted
 progress rate over a fixed horizon. Horizon time not executed because the
 attempt stopped early (stall, crash, track limits) earns zero progress. A safe
-completed lap is credited at its own mean lap speed for the whole horizon, so a
-faster lap always scores higher. Raw metres, credited metres and the horizon
-progress rate remain in each summary.
-The existing centerline measures route position; proximity to it earns no reward.
-No optimized racing line has been selected. Preview the reference with:
+completed lap is credited at its own centered pace for the whole horizon, so a
+faster lap always scores higher. Raw, centered and credited metres remain in
+each summary. The centerline measures route position and the centering weight;
+no optimized racing line has been selected. Preview the reference with:
 
 ```sh
 uv run tools/plot_track_reference.py --output artifacts/track-reference.png
 ```
 
-Progress is the only reward term (v5). Obstacle collisions, offroad excursions
-and falls end the episode, which forfeits the rest of the horizon; their kinetic
-energy as metres of 0.25 g braking (`collision_cost`, `offroad_cost`,
-`fall_cost`) is reported as a diagnostic, not rewarded, because charging it on
-top of the forfeited horizon ranked stalling above attempting a corner.
+`termination_cost` (scale -1) charges the incident that ended the episode
+(obstacle collision, offroad or fall) once at onset, `v^2 / (2 * 0.48 g)`, the
+run-off needed to stop at the game's offtrack friction, so arriving at the same
+failure point faster ranks lower. A stall is charged as an offroad at 10 m/s
+(10.6 m), so stopping before a corner is not free. Per-kind costs
+(`collision_cost`, `offroad_cost`, `fall_cost`) remain diagnostics.
 Events are accumulated across every executed physics tick, including brief
 excursions between observations. An invalid lap alone is not an offroad event.
 The 0/1 flags `collision_any`, `offroad` and `fall_without_collision` are still
@@ -187,5 +188,6 @@ stale prepared configurations are rejected. Historical results are unchanged.
 
 The stall monitor still ends an attempt with under 1 m of legal progress in a
 5 s window after 5 s grace. Because unexecuted horizon earns nothing, the stalled
-attempt scores what a bike that stayed stopped would score over the full horizon.
+attempt earns the progress a bike that stayed stopped would earn over the full
+horizon, less the stall cost.
 See [reward details](../docs/reward-references.md).

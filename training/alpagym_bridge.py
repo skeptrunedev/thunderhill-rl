@@ -721,10 +721,12 @@ class GodotRuntime(runtime_grpc.RuntimeServiceServicer):
                 # A stall still ends the attempt (a stopped bike would spend the
                 # remaining inference budget standing still), but the reward is
                 # a fixed-horizon rate: the unexecuted horizon earns zero progress,
-                # exactly what a bike that stays stopped would have earned.
+                # exactly what a bike that stays stopped would have earned, and
+                # the stall is charged like a modest-speed offroad.
                 metrics = reward_metrics.values(
                     elapsed_seconds=elapsed,
                     lap_completed=completed,
+                    stalled=reason == "stalled",
                 )
                 metrics.update(
                     sim_seconds=elapsed,
