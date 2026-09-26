@@ -52,6 +52,11 @@ NVIDIA_RL_WARMUP_STEPS = 0
 # 2e-5 VLA-RL, 1e-5..4e-5 AD-R1). The previous 1e-4 x 240 steps per update
 # diverged (clip 13-17%, min ratio 0.0067).
 LEARNING_RATE = 1.0e-5
+# Adam epsilon. Cosmos defaults to 1e-6, but one whole-group optimizer step with
+# mean-centered (Dr. GRPO) advantages gives grad_norm ~3e-4..8e-4 over the
+# trainable expert (qualification 2026-09-26), i.e. ~1e-8..1e-7 per weight, so
+# 1e-6 dominated sqrt(v) and shrank each step ~20-50x below the learning rate.
+ADAM_EPSILON = 1.0e-10
 # Flow SDE exploration scale a (std_dev_t = sqrt(sigma / (1 - sigma)) * a) for
 # the trajectory expert. NVIDIA's recipe uses a = 0.2; piRL
 # (arXiv:2510.25889), which RL-trains flow-matching VLA actions with the same
@@ -201,6 +206,7 @@ def prepare(
     config.cosmos.train.train_batch_per_replica = rollouts
     config.cosmos.train.optm_lr = float(learning_rate)
     config.cosmos.train.optm_warmup_steps = warmup_steps
+    config.cosmos.train.epsilon = ADAM_EPSILON
     diffusion = config.policy.inference.sampling.diffusion_kwargs
     if diffusion.int_method != "sde":
         raise ValueError("RL log-probs require the upstream SDE trajectory sampler")
@@ -210,6 +216,7 @@ def prepare(
     optimizer = {
         "optm_lr": config.cosmos.train.optm_lr,
         "optm_warmup_steps": config.cosmos.train.optm_warmup_steps,
+        "adam_epsilon": config.cosmos.train.epsilon,
         # Cosmos-RL's default; the generated TOML does not override it.
         "optm_warmup_start_factor": 0.0,
         "optm_decay_type": config.cosmos.train.optm_decay_type,

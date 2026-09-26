@@ -1,8 +1,8 @@
 {
-  "version": "native_unbiased_advantage_v1",
+  "version": "native_unbiased_advantage_adam_epsilon_v2",
   "upstream_revision": "972d160eed0e23d388497851504a3a233fec5879",
-  "patch_sha256": "403e5e593f26c729cfc8c240ae915cea8a0b07d0f4fa37fe939bd083e9dde96b",
+  "patch_sha256": "03e3d11b63d87a810fdb4df24478dff3ed1f22b203cc2574d5c51b981dcf8f34",
   "files": {
-    "packages/host/src/alpagym_host/config.py": "5f162b5aa21bf18bad4d595b700e1985ebf1a7e22775c3be18e410405d2f4a73"
+    "packages/host/src/alpagym_host/config.py": "6317d882c08a4195126944157609db3b5b30564ef64608d9163497b99cc98e5e"
   }
 }

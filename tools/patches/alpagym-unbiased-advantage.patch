@@ -1,5 +1,5 @@
 diff --git a/packages/host/src/alpagym_host/config.py b/packages/host/src/alpagym_host/config.py
-index 4147297..4e95731 100644
+index 4147297..0967e8b 100644
 --- a/packages/host/src/alpagym_host/config.py
 +++ b/packages/host/src/alpagym_host/config.py
 @@ -209,6 +209,10 @@ class CosmosRLTrainPolicyConfig:
@@ -13,3 +13,13 @@ index 4147297..4e95731 100644
  
  
  @dataclass
+@@ -240,6 +244,9 @@ class CosmosRLTrainConfig:
+     optm_lr: float
+     optm_warmup_steps: int
+     train_policy: CosmosRLTrainPolicyConfig
++    # Passed through unchanged to Cosmos-RL `train.epsilon` (the Adam epsilon).
++    # 1e-6 keeps Cosmos's default.
++    epsilon: float = 1e-6
+     # LR schedule after warmup. decay_type in {sqrt, cosine, linear, none};
+     # decay_ratio is the fraction of total steps spent decaying (1.0 = whole run);
+     # lr decays to optm_min_lr_factor * optm_lr (0.0 = down to zero). The
