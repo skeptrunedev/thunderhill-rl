@@ -30,16 +30,21 @@ ALPAGYM_REVISION = "972d160eed0e23d388497851504a3a233fec5879"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = REPO_ROOT.parent / "thunderhill-references" / "alpagym"
 # NVIDIA's own Alpamayo 1.5 closed-loop RL experiment at the pinned revision.
-# AlpaGym's host default.yaml instead inherits Cosmos-RL's generic LLM values
-# (optm_lr 1e-6, 20 warmup steps starting from zero), which NVIDIA overrides
-# for this policy. prepare() records both the reference and the chosen values.
+# It is a smoke test: its optm_lr 1e-4 is not a training value. The group size
+# still comes from it; prepare() records it next to the chosen values.
 NVIDIA_CLRL_EXPERIMENT = (
     "packages/policies/alpamayo_r1/src/alpagym_alpamayo_r1/configs/experiment/"
     "alpamayo_1_5_clrl_test_run.yaml"
 )
-NVIDIA_CLRL_LEARNING_RATE = 1.0e-4
-NVIDIA_CLRL_WARMUP_STEPS = 1
 NVIDIA_CLRL_GROUP_SIZE = 6
+# NVIDIA's Alpamayo 1.5 RL post-training optimizer (alpamayo-recipes
+# recipes/alpamayo1_x_rl: toml/alpamayo_rvla_rl_local_test.toml and the SKILL.md
+# cluster table of "the values used to RL post-train Alpamayo 1.5"): AdamW at
+# optm_lr 2e-6 with no warmup, each optimizer step accumulating mini_batch=1
+# forwards. Each of our GRPO updates is one such step over its whole group.
+NVIDIA_RL_RECIPE = "alpamayo-recipes/recipes/alpamayo1_x_rl"
+NVIDIA_RL_LEARNING_RATE = 2.0e-6
+NVIDIA_RL_WARMUP_STEPS = 0
 
 
 def load_upstream(source: Path) -> Path:
@@ -60,8 +65,8 @@ def prepare(
     godot: str,
     max_steps: int = 1,
     rollouts: int = NVIDIA_CLRL_GROUP_SIZE,
-    learning_rate: float = NVIDIA_CLRL_LEARNING_RATE,
-    warmup_steps: int = NVIDIA_CLRL_WARMUP_STEPS,
+    learning_rate: float = NVIDIA_RL_LEARNING_RATE,
+    warmup_steps: int = NVIDIA_RL_WARMUP_STEPS,
     episode_seconds: float = 30,
     initial_speed_m_s: float = 0.0,
     randomized_start_count: int = 0,
@@ -160,7 +165,11 @@ def prepare(
     # NVIDIA owns advantage computation, minibatching and each optimizer step.
     # With one policy replica and dp_shard_size 1, Cosmos fetches
     # ceil(train_batch_per_replica / n_generation) = 1 prompt per policy step,
-    # so each optimizer step consumes exactly one complete GRPO group.
+    # so each policy step consumes exactly one complete GRPO group. The trainer
+    # patch honours Cosmos's batch_size_per_optimize, left unset (whole batch):
+    # the group's rollouts * expected_valid_steps replay rows are accumulated
+    # as mini_batch=1 forwards into a single optimizer step, as in NVIDIA's RL
+    # recipe, instead of one optimizer step per replayed decision.
     config.cosmos.train.train_batch_per_replica = rollouts
     config.cosmos.train.optm_lr = float(learning_rate)
     config.cosmos.train.optm_warmup_steps = warmup_steps
@@ -178,6 +187,12 @@ def prepare(
         "grpo_optimization_iterations": (
             config.cosmos.train.train_policy.grpo_optimization_iterations
         ),
+        # Cosmos batch_size_per_optimize is unset, so one optimizer step per
+        # optimization iteration covers the whole replay pool of the group.
+        "replay_rows_per_optimizer_step": rollouts * config.expected_valid_steps,
+        "optimizer_steps_per_update": (
+            config.cosmos.train.train_policy.grpo_optimization_iterations
+        ),
         "kl_beta": config.cosmos.train.train_policy.kl_beta,
         # Cosmos-RL's DAPO variant drops only groups whose rewards are exactly
         # equal, and it bypasses the per-weight-version prompt cap that bounds
@@ -192,6 +207,12 @@ def prepare(
             "train_batch_per_replica": reference_train["train_batch_per_replica"],
             "mini_batch": reference_train["train_policy"]["mini_batch"],
             "kl_beta": reference_train["train_policy"]["kl_beta"],
+        },
+        "nvidia_rl_post_training": {
+            "recipe": NVIDIA_RL_RECIPE,
+            "optm_lr": NVIDIA_RL_LEARNING_RATE,
+            "optm_warmup_steps": NVIDIA_RL_WARMUP_STEPS,
+            "mini_batch": 1,
         },
     }
     config.cosmos.rollout.backend = "thunderhill_alpagym_rollout"
@@ -853,14 +874,14 @@ def main(argv: list[str] | None = None) -> None:
     prep.add_argument(
         "--learning-rate",
         type=float,
-        default=NVIDIA_CLRL_LEARNING_RATE,
-        help="Cosmos optm_lr; defaults to NVIDIA's Alpamayo 1.5 closed-loop RL run",
+        default=NVIDIA_RL_LEARNING_RATE,
+        help="Cosmos optm_lr; defaults to NVIDIA's Alpamayo 1.5 RL post-training",
     )
     prep.add_argument(
         "--warmup-steps",
         type=int,
-        default=NVIDIA_CLRL_WARMUP_STEPS,
-        help="Cosmos optm_warmup_steps (linear from zero); NVIDIA uses 1",
+        default=NVIDIA_RL_WARMUP_STEPS,
+        help="Cosmos optm_warmup_steps (linear from zero); NVIDIA uses 0",
     )
     prep.add_argument("--episode-seconds", type=float, default=30)
     prep.add_argument(

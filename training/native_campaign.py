@@ -20,8 +20,8 @@ from pathlib import Path
 
 from training.nvidia_alpagym import (
     NVIDIA_CLRL_GROUP_SIZE,
-    NVIDIA_CLRL_LEARNING_RATE,
-    NVIDIA_CLRL_WARMUP_STEPS,
+    NVIDIA_RL_LEARNING_RATE,
+    NVIDIA_RL_WARMUP_STEPS,
 )
 
 TOTAL_SECONDS = 12 * 60 * 60
@@ -172,8 +172,8 @@ def prepare_campaign(
     randomized_starts: int = 0,
     start_seed: int = 0,
     max_steps: int = 100_000,
-    optimizer_lr: float = NVIDIA_CLRL_LEARNING_RATE,
-    optimizer_warmup_steps: int = NVIDIA_CLRL_WARMUP_STEPS,
+    optimizer_lr: float = NVIDIA_RL_LEARNING_RATE,
+    optimizer_warmup_steps: int = NVIDIA_RL_WARMUP_STEPS,
     resume_plan: dict | None = None,
     scatter_diagnostics: bool = False,
 ) -> Path:
@@ -312,7 +312,7 @@ def summarize(run_dir: Path) -> dict:
             )
         )
         for line in log.splitlines():
-            if "AlpaGym trainer minibatch" in line:
+            if "AlpaGym trainer optimizer step" in line:
                 match = re.search(r"grad_norm=([0-9.eE+\-]+)", line)
                 if match and math.isfinite(float(match[1])) and float(match[1]) > 0:
                     gradient_records.add(line)
@@ -455,8 +455,8 @@ def run_campaign(
     concurrency: int,
     checkpoint_every: int,
     rollouts: int = NVIDIA_CLRL_GROUP_SIZE,
-    optimizer_lr: float = NVIDIA_CLRL_LEARNING_RATE,
-    optimizer_warmup_steps: int = NVIDIA_CLRL_WARMUP_STEPS,
+    optimizer_lr: float = NVIDIA_RL_LEARNING_RATE,
+    optimizer_warmup_steps: int = NVIDIA_RL_WARMUP_STEPS,
     initial_speed_m_s: float = 0.0,
     randomized_starts: int = 0,
     start_seed: int = 0,
@@ -864,10 +864,10 @@ def main():
             help="GRPO group size (NVIDIA n_generation)",
         )
         item.add_argument(
-            "--optimizer-lr", type=float, default=NVIDIA_CLRL_LEARNING_RATE
+            "--optimizer-lr", type=float, default=NVIDIA_RL_LEARNING_RATE
         )
         item.add_argument(
-            "--optimizer-warmup-steps", type=int, default=NVIDIA_CLRL_WARMUP_STEPS
+            "--optimizer-warmup-steps", type=int, default=NVIDIA_RL_WARMUP_STEPS
         )
         item.add_argument("--concurrency", type=int, required=True)
         item.add_argument("--checkpoint-every", type=int, default=2)

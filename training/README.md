@@ -84,10 +84,12 @@ on this machine also stopped at the missing `redis-server` prerequisite; it coul
 not be installed without administrator access. Full GPU training remains unverified.
 
 `--rollouts` is the number of sibling attempts per scene (one GRPO group).
-`--rollouts`, `--learning-rate` and `--warmup-steps` default to NVIDIA's own
-Alpamayo 1.5 closed-loop RL experiment (6, 1e-4, 1), not AlpaGym's generic
-host defaults (1e-6 with a 20 step warmup from zero). `--max-steps` bounds
-NVIDIA training steps. A step can contain several optimizer minibatches; it is
+`--rollouts` defaults to NVIDIA's Alpamayo 1.5 closed-loop RL experiment (6).
+`--learning-rate` and `--warmup-steps` default to NVIDIA's Alpamayo 1.5 RL
+post-training recipe (2e-6, no warmup), not that experiment's smoke test value
+(1e-4) or AlpaGym's generic host defaults (1e-6 with a 20 step warmup from
+zero). `--max-steps` bounds NVIDIA training steps. Each step accumulates the
+group's replay rows as `mini_batch=1` forwards into one optimizer step; it is
 not the old one update per generation loop. Video generations identify the actual
 Cosmos policy weight version, not an invented batch counter.
 

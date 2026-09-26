@@ -1,10 +1,10 @@
 {
-  "version": "native_padding_skip_v1",
+  "version": "native_padding_skip_v2_accumulated_optimizer_batch",
   "upstream_revision": "972d160eed0e23d388497851504a3a233fec5879",
-  "patch_sha256": "fd50a5ecdb70bbe8564558a0967dd6e348fd9410ac2f554fe86b65af5d50a728",
+  "patch_sha256": "b00afd3659579f9f847f49e898106e708fea59d13dab8a5030501472fa2b5267",
   "files": {
-    "packages/runtime/src/alpagym_runtime/cosmos/trainer.py": "769f87b0f33bf7034cb697be29dc1a19f7075abf68d5ec35f8b0fc9f21e24468",
-    "packages/runtime/src/alpagym_runtime/cosmos/padding_skip.py": "1b7c2a4cd16976580cb81f0f9819edf1531e5bee7f05ea0c81350b88d6506afc"
+    "packages/runtime/src/alpagym_runtime/cosmos/trainer.py": "b7d58293595edcfd88c9e7526048cbd38cf1e5d01a28428663450d692a8fbed6",
+    "packages/runtime/src/alpagym_runtime/cosmos/padding_skip.py": "053d50cbb985d2105ae74c1846d52e5456075ff75f41bd14d69cd8f4945cfd9d"
   },
   "added_files": [
     "packages/runtime/src/alpagym_runtime/cosmos/padding_skip.py"
