@@ -1,12 +1,178 @@
 diff --git a/packages/runtime/src/alpagym_runtime/cosmos/trainer.py b/packages/runtime/src/alpagym_runtime/cosmos/trainer.py
-index 71edf3e..ed7ac59 100644
+index 71edf3e..7afad4a 100644
 --- a/packages/runtime/src/alpagym_runtime/cosmos/trainer.py
 +++ b/packages/runtime/src/alpagym_runtime/cosmos/trainer.py
-@@ -377,6 +377,33 @@ class AlpagymGRPOTrainer(_grpo_trainer.GRPOTrainer):
+@@ -122,6 +122,10 @@
+         self._grpo_ratio_clip_high: float = float(grpo_config.epsilon_high)
+         self._grpo_optimization_iterations: int = int(grpo_config.mu_iterations)
+         self._mini_batch: int = int(grpo_config.mini_batch)
++        # Cosmos-native optimizer batch: replay rows per optimizer step, built
++        # by accumulating ``mini_batch``-row forwards. Unset (Cosmos default)
++        # means the whole batch, i.e. one optimizer step per iteration.
++        self._batch_size_per_optimize: int = int(grpo_config.batch_size_per_optimize or 0)
+         self._kl_beta: float = float(grpo_config.kl_beta)
+         self._allowed_outdated_steps: int = int(grpo_config.allowed_outdated_steps)
+         # Cosmos optionally allows reference_reset_interval=None to mean "never";
+@@ -207,6 +211,7 @@
+             ratio_min,
+             clip_fraction_sum,
+             grad_norm_sum,
++            optimizer_steps,
+         ) = self._run_training_loop(samples, advantages, inter_policy_nccl)
+         self.lr_schedulers.step()
+         if is_master_replica and do_save_checkpoint:
+@@ -240,16 +245,18 @@
+             "train/ratio_max": ratio_max,
+             "train/ratio_min": ratio_min,
+             "train/clip_fraction": clip_fraction_sum / num_batches if num_batches else 0.0,
+-            "train/grad_norm": grad_norm_sum / num_batches if num_batches else 0.0,
++            "train/grad_norm": grad_norm_sum / optimizer_steps if optimizer_steps else 0.0,
++            "train/optimizer_steps": optimizer_steps,
+             "train/iteration_time": 0.0,
+         }
+         logger.info(
+             "AlpaGym trainer step end current_step=%d steps=%d batches=%d "
+-            "loss_avg=%.6f kl_avg=%.6f ratio_min=%.6f ratio_max=%.6f "
++            "optimizer_steps=%d loss_avg=%.6f kl_avg=%.6f ratio_min=%.6f ratio_max=%.6f "
+             "clip_fraction=%.6f grad_norm=%.6f lr=%.8g",
+             current_step,
+             len(samples),
+             num_batches,
++            optimizer_steps,
+             float(metrics["train/loss_avg"]),
+             avg_kl,
+             ratio_min,
+@@ -303,24 +310,31 @@
+         samples: list[Any],
+         advantages: torch.Tensor,
+         inter_policy_nccl: dist_util.HighAvailabilitylNccl,
+-    ) -> tuple[float, float, int, float, float, float]:
+-        """Run ``grpo_optimization_iterations × num_mini_batches`` PPO updates.
++    ) -> tuple[float, float, int, float, float, float, float, int]:
++        """Run ``grpo_optimization_iterations × num_optimizer_batches`` PPO updates.
+ 
+         Minibatching is at the step level: ``samples`` is the flattened pool of
+         per-step replay samples across all rollouts, shuffled fresh each
+-        optimization iteration and split into minibatches. The collate step
+-        stacks one minibatch of single-step samples into the ``[B, ...]`` inputs
+-        the model forward sees.
++        optimization iteration and split into optimizer batches of
++        ``batch_size_per_optimize`` rows (the whole pool when unset), as in
++        Cosmos's GRPO trainer. Each optimizer batch accumulates gradients over
++        ``mini_batch``-row forwards, weighting each by its share of the batch's
++        valid rows so the step follows the batch's valid-row mean loss, then
++        applies one optimizer step. The collate step stacks one minibatch of
++        single-step samples into the ``[B, ...]`` inputs the model forward sees.
+ 
+         Returns:
+             Aggregates: ``(total_loss, total_kl, num_batches, ratio_max,
+-            ratio_min, clip_fraction_sum, grad_norm_sum)``.
++            ratio_min, clip_fraction_sum, grad_norm_sum, optimizer_steps)``.
+         """
+         self._ensure_reference_model()
+ 
+         num_steps = len(samples)
+-        mini_batch_size = min(self._mini_batch, num_steps)
+-        num_mini_batches = (num_steps + mini_batch_size - 1) // mini_batch_size
++        optimize_size = min(self._batch_size_per_optimize or num_steps, num_steps)
++        mini_batch_size = min(self._mini_batch, optimize_size)
++        is_padding = torch.tensor(
++            [bool(sample.training_signal.is_padding.item()) for sample in samples]
++        )
+ 
+         total_loss = 0.0
+         total_kl = 0.0
+@@ -329,35 +343,49 @@
+         ratio_min = float("inf")
+         clip_fraction_sum = 0.0
+         grad_norm_sum = 0.0
++        optimizer_steps = 0
+ 
+         for _ in range(self._grpo_optimization_iterations):
+             indices = torch.randperm(num_steps)
+-            for minibatch_index in range(num_mini_batches):
+-                start = minibatch_index * mini_batch_size
+-                end = min(start + mini_batch_size, num_steps)
+-                minibatch_indices = indices[start:end]
+-                minibatch_samples = [samples[int(index)] for index in minibatch_indices]
+-                minibatch_advantages = advantages[minibatch_indices]
+-
+-                (
+-                    loss_value,
+-                    kl_value,
+-                    batch_ratio_max,
+-                    batch_ratio_min,
+-                    batch_clip_fraction,
+-                    batch_grad_norm,
+-                ) = self._train_minibatch(
+-                    minibatch_samples,
+-                    minibatch_advantages,
+-                    inter_policy_nccl,
++            for optimize_start in range(0, num_steps, optimize_size):
++                optimize_indices = indices[optimize_start : optimize_start + optimize_size]
++                valid_rows = int((~is_padding[optimize_indices]).sum())
++                self.optimizers.zero_grad()
++                for start in range(0, len(optimize_indices), mini_batch_size):
++                    minibatch_indices = optimize_indices[start : start + mini_batch_size]
++                    minibatch_samples = [samples[int(index)] for index in minibatch_indices]
++                    minibatch_advantages = advantages[minibatch_indices]
++                    minibatch_valid = int((~is_padding[minibatch_indices]).sum())
++
++                    (
++                        loss_value,
++                        kl_value,
++                        batch_ratio_max,
++                        batch_ratio_min,
++                        batch_clip_fraction,
++                    ) = self._train_minibatch(
++                        minibatch_samples,
++                        minibatch_advantages,
++                        inter_policy_nccl,
++                        loss_scale=minibatch_valid / valid_rows if valid_rows else 0.0,
++                    )
++                    total_loss += loss_value
++                    total_kl += kl_value
++                    num_batches += 1
++                    ratio_max = max(ratio_max, batch_ratio_max)
++                    ratio_min = min(ratio_min, batch_ratio_min)
++                    clip_fraction_sum += batch_clip_fraction
++                grad_norm = self.all_reduce_states(inter_policy_nccl)
++                optimizer_steps += 1
++                grad_norm_sum += grad_norm
++                logger.info(
++                    "AlpaGym trainer optimizer step rows=%d valid_rows=%d minibatches=%d "
++                    "grad_norm=%.6f",
++                    len(optimize_indices),
++                    valid_rows,
++                    (len(optimize_indices) + mini_batch_size - 1) // mini_batch_size,
++                    grad_norm,
+                 )
+-                total_loss += loss_value
+-                total_kl += kl_value
+-                num_batches += 1
+-                ratio_max = max(ratio_max, batch_ratio_max)
+-                ratio_min = min(ratio_min, batch_ratio_min)
+-                clip_fraction_sum += batch_clip_fraction
+-                grad_norm_sum += batch_grad_norm
+ 
+         if num_batches == 0:
+             ratio_max = 0.0
+@@ -370,6 +398,7 @@
+             ratio_min,
+             clip_fraction_sum,
+             grad_norm_sum,
++            optimizer_steps,
+         )
+ 
+     def _train_minibatch(
+@@ -377,12 +406,39 @@
          minibatch_samples: list[Any],
          minibatch_advantages: torch.Tensor,
          inter_policy_nccl: dist_util.HighAvailabilitylNccl,
-+    ) -> tuple[float, float, float, float, float, float]:
+-    ) -> tuple[float, float, float, float, float, float]:
+-        """Train on a single step-level minibatch and apply gradient.
++        loss_scale: float,
++    ) -> tuple[float, float, float, float, float]:
 +        """Skip only verified no-op padding on a single policy rank."""
 +        if os.environ.get("ALPAGYM_SKIP_ALL_PADDING_MINIBATCHES") == "1":
 +            inter_policy_nccl.wait_comm_ready()
@@ -21,24 +187,103 @@ index 71edf3e..ed7ac59 100644
 +                self._padding_skip_verified = True
 +                logger.info("AlpaGym padding skip verification: %s", report)
 +            if all(bool(row.training_signal.is_padding.all()) for row in minibatch_samples):
-+                self.optimizers.zero_grad()
++                # Its loss_scale is zero; gradients accumulated so far are kept.
 +                logger.info("AlpaGym skipped all-padding minibatch rows=%d", len(minibatch_samples))
-+                return 0.0, 0.0, 1.0, 1.0, 0.0, 0.0
-+        return self._train_minibatch_full(
-+            minibatch_samples, minibatch_advantages, inter_policy_nccl
-+        )
++                return 0.0, 0.0, 1.0, 1.0, 0.0
++        return self._train_minibatch_full(minibatch_samples, minibatch_advantages, loss_scale)
 +
 +    def _train_minibatch_full(
 +        self,
 +        minibatch_samples: list[Any],
 +        minibatch_advantages: torch.Tensor,
-+        inter_policy_nccl: dist_util.HighAvailabilitylNccl,
-     ) -> tuple[float, float, float, float, float, float]:
-         """Train on a single step-level minibatch and apply gradient.
++        loss_scale: float,
++    ) -> tuple[float, float, float, float, float]:
++        """Accumulate the gradient of a single step-level minibatch.
  
+         Orchestrates: collate the per-step samples, forward the full minibatch,
+-        compute PPO surrogate + KL penalty, backward + optimizer step, emit
+-        metrics. Padding rows are forwarded like any other (so every DP worker
++        compute PPO surrogate + KL penalty, backward ``loss * loss_scale`` into
++        the optimizer batch's gradient, emit metrics; the caller steps. Padding
++        rows are forwarded like any other (so every DP worker
+         runs the identical model forward in lockstep) but are neutralized: their
+         advantage is zero (no policy-loss gradient) and they are masked out of
+         the KL term and the diagnostics.
+@@ -391,7 +447,7 @@
+             minibatch_samples: one single-step replay sample per row.
+             minibatch_advantages: ``[B]`` per-step advantages (zero on padding
+                 rows), aligned row-for-row with ``minibatch_samples``.
+-            inter_policy_nccl: NCCL communicator across DP replicas.
++            loss_scale: this minibatch's share of its optimizer batch.
+ 
+         Returns:
+             Tuple ``(loss, kl_value, ratio_max, ratio_min, clip_fraction)``.
+@@ -418,9 +474,7 @@
+         )
+         loss = policy_loss + kl_loss
+ 
+-        self.optimizers.zero_grad()
+-        loss.backward()
+-        grad_norm = self.all_reduce_states(inter_policy_nccl)
++        (loss * loss_scale).backward()
+ 
+         return self._minibatch_metrics(
+             policy_loss=policy_loss,
+@@ -430,7 +484,6 @@
+             advantages=advantages,
+             old_logprobs=old_logprobs,
+             new_logprobs=new_logprobs,
+-            grad_norm=grad_norm,
+         )
+ 
+     def _forward_with_reference(
+@@ -453,8 +506,7 @@
+         advantages: torch.Tensor,
+         old_logprobs: torch.Tensor,
+         new_logprobs: torch.Tensor,
+-        grad_norm: float,
+-    ) -> tuple[float, float, float, float, float, float]:
++    ) -> tuple[float, float, float, float, float]:
+         """Compute ratio/clip diagnostics over the valid (non-padding) rows.
+ 
+         ``_train_minibatch`` forwards the full minibatch, so the ratio/clip
+@@ -482,7 +534,7 @@
+             "AlpaGym trainer minibatch rows=%d valid_rows=%d loss=%.6f "
+             "policy_loss=%.6f kl_loss=%.6f ratio_min=%.6f ratio_max=%.6f "
+             "clip_fraction=%.6f advantage_mean=%.6f old_logprob_mean=%.6f "
+-            "new_logprob_mean=%.6f grad_norm=%.6f",
++            "new_logprob_mean=%.6f",
+             int(old_logprobs.numel()),
+             int(valid_mask.sum().item()),
+             loss_value,
+@@ -494,7 +546,6 @@
+             advantage_mean,
+             float(old_logprobs.mean().item()),
+             float(new_logprobs.mean().item()),
+-            grad_norm,
+         )
+         return (
+             loss_value,
+@@ -502,7 +553,6 @@
+             batch_ratio_max,
+             batch_ratio_min,
+             clip_fraction,
+-            grad_norm,
+         )
+ 
+     def all_reduce_states(self, inter_policy_nccl: dist_util.HighAvailabilitylNccl) -> float:
+@@ -540,7 +590,7 @@
+             )
+             grad_norm_value = float(grad_norm) if grad_norm is not None else 0.0
+             # Skip the optimizer step on a zero gradient (all-padding or
+-            # zero-advantage minibatch) so weight decay / Adam state do not
++            # zero-advantage optimizer batch) so weight decay / Adam state do not
+             # advance on no signal.
+             if grad_norm_value != 0.0:
+                 self.optimizers.step()
 --- /dev/null
 +++ b/packages/runtime/src/alpagym_runtime/cosmos/padding_skip.py
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,115 @@
 +"""Verify an all-padding native forward is state neutral before skipping it."""
 +
 +import json
@@ -116,13 +361,15 @@ index 71edf3e..ed7ac59 100644
 +        ),
 +    )
 +    forward_started = time.monotonic()
++    # Full native cycle at unit scale: accumulate, then reduce/clip/step.
 +    result = trainer._train_minibatch_full(
-+        [padding], torch.zeros(1, dtype=torch.float32), inter_policy_nccl
++        [padding], torch.zeros(1, dtype=torch.float32), loss_scale=1.0
 +    )
++    grad_norm = trainer.all_reduce_states(inter_policy_nccl)
 +    torch.cuda.synchronize()
 +    forward_seconds = time.monotonic() - forward_started
 +    checks = {
-+        "neutral_metrics": result == (0.0, 0.0, 1.0, 1.0, 0.0, 0.0),
++        "neutral_metrics": result == (0.0, 0.0, 1.0, 1.0, 0.0) and grad_norm == 0.0,
 +        "parameters_exact": _equal(parameters, dict(trainer.model.named_parameters())),
 +        "buffers_exact": _equal(buffers, dict(trainer.model.named_buffers())),
 +        "optimizer_exact": _equal(optimizer, [item.state_dict() for item in trainer.optimizers]),

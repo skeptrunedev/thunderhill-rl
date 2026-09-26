@@ -360,10 +360,11 @@ def main(
     validation_run: str,
     episode_seconds: float,
     concurrency: int,
-    # NVIDIA's Alpamayo 1.5 closed-loop RL values (training/nvidia_alpagym.py).
+    # NVIDIA_CLRL_GROUP_SIZE, LEARNING_RATE and NVIDIA_RL_WARMUP_STEPS in
+    # training/nvidia_alpagym.py.
     rollouts: int = 6,
-    optimizer_lr: float = 1.0e-4,
-    optimizer_warmup_steps: int = 1,
+    optimizer_lr: float = 1.0e-5,
+    optimizer_warmup_steps: int = 0,
     initial_speed_m_s: float = 0.0,
     randomized_starts: int = 0,
     start_seed: int = 0,

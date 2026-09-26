@@ -465,7 +465,7 @@ def validate(
             gradients.extend(
                 float(x)
                 for x in re.findall(
-                    r"AlpaGym trainer minibatch[^\n]*grad_norm=([0-9.eE+\-]+)",
+                    r"AlpaGym trainer optimizer step[^\n]*grad_norm=([0-9.eE+\-]+)",
                     log_text,
                 )
             )
@@ -473,14 +473,14 @@ def validate(
             padding_minibatches_skipped=padding_skipped,
             export=str(trained),
             weights_changed=comparison["weights_changed"],
-            nonzero_gradient_minibatches=sum(
+            nonzero_gradient_optimizer_steps=sum(
                 math.isfinite(g) and g > 0 for g in gradients
             ),
         )
         if (
             not comparison["weights_changed"]
             or not comparison["frozen_vlm_unchanged"]
-            or not report["nonzero_gradient_minibatches"]
+            or not report["nonzero_gradient_optimizer_steps"]
         ):
             raise RuntimeError("No verified nonzero native optimizer update")
         if scatter_diagnostics:
