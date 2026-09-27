@@ -110,3 +110,25 @@ completes a valid lap in 194.1 s with no off track ticks, 42 m/s maximum,
 lookahead the follower runs wide in a tight corner. Asking it for about 0.7 g of
 braking while cornering at 0.75 g spins the car, which is the expected result
 of trail braking a car whose rear axle then carries about 36% of the load.
+
+## First training check
+
+`car-smoke-1` (runs/sac/car-smoke-1; 8 workers, `--vehicle car --reward-line
+progress --pedal-gain 1.25`, eval every 100k env steps from 2 starts, 240 s
+horizon), 21 minutes, 315k env steps, 76k updates:
+
+| Env steps | Mean progress per 60 s training episode | Eval |
+| --- | --- | --- |
+| 10k | 24 m (67% off track) | |
+| 60k | 766 m | |
+| 100k | about 1,000 m | 1 of 2 laps, 160.53 s |
+| 200k | about 1,000 to 1,350 m | 0 of 2 laps |
+| 300k | 1,213 to 1,322 m (74 to 90% reach the horizon) | 2 of 2 laps, 153.23 s and 154.39 s |
+
+The privileged path follower's 194.1 s lap is not a pace reference; it drives
+at 0.7 g. The policy still saws the steering between calls.
+
+Full run:
+
+    uv run --script training/sac_async.py --godot GODOT --run-name sac-car-1 \
+      --vehicle car --workers 48 --reward-line progress --pedal-gain 1.25
