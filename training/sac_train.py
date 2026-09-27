@@ -22,6 +22,9 @@ Godot workers (see sac_env.py for the observation, action, reward and resets).
   uv run training/sac_train.py --godot GODOT --run-name sac-pilot --workers 32
   uv run training/sac_train.py --godot GODOT --run-name sac-pilot --resume
 
+Ctrl-C or kill -INT/-TERM stops after the current step and saves the unflushed
+rollouts, a final checkpoint and the replay buffer; --resume continues from them.
+
 Everything for a run lives in --runs-dir/RUN_NAME:
   checkpoints/step_N.zip, replay_buffer.pkl   policy and optimizer state, resume
   rollouts/shard-NNNNN.npz                    every training transition (obs,
@@ -38,6 +41,8 @@ import argparse
 import json
 import math
 import os
+import signal
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -64,6 +69,8 @@ TERMINATIONS = ("offroad", "collision", "fall", "stall", "horizon", "lap_complet
 
 def make_env(args, index, data_dir):
     def factory():
+        # Ctrl-C stops the trainer gracefully; env workers only exit when it closes them.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         return ThunderhillSACEnv(godot=args.godot, data_dir=data_dir, horizon_s=args.horizon,
                                  seed=args.seed * 1000 + index, policy_id=args.run_name)
     return factory
@@ -90,6 +97,7 @@ class RolloutRecorder(BaseCallback):
 
     def __init__(self, args, run_dir, evaluator, wandb):
         super().__init__()
+        self.stop_requested = threading.Event()
         self.args, self.run_dir, self.evaluator, self.wandb = args, run_dir, evaluator, wandb
         self.rollouts = run_dir / "rollouts"
         self.rollouts.mkdir(parents=True, exist_ok=True)
@@ -148,9 +156,11 @@ class RolloutRecorder(BaseCallback):
         if self.evaluator and step - self.last_eval >= self.args.eval_every:
             self._checkpoint(step)
             self.last_eval = step
+            began = time.monotonic()
             self.evaluator.run(self.model, step, self.wandb)
-            self.last_log_time = time.monotonic()  # keep eval time out of steps/s
-        return True
+            self.last_log_time += time.monotonic() - began  # keep eval out of steps/s
+        # Returning False ends learn() between steps, so on_training_end saves state.
+        return not self.stop_requested.is_set()
 
     def _flush(self):
         if not self.rows["reward"]:
@@ -243,7 +253,8 @@ class Evaluator:
                 recordings = list(self.directory.glob(f"**/{row['episode_id']}.jsonl"))
                 stream.write(json.dumps(dict(
                     row, policy_step=step, checkpoint=f"checkpoints/step_{step}.zip",
-                    recording=str(recordings[0]) if recordings else None)) + "\n")
+                    recording=(str(recordings[0].relative_to(self.directory.parent))
+                               if recordings else None))) + "\n")
         laps = [r["lap_time_s"] for r in results if r["lap_time_s"] is not None]
         values = {
             "global_step": step,
@@ -280,9 +291,11 @@ def main():
     parser.add_argument("--horizon", type=float, default=60.0, help="training episode seconds")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--buffer-size", type=int, default=2_000_000)
-    parser.add_argument("--batch-size", type=int, default=512)
-    parser.add_argument("--gradient-steps", type=int, default=8,
-                        help="gradient steps per vectorized step (one transition per worker)")
+    parser.add_argument("--batch-size", type=int, default=1024)
+    parser.add_argument("--gradient-steps", type=int, default=2,
+                        help="gradient steps per vectorized step (one transition per worker); "
+                        "an SB3 SAC update costs ~22 ms here regardless of batch size (kernel "
+                        "launch bound), so large batches with few steps keep workers busy")
     parser.add_argument("--learning-starts", type=int, default=20_000)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--gamma", type=float, default=0.99)
@@ -290,7 +303,7 @@ def main():
     parser.add_argument("--log-every", type=int, default=20_000)
     parser.add_argument("--shard-steps", type=int, default=200_000)
     parser.add_argument("--checkpoint-every", type=int, default=500_000)
-    parser.add_argument("--eval-every", type=int, default=250_000)
+    parser.add_argument("--eval-every", type=int, default=150_000)
     parser.add_argument("--eval-starts", type=int, default=4)
     parser.add_argument("--eval-horizon", type=float, default=240.0)
     parser.add_argument("--wandb-project", default="thunderhill-rl")
@@ -335,9 +348,13 @@ def main():
         )
     model.set_logger(Logger(None, [WandbWriter(wandb)] if wandb else []))
     evaluator = Evaluator(args, run_dir) if args.eval_every > 0 else None
+    recorder = RolloutRecorder(args, run_dir, evaluator, wandb)
+    # SIGINT/SIGTERM stop after the current step, keeping unflushed rollouts, a final
+    # checkpoint and the replay buffer so --resume continues the run.
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: recorder.stop_requested.set())
     try:
-        model.learn(total_timesteps=args.total_steps, log_interval=20,
-                    callback=RolloutRecorder(args, run_dir, evaluator, wandb),
+        model.learn(total_timesteps=args.total_steps, log_interval=20, callback=recorder,
                     reset_num_timesteps=not args.resume)
     finally:
         env.close()

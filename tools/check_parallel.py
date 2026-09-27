@@ -64,6 +64,9 @@ def worker(godot, directory, timeout, extra_args=(), *, rendered=False):
             stdout=output,
             stderr=subprocess.STDOUT,
             env=dict(os.environ, XDG_DATA_HOME=str(data)),
+            # Owned by its client, not the terminal: Ctrl-C reaches the client, which
+            # then stops the worker itself.
+            start_new_session=True,
         )
         try:
             deadline = time.monotonic() + timeout
