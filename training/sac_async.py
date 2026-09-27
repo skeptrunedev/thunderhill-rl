@@ -19,7 +19,11 @@
 environment is sac_env.py; the GPU learner is sac_learner.py).
 
   uv run training/sac_async.py --godot GODOT --run-name sac-async --workers 48
-  uv run training/sac_async.py --godot GODOT --run-name sac-async --resume
+  uv run training/sac_async.py --godot GODOT --run-name sac-async --workers 48 --resume
+
+On the 56-core / RTX 2080 Ti box: 48 workers step ~1,900 env steps/s (CPU bound:
+each headless Godot uses ~0.9 core while stepping) and the learner sustains ~545
+updates/s at batch 1024, so the default --utd 0.25 keeps both sides busy.
 
 Each actor process owns one Godot worker and steps it continuously with a NumPy
 copy of the policy, which it refreshes whenever the learner publishes new
@@ -493,14 +497,12 @@ class Trainer:
                            time=time.time())
             self.recorder.add_episode(summary)
 
-    def publish(self, wait=False):
+    def publish(self):
         """Hand the actor's weights to the actors without stalling the GPU queue."""
         if self.pending_publish is None:
             self.pending_publish = self.sac.snapshot_actor()
             self.last_publish = self.sac.updates
         host, event, version = self.pending_publish
-        if wait:
-            event.synchronize()
         if event.query():
             self.shared.publish(host.numpy(), version)
             self.pending_publish = None
@@ -698,7 +700,9 @@ def main():
     parser.add_argument("--log-every", type=int, default=20_000)
     parser.add_argument("--shard-steps", type=int, default=200_000)
     parser.add_argument("--checkpoint-every", type=int, default=500_000)
-    parser.add_argument("--eval-every", type=int, default=150_000)
+    parser.add_argument("--eval-every", type=int, default=500_000,
+                        help="env steps between evaluations (~4 min at 1,900 steps/s; each "
+                        "keeps ~165 MB of Godot recordings)")
     parser.add_argument("--eval-starts", type=int, default=4)
     parser.add_argument("--eval-horizon", type=float, default=240.0)
     parser.add_argument("--wandb-project", default="thunderhill-rl")
