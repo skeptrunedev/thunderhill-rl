@@ -77,7 +77,16 @@ func _ready() -> void:
 	box.add_child(label("THUNDERHILL", 37))
 	box.add_child(label("EAST CIRCUIT  /  CALIFORNIA", 14, Color("c3b48d")))
 	box.add_child(
-		label("Ducati Streetfighter V4 S\nOpen practice • East Circuit", 16, Color("c7cccd"))
+		label(
+			(
+				"Mazda MX-5 Cup"
+				if game != null and game.vehicle == "car"
+				else "Ducati Streetfighter V4 S"
+			)
+			+ "\nOpen practice • East Circuit",
+			16,
+			Color("c7cccd")
+		)
 	)
 	for item in [
 		["Ride", "ride"],
@@ -112,14 +121,17 @@ func _process(_dt: float) -> void:
 	var millis := int(game.lap_time * 1000)
 	timing.text = "%02d:%02d.%03d" % [millis / 60000, (millis / 1000) % 60, millis % 1000]
 	status.text = (
-		"STREETFIGHTER V4 S   •   %s"
-		% (
+		"%s   •   %s"
+		% [
+			"MX-5 CUP" if game.vehicle == "car" else "STREETFIGHTER V4 S",
 			"CRASHED  /  R TO RESET"
 			if game.sim.crashed
 			else ("AGENT CONTROL" if game.agent_mode else ("PAUSED" if game.paused else "PRACTICE"))
-		)
+		]
 	)
-	status.text += "   •   " + ["CHASE", "RIDER", "ONBOARD"][clampi(game.camera_mode, 0, 2)]
+	status.text += "   •   " + (["CHASE", "DRIVER", "ONBOARD"] if game.vehicle == "car" else ["CHASE", "RIDER", "ONBOARD"])[
+		clampi(game.camera_mode, 0, 2)
+	]
 	if not game.environment_failure.is_empty():
 		status.text = "RIDING STATE NOT SUPPORTED YET / R TO RESTART"
 		status.tooltip_text = str(game.environment_failure.error)
