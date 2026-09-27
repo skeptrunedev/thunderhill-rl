@@ -215,7 +215,7 @@ def run_actor(index, args, shared: Shared):
     env = ThunderhillSACEnv(godot=args.godot, data_dir=args.run_dir / "workers",
                             horizon_s=args.horizon, seed=args.seed * 1000 + index,
                             reward_line=args.reward_line, pedal_gain=args.pedal_gain,
-                            policy_id=args.run_name)
+                            vehicle=args.vehicle, policy_id=args.run_name)
     rng = np.random.default_rng([args.seed, index, int(time.time())])
     policy = NumpyPolicy(args.hidden)
     rows, meta = shared.rows[index], shared.meta[index]
@@ -276,7 +276,8 @@ def run_evaluator(args, shared: Shared, requests, results):
     starts = evaluation_starts(args.eval_starts)
     envs = [ThunderhillSACEnv(godot=args.godot, data_dir=directory, horizon_s=args.eval_horizon,
                               reward_line=args.reward_line, pedal_gain=args.pedal_gain,
-                              record_godot=True, policy_id=f"{args.run_name}-eval")
+                              vehicle=args.vehicle, record_godot=True,
+                              policy_id=f"{args.run_name}-eval")
             for _ in starts]
 
     def episode(policy, env, start):
@@ -696,6 +697,9 @@ def main():
     parser.add_argument("--pedal-gain", type=float, default=1.25,
                         help="scale on the throttle/brake action before clipping, so full "
                         "throttle and full brake are reachable without saturating tanh")
+    parser.add_argument("--vehicle", choices=("motorcycle", "car"), default="motorcycle",
+                        help="simulated vehicle: the motorcycle (motorcycle.gd) or the MX-5 Cup "
+                        "car (car.gd, docs/car-reference.md)")
     parser.add_argument("--workers", type=int, default=48, help="actor processes (one Godot each)")
     parser.add_argument("--actor-nice", type=int, default=5,
                         help="niceness added to actors and their Godot workers, so the "

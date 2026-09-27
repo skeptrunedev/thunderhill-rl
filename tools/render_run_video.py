@@ -2,6 +2,7 @@
 
 Rendering is playback of recorded states, never a second simulation. One second
 of final state is retained, including for attempts with no accepted controls.
+The game renders the vehicle the recording names (motorcycle or car).
 The source and an existing output are never overwritten.
 """
 import argparse
@@ -75,6 +76,8 @@ def inspect_recording(source: Path, fps: int = 30) -> dict:
         'source': str(source.resolve()), 'source_sha256': sha256(source),
         'episode_id': header.get('episode_id'), 'policy_id': header.get('policy_id'),
         'policy_display': header.get('policy_display', {}),
+        'vehicle': header.get('vehicle', 'motorcycle'),
+        'physics_version': header.get('physics_version'),
         'initial_tick': initial['tick'], 'final_tick': previous['tick'],
         'initial_elapsed_seconds': initial['elapsed'],
         'final_elapsed_seconds': previous['elapsed'],
@@ -88,8 +91,10 @@ def inspect_recording(source: Path, fps: int = 30) -> dict:
 
 
 def render_video(source: Path, output: Path, *, godot: str, ffmpeg: str,
-                 fps: int = 30) -> dict:
+                 fps: int = 30, camera: int = 1) -> dict:
     source, output = Path(source).resolve(), Path(output).resolve()
+    if camera not in (0, 1, 2):
+        raise ValueError('camera must be 0 (chase), 1 (rider or driver eye) or 2 (onboard)')
     if output.suffix.lower() != '.mp4':
         raise ValueError('Output must be an MP4')
     sidecar = output.with_suffix('.mp4.json')
@@ -104,7 +109,7 @@ def render_video(source: Path, output: Path, *, godot: str, ffmpeg: str,
     render_command = [str(godot), '--path', str(ROOT / 'godot'),
                       '--write-movie', str(avi), '--fixed-fps', str(fps),
                       '--quit-after', str(info['expected_frames']), '--',
-                      '--replay=' + str(source), '--preview-camera=1']
+                      '--replay=' + str(source), f'--preview-camera={camera}']
     with (work / 'godot.log').open('x') as log:
         subprocess.run(render_command, stdout=log, stderr=subprocess.STDOUT, check=True)
     log_text = (work / 'godot.log').read_text()
@@ -160,9 +165,12 @@ def main():
     parser.add_argument('--godot', required=True)
     parser.add_argument('--ffmpeg', required=True)
     parser.add_argument('--fps', type=int, default=30)
+    parser.add_argument('--camera', type=int, choices=(0, 1, 2), default=1,
+                        help='0 chase, 1 rider or driver eye, 2 onboard')
     args = parser.parse_args()
     print(json.dumps(render_video(args.source, args.output, godot=args.godot,
-                                  ffmpeg=args.ffmpeg, fps=args.fps), indent=2))
+                                  ffmpeg=args.ffmpeg, fps=args.fps, camera=args.camera),
+                     indent=2))
 
 
 if __name__ == '__main__':

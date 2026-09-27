@@ -50,13 +50,23 @@ def audit_recordings(output: Path) -> dict:
             "ordered_ticks": ordered_ticks, "driven_episodes": driven_episodes, "recorded_gates": gates}
 
 
+# godot/scripts/car.gd wheelbase_m and steering_limit_rad.
+CAR_WHEELBASE_M = 2.310
+CAR_STEERING_LIMIT_RAD = 0.42
+
+
 class Driver:
-    def __init__(self, max_speed: float):
+    def __init__(self, max_speed: float, vehicle: str = "motorcycle", lateral_accel: float = 2.2,
+                 braking: float = 1.8, max_pedal: float = 0.65, lookahead_base: float = 7.0,
+                 lookahead_time: float = 1.3):
         geometry = json.loads((ROOT / "godot/data/track.json").read_text())
         self.samples = geometry["samples"]
         self.stations = [sample["s"] for sample in self.samples]
         self.length = geometry["length_m"]
         self.max_speed = max_speed
+        self.vehicle = vehicle
+        self.lateral_accel, self.braking, self.max_pedal = lateral_accel, braking, max_pedal
+        self.lookahead_base, self.lookahead_time = lookahead_base, lookahead_time
 
     def point(self, station: float) -> list[float]:
         station %= self.length
@@ -70,7 +80,7 @@ class Driver:
         state = observation["state"]
         speed = state["speed"]
         station = observation["track"]["progress"] * self.length
-        lookahead = 7.0 + speed * 1.3
+        lookahead = self.lookahead_base + speed * self.lookahead_time
         target = self.point(station + lookahead)
         dx, dz = target[0] - state["position"][0], target[2] - state["position"][2]
         target_heading = math.atan2(dx, -dz)
@@ -78,18 +88,21 @@ class Driver:
         curvature = 2 * math.sin(alpha) / max(math.hypot(dx, dz), 1.0)
         requested_lean = math.atan(speed * speed * curvature / 9.81)
         steering = clamp(requested_lean / 0.88, -0.75, 0.75)
+        if self.vehicle == "car":
+            # Pure pursuit front wheel angle; steer is a fraction of the wheel limit.
+            steering = clamp(math.atan(CAR_WHEELBASE_M * curvature) / CAR_STEERING_LIMIT_RAD, -1.0, 1.0)
         # Preview braking uses privileged centerline curvature, never model observations.
         target_speed = self.max_speed
         for ahead in range(0, 121, 6):
             index = max(0, bisect.bisect_right(self.stations, (station + ahead) % self.length) - 1)
             curve = abs(self.samples[index]["curvature"])
-            corner_speed = math.sqrt(2.2 / max(curve, 0.001))
-            approach_speed = math.sqrt(corner_speed * corner_speed + 2 * 1.8 * ahead)
+            corner_speed = math.sqrt(self.lateral_accel / max(curve, 0.001))
+            approach_speed = math.sqrt(corner_speed * corner_speed + 2 * self.braking * ahead)
             target_speed = min(target_speed, approach_speed)
         target_speed = max(4.5, target_speed)
         error = target_speed - speed
-        throttle = clamp(0.10 + 0.14 * error, 0.0, 0.65)
-        front_brake = clamp(-error * 0.15, 0.0, 0.65)
+        throttle = clamp(0.10 + 0.14 * error, 0.0, self.max_pedal)
+        front_brake = clamp(-error * 0.15, 0.0, self.max_pedal)
         if front_brake > 0:
             throttle = 0.0
         return {"throttle": throttle, "front_brake": front_brake, "rear_brake": front_brake * 0.18,
@@ -104,6 +117,16 @@ def main() -> None:
     parser.add_argument("--godot", default=shutil.which("godot") or shutil.which("godot4"))
     parser.add_argument("--max-speed", type=float, default=18.0)
     parser.add_argument("--max-actions", type=int, default=8000)
+    parser.add_argument("--vehicle", choices=("motorcycle", "car"), default="motorcycle")
+    parser.add_argument("--lateral-accel", type=float, default=2.2,
+                        help="corner speed target sqrt(a / curvature), m/s^2")
+    parser.add_argument("--braking", type=float, default=1.8,
+                        help="approach speed deceleration budget, m/s^2")
+    parser.add_argument("--max-pedal", type=float, default=0.65,
+                        help="largest throttle or front brake command")
+    parser.add_argument("--lookahead-base", type=float, default=7.0, help="pursuit lookahead, m")
+    parser.add_argument("--lookahead-time", type=float, default=1.3,
+                        help="pursuit lookahead added per m/s of speed, s")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if not args.godot:
@@ -118,7 +141,9 @@ def main() -> None:
     start = time.monotonic()
     with (output / "godot.log").open("wb") as log:
         process = subprocess.Popen([args.godot, "--headless", "--path", str(ROOT / "godot"),
-                                    "--", f"--agent-port={port}"], stdout=log, stderr=subprocess.STDOUT, env=env)
+                                    "--", f"--agent-port={port}",
+                                    *([f"--vehicle={args.vehicle}"] if args.vehicle != "motorcycle" else [])],
+                                   stdout=log, stderr=subprocess.STDOUT, env=env)
         connection = None
         try:
             deadline = time.monotonic() + 90
@@ -135,7 +160,8 @@ def main() -> None:
             connection.settimeout(30)
             client = Client(connection)
             observation = client.request({"op": "reset", "policy_id": "privileged-path-qa-v1"})
-            driver = Driver(args.max_speed)
+            driver = Driver(args.max_speed, args.vehicle, args.lateral_accel, args.braking,
+                            args.max_pedal, args.lookahead_base, args.lookahead_time)
             max_lateral = 0.0
             actions = 0
             reason = "action_budget"

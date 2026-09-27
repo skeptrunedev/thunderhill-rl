@@ -24,10 +24,19 @@ Observation (float32, OBSERVATION_SIZE = 64), all roughly unit scale:
   53-62  centerline curvature at COURSE_DISTANCES_M ahead * 50 m
   63     on track flag
 
+vehicle="car" (godot/scripts/car.gd, --vehicle=car) keeps this layout and
+reuses the two lean slots for the car's own stability state, since body roll
+is a small, nearly redundant function of lateral acceleration:
+  3      sideslip angle at the centre of gravity / 1 rad
+  4      yaw rate / 2 rad/s
+Slot 5 is then the front road wheel angle / 0.5 rad (the car's limit is 0.42).
+
 Action Box([-1, 1]^2): steer with the game's steering assist (the command sets a
 target lean), and combined throttle (+) / brake (-); braking applies the same
 fraction to both brakes, as the rolling-start speed hold does. Gears stay
-automatic.
+automatic. For the car, steer sets the front road wheel angle as a fraction of
+its steering limit (rate limited, no assist) and the brake pedal is split by
+the car's brake balance.
 
 Reward per 0.1 s step, in units of STEP_REFERENCE_M (the distance covered in one
 step at the v6 reference speed of 20 m/s), reusing the reward v6 accounting in
@@ -117,8 +126,16 @@ class Track:
         )
 
 
-def observation_vector(track: Track, observation: dict, previous_action) -> np.ndarray:
+VEHICLES = ("motorcycle", "car")
+
+
+def observation_vector(track: Track, observation: dict, previous_action,
+                       vehicle: str = "motorcycle") -> np.ndarray:
     state, road = observation["state"], observation["track"]
+    if vehicle == "car":
+        roll, roll_rate = state["sideslip_rad"], state["yaw_rate"]
+    else:
+        roll, roll_rate = state["lean"], state["lean_rate"]
     x, _, z = state["position"]
     heading = state["heading"]
     station = float(road["progress"]) * track.length
@@ -141,8 +158,8 @@ def observation_vector(track: Track, observation: dict, previous_action) -> np.n
             state["speed"] / 40.0,
             state["longitudinal_acceleration"] / 10.0,
             state["lateral_acceleration"] / 10.0,
-            state["lean"],
-            state["lean_rate"] / 2.0,
+            roll,
+            roll_rate / 2.0,
             state["steering"] / 0.5,
             math.sin(error),
             math.cos(error),
@@ -181,6 +198,7 @@ class ThunderhillSACEnv(gym.Env):
 
     def __init__(self, *, godot: str, data_dir: str, horizon_s: float = 60.0,
                  reward_line: str = "progress", pedal_gain: float = 1.0,
+                 vehicle: str = "motorcycle",
                  record_godot: bool = False, starts: list[dict] | None = None,
                  seed: int = 0, policy_id: str = "sac"):
         self.godot, self.data_dir = godot, Path(data_dir)
@@ -191,6 +209,9 @@ class ThunderhillSACEnv(gym.Env):
         if not 1.0 <= pedal_gain <= 2.0:
             raise ValueError("pedal_gain must be in [1, 2]")
         self.pedal_gain = pedal_gain
+        if vehicle not in VEHICLES:
+            raise ValueError(f"Unknown vehicle {vehicle!r}")
+        self.vehicle = vehicle
         self.fixed_starts, self.policy_id = starts, policy_id
         self.track = Track(RoadTelemetry())
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (OBSERVATION_SIZE,), np.float32)
@@ -207,6 +228,8 @@ class ThunderhillSACEnv(gym.Env):
         directory = self.data_dir / f"worker-{self.tag}-{self._restarts}"
         self.data_dir.mkdir(parents=True, exist_ok=True)
         extra = () if self.record_godot else ("--agent-no-recording",)
+        if self.vehicle != "motorcycle":
+            extra += (f"--vehicle={self.vehicle}",)
         self._client, _ = self._stack.enter_context(
             worker(self.godot, directory, 120, extra)
         )
@@ -221,6 +244,10 @@ class ThunderhillSACEnv(gym.Env):
         result = self._client.request(request)
         if "error" in result or not result.get("rollout_valid", False):
             raise RuntimeError(f"Invalid simulator response: {str(result)[:500]}")
+        # Motorcycle telemetry predates the vehicle field.
+        if result["state"].get("vehicle", "motorcycle") != self.vehicle:
+            raise RuntimeError(f"Worker simulates {result['state'].get('vehicle')}, "
+                               f"expected {self.vehicle}")
         return result
 
     # Episodes ---------------------------------------------------------------
@@ -265,7 +292,8 @@ class ThunderhillSACEnv(gym.Env):
         self._progress_window = []
         self._return, self._laps, self._lap_time = 0.0, 0, None
         self._start = start
-        self._vector = observation_vector(self.track, observation, self._previous_action)
+        self._vector = observation_vector(self.track, observation, self._previous_action,
+                                          self.vehicle)
         return self._vector, {"episode_id": observation["episode_id"], "start": start}
 
     def step(self, action):
@@ -300,7 +328,8 @@ class ThunderhillSACEnv(gym.Env):
         self._observation = result
         self._step_count += 1
         self._previous_action = (command["steer"], command["throttle"] - command["front_brake"])
-        self._vector = observation_vector(self.track, result, self._previous_action)
+        self._vector = observation_vector(self.track, result, self._previous_action,
+                                          self.vehicle)
         progress = sum(row["reward_components"]["legal_progress_m"] for row in transitions)
         self._progress_window = (self._progress_window + [progress])[
             -round(STALL_WINDOW_S / CONTROL_PERIOD_S):]

@@ -105,7 +105,11 @@ func apply_state(sim: RefCounted, state: Dictionary) -> void:
 		"lean_relative_road_rad",
 		"gravity_forward_m_s2",
 		"gravity_right_m_s2",
-		"gravity_normal_m_s2"
+		"gravity_normal_m_s2",
+		# Car state; absent from motorcycle recordings.
+		"lateral_velocity",
+		"yaw_rate",
+		"brake_applied"
 	]:
 		if state.has(key):
 			sim.set(key, state[key])

@@ -6,6 +6,7 @@ const SimScript = preload("res://scripts/motorcycle.gd")
 const HudScript = preload("res://scripts/hud.gd")
 const AgentCameraScript = preload("res://scripts/agent_camera.gd")
 const DT: float = 1.0 / 120.0
+const VEHICLES := ["motorcycle", "car"]
 const MAX_AGENT_SNAPSHOTS := 64
 # Rolling starts up to racing straight speeds; training/episode_config.py mirrors it.
 const MAX_INITIAL_SPEED_M_S := 40.0
@@ -91,6 +92,11 @@ var agent_request_pending := false
 var startup_profile: FileAccess
 var startup_started_usec: int
 var startup_previous_usec: int
+# One selection point: --vehicle=car (default motorcycle), or a replay's manifest.
+# The car's scripts load only when selected; the motorcycle path is unchanged.
+var vehicle := "motorcycle"
+var wheel_radius_m := 0.32
+var envelope_script: GDScript = preload("res://scripts/bike_collision_envelope.gd")
 
 
 func _ready() -> void:
@@ -168,6 +174,20 @@ func _ready() -> void:
 			policy_display["generation"] = int(generation)
 		if arg.begins_with("--replay="):
 			replay_path = arg.trim_prefix("--replay=")
+		if arg.begins_with("--vehicle="):
+			vehicle = arg.trim_prefix("--vehicle=")
+			if vehicle not in VEHICLES:
+				push_error("Vehicle must be one of %s" % str(VEHICLES))
+				get_tree().quit(2)
+				return
+	if not replay_path.is_empty():
+		var recorded := _recorded_vehicle(replay_path)
+		if "--vehicle=" + vehicle not in OS.get_cmdline_user_args() or recorded == vehicle:
+			vehicle = recorded
+		else:
+			push_error("Replay vehicle %s differs from --vehicle=%s" % [recorded, vehicle])
+			get_tree().quit(2)
+			return
 	if (
 		policy_display.has("model_name") != policy_display.has("generation")
 		or (
@@ -266,7 +286,10 @@ func _ready() -> void:
 	var scenery = load("res://assets/generated/scenery.scn").instantiate()
 	add_child(scenery)
 	_startup_mark("scenery_complete")
-	sim = SimScript.new()
+	sim = SimScript.new() if vehicle == "motorcycle" else load("res://scripts/car.gd").new()
+	if vehicle == "car":
+		wheel_radius_m = sim.wheel_radius_m()
+		envelope_script = load("res://scripts/car_collision_envelope.gd")
 	if DisplayServer.get_name() != "headless":
 		engine_audio = preload("res://scripts/engine_audio.gd").new()
 		engine_audio.sim = sim
@@ -274,10 +297,14 @@ func _ready() -> void:
 	_environment()
 	bike_root = Node3D.new()
 	add_child(bike_root)
-	bike = BikeScript.new()
+	bike = BikeScript.new() if vehicle == "motorcycle" else load("res://scripts/car_visual.gd").new()
 	bike_root.add_child(bike)
-	var envelope = preload("res://scripts/bike_collision_envelope.gd").new()
-	var collision_error: String = envelope.build(bike)
+	var envelope = envelope_script.new()
+	var collision_error: String = (
+		envelope.build(bike)
+		if vehicle == "motorcycle"
+		else envelope.build(bike, float(sim.parameters.steering_limit_rad))
+	)
 	collision_sweep = preload("res://scripts/bike_sweep.gd").new()
 	if collision_error.is_empty():
 		collision_error = collision_sweep.build(envelope)
@@ -288,10 +315,14 @@ func _ready() -> void:
 	_startup_mark("environment_and_bike_complete")
 	# Policy cameras use a car rig: no motorcycle, rider or instruments in view.
 	AgentCameraScript.assign_rider_layer(bike, AgentCameraScript.BIKE_LAYER)
-	AgentCameraScript.assign_rider_layer(bike.rider)
-	AgentCameraScript.assign_rider_layer(bike._arms, AgentCameraScript.RIDER_LIMB_LAYER)
-	preload("res://scripts/rider_shadows.gd").install(bike.rider)
-	preload("res://scripts/rider_shadows.gd").install(bike._arms)
+	if vehicle == "car":
+		# The cabin shares the rider's layer: hidden from the driver's eye view.
+		AgentCameraScript.assign_rider_layer(bike.cabin)
+	else:
+		AgentCameraScript.assign_rider_layer(bike.rider)
+		AgentCameraScript.assign_rider_layer(bike._arms, AgentCameraScript.RIDER_LIMB_LAYER)
+		preload("res://scripts/rider_shadows.gd").install(bike.rider)
+		preload("res://scripts/rider_shadows.gd").install(bike._arms)
 	camera = Camera3D.new()
 	camera.far = 3000
 	camera.near = 0.06
@@ -362,6 +393,17 @@ func _ready() -> void:
 			RenderingServer.frame_post_draw.connect(_startup_first_draw, CONNECT_ONE_SHOT)
 	if "--qa-controls" in OS.get_cmdline_user_args():
 		_run_control_checks.call_deferred()
+
+
+## The vehicle a recording was made with; recordings before cars are motorcycles.
+static func _recorded_vehicle(path: String) -> String:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return "motorcycle"
+	var first: Variant = JSON.parse_string(file.get_line())
+	if first is Dictionary:
+		return str(first.get("vehicle", "motorcycle"))
+	return "motorcycle"
 
 
 func _startup_mark(stage: String) -> void:
@@ -540,6 +582,7 @@ func _start_recording(station: float) -> void:
 			"track_sha256": FileAccess.get_sha256("res://data/track.json"),
 			"terrain_sha256": FileAccess.get_sha256("res://data/terrain.json"),
 			"surface_sha256": FileAccess.get_sha256("res://data/surface.json"),
+			"vehicle": vehicle,
 			"physics_version": sim.MODEL_VERSION,
 			"physics_dt": DT,
 			"episode_limits":
@@ -549,7 +592,7 @@ func _start_recording(station: float) -> void:
 			},
 			"obstacle_collision":
 			{
-				"envelope": preload("res://scripts/bike_collision_envelope.gd").MODEL_VERSION,
+				"envelope": envelope_script.MODEL_VERSION,
 				"sweep": preload("res://scripts/bike_sweep.gd").MODEL_VERSION,
 				"spatial_tolerance_m": preload("res://scripts/bike_sweep.gd").SPATIAL_TOLERANCE_M,
 				"pit_wall_sha256": FileAccess.get_sha256("res://data/pit-wall.json"),
@@ -615,7 +658,7 @@ func _physics_process(_dt: float) -> void:
 			_show_decision(decision)
 		replay.apply_state(sim, row.state)
 		lap_time = (sim.tick - replay.model_control_start_tick) * DT if replay.model_control_start_tick >= 0 else sim.elapsed
-		wheel_rotation += sim.longitudinal_velocity * DT / 0.32
+		wheel_rotation += sim.longitudinal_velocity * DT / wheel_radius_m
 		if not sim.collision_contact.is_empty():
 			wheel_rotation = float(sim.collision_contact.wheel_rotation)
 		return
@@ -705,7 +748,7 @@ func _sample_ground_after_step() -> Dictionary:
 			"failure_type": "infrastructure"
 		}
 	sim.position.y = ground.height
-	var next_wheel: float = wheel_rotation + sim.longitudinal_velocity * DT / 0.32
+	var next_wheel: float = wheel_rotation + sim.longitudinal_velocity * DT / wheel_radius_m
 	var finish := _collision_pose(ground.normal, next_wheel)
 	var contact: Dictionary = collision_sweep.sweep(
 		get_world_3d().direct_space_state,
@@ -748,6 +791,9 @@ func _sample_ground_after_step() -> Dictionary:
 	sim.speed = 0.0
 	sim.longitudinal_velocity = 0.0
 	sim.lean_rate = 0.0
+	if vehicle == "car":
+		sim.lateral_velocity = 0.0
+		sim.yaw_rate = 0.0
 	sim.crashed = true
 	sim.crash_reason = "pit_wall"
 	sim.collision_contact = contact
@@ -861,7 +907,7 @@ func _step(action: Dictionary) -> Dictionary:
 	):
 		truncation_reason = "episode_tick_limit"
 		events.append({"type": "truncation", "reason": truncation_reason})
-	wheel_rotation += sim.longitudinal_velocity * DT / 0.32
+	wheel_rotation += sim.longitudinal_velocity * DT / wheel_radius_m
 	if not sim.collision_contact.is_empty():
 		wheel_rotation = float(sim.collision_contact.wheel_rotation)
 	var transition: Dictionary = {
@@ -1478,15 +1524,15 @@ func _build_provenance() -> Dictionary:
 		"kind": "unbundled_development",
 		"geometry_helper_sha256": geometry_sources,
 		"capture_validation_sha256": FileAccess.get_sha256("res://scripts/image_validation.gd"),
-		"physics_script_sha256": FileAccess.get_sha256("res://scripts/motorcycle.gd"),
+		"physics_script_sha256": FileAccess.get_sha256(sim.get_script().resource_path),
 		"game_script_sha256": FileAccess.get_sha256("res://scripts/main.gd"),
-		"bike_visual_script_sha256": FileAccess.get_sha256("res://scripts/bike_visual.gd"),
+		"bike_visual_script_sha256": FileAccess.get_sha256(bike.get_script().resource_path),
 		"instrument_display_sha256": FileAccess.get_sha256("res://scripts/instrument_display.gd"),
 		"instrument_screen_sha256":
 		FileAccess.get_sha256("res://shaders/instrument_screen.gdshader"),
 		"pavement_sha256": FileAccess.get_sha256("res://data/pavement.json"),
 		"curb_placement_sha256": FileAccess.get_sha256("res://data/curb-placement.json"),
 		"track_script_sha256": FileAccess.get_sha256("res://scripts/track.gd"),
-		"envelope_script_sha256": FileAccess.get_sha256("res://scripts/bike_collision_envelope.gd"),
+		"envelope_script_sha256": FileAccess.get_sha256(envelope_script.resource_path),
 		"sweep_script_sha256": FileAccess.get_sha256("res://scripts/bike_sweep.gd")
 	}

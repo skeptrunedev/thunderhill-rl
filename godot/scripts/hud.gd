@@ -149,7 +149,7 @@ func _draw() -> void:
 		draw_polyline(line, Color(0.82, 0.80, 0.71, 0.75), 2, true)
 	var p: Vector3 = game.sim.position
 	draw_circle(rect.position + (Vector2(p.x, p.z) - low) * scale, 4, Color("ef634d"))
-	var rpm_ratio: float = clampf(game.sim.rpm / 13500.0, 0, 1)
+	var rpm_ratio: float = clampf(game.sim.rpm / float(game.sim.parameters.rev_limit_rpm), 0, 1)
 	draw_rect(Rect2(42, size.y - 157, 220, 3), Color(0.8, 0.8, 0.8, 0.18))
 	draw_rect(
 		Rect2(42, size.y - 157, 220 * rpm_ratio, 3),
