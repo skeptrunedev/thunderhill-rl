@@ -32,7 +32,12 @@ automatic.
 Reward per 0.1 s step, in units of STEP_REFERENCE_M (the distance covered in one
 step at the v6 reference speed of 20 m/s), reusing the reward v6 accounting in
 alpagym_metrics.EpisodeMetrics tick by tick:
-  r = sum_ticks legal_progress_m * max(0, 1 - |lateral| / half_width) / 2 m
+  r = sum_ticks legal_progress_m / 2 m                                  (reward_line="progress")
+  r = sum_ticks legal_progress_m * max(0, 1 - |lateral| / half_width) / 2 m  ("centered")
+The default "progress" pays centerline progress however wide the line, so a
+racing line that uses the track width to straighten corners earns more per
+second; "centered" (reward v6) weights credit toward the centerline, which kept
+the policy on the centerline instead of hitting apexes.
       - incident_cost_m(v) / 2 m   on the step of the first incident
 where incident_cost_m(v) = v^2 / (2 * 0.48 g) is the off-track run-off distance.
 The first incident (offroad, obstacle contact, fall) terminates the episode. A
@@ -168,10 +173,14 @@ class ThunderhillSACEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, *, godot: str, data_dir: str, horizon_s: float = 60.0,
+                 reward_line: str = "progress",
                  record_godot: bool = False, starts: list[dict] | None = None,
                  seed: int = 0, policy_id: str = "sac"):
         self.godot, self.data_dir = godot, Path(data_dir)
         self.horizon_s, self.record_godot = horizon_s, record_godot
+        if reward_line not in ("progress", "centered"):
+            raise ValueError(f"Unknown reward line {reward_line!r}")
+        self.reward_line = reward_line
         self.fixed_starts, self.policy_id = starts, policy_id
         self.track = Track(RoadTelemetry())
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (OBSERVATION_SIZE,), np.float32)
@@ -269,14 +278,15 @@ class ThunderhillSACEnv(gym.Env):
             info.update(worker_restart=True, worker_error=str(error)[:500])
             return self._vector, 0.0, False, True, info
         metrics = self._metrics
-        before_centered, before_incidents = metrics.centered_distance, len(metrics.incidents)
+        credited = "centered_distance" if self.reward_line == "centered" else "distance"
+        before_credit, before_incidents = getattr(metrics, credited), len(metrics.incidents)
         for transition in transitions:
             metrics.observe(transition)
             for event in transition["events"]:
                 if event.get("type") == "lap":
                     self._laps += 1
                     self._lap_time = float(event["time"])
-        reward = (metrics.centered_distance - before_centered) / STEP_REFERENCE_M
+        reward = (getattr(metrics, credited) - before_credit) / STEP_REFERENCE_M
         self._observation = result
         self._step_count += 1
         self._previous_action = (command["steer"], float(np.clip(action[1], -1.0, 1.0)))

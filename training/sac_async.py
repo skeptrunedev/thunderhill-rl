@@ -214,6 +214,7 @@ def run_actor(index, args, shared: Shared):
     parent = _child_setup(args.actor_nice)
     env = ThunderhillSACEnv(godot=args.godot, data_dir=args.run_dir / "workers",
                             horizon_s=args.horizon, seed=args.seed * 1000 + index,
+                            reward_line=args.reward_line,
                             policy_id=args.run_name)
     rng = np.random.default_rng([args.seed, index, int(time.time())])
     policy = NumpyPolicy(args.hidden)
@@ -274,6 +275,7 @@ def run_evaluator(args, shared: Shared, requests, results):
     directory = args.run_dir / "eval"
     starts = evaluation_starts(args.eval_starts)
     envs = [ThunderhillSACEnv(godot=args.godot, data_dir=directory, horizon_s=args.eval_horizon,
+                              reward_line=args.reward_line,
                               record_godot=True, policy_id=f"{args.run_name}-eval")
             for _ in starts]
 
@@ -409,6 +411,9 @@ class Trainer:
                        gamma=args.gamma, tau=args.tau, compile=not args.no_compile,
                        cuda_graph=not args.no_cuda_graph)
         self.env_steps = 0
+        # Learner updates made before this run's env steps (--init-from); the
+        # update-to-data accounting counts only this run's updates.
+        self.update_offset = 0
         self.recorder = Recorder(args, run_dir)
         checkpoints = sorted((run_dir / "checkpoints").glob("step_*.pt"),
                              key=lambda p: int(p.stem.split("_")[1]))
@@ -417,10 +422,18 @@ class Trainer:
             state = torch.load(checkpoints[-1], map_location="cuda", weights_only=False)
             self.sac.load_state_dict(state["sac"])
             self.env_steps = state["env_steps"]
+            self.update_offset = state.get("update_offset", 0)
             if (run_dir / "replay_buffer.npz").exists():
                 self.sac.buffer.load(run_dir / "replay_buffer.npz")
             print(f"Resumed {checkpoints[-1].name}: {self.env_steps} env steps, "
                   f"{self.sac.updates} updates, {self.sac.buffer.count} replay rows", flush=True)
+        elif args.init_from:
+            # Networks, optimizers and entropy temperature from another run's
+            # checkpoint; an empty replay buffer, since its rewards may differ.
+            state = torch.load(args.init_from, map_location="cuda", weights_only=False)
+            self.sac.load_state_dict(state["sac"])
+            self.update_offset = self.sac.updates
+            print(f"Initialized from {args.init_from} ({self.update_offset} updates)", flush=True)
 
         context = get_context("spawn")
         parameters = sum(math.prod(shape) for shape in actor_shapes(args.hidden))
@@ -448,7 +461,8 @@ class Trainer:
         if args.max_lead < 0:
             return np.iinfo(np.int64).max
         # Env steps the learner's updates so far match at --utd, plus the lead.
-        return int(args.learning_starts + self.sac.updates / args.utd) + args.max_lead
+        own = self.sac.updates - self.update_offset
+        return int(args.learning_starts + own / args.utd) + args.max_lead
 
     def ingest(self):
         """Drain every actor ring into the replay buffer and the recorder."""
@@ -512,10 +526,11 @@ class Trainer:
         args, sac = self.args, self.sac
         if self.env_steps < args.learning_starts or sac.buffer.count < args.batch_size:
             return 0
-        owed = int(args.utd * (self.env_steps - args.learning_starts)) - sac.updates
+        owed = int(args.utd * (self.env_steps - args.learning_starts)) - (
+            sac.updates - self.update_offset)
         if owed <= 0:
             return 0
-        if sac.updates == 0:
+        if sac.updates == self.update_offset:
             print(f"Learning starts at {self.env_steps} env steps (compiling and capturing "
                   "the update)", flush=True)
         count = min(owed, args.update_chunk)
@@ -527,7 +542,7 @@ class Trainer:
         directory.mkdir(exist_ok=True)
         path = directory / f"step_{self.env_steps}.pt"
         self.torch.save(dict(sac=self.sac.state_dict(), env_steps=self.env_steps,
-                             args=vars(self.args)), path)
+                             update_offset=self.update_offset, args=vars(self.args)), path)
         return path
 
     def request_eval(self):
@@ -581,7 +596,8 @@ class Trainer:
             "time/steps_per_second": steps / seconds,
             "time/updates_per_second": updates / seconds,
             "time/utd": updates / max(steps, 1),
-            "time/utd_total": self.sac.updates / max(self.env_steps - self.args.learning_starts, 1),
+            "time/utd_total": (self.sac.updates - self.update_offset)
+            / max(self.env_steps - self.args.learning_starts, 1),
             "time/elapsed_s": now - self.started,
             "time/updates": self.sac.updates,
             "time/actors_held_frac": self.held_loops / max(self.loops, 1),
@@ -671,6 +687,12 @@ def main():
     parser.add_argument("--runs-dir", type=Path, default=ROOT / "runs" / "sac")
     parser.add_argument("--resume", action="store_true",
                         help="continue from the run's latest checkpoint and replay buffer")
+    parser.add_argument("--init-from", type=Path,
+                        help="start a new run from another run's checkpoint networks, "
+                        "with an empty replay buffer")
+    parser.add_argument("--reward-line", choices=("progress", "centered"), default="progress",
+                        help="progress: centerline progress, so the policy may use the track "
+                        "width; centered: reward v6 weighting toward the centerline")
     parser.add_argument("--workers", type=int, default=48, help="actor processes (one Godot each)")
     parser.add_argument("--actor-nice", type=int, default=5,
                         help="niceness added to actors and their Godot workers, so the "
