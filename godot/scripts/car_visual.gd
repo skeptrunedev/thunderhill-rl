@@ -13,9 +13,10 @@ const REAR_TRACK_M := 1.505
 const TIRE_RADIUS_M := 0.305
 const TIRE_WIDTH_M := 0.215
 ## Estimated left hand drive eye point and roof camera, not measured.
-const RIDER_EYE_LOCAL := Vector3(-0.36, 1.02, 0.22)
+const RIDER_EYE_LOCAL := Vector3(-0.36, 1.12, 0.22)
 const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.16, 0.45)
 const ONBOARD_LOOK_DOWN := 0.10
+const RIDER_LOOK_DOWN := 0.08
 const ONBOARD_FOV_DEG := 80.0
 ## The camera is fixed to the body, so it rolls fully with it.
 const ONBOARD_ROLL_SCALE := 1.0
@@ -164,19 +165,35 @@ func _build_body() -> void:
 	var half := WIDTH_M * 0.5
 	var nose := -LENGTH_M * 0.5
 	var tail := LENGTH_M * 0.5
-	# Lower body side profile (z forward negative, y up): low nose, long hood,
-	# short high rear deck, as the ND silhouette. Artistic estimate.
-	_profile_slab(PackedVector2Array([
-		Vector2(nose + 0.05, 0.16), Vector2(nose, 0.34), Vector2(nose + 0.12, 0.58),
-		Vector2(nose + 0.75, 0.70), Vector2(-0.35, 0.78), Vector2(0.95, 0.80),
-		Vector2(tail - 0.12, 0.80), Vector2(tail, 0.62), Vector2(tail - 0.03, 0.22),
-		Vector2(tail - 0.35, 0.14), Vector2(nose + 0.40, 0.14),
-	]), half - 0.06, _paint, self)
+	# Side profile of the body top (z forward negative, y up): low nose, long
+	# hood, short high rear deck, as the ND silhouette. Artistic estimate.
+	var top := PackedVector2Array([
+		Vector2(nose, 0.34), Vector2(nose + 0.12, 0.58), Vector2(nose + 0.75, 0.70),
+		Vector2(-0.35, 0.78), Vector2(0.95, 0.80), Vector2(tail - 0.12, 0.80),
+		Vector2(tail, 0.62),
+	])
+	# Sections between wheel openings: bumpers, fenders over the wheels and
+	# sills between them, so the tires show through their openings.
+	var opening := TIRE_RADIUS_M + 0.04
+	var front_axle := -WHEELBASE_M * 0.5
+	var rear_axle := WHEELBASE_M * 0.5
+	for section in [
+		[nose, front_axle - opening, 0.16],
+		[front_axle - opening, front_axle + opening, 2.0 * TIRE_RADIUS_M + 0.03],
+		[front_axle + opening, rear_axle - opening, 0.17],
+		[rear_axle - opening, rear_axle + opening, 2.0 * TIRE_RADIUS_M + 0.03],
+		[rear_axle + opening, tail, 0.28],
+	]:
+		_body_section(top, float(section[0]), float(section[1]), float(section[2]), half - 0.06)
 	# Front and rear fender bulges over the wheels.
 	for z in [-WHEELBASE_M * 0.5, WHEELBASE_M * 0.5]:
 		for side in [-1.0, 1.0]:
 			_rounded_box(
-				Vector3(0.12, 0.30, 0.86), Vector3(side * (half - 0.07), 0.62, z), 0.05, _paint, self
+				Vector3(0.12, 0.14, 0.80),
+				Vector3(side * (half - 0.07), _top_at(top, z) - 0.075, z),
+				0.05,
+				_paint,
+				self
 			)
 	# Side skirts, front splitter and rear diffuser in black composite.
 	for side in [-1.0, 1.0]:
@@ -194,12 +211,32 @@ func _build_body() -> void:
 		roundel.height = 0.012
 		var disc := _mesh(roundel, _white, self, Vector3(side * (half - 0.055), 0.52, 0.05))
 		disc.rotation.z = PI * 0.5
-	# White racing stripe along the hood and rear deck.
-	_chamfered_box(Vector3(0.28, 0.02, 1.35), Vector3(0.0, 0.775, nose + 1.10), 0.008, _white, self)
 	# Rear wing on two uprights (Cup cars carry a small wing).
 	for side in [-1.0, 1.0]:
 		_chamfered_box(Vector3(0.03, 0.18, 0.08), Vector3(side * 0.55, 0.89, tail - 0.18), 0.01, _black, self)
 	_chamfered_box(Vector3(1.40, 0.025, 0.22), Vector3(0, 0.99, tail - 0.18), 0.01, _black, self)
+
+
+## One closed slab of the body between two stations, from a flat bottom up to
+## the top profile, sampled at the profile's own vertices inside the range.
+func _body_section(
+	top: PackedVector2Array, start: float, end: float, bottom: float, half_width: float
+) -> void:
+	var outline := PackedVector2Array([Vector2(start, bottom), Vector2(start, _top_at(top, start))])
+	for point in top:
+		if point.x > start and point.x < end:
+			outline.append(point)
+	outline.append(Vector2(end, _top_at(top, end)))
+	outline.append(Vector2(end, bottom))
+	_profile_slab(outline, half_width, _paint, self)
+
+
+func _top_at(top: PackedVector2Array, z: float) -> float:
+	for i in range(1, top.size()):
+		if z <= top[i].x:
+			var t := clampf((z - top[i - 1].x) / (top[i].x - top[i - 1].x), 0.0, 1.0)
+			return lerpf(top[i - 1].y, top[i].y, t)
+	return top[-1].y
 
 
 func _build_cabin() -> void:

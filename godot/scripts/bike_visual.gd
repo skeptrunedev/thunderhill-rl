@@ -10,6 +10,8 @@ const RIDER_EYE_LOCAL := Vector3(0.0, 1.51, -0.30)
 ## This remains an estimate, not a recovered physical camera mount.
 const ONBOARD_CAMERA_LOCAL := Vector3(0.0, 1.51, -0.30)
 const ONBOARD_LOOK_DOWN := 0.30
+## Helmet eye view pitch below the riding tangent.
+const RIDER_LOOK_DOWN := 0.25
 const ONBOARD_FOV_DEG := 90.0
 ## Reference guided framing estimates, not a recovered camera calibration.
 const ONBOARD_ROLL_SCALE := 0.65
