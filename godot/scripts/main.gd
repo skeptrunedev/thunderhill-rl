@@ -37,6 +37,9 @@ var hud: Control
 var paused := true
 var agent_mode := false
 var agent_offscreen := false
+# Trainers that record their own compact transitions (training/sac) opt out of
+# the per-tick JSONL episode recording; evaluation workers keep it for replay.
+var agent_recording := true
 var camera_mode := 0
 var wheel_rotation := 0.0
 var lap_time := 0.0
@@ -135,6 +138,8 @@ func _ready() -> void:
 			agent_max_episode_ticks = int(value)
 		if arg == "--agent-offscreen":
 			agent_offscreen = true
+		if arg == "--agent-no-recording":
+			agent_recording = false
 		if arg.begins_with("--agent-port="):
 			server_port = int(arg.split("=")[1])
 			agent_mode = true
@@ -186,6 +191,10 @@ func _ready() -> void:
 		)
 	if agent_max_episode_ticks > 0 and not agent_mode:
 		push_error("Agent episode tick limit requires agent mode")
+		get_tree().quit(2)
+		return
+	if not agent_recording and not agent_mode:
+		push_error("Disabling episode recording requires agent mode")
 		get_tree().quit(2)
 		return
 	if (
@@ -514,6 +523,9 @@ func reset_episode(
 func _start_recording(station: float) -> void:
 	if recorder:
 		recorder.close()
+		recorder = null
+	if not agent_recording:
+		return
 	var folder: String = "user://runs/" + run_id
 	DirAccess.make_dir_recursive_absolute(folder)
 	recorder = FileAccess.open(folder + "/" + episode_id + ".jsonl", FileAccess.WRITE)
