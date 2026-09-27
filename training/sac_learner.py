@@ -144,6 +144,7 @@ class SAC:
     def __init__(self, *, observation_size, action_size, hidden, buffer_size, batch_size,
                  learning_rate, gamma, tau, device="cuda", compile=True, cuda_graph=True):
         self.device, self.batch_size, self.gamma, self.tau = device, batch_size, gamma, tau
+        self.learning_rate = learning_rate
         self.actor = Actor(observation_size, action_size, hidden).to(device)
         self.critic = Critics(observation_size, action_size, hidden).to(device)
         self.critic_target = Critics(observation_size, action_size, hidden).to(device)
@@ -276,5 +277,9 @@ class SAC:
         with torch.no_grad():
             self.log_alpha.copy_(state["log_alpha"])
         for name in ("actor_optimizer", "critic_optimizer", "alpha_optimizer"):
-            getattr(self, name).load_state_dict(state[name])
+            optimizer = getattr(self, name)
+            optimizer.load_state_dict(state[name])
+            # The saved param_groups carry the old run's lr; the configured one wins.
+            for group in optimizer.param_groups:
+                group["lr"] = self.learning_rate
         self.updates = state["updates"]
