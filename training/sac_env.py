@@ -160,8 +160,15 @@ def observation_vector(track: Track, observation: dict, previous_action) -> np.n
     return vector
 
 
-def controls(action) -> dict:
-    steer, pedal = (float(np.clip(value, -1.0, 1.0)) for value in action)
+def controls(action, pedal_gain: float = 1.0) -> dict:
+    """pedal_gain > 1 reaches full throttle or brake before tanh saturates.
+
+    SAC's tanh squashing and entropy bonus keep the policy mean away from the
+    action bounds, so with gain 1 it held throttle near 0.56 on straights at
+    10% grip use; with gain 1.25 a raw 0.8 is already full throttle.
+    """
+    steer = float(np.clip(action[0], -1.0, 1.0))
+    pedal = float(np.clip(pedal_gain * action[1], -1.0, 1.0))
     brake = max(0.0, -pedal)
     return dict(steer=steer, throttle=max(0.0, pedal), front_brake=brake, rear_brake=brake)
 
@@ -173,7 +180,7 @@ class ThunderhillSACEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, *, godot: str, data_dir: str, horizon_s: float = 60.0,
-                 reward_line: str = "progress",
+                 reward_line: str = "progress", pedal_gain: float = 1.0,
                  record_godot: bool = False, starts: list[dict] | None = None,
                  seed: int = 0, policy_id: str = "sac"):
         self.godot, self.data_dir = godot, Path(data_dir)
@@ -181,6 +188,9 @@ class ThunderhillSACEnv(gym.Env):
         if reward_line not in ("progress", "centered"):
             raise ValueError(f"Unknown reward line {reward_line!r}")
         self.reward_line = reward_line
+        if not 1.0 <= pedal_gain <= 2.0:
+            raise ValueError("pedal_gain must be in [1, 2]")
+        self.pedal_gain = pedal_gain
         self.fixed_starts, self.policy_id = starts, policy_id
         self.track = Track(RoadTelemetry())
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (OBSERVATION_SIZE,), np.float32)
@@ -259,7 +269,7 @@ class ThunderhillSACEnv(gym.Env):
         return self._vector, {"episode_id": observation["episode_id"], "start": start}
 
     def step(self, action):
-        command = controls(action)
+        command = controls(action, self.pedal_gain)
         try:
             result = self._request({
                 "op": "advance",
@@ -289,7 +299,7 @@ class ThunderhillSACEnv(gym.Env):
         reward = (getattr(metrics, credited) - before_credit) / STEP_REFERENCE_M
         self._observation = result
         self._step_count += 1
-        self._previous_action = (command["steer"], float(np.clip(action[1], -1.0, 1.0)))
+        self._previous_action = (command["steer"], command["throttle"] - command["front_brake"])
         self._vector = observation_vector(self.track, result, self._previous_action)
         progress = sum(row["reward_components"]["legal_progress_m"] for row in transitions)
         self._progress_window = (self._progress_window + [progress])[
