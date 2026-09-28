@@ -564,6 +564,8 @@ class Trainer:
             self.update_offset = self.sac.updates
             print(f"Initialized from {args.init_from} ({self.update_offset} updates)", flush=True)
 
+        # The actors' written counts start from zero in this process.
+        self.resumed_steps = self.env_steps
         context = get_context("spawn")
         parameters = sum(math.prod(shape) for shape in actor_shapes(args.hidden))
         self.shared = Shared(context, args.workers, args.ring, parameters).views()
@@ -598,9 +600,10 @@ class Trainer:
         args = self.args
         if args.max_lead < 0:
             return np.iinfo(np.int64).max
-        # Env steps the learner's updates so far match at --utd, plus the lead.
+        # Env steps the learner's updates so far match at --utd, plus the lead,
+        # less those of the run before a --resume (not in shared.written).
         own = self.sac.updates - self.update_offset
-        return int(args.learning_starts + own / args.utd) + args.max_lead
+        return int(args.learning_starts + own / args.utd) + args.max_lead - self.resumed_steps
 
     def ingest(self):
         """Drain every actor ring into the replay buffer and the recorder."""
