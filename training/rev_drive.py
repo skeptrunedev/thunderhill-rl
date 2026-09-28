@@ -93,7 +93,9 @@ def ride(env: ThunderhillSACEnv, rider: RevRider, start: dict | None, log, teach
         # sac_env.controls scales the pedal by pedal_gain; send the raw value that lands on `pedal`.
         action = np.array([steer, pedal / rider.pedal_gain], dtype=np.float32)
         next_obs, _, terminated, truncated, info = env.step(action)
-        log({"episode_id": info["episode_id"], "step": env._step_count,
+        # A worker restart truncates the episode with only its summary (sac_env.step).
+        episode_id = info.get("episode_id") or info.get("episode_summary", {}).get("episode_id")
+        log({"episode_id": episode_id, "step": env._step_count,
              "station_m": round(float(env._observation["track"]["progress"]) * env.track.length, 1),
              "steer": round(steer, 4), "pedal": round(pedal, 4), "teacher": by_teacher,
              "steer_probabilities": answers["steer"]["probabilities"],

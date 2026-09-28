@@ -7,12 +7,18 @@ Kev checkpoint (--init_from) and no Kev replay data. The recipe is the from-scra
 first stage Kev documents for its 0.8B size (2 epochs, lr 1e-4, batch 8, LoRA r16,
 bf16 autocast over fp32 masters).
 
+DAgger rounds continue from the previous round's Rev (--init-from NAME, a run on this
+app's volume; nothing outside it is accepted, so a round can never start from Kev's
+weights) for --epochs 1 at a lower learning rate.
+
 After training, one temperature is fitted on calibration.jsonl (min NLL on raw logits,
 kev.metrics.fit_temperature) and written into the checkpoint, and development.jsonl is
 scored at that temperature. Everything is pulled to runs/rev/NAME/.
 
   uvx --from modal==1.5.5 modal run --detach training/modal_rev.py::train \\
       --data runs/rev/data-v1 --name rev-0.8b-v1
+  uvx --from modal==1.5.5 modal run training/modal_rev.py::train \\
+      --data runs/rev/data-r1 --name rev-0.8b-r1 --init-from rev-0.8b-v1 --epochs 1 --lr 5e-5
 """
 
 import io
@@ -58,7 +64,8 @@ def stage(message):
 
 @app.function(image=image, gpu="H100", cpu=4, memory=(32768, 131072), timeout=4 * 3600, retries=0,
               volumes={RUNS: runs, HF: hf_cache})
-def train_remote(name: str, data: dict, size: str, epochs: int, seed: int) -> dict:
+def train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_from: str = "",
+                 lr: float = 0.0) -> dict:
     import torch
     from kev.benchmark import evaluate_records
     from kev.checkpoint import LoadOptions, read_meta, write_meta
@@ -67,18 +74,29 @@ def train_remote(name: str, data: dict, size: str, epochs: int, seed: int) -> di
     from kev.predictors import LocalPredictor
 
     out = Path(RUNS) / name
-    if out.exists():
-        raise FileExistsError(f"/runs/{name} exists; choose a new name")
+    if (out / "result.json").exists():
+        raise FileExistsError(f"/runs/{name} is a finished run; choose a new name")
+    if out.exists():  # an attempt that died before scoring: start it over
+        import shutil
+        shutil.rmtree(out)
     (out / "data").mkdir(parents=True)
     for part, text in data.items():
         (out / "data" / f"{part}.jsonl").write_text(text)
     base, revision = BASES[size]
-    recipe = {**RECIPES[size], **({"epochs": epochs} if epochs else {})}
+    recipe = {**RECIPES[size], **({"epochs": epochs} if epochs else {}), **({"lr": lr} if lr else {})}
     checkpoint = out / "checkpoint"
+    init = None
+    if init_from:
+        init = Path(RUNS) / init_from / "checkpoint"
+        result = json.loads((Path(RUNS) / init_from / "result.json").read_text())
+        if not (init / "head.pt").exists() or result.get("base") != base:
+            raise ValueError(f"--init-from must be a Rev run on this volume with base {base}: {init_from}")
     cmd = [sys.executable, "-m", "kev.train", "--data", str(out / "data/train.jsonl"),
            "--base", base, "--base_revision", revision, "--epochs", recipe["epochs"], "--lr", recipe["lr"],
            "--batch", recipe["batch"], "--accum", recipe["accum"], "--checkpointing", recipe["checkpointing"],
            "--dtype", "bf16", "--device", "cuda", "--seed", seed, "--out", checkpoint]
+    if init:
+        cmd += ["--init_from", init]
     cmd = [str(c) for c in cmd]
     stage("training: " + " ".join(cmd[2:]))
     started = time.time()
@@ -107,7 +125,7 @@ def train_remote(name: str, data: dict, size: str, epochs: int, seed: int) -> di
                                      "method": "min NLL, micro, kev.metrics.fit_temperature"}
     write_meta(str(checkpoint), meta)
     clean = [r for r in rows if r["variant"] == "clean"]
-    result = {"name": name, "model": f"rev-{size}", "base": base, "base_revision": revision, "init_from": None,
+    result = {"name": name, "model": f"rev-{size}", "base": base, "base_revision": revision, "init_from": init_from or None,
               "kev_ref": KEV_REF, "recipe": recipe, "seed": seed,
               "records": {part: text.count("\n") for part, text in data.items()},
               "temperature": temperature, "development": {
@@ -131,14 +149,15 @@ def pull_remote(name: str) -> bytes:
 
 
 @app.local_entrypoint()
-def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int = 0):
+def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int = 0, init_from: str = "",
+          lr: float = 0.0):
     if size not in BASES:
         raise SystemExit(f"--size must be one of {sorted(BASES)}")
     local = ROOT / "runs/rev" / name
     if local.exists():
         raise SystemExit(f"{local} exists; choose a new name")
     texts = {part: (Path(data) / f"{part}.jsonl").read_text() for part in PARTITIONS}
-    result = train_remote.remote(name, texts, size, epochs, seed)
+    result = train_remote.remote(name, texts, size, epochs, seed, init_from, lr)
     local.mkdir(parents=True)
     with tarfile.open(fileobj=io.BytesIO(pull_remote.remote(name)), mode="r:gz") as tar:
         tar.extractall(local, filter="data")
