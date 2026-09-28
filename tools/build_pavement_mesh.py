@@ -136,15 +136,13 @@ def build(track_path, surface_path, output_path, metadata=None):
             uvs.append(list(key[1]))
         return vertex_lookup[key]
 
+    def coincident_plan(xz):
+        return any(np.array_equal(xz[i], xz[j]) for i, j in ((0, 1), (1, 2), (0, 2)))
+
     def emit_polygon(positions, texcoords):
         nonlocal split_triangles
         positions = np.asarray(positions)
         texcoords = np.asarray(texcoords)
-        # Distinct terrain vertices can round to one float32 position (a grid point
-        # and a clipped boundary point a few nanometres apart). They are one render
-        # vertex, so drop the repeat instead of emitting a zero area triangle.
-        keep = np.any(positions != np.roll(positions, 1, axis=0), axis=1)
-        positions, texcoords = positions[keep], texcoords[keep]
         if len(positions) == 3:
             faces = [(positions, texcoords)]
         else:
@@ -158,6 +156,12 @@ def build(track_path, surface_path, output_path, metadata=None):
             xz = p[:, [0, 2]]
             ab, ac = xz[1] - xz[0], xz[2] - xz[0]
             area2 = float(ab[0]*ac[1] - ab[1]*ac[0])
+            if area2 == 0 and np.isfinite(p).all() and coincident_plan(xz):
+                # Distinct terrain vertices can round to one float32 plan position (a
+                # grid point and a clipped boundary point nanometres apart, heights
+                # differing by float32 rounding). The fan face between them has no
+                # plan area, so omitting it leaves no hole in coverage or contact.
+                continue
             if area2 == 0 or not np.isfinite(p).all():
                 raise ValueError('Degenerate or nonfinite pavement triangle')
             if area2 < 0:
@@ -183,7 +187,7 @@ def build(track_path, surface_path, output_path, metadata=None):
                               for a, b in zip(tri, np.roll(tri, -1)))
     actual_boundary = {edge for edge, count in boundary_counts.items() if count == 1}
     expected_boundary = {edge_key(ground[a], ground[b]) for a, b in boundary
-                         if not np.array_equal(ground[a], ground[b])}
+                         if not np.array_equal(ground[a][[0, 2]], ground[b][[0, 2]])}
     if any(count > 2 for count in boundary_counts.values()) or actual_boundary != expected_boundary:
         raise ValueError(f'Pavement boundary mismatch: extra={len(actual_boundary-expected_boundary)}, '
                          f'missing={len(expected_boundary-actual_boundary)}')

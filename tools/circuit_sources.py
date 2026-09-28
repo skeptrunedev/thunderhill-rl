@@ -19,6 +19,7 @@ import hashlib
 import io
 import json
 import math
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -66,7 +67,9 @@ class Product:
         else:
             raw = http(url, data=data, expect=expect)
             path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_suffix(path.suffix + ".part")
+            # Overlapping mosaics fetch the same tile from several threads; each
+            # writes its own temporary file and the atomic replace keeps one.
+            tmp = path.with_suffix(f"{path.suffix}.{threading.get_ident()}.part")
             tmp.write_bytes(raw)
             tmp.replace(path)
         self.entries[key] = sha256_bytes(raw)

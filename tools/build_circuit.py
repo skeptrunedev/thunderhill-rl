@@ -763,6 +763,12 @@ def discover(circuit: str) -> None:
     graph = {}
     for e in edges:
         graph.setdefault(e[0], []).append(e)
+    rings = []
+    for w in ways:
+        ids = w["nodes"]
+        if ids[0] == ids[-1] and all(usage[n] == 1 or n == ids[0] for n in ids[1:-1]):
+            length = sum(math.dist(xy[p], xy[q]) for p, q in zip(ids, ids[1:]))
+            rings.append((length, [(ids[0], ids[0], w["id"], w["version"], length)]))
     official = manifest["official_length_m"]
     cycles = []
 
@@ -781,10 +787,12 @@ def discover(circuit: str) -> None:
     for length, path in cycles:
         key = frozenset((e[0], e[1], e[2]) for e in path)
         unique[key] = (length, path)
-    ranked = sorted(unique.values(), key=lambda row: abs(row[0] - official))[:6]
+    ranked = sorted([*unique.values(), *rings], key=lambda row: abs(row[0] - official))[:6]
     for length, path in ranked:
         route = [{"way": e[2], "version": e[3], "from": e[0], "to": e[1]} for e in path]
-        pts = np.array([xy[e[0]] for e in path])
+        by_id = {w["id"]: w for w in ways}
+        # Direction from every node of the route, the same walk the build performs.
+        pts = np.array([xy[n] for part in route for n in way_chain(part, by_id[part["way"]]["nodes"])[:-1]])
         area = 0.5 * float(np.sum(pts[:, 0] * np.roll(pts[:, 1], -1) - np.roll(pts[:, 0], -1) * pts[:, 1]))
         names = sorted({w.get("tags", {}).get("name", "") for w in ways if w["id"] in {e[2] for e in path}})
         print(json.dumps({"length_m": round(length, 1), "error": round((length - official) / official, 4),
@@ -803,10 +811,23 @@ def preview(circuit: str, station: float, span: float, output: Path | None) -> N
     s = np.array([r["s"] for r in samples])
     k = int(np.argmin(np.abs(s - station)))
     cx, cz = samples[k]["p"][0], samples[k]["p"][2]
-    res = imagery["detail"]["resolution_m"]
-    pixels = round(span / res)
-    canvas = Image.new("RGB", (pixels, pixels))
     gen = TRACKS / circuit / "generated/imagery"
+    if not imagery["detail"]["layers"]:
+        # Satellite only circuits: crop the overview, drawn at a minimum of 1 m per
+        # pixel so the overlay stays legible over 10 m source pixels.
+        res = min(1.0, imagery["overview"]["resolution_m"])
+        pixels = round(span / res)
+        overview = Image.open(gen / imagery["overview"]["file"])
+        bounds = imagery["overview"]["bounds"]
+        scale = imagery["overview"]["resolution_m"]
+        box = ((cx - span / 2 - bounds["x0"]) / scale, (cz - span / 2 - bounds["z0"]) / scale,
+               (cx + span / 2 - bounds["x0"]) / scale, (cz + span / 2 - bounds["z0"]) / scale)
+        canvas = overview.resize((pixels, pixels), Image.Resampling.BILINEAR, box=box)
+        grid = None
+    else:
+        res = imagery["detail"]["resolution_m"]
+        pixels = round(span / res)
+        canvas = Image.new("RGB", (pixels, pixels))
     for layer in imagery["detail"]["layers"]:
         col, row = layer["key"]
         tx = col * TILE_M - origin["easting"]
