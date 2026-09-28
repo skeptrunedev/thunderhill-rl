@@ -51,7 +51,8 @@ checkpoint and the replay buffer; --resume continues from them.
 Everything for a run lives in --runs-dir/RUN_NAME:
   checkpoints/step_N.pt, replay_buffer.npz    learner state (networks, optimizers,
                                               counters) and replay, for --resume
-  rollouts/shard-NNNNN.npz                    every transition (obs, action, reward,
+  rollouts/shard-NNNNN.npz                    every transition, unless --no-rollout-shards
+                                              (~7 GB/hour at 1,900 steps/s): (obs, action, reward,
                                               next_obs, terminated, truncated, env,
                                               episode, policy_step = env step,
                                               policy_version = learner update of
@@ -425,12 +426,17 @@ class Recorder:
         self.args = args
         # With --tracks, a shard column `track` indexes run_dir/tracks.json.
         self.fields = self.SHARD_FIELDS + (("track",) if args.tracks else ())
+        self.shards = not args.no_rollout_shards
         self.directory = run_dir / "rollouts"
         self.directory.mkdir(parents=True, exist_ok=True)
         shards = sorted(self.directory.glob("shard-*.npz"))
         self.shard_index = len(shards)
         # Episode numbers are unique within the run, continuing across resumes.
-        self.first_episode = 1 + max([-1] + [int(np.load(path)["episode"].max()) for path in shards])
+        episodes = [int(np.load(path)["episode"].max()) for path in shards]
+        if not self.shards and (self.directory / "episodes.jsonl").exists():
+            with (self.directory / "episodes.jsonl").open() as stream:
+                episodes += [json.loads(line)["episode"] for line in stream]
+        self.first_episode = 1 + max([-1] + episodes)
         self.episodes = (self.directory / "episodes.jsonl").open("a")
         self.pending = {k: [] for k in self.fields}
         self.pending_rows = 0
@@ -618,6 +624,17 @@ class Trainer:
             "reward": column("reward")[valid, 0], "next_obs": column("next_obs")[valid],
             "terminated": column("terminated")[valid, 0]})
         versions = meta[:, 1]
+        if self.recorder.shards:
+            self.record(parts, rows, meta, n)
+        acted = versions > 0
+        if acted.any():
+            self.staleness.append(self.sac.updates - versions[acted])
+        self.env_steps += n
+        return n
+
+    def record(self, parts, rows, meta, n):
+        """Every ingested transition, restarts included, to the rollout shards."""
+        column = lambda name: rows[:, OFFSETS[name]]  # noqa: E731
         record = {
             "obs": column("obs").copy(), "action": column("action").copy(),
             "reward": column("reward")[:, 0].copy(), "next_obs": column("next_obs").copy(),
@@ -625,16 +642,11 @@ class Trainer:
             "env": np.concatenate([np.full(len(p[1]), p[0], np.int16) for p in parts]),
             "episode": meta[:, 0].copy(),
             "policy_step": self.env_steps + np.arange(n, dtype=np.int64),
-            "policy_version": versions.copy(),
+            "policy_version": meta[:, 1].copy(),
             "learner_update": np.full(n, self.sac.updates, np.int64)}
         if self.args.tracks:
             record["track"] = meta[:, 2].astype(np.int16)
         self.recorder.add_rows(record)
-        acted = versions > 0
-        if acted.any():
-            self.staleness.append(self.sac.updates - versions[acted])
-        self.env_steps += n
-        return n
 
     def drain_summaries(self):
         while True:
@@ -826,6 +838,10 @@ class Trainer:
         self.last_checkpoint = self.last_eval = self.env_steps
         self.last_publish = self.sac.updates
         self.held_loops = self.loops = 0
+        if self.evaluator and self.sac.updates and self.env_steps == 0:
+            # --init-from: the starting weights under this run's evaluation, a
+            # baseline (and a candidate) for what the run then learns.
+            self.request_eval()
         last_health_check, failure = time.monotonic(), None
         try:
             while not stop_requested() and self.env_steps < args.total_steps:
@@ -945,6 +961,9 @@ def main():
     parser.add_argument("--no-cuda-graph", action="store_true")
     parser.add_argument("--log-every", type=int, default=20_000)
     parser.add_argument("--shard-steps", type=int, default=200_000)
+    parser.add_argument("--no-rollout-shards", action="store_true",
+                        help="skip the per-transition rollout shards; episodes.jsonl, "
+                        "evaluations and checkpoints are still written")
     parser.add_argument("--checkpoint-every", type=int, default=500_000)
     parser.add_argument("--eval-every", type=int, default=500_000,
                         help="env steps between evaluations (~4 min at 1,900 steps/s; each "
