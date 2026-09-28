@@ -21,7 +21,8 @@ policy itself, so every circuit has a baseline under the same protocol; it
 also remains a candidate, so a specialist is never worse than its start.
 
 The kept checkpoint is the best evaluated one (most laps out of --eval-starts
-fixed rolling starts, then the fastest lap), not the last. After each circuit
+fixed rolling starts, then the fastest lap, then the mean legal progress), not
+the last. After each circuit
 the registry (--registry, runs/sac/specialists.json) gains
 
   track -> {checkpoint, best_lap_s, mean_lap_s, laps, eval_starts, steps, general, run}
@@ -80,13 +81,17 @@ def evaluations(run_dir: Path, starts: int) -> list[dict]:
         laps = [r["lap_time_s"] for r in rows if r["lap_time_s"] is not None]
         result.append(dict(checkpoint=checkpoint, steps=rows[0]["policy_step"], laps=len(laps),
                            best_lap_s=min(laps) if laps else None,
-                           mean_lap_s=sum(laps) / len(laps) if laps else None, rows=rows))
+                           mean_lap_s=sum(laps) / len(laps) if laps else None,
+                           progress_m=sum(r["legal_progress_m"] for r in rows) / len(rows),
+                           rows=rows))
     return result
 
 
 def rank(evaluation):
-    """Most laps, then the fastest lap."""
-    return evaluation["laps"], -(evaluation["best_lap_s"] or math.inf)
+    """Most laps, then the fastest lap; between lapless evaluations, the furthest
+    mean legal progress."""
+    return (evaluation["laps"], -(evaluation["best_lap_s"] or math.inf),
+            evaluation["progress_m"])
 
 
 def last_improvement(evals: list[dict], min_delta: float) -> int:
@@ -223,7 +228,8 @@ class Specialists:
                 best = max(evals, key=rank)
                 print(f"EVAL {track} step {evals[-1]['steps']}: {evals[-1]['laps']}/"
                       f"{args.eval_starts} laps, best {evals[-1]['best_lap_s']}; best so far "
-                      f"{best['laps']} laps {best['best_lap_s']} at {best['steps']}", flush=True)
+                      f"{best['laps']} laps {best['best_lap_s']} progress "
+                      f"{best['progress_m']:.0f} m at {best['steps']}", flush=True)
             if self.plateaued(evals, since):
                 self.child.send_signal(signal.SIGINT)
                 reason = "plateau"
