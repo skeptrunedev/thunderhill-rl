@@ -2,11 +2,11 @@
 # requires-python = ">=3.12"
 # dependencies = ["numpy", "gymnasium>=1.1"]
 # ///
-"""Ride Thunderhill with a Kev decision model: the SAC evaluation, driven by typed questions.
+"""Ride Thunderhill with Rev, our decision model: the SAC evaluation, driven by typed questions.
 
-Every 0.1 s control step renders the observation as kev_dataset's telemetry state and
-asks a Kev server (/v1/systemone) the three training questions, word for word. The
-action is the probability-weighted steer and pedal level (kev_dataset.expected_level),
+Every 0.1 s control step renders the observation as rev_dataset's telemetry state and
+asks a Rev server (kev.serve) (/v1/systemone) the three training questions, word for word. The
+action is the probability-weighted steer and pedal level (rev_dataset.expected_level),
 or the most likely level with --decode argmax. The simulator waits for each action,
 so model latency slows the evaluation but never changes the ride.
 
@@ -18,8 +18,8 @@ Rides start from the same fixed rolling starts as the SAC evaluator
   decisions.jsonl  every step: station, action, the answers' probabilities, the
                    off_track_soon probability and the model latency
 
-  uv run --extra serve python -m kev.serve --run CHECKPOINT --port 8019   # in the kev repo
-  uv run training/kev_drive.py --godot GODOT --run-name kev-rider-v1
+  uv run --extra serve python -m kev.serve --run runs/rev/rev-0.8b-v1/checkpoint --port 8019   # in the kev repo
+  uv run training/rev_drive.py --godot GODOT --run-name rev-0.8b-v1-ride
 """
 
 from __future__ import annotations
@@ -35,15 +35,16 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from kev_dataset import PEDAL_LEVELS, QUESTIONS, STEER_LEVELS, expected_level, render_state  # noqa: E402
+from rev_dataset import PEDAL_LEVELS, QUESTIONS, STEER_LEVELS, expected_level, render_state  # noqa: E402
 from sac_env import ROOT, ThunderhillSACEnv, evaluation_starts  # noqa: E402
 
 
-class KevRider:
+class RevRider:
     def __init__(self, url: str, decode: str, pedal_gain: float):
         self.url, self.decode, self.pedal_gain = url.rstrip("/") + "/v1/systemone", decode, pedal_gain
 
     def ask(self, obs) -> dict:
+        # kev.serve answers to its fixed alias whatever checkpoint it loaded; the weights are Rev's.
         body = json.dumps({"model": "kev-latest", "state": render_state(obs), "questions": QUESTIONS}).encode()
         request = urllib.request.Request(self.url, body, {"content-type": "application/json"})
         began = time.perf_counter()
@@ -58,7 +59,7 @@ class KevRider:
         return expected_level(probabilities, levels)
 
 
-def ride(env: ThunderhillSACEnv, rider: KevRider, start: dict, log) -> dict:
+def ride(env: ThunderhillSACEnv, rider: RevRider, start: dict, log) -> dict:
     obs, _ = env.reset(options={"start": start})
     while True:
         response = rider.ask(obs)
@@ -84,8 +85,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--godot", required=True)
     parser.add_argument("--run-name", required=True)
-    parser.add_argument("--runs-dir", type=Path, default=ROOT / "runs/kev")
-    parser.add_argument("--kev-url", default="http://127.0.0.1:8019")
+    parser.add_argument("--runs-dir", type=Path, default=ROOT / "runs/rev")
+    parser.add_argument("--rev-url", default="http://127.0.0.1:8019")
     parser.add_argument("--decode", choices=("mean", "argmax"), default="mean")
     parser.add_argument("--starts", type=int, default=4)
     parser.add_argument("--horizon", type=float, default=240.0)
@@ -95,7 +96,7 @@ def main():
     directory = run_dir / "eval"
     directory.mkdir(parents=True, exist_ok=False)
     (run_dir / "config.json").write_text(json.dumps({k: str(v) for k, v in vars(args).items()}, indent=1) + "\n")
-    rider = KevRider(args.kev_url, args.decode, args.pedal_gain)
+    rider = RevRider(args.rev_url, args.decode, args.pedal_gain)
     starts = evaluation_starts(args.starts)
     envs = [ThunderhillSACEnv(godot=args.godot, data_dir=directory, horizon_s=args.horizon,
                               reward_line="progress", pedal_gain=args.pedal_gain, record_godot=True,
@@ -116,11 +117,11 @@ def main():
     with (directory / "eval.jsonl").open("a") as stream:
         for row in rows:
             recordings = list(directory.glob(f"**/{row['episode_id']}.jsonl"))
-            row.update(policy_step=0, checkpoint=args.kev_url,
+            row.update(policy_step=0, checkpoint=args.rev_url,
                        recording=str(recordings[0].relative_to(run_dir)) if recordings else None)
             stream.write(json.dumps(row) + "\n")
     laps = sorted(row["lap_time_s"] for row in rows if row["termination"] == "lap_completed")
-    print(f"KEV EVAL {args.run_name}: {len(laps)}/{len(rows)} laps {laps} s, "
+    print(f"REV EVAL {args.run_name}: {len(laps)}/{len(rows)} laps {laps} s, "
           f"terminations {[row['termination'] for row in rows]}, {time.monotonic() - began:.0f} s")
 
 

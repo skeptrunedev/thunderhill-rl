@@ -2,11 +2,12 @@
 # requires-python = ">=3.12"
 # dependencies = ["numpy"]
 # ///
-"""SAC rollouts as labelled Kev records: a Jev-style decision model for riding.
+"""SAC rollouts as labelled records for Rev, our Jev-style decision model for riding.
 
-Kev (github.com/jaredpalmer/kev) is a Qwen base with a LoRA and a pointer head that
-answers typed questions about a state with calibrated probabilities. Each record
-here is one control step of the SAC rider (the 64-dim sac_env observation, rendered
+Rev is a Qwen base model with a LoRA and a pointer head, trained from scratch on these
+records with the open-source Kev code (github.com/jaredpalmer/kev); it never starts from
+Kev's weights. It answers typed questions about a state with calibrated probabilities,
+in the TypeSafe System One record format. Each record here is one control step of the SAC rider (the 64-dim sac_env observation, rendered
 as labelled telemetry) with three questions:
 
   steer           choice over 7 levels of the steer action (hard left .. hard right)
@@ -21,11 +22,10 @@ the right edge); lateral offsets and edge positions are positive to the left.
 
 Records come from whole episodes inside consecutive shard blocks, so a label never
 depends on steps outside the loaded rows. Training and held-out records come from
-different runs (Kev's rule: fit the temperature on data from outside the training
-distribution); the held-out run is split in half by episode into calibration and
+different runs (fit the temperature on data from outside the training distribution); the held-out run is split in half by episode into calibration and
 development.
 
-  uv run training/kev_dataset.py --out runs/kev/data-v1
+  uv run training/rev_dataset.py --out runs/rev/data-v1
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ AHEAD = "/".join(str(d) for d in COURSE_DISTANCES_M)
 
 def render_state(obs) -> dict:
     """The sac_env observation vector as labelled telemetry in physical units, short
-    enough for Kev's 384-token training states."""
+    enough for the 384-token training states of the Kev trainer."""
     o = np.asarray(obs, dtype=np.float64)
     course = o[13:53].reshape(len(COURSE_DISTANCES_M), 4) * 50.0  # left fwd, left lat, right fwd, right lat
     ahead = lambda values: " ".join(str(v) for v in values)  # noqa: E731
