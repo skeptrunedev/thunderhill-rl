@@ -74,6 +74,7 @@ for _variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_variable, "1")
 
 import argparse  # noqa: E402
+import collections  # noqa: E402
 import json  # noqa: E402
 import math  # noqa: E402
 import queue  # noqa: E402
@@ -88,6 +89,8 @@ import numpy as np  # noqa: E402
 
 from sac_env import (  # noqa: E402
     DEFAULT_TRACK,
+    MAX_INITIAL_SPEED_M_S,
+    MIN_START_SPEED_M_S,
     OBSERVATION_SIZE,
     ROOT,
     RoadTelemetry,
@@ -242,8 +245,24 @@ def run_actor(index, args, shared: Shared):
     rng = np.random.default_rng([args.seed, index, int(time.time())])
     policy = NumpyPolicy(args.hidden)
     rows, meta = shared.rows[index], shared.meta[index]
+    # --focus-fraction: this actor's recent failure stations per track; a share of its
+    # episodes restart --focus-lead metres before one of them, at 80% of the safe speed.
+    failures = {track: collections.deque(maxlen=64) for track in tracks}
+
+    def reset():
+        spots = failures[tracks[slot]]
+        if spots and args.focus_fraction > 0 and rng.random() < args.focus_fraction:
+            track = env.track
+            station = (spots[int(rng.integers(len(spots)))] - args.focus_lead) % track.length
+            limit = track.speed_limits[min(int(np.searchsorted(track._s, station, side="right") - 1),
+                                           len(track.speed_limits) - 1)]
+            speed = float(np.clip(0.8 * limit, MIN_START_SPEED_M_S, MAX_INITIAL_SPEED_M_S))
+            return env.reset(options={"start": dict(station=round(float(station), 2),
+                                                    speed=round(speed, 2))})
+        return env.reset()
+
     try:
-        obs, _ = env.reset()
+        obs, _ = reset()
         episode = shared.next_episode()
         while not shared.stop.is_set() and os.getppid() == parent:
             # Hold while ahead of the learner's update-to-data ratio or the ring is full.
@@ -273,12 +292,15 @@ def run_actor(index, args, shared: Shared):
                 if args.tracks:
                     summary["track"] = tracks[slot]
                 shared.summaries.put(summary)
+                if summary["termination"] in ("offroad", "fall", "collision"):
+                    failures[tracks[slot]].append(
+                        (summary["start_station_m"] + summary["legal_progress_m"]) % env.track.length)
                 if rotate and time.monotonic() >= switch_at:
                     env.close()
                     slot, rotation = (slot + 1) % len(tracks), rotation + 1
                     env = make_env()
                     switch_at += args.track_dwell
-                obs, _ = env.reset()
+                obs, _ = reset()
                 episode = shared.next_episode()
             else:
                 obs = next_obs
@@ -340,8 +362,9 @@ def run_track_evaluator(args, shared: Shared, requests, results):
     --eval-workers Godots run however many tracks there are."""
     parent = _child_setup(0)
     directory = args.run_dir / "eval"
+    ridden = args.tracks + args.eval_only_tracks
     starts = {track: evaluation_starts(args.eval_starts, Track(RoadTelemetry(track=track)))
-              for track in args.tracks}
+              for track in ridden}
 
     def ride(policy, track):
         env = ThunderhillSACEnv(godot=args.godot, data_dir=directory,
@@ -362,7 +385,8 @@ def run_track_evaluator(args, shared: Shared, requests, results):
                     return None
                 recordings = list(worker_dir.glob(
                     f"**/{info['episode_summary']['episode_id']}.jsonl"))
-                rows.append(dict(info["episode_summary"], track=track, recording=(
+                rows.append(dict(info["episode_summary"], track=track,
+                                 held_out=track in args.eval_only_tracks, recording=(
                     str(recordings[0].relative_to(args.run_dir)) if recordings else None)))
         finally:
             env.close()
@@ -377,7 +401,7 @@ def run_track_evaluator(args, shared: Shared, requests, results):
             began = time.monotonic()
             policy = NumpyPolicy(args.hidden)
             policy.load(flat, update)
-            per_track = list(pool.map(lambda track: ride(policy, track), args.tracks))
+            per_track = list(pool.map(lambda track: ride(policy, track), ridden))
             if None in per_track:
                 return
             rows = [row for track_rows in per_track for row in track_rows]
@@ -701,7 +725,10 @@ class Trainer:
     def collect_track_eval(self, step, update, rows, seconds):
         """Per-track laps, lap times and terminations; aggregates are the laps
         completed out of all evaluation episodes and the median over tracks of
-        this evaluation's best lap relative to that track's best so far."""
+        this evaluation's best lap relative to that track's best so far. Held-out
+        tracks (--eval-only-tracks, never trained on) are reported on their own."""
+        held_out = [r for r in rows if r.get("held_out")]
+        rows = [r for r in rows if not r.get("held_out")]
         values = {"global_step": step, "eval/learner_update": update,
                   "eval/wall_seconds": seconds, "eval/episodes": len(rows),
                   "eval/laps_completed": sum(r["lap_time_s"] is not None for r in rows)}
@@ -736,6 +763,27 @@ class Trainer:
               f"{values.get('eval/median_relative_lap', math.nan):.3f}, {seconds:.0f} s, "
               f"elapsed {time.monotonic() - self.started:.0f} s", flush=True)
         print("\n".join(lines), flush=True)
+        if held_out:
+            lines = []
+            for track in self.args.eval_only_tracks:
+                track_rows = [r for r in held_out if r["track"] == track]
+                laps = [r["lap_time_s"] for r in track_rows if r["lap_time_s"] is not None]
+                values[f"eval_heldout/{track}/laps"] = len(laps)
+                values[f"eval_heldout/{track}/legal_progress_mean_m"] = float(
+                    np.mean([r["legal_progress_m"] for r in track_rows]))
+                if laps:
+                    values[f"eval_heldout/{track}/best_lap_time_s"] = min(laps)
+                lines.append(f"  {track:<16} {len(laps)}/{len(track_rows)} laps  "
+                             f"{min(laps) if laps else math.nan:7.2f} s  progress "
+                             f"{[round(r['legal_progress_m']) for r in track_rows]}  "
+                             f"{','.join(r['termination'] for r in track_rows)}")
+            if self.wandb:
+                self.wandb.log({k: v for k, v in values.items() if k.startswith("eval_heldout/")}
+                               | {"global_step": step})
+            print(f"HELD-OUT EVAL env step {step}: "
+                  f"{sum(r['lap_time_s'] is not None for r in held_out)}/{len(held_out)} laps on "
+                  f"tracks never trained on", flush=True)
+            print("\n".join(lines), flush=True)
 
     def log(self):
         now = time.monotonic()
@@ -857,6 +905,14 @@ def main():
     parser.add_argument("--tracks",
                         help="train on several circuits at once: 'all' (thunderhill-east and "
                         "every circuit with a track.json) or a comma list; overrides --track")
+    parser.add_argument("--eval-only-tracks", default="",
+                        help="with --tracks: comma list of circuits the evaluator also rides but "
+                        "no actor trains on, to measure generalization to unseen tracks")
+    parser.add_argument("--focus-fraction", type=float, default=0.0,
+                        help="share of an actor's episodes that restart before one of its recent "
+                        "failures on that track (offroad, fall, collision)")
+    parser.add_argument("--focus-lead", type=float, default=150.0,
+                        help="metres before a failure station that a focused episode starts")
     parser.add_argument("--track-dwell", type=float, default=900.0,
                         help="with --tracks: seconds an actor stays on a track before moving to "
                         "the next one (a Godot restart); 0 keeps each actor on one track")
@@ -916,6 +972,15 @@ def main():
             if track != DEFAULT_TRACK and track not in known:
                 parser.error(f"Unknown track {track!r}; available: {[DEFAULT_TRACK, *known]}")
             if track != DEFAULT_TRACK and not (circuits / track / "generated" / "imagery.json").exists():
+                parser.error(f"Circuit {track} is not built: uv run tools/build_circuit.py {track}")
+    args.eval_only_tracks = [t.strip() for t in args.eval_only_tracks.split(",") if t.strip()]
+    if args.eval_only_tracks:
+        if not args.tracks:
+            parser.error("--eval-only-tracks needs --tracks")
+        for track in args.eval_only_tracks:
+            if track in args.tracks:
+                parser.error(f"{track} is a training track; --eval-only-tracks must be held out")
+            if not (ROOT / "godot" / "tracks" / track / "generated" / "imagery.json").exists():
                 parser.error(f"Circuit {track} is not built: uv run tools/build_circuit.py {track}")
     run_dir.mkdir(parents=True, exist_ok=True)
     if args.tracks:
