@@ -1,0 +1,21 @@
+{
+ "schema_version": 1,
+ "track_sha256": "c0a10e2a7d1d66ce4e7eec753ba4c6660798ce9547621deceade60421562c769",
+ "sample_count": 1389,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/le-mans.json",
+ "runs": [
+  {
+   "id": "K001",
+   "side": 1,
+   "segments": [
+    296,
+    297,
+    298
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  }
+ ]
+}

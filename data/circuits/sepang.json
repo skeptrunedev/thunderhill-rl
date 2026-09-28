@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "id": "sepang",
+  "version": 1,
+  "name": "Petronas Sepang International Circuit",
+  "country": "Malaysia",
+  "center_lonlat": [
+    101.7375,
+    2.7606
+  ],
+  "crs": "EPSG:32647",
+  "layout": "Full Grand Prix circuit (5.543 km, 15 turns: 10 right, 5 left), clockwise; the back straight and pit straight joined by the Turn 15 hairpin",
+  "direction": "clockwise",
+  "official_length_m": 5543,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/malaysia/d1aedfce-d7c8-4d4a-9532-99c82547baad",
+  "width_m": {
+    "published": 16,
+    "source": "motogp.com 2026 event page (track width 16 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      101.7383513,
+      2.7607601
+    ],
+    "source": "OSM node 1578189278 (name=Start-Finish, raceway=start-finish) on the pit straight; not checked against the painted grid, which 10 m Sentinel-2 imagery cannot show"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 1561055756,
+        "version": 1,
+        "from": 1578228940,
+        "to": 253451621
+      },
+      {
+        "way": 1561055757,
+        "version": 1,
+        "from": 253451621,
+        "to": 253451626
+      },
+      {
+        "way": 1561055758,
+        "version": 1,
+        "from": 253451626,
+        "to": 253451627
+      },
+      {
+        "way": 144359489,
+        "version": 8,
+        "from": 253451627,
+        "to": 1234072647
+      },
+      {
+        "way": 1561055759,
+        "version": 1,
+        "from": 1234072647,
+        "to": 253451641
+      },
+      {
+        "way": 1561055760,
+        "version": 1,
+        "from": 253451641,
+        "to": 1234072896
+      },
+      {
+        "way": 1561055760,
+        "version": 1,
+        "from": 1234072896,
+        "to": 253451644
+      },
+      {
+        "way": 1561055761,
+        "version": 2,
+        "from": 253451644,
+        "to": 253451650
+      },
+      {
+        "way": 1561055762,
+        "version": 1,
+        "from": 253451650,
+        "to": 253451811
+      },
+      {
+        "way": 1561055763,
+        "version": 1,
+        "from": 253451811,
+        "to": 253451831
+      },
+      {
+        "way": 1561055764,
+        "version": 1,
+        "from": 253451831,
+        "to": 1263648550
+      },
+      {
+        "way": 1561055770,
+        "version": 1,
+        "from": 1263648550,
+        "to": 253451910
+      },
+      {
+        "way": 1561055771,
+        "version": 1,
+        "from": 253451910,
+        "to": 1578228687
+      },
+      {
+        "way": 1561055765,
+        "version": 1,
+        "from": 1578228687,
+        "to": 253451937
+      },
+      {
+        "way": 1561055766,
+        "version": 1,
+        "from": 253451937,
+        "to": 1234072435
+      },
+      {
+        "way": 23410503,
+        "version": 19,
+        "from": 1234072435,
+        "to": 1234072526
+      },
+      {
+        "way": 23410503,
+        "version": 19,
+        "from": 1234072526,
+        "to": 253451947
+      },
+      {
+        "way": 1561055768,
+        "version": 1,
+        "from": 253451947,
+        "to": 253451592
+      },
+      {
+        "way": 1561055767,
+        "version": 1,
+        "from": 253451592,
+        "to": 1234072781
+      },
+      {
+        "way": 1561055754,
+        "version": 1,
+        "from": 1234072781,
+        "to": 1578189185
+      },
+      {
+        "way": 1561055755,
+        "version": 1,
+        "from": 1578189185,
+        "to": 1578228808
+      },
+      {
+        "way": 1561055769,
+        "version": 1,
+        "from": 1578228808,
+        "to": 1578228940
+      }
+    ],
+    "snapshot_sha256": "9f1788ff9c9e9f80b29da7916f5f29ef8dca461cdb2f786666fb6729b8eef25e"
+  },
+  "imagery": {
+    "detail": null,
+    "overview": {
+      "name": "Sentinel-2 L2A true colour (TCI), scenes S2C_47NRD_20260815_0_L2A and S2C_47NQD_20260815_0_L2A (2026-08-15, same pass)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/47/N/RD/2026/8/S2C_47NRD_20260815_0_L2A/TCI.tif",
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/47/N/QD/2026/8/S2C_47NQD_20260815_0_L2A/TCI.tif"
+        ]
+      }
+    },
+    "horizon": {
+      "name": "Sentinel-2 L2A true colour (TCI), scenes S2C_47NRD_20260815_0_L2A and S2C_47NQD_20260815_0_L2A (2026-08-15, same pass)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/47/N/RD/2026/8/S2C_47NRD_20260815_0_L2A/TCI.tif",
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/47/N/QD/2026/8/S2C_47NQD_20260815_0_L2A/TCI.tif"
+        ]
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N02_00_E101_00_DEM/Copernicus_DSM_COG_10_N02_00_E101_00_DEM.tif"
+        ]
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N02_00_E101_00_DEM/Copernicus_DSM_COG_10_N02_00_E101_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "9f1788ff9c9e9f80b29da7916f5f29ef8dca461cdb2f786666fb6729b8eef25e",
+    "dem": "3b535dd31ede8b4a94b050e4a090e5baa4c45a6812db03fd5397dc126351e910",
+    "dem_horizon": "755038ca5b238dee3374dbaf70edd818d19435ac4d220d0302b234c5d1393d3b",
+    "imagery_overview": "4f1f258a5a913945deeb83c53681a72d613a49bcdc4b0f70fa45dd9ad95e6700",
+    "imagery_horizon": "7688e1537c60dfdbebb390a738c1ce4ccc8ae3eecf0086b4a5a353e39e99a996"
+  },
+  "layout_source": "https://en.wikipedia.org/wiki/Sepang_International_Circuit",
+  "motogp_round": 19
+}

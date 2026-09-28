@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "id": "le-mans",
+  "version": 1,
+  "name": "Le Mans Bugatti Circuit",
+  "country": "France",
+  "center_lonlat": [
+    0.2107,
+    47.955
+  ],
+  "crs": "EPSG:2154",
+  "layout": "Bugatti Grand Prix circuit as used by MotoGP (the 18 ways of OSM relation 2725877 'Circuit Bugatti'): through the Dunlop chicane and Virage du Garage Vert, not the MotoGP long-lap penalty loop (way 791563023)",
+  "layout_source": "https://www.openstreetmap.org/relation/2725877",
+  "direction": "clockwise",
+  "direction_source": "https://en.wikipedia.org/wiki/List_of_Grand_Prix_motorcycle_circuits",
+  "official_length_m": 4185,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/france/4237f175-c6a4-4d1e-b658-82962baf3fa3",
+  "width_m": {
+    "published": 13,
+    "source": "motogp.com 2026 event page (track width 13 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      0.2075929,
+      47.9511674
+    ],
+    "source": "Start line at the front of the painted grid (transverse white line ahead of the 3-wide grid slots), identified in the IGN BD ORTHO orthophoto; coincides with OSM node 6601036742 (raceway=start)"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 1101935465,
+        "version": 1,
+        "from": 8402998390,
+        "to": 368494
+      },
+      {
+        "way": 1101935466,
+        "version": 1,
+        "from": 368494,
+        "to": 2636347065
+      },
+      {
+        "way": 258242164,
+        "version": 6,
+        "from": 2636347065,
+        "to": 2626846599
+      },
+      {
+        "way": 773623629,
+        "version": 5,
+        "from": 2626846599,
+        "to": 368503
+      },
+      {
+        "way": 773623628,
+        "version": 5,
+        "from": 368503,
+        "to": 368510
+      },
+      {
+        "way": 1101935455,
+        "version": 3,
+        "from": 368510,
+        "to": 1789587477
+      },
+      {
+        "way": 773623626,
+        "version": 2,
+        "from": 1789587477,
+        "to": 10119958
+      },
+      {
+        "way": 773623627,
+        "version": 5,
+        "from": 10119958,
+        "to": 1789587405
+      },
+      {
+        "way": 1101935457,
+        "version": 3,
+        "from": 1789587405,
+        "to": 1789587481
+      },
+      {
+        "way": 1101935456,
+        "version": 2,
+        "from": 1789587481,
+        "to": 2618253276
+      },
+      {
+        "way": 1101935458,
+        "version": 1,
+        "from": 2618253276,
+        "to": 10119940
+      },
+      {
+        "way": 1101935459,
+        "version": 2,
+        "from": 10119940,
+        "to": 603318091
+      },
+      {
+        "way": 1101935460,
+        "version": 1,
+        "from": 603318091,
+        "to": 368529
+      },
+      {
+        "way": 1101935461,
+        "version": 2,
+        "from": 368529,
+        "to": 603318097
+      },
+      {
+        "way": 1101935462,
+        "version": 1,
+        "from": 603318097,
+        "to": 10119927
+      },
+      {
+        "way": 1101935463,
+        "version": 2,
+        "from": 10119927,
+        "to": 368480
+      },
+      {
+        "way": 1101935464,
+        "version": 1,
+        "from": 368480,
+        "to": 2619575028
+      },
+      {
+        "way": 2313153,
+        "version": 34,
+        "from": 2619575028,
+        "to": 10119910
+      },
+      {
+        "way": 1101935465,
+        "version": 1,
+        "from": 10119910,
+        "to": 8402998390
+      }
+    ],
+    "snapshot_sha256": "87a9ea70f78c80d55ee88fc7c05b3616fe41cba39dc75cf0422ebc69b6b95a2e"
+  },
+  "imagery": {
+    "detail": {
+      "name": "IGN BD ORTHO (Geoplateforme WMS layer ORTHOIMAGERY.ORTHOPHOTOS)",
+      "resolution_m": 0.25,
+      "license": "Licence Ouverte / Open Licence Etalab 2.0",
+      "license_url": "https://www.data.gouv.fr/pages/legal/licences/etalab-2.0",
+      "attribution": "IGN - BD ORTHO",
+      "source": {
+        "kind": "wms",
+        "url": "https://data.geopf.fr/wms-r/wms",
+        "layer": "ORTHOIMAGERY.ORTHOPHOTOS",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "IGN BD ORTHO (Geoplateforme WMS layer ORTHOIMAGERY.ORTHOPHOTOS)",
+      "resolution_m": 1.0,
+      "license": "Licence Ouverte / Open Licence Etalab 2.0",
+      "license_url": "https://www.data.gouv.fr/pages/legal/licences/etalab-2.0",
+      "attribution": "IGN - BD ORTHO",
+      "source": {
+        "kind": "wms",
+        "url": "https://data.geopf.fr/wms-r/wms",
+        "layer": "ORTHOIMAGERY.ORTHOPHOTOS",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "IGN BD ORTHO (Geoplateforme WMS layer ORTHOIMAGERY.ORTHOPHOTOS)",
+      "resolution_m": 8.0,
+      "license": "Licence Ouverte / Open Licence Etalab 2.0",
+      "license_url": "https://www.data.gouv.fr/pages/legal/licences/etalab-2.0",
+      "attribution": "IGN - BD ORTHO",
+      "source": {
+        "kind": "wms",
+        "url": "https://data.geopf.fr/wms-r/wms",
+        "layer": "ORTHOIMAGERY.ORTHOPHOTOS",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "IGN MNT LiDAR HD (0.5 m DTM, requested at 1 m)",
+      "resolution_m": 1.0,
+      "license": "Licence Ouverte / Open Licence Etalab 2.0",
+      "license_url": "https://www.data.gouv.fr/pages/legal/licences/etalab-2.0",
+      "attribution": "IGN - MNT LiDAR HD",
+      "source": {
+        "kind": "wms_dem",
+        "url": "https://data.geopf.fr/wms-r/wms",
+        "layer": "IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93",
+        "format": "image/geotiff",
+        "resolution_m": 1.0,
+        "max_pixels": 4000
+      }
+    },
+    "horizon": {
+      "name": "IGN RGE ALTI (1 m DTM, requested at 25 m)",
+      "resolution_m": 25.0,
+      "license": "Licence Ouverte / Open Licence Etalab 2.0",
+      "license_url": "https://www.data.gouv.fr/pages/legal/licences/etalab-2.0",
+      "attribution": "IGN - RGE ALTI",
+      "source": {
+        "kind": "wms_dem",
+        "url": "https://data.geopf.fr/wms-r/wms",
+        "layer": "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES",
+        "format": "image/geotiff",
+        "resolution_m": 25.0
+      }
+    }
+  },
+  "motogp_round": 5,
+  "locks": {
+    "osm_snapshot": "87a9ea70f78c80d55ee88fc7c05b3616fe41cba39dc75cf0422ebc69b6b95a2e",
+    "imagery_detail": "72db2511ba06c9dd16908b7bdd800a1218969a53afefcd63d6224afce57b102a",
+    "dem": "8c912fb0d7a4e477a6b5f4df7d6c5c537bff2da030e9d8e5cb1ac5f7470064df",
+    "dem_horizon": "b9e0c62daafa8618b9d07c0461314b2727089b7822decb572deb707944e64646",
+    "imagery_overview": "f24179c47b5b11d23545544603bfd49a80a3c5f5edcf2f4d3d93ee249d64f687",
+    "imagery_horizon": "9e8eb70072cfce917ec5a4eee2c254d94a595332f5783ef76ead492733e5a37e"
+  }
+}

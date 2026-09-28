@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "id": "phillip-island",
+  "version": 1,
+  "name": "Phillip Island Grand Prix Circuit",
+  "country": "Australia",
+  "motogp_round": 18,
+  "center_lonlat": [
+    145.2364,
+    -38.5031
+  ],
+  "crs": "EPSG:32755",
+  "layout": "Grand Prix circuit (4.448 km, 12 turns), anti-clockwise; the only layout, as used since 1988",
+  "layout_source": "https://en.wikipedia.org/wiki/Phillip_Island_Grand_Prix_Circuit",
+  "direction": "counterclockwise",
+  "direction_source": "https://www.v8sleuth.com.au/phillip-island-was-originally-meant-to-go-the-other-way/ (\"...the Phillip Island Grand Prix Circuit which, for the entirety of its existence, has been and is an anti-clockwise circuit...\")",
+  "official_length_m": 4448,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/australia/66961f05-2454-4455-9d65-f99c49d25b17 (4.45 km; 4.448 km per https://en.wikipedia.org/wiki/Phillip_Island_Grand_Prix_Circuit)",
+  "width_m": {
+    "published": 13,
+    "source": "motogp.com 2026 event page (track width 13 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      145.2316417,
+      -38.5015346
+    ],
+    "source": "Approximate: point on the Gardner Straight level with the middle of the pit lane (OSM way 1436851709), projected onto the OSM circuit line. No open aerial imagery; the 10 m Sentinel-2 imagery cannot show the painted grid, and OSM has no start/finish node here."
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 43598473,
+        "version": 21,
+        "from": 2282886148,
+        "to": 2282886148
+      }
+    ],
+    "snapshot_sha256": "e640ca49835fd8d4039048a0851444a9881681204bb7ec38e41235e20f10912e"
+  },
+  "imagery": {
+    "detail": null,
+    "overview": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2B_55HCT_20260923_0_L2A (2026-09-23, 0.24% cloud), Element84 Earth Search",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/55/H/CT/2026/9/S2B_55HCT_20260923_0_L2A/TCI.tif"
+        ]
+      }
+    },
+    "horizon": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2B_55HCT_20260923_0_L2A (2026-09-23, 0.24% cloud), Element84 Earth Search",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/55/H/CT/2026/9/S2B_55HCT_20260923_0_L2A/TCI.tif"
+        ]
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Geoscience Australia DEM of Australia derived from LiDAR 5 m (DEM_LiDAR_5m_2025)",
+      "resolution_m": 5.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "© Commonwealth of Australia (Geoscience Australia)",
+      "source": {
+        "kind": "wcs10",
+        "url": "https://services.ga.gov.au/gis/services/DEM_LiDAR_5m_2025/MapServer/WCSServer",
+        "coverage": "1",
+        "crs": "EPSG:4283",
+        "native_units_per_pixel": 5e-05,
+        "resolution_m": 5.0,
+        "max_pixels": 1000
+      }
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S39_00_E145_00_DEM/Copernicus_DSM_COG_10_S39_00_E145_00_DEM.tif"
+        ]
+      },
+      "bank_from_dem": false
+    }
+  },
+  "locks": {
+    "osm_snapshot": "e640ca49835fd8d4039048a0851444a9881681204bb7ec38e41235e20f10912e",
+    "dem": "1df61f27033d0d9a167d8bf50cafc920b124d66d2b14241a7deeefc8d61e432e",
+    "dem_horizon": "bc2f30c29371d18656f60479b896a64725bd72864d104354d5af48e8ab48a554",
+    "imagery_overview": "d42b91545f28d9a2aafcaf4ed6eb356a3fea22f3e9b7a12e750b984b33c2a824",
+    "imagery_horizon": "966f942379837b41e7454ed276a58919ee62c98e1781d155061a7fb5705e18e6"
+  }
+}

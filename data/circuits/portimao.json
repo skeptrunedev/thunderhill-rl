@@ -1,0 +1,318 @@
+{
+  "schema_version": 1,
+  "id": "portimao",
+  "version": 1,
+  "name": "Autódromo Internacional do Algarve",
+  "country": "Portugal",
+  "motogp_round": 21,
+  "center_lonlat": [
+    -8.6319,
+    37.2319
+  ],
+  "crs": "EPSG:3763",
+  "layout": "Motorcycle Grand Prix circuit, 4.592 km, 15 turns",
+  "layout_source": "https://www.motogp.com/en/calendar/2026/event/portugal/c7f7626b-807f-4a6f-813e-7ad2c68302a3",
+  "direction": "clockwise",
+  "direction_source": "https://www.24hseries.com/circuits/autodromo-internacional-do-algarve (Circuit direction: Clockwise)",
+  "official_length_m": 4592,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/portugal/c7f7626b-807f-4a6f-813e-7ad2c68302a3",
+  "width_m": {
+    "published": 18,
+    "source": "motogp.com 2026 event page (total width 18 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      -8.6308098,
+      37.2321164
+    ],
+    "source": "provisional"
+  },
+  "imagery": {
+    "detail": {
+      "name": "DGT Ortofotos 25 cm Portugal Continental 2025 (Ortos2025-RGB)",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_source": "https://dados.gov.pt/datasets/ortofotos-25-cm-portugal-continental-2025",
+      "attribution": "Ortofotos 2025: informação geográfica propriedade da Direção-Geral do Território (DGT), CC BY 4.0",
+      "source": {
+        "kind": "wms",
+        "url": "https://cartografia.dgterritorio.gov.pt/wms/ortos2025",
+        "layer": "Ortos2025-RGB",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "DGT Ortofotos 25 cm Portugal Continental 2025 (Ortos2025-RGB)",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_source": "https://dados.gov.pt/datasets/ortofotos-25-cm-portugal-continental-2025",
+      "attribution": "Ortofotos 2025: informação geográfica propriedade da Direção-Geral do Território (DGT), CC BY 4.0",
+      "source": {
+        "kind": "wms",
+        "url": "https://cartografia.dgterritorio.gov.pt/wms/ortos2025",
+        "layer": "Ortos2025-RGB",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "DGT Ortofotos 25 cm Portugal Continental 2025 (Ortos2025-RGB)",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_source": "https://dados.gov.pt/datasets/ortofotos-25-cm-portugal-continental-2025",
+      "attribution": "Ortofotos 2025: informação geográfica propriedade da Direção-Geral do Território (DGT), CC BY 4.0",
+      "source": {
+        "kind": "wms",
+        "url": "https://cartografia.dgterritorio.gov.pt/wms/ortos2025",
+        "layer": "Ortos2025-RGB",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 30.0,
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N37_00_W009_00_DEM/Copernicus_DSM_COG_10_N37_00_W009_00_DEM.tif"
+        ]
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 30.0,
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N37_00_W009_00_DEM/Copernicus_DSM_COG_10_N37_00_W009_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 157736307,
+        "version": 4,
+        "from": 1699903423,
+        "to": 469811442
+      },
+      {
+        "way": 511858151,
+        "version": 4,
+        "from": 469811442,
+        "to": 449345126
+      },
+      {
+        "way": 511858149,
+        "version": 2,
+        "from": 449345126,
+        "to": 469811444
+      },
+      {
+        "way": 511858150,
+        "version": 3,
+        "from": 469811444,
+        "to": 469811446
+      },
+      {
+        "way": 511858549,
+        "version": 2,
+        "from": 469811446,
+        "to": 5006082193
+      },
+      {
+        "way": 363133201,
+        "version": 6,
+        "from": 5006082193,
+        "to": 5006084808
+      },
+      {
+        "way": 511858548,
+        "version": 2,
+        "from": 5006084808,
+        "to": 469811433
+      },
+      {
+        "way": 511858547,
+        "version": 2,
+        "from": 469811433,
+        "to": 449345129
+      },
+      {
+        "way": 363133187,
+        "version": 6,
+        "from": 449345129,
+        "to": 449345131
+      },
+      {
+        "way": 511858546,
+        "version": 2,
+        "from": 449345131,
+        "to": 469811427
+      },
+      {
+        "way": 511859284,
+        "version": 2,
+        "from": 469811427,
+        "to": 1699903153
+      },
+      {
+        "way": 363133194,
+        "version": 6,
+        "from": 1699903153,
+        "to": 469811413
+      },
+      {
+        "way": 511858536,
+        "version": 2,
+        "from": 469811413,
+        "to": 5006084805
+      },
+      {
+        "way": 363133190,
+        "version": 6,
+        "from": 5006084805,
+        "to": 1872423272
+      },
+      {
+        "way": 511858533,
+        "version": 2,
+        "from": 1872423272,
+        "to": 449345135
+      },
+      {
+        "way": 511858543,
+        "version": 3,
+        "from": 449345135,
+        "to": 1699903180
+      },
+      {
+        "way": 511858539,
+        "version": 2,
+        "from": 1699903180,
+        "to": 469811423
+      },
+      {
+        "way": 511859291,
+        "version": 2,
+        "from": 469811423,
+        "to": 1872423265
+      },
+      {
+        "way": 511859290,
+        "version": 2,
+        "from": 1872423265,
+        "to": 5006090689
+      },
+      {
+        "way": 511859289,
+        "version": 2,
+        "from": 5006090689,
+        "to": 1699902760
+      },
+      {
+        "way": 363133193,
+        "version": 5,
+        "from": 1699902760,
+        "to": 449345138
+      },
+      {
+        "way": 511859287,
+        "version": 2,
+        "from": 449345138,
+        "to": 449345139
+      },
+      {
+        "way": 511859288,
+        "version": 2,
+        "from": 449345139,
+        "to": 469811434
+      },
+      {
+        "way": 511859286,
+        "version": 2,
+        "from": 469811434,
+        "to": 1699902756
+      },
+      {
+        "way": 363133197,
+        "version": 5,
+        "from": 1699902756,
+        "to": 469811456
+      },
+      {
+        "way": 511859285,
+        "version": 2,
+        "from": 469811456,
+        "to": 469811438
+      },
+      {
+        "way": 511859282,
+        "version": 2,
+        "from": 469811438,
+        "to": 449345142
+      },
+      {
+        "way": 363133196,
+        "version": 5,
+        "from": 449345142,
+        "to": 1872423291
+      },
+      {
+        "way": 511859283,
+        "version": 2,
+        "from": 1872423291,
+        "to": 1700482807
+      },
+      {
+        "way": 363133198,
+        "version": 4,
+        "from": 1700482807,
+        "to": 469811439
+      },
+      {
+        "way": 363133195,
+        "version": 5,
+        "from": 469811439,
+        "to": 469811440
+      },
+      {
+        "way": 363133199,
+        "version": 8,
+        "from": 469811440,
+        "to": 1700481867
+      },
+      {
+        "way": 511858148,
+        "version": 2,
+        "from": 1700481867,
+        "to": 469811441
+      },
+      {
+        "way": 363133200,
+        "version": 6,
+        "from": 469811441,
+        "to": 1699903423
+      }
+    ]
+  },
+  "status": "blocked",
+  "notes": [
+    "NOT BUILT. The OSM route that matches the official MotoGP map (discover rank 3, full Torre VIP loop) measures 4639.7 m against the official motorcycle lap of 4592 m (+1.04%, over the 1% gate). OSM gives about the 4653 m car layout, and its ways cite a Wikimedia schematic as source; the geometry of the motorcycle variant is not in OSM and could not be verified."
+  ]
+}

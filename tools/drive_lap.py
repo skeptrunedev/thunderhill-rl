@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import bisect
+import hashlib
 from datetime import datetime, timezone
 import json
 import math
@@ -201,6 +202,7 @@ def main() -> None:
                 reason = "recording_verification_failed"
             summary = {"success": success, "reason": reason, "driver": "privileged-path-qa-v1",
                        "track": args.track,
+                       "track_sha256": hashlib.sha256(track_json(args.track).read_bytes()).hexdigest(),
                        "not_training": True, "actions": actions, "sim_time_s": observation["sim_time"],
                        "wall_time_s": time.monotonic() - start, "max_lateral_m": max_lateral,
                        "max_target_speed_m_s": args.max_speed, "recording_audit": audit,

@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "id": "cota",
+  "version": 1,
+  "name": "Circuit of the Americas",
+  "country": "United States",
+  "motogp_round": 3,
+  "center_lonlat": [
+    -97.6411,
+    30.1328
+  ],
+  "crs": "EPSG:32614",
+  "layout": "Full 20-turn Grand Prix circuit (5.51 km), as used by MotoGP and Formula One; not the short National or Club layouts",
+  "layout_source": "https://en.wikipedia.org/wiki/Circuit_of_the_Americas",
+  "direction": "counterclockwise",
+  "direction_source": "https://www.motogp.com/en/calendar/2026/event/americas/8c83648e-8ec9-40f1-9ba0-b0f19883e7d7 (Direction: counter clockwise); https://en.wikipedia.org/wiki/Circuit_of_the_Americas",
+  "official_length_m": 5513,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/americas/8c83648e-8ec9-40f1-9ba0-b0f19883e7d7 (5.51 km; 5.513 km per https://en.wikipedia.org/wiki/Circuit_of_the_Americas)",
+  "width_m": {
+    "published": 15,
+    "source": "motogp.com 2026 event page (track width 15 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      -97.6398438,
+      30.1318809
+    ],
+    "source": "Transverse white line across the main straight at OSM node 7909207460 (raceway=start-finish), located in the USGS NAIP 2022 orthoimage; the painted grid slots are not discernible in the 0.6 m NAIP, so the line is identified from the OSM tag plus the imaged line"
+  },
+  "osm": {
+    "relation": 6537729,
+    "route": [
+      {
+        "way": 118258939,
+        "version": 6,
+        "from": 1330333594,
+        "to": 1330333420
+      },
+      {
+        "way": 118258950,
+        "version": 5,
+        "from": 1330333420,
+        "to": 1330333408
+      },
+      {
+        "way": 118258954,
+        "version": 4,
+        "from": 1330333408,
+        "to": 1330333525
+      },
+      {
+        "way": 118258956,
+        "version": 5,
+        "from": 1330333525,
+        "to": 3801054105
+      },
+      {
+        "way": 514758200,
+        "version": 3,
+        "from": 3801054105,
+        "to": 5028826490
+      },
+      {
+        "way": 514820043,
+        "version": 2,
+        "from": 5028826490,
+        "to": 5028826517
+      },
+      {
+        "way": 514820041,
+        "version": 2,
+        "from": 5028826517,
+        "to": 5028826495
+      },
+      {
+        "way": 118258930,
+        "version": 5,
+        "from": 5028826495,
+        "to": 5028826477
+      },
+      {
+        "way": 118258958,
+        "version": 5,
+        "from": 5028826477,
+        "to": 1330333555
+      },
+      {
+        "way": 118258962,
+        "version": 4,
+        "from": 1330333555,
+        "to": 5028862189
+      },
+      {
+        "way": 118258931,
+        "version": 4,
+        "from": 5028862189,
+        "to": 1330333407
+      },
+      {
+        "way": 118258929,
+        "version": 4,
+        "from": 1330333407,
+        "to": 1330333551
+      },
+      {
+        "way": 118258946,
+        "version": 4,
+        "from": 1330333551,
+        "to": 1330353555
+      },
+      {
+        "way": 118258935,
+        "version": 4,
+        "from": 1330353555,
+        "to": 1330333513
+      },
+      {
+        "way": 118258951,
+        "version": 4,
+        "from": 1330333513,
+        "to": 1330333553
+      },
+      {
+        "way": 118258940,
+        "version": 9,
+        "from": 1330333553,
+        "to": 5028946429
+      },
+      {
+        "way": 118258942,
+        "version": 5,
+        "from": 5028946429,
+        "to": 1330333376
+      },
+      {
+        "way": 118258947,
+        "version": 5,
+        "from": 1330333376,
+        "to": 5028945717
+      },
+      {
+        "way": 118258943,
+        "version": 4,
+        "from": 5028945717,
+        "to": 5028945719
+      },
+      {
+        "way": 118258961,
+        "version": 4,
+        "from": 5028945719,
+        "to": 1330353564
+      },
+      {
+        "way": 118258928,
+        "version": 5,
+        "from": 1330353564,
+        "to": 1330333467
+      },
+      {
+        "way": 514836010,
+        "version": 2,
+        "from": 1330333467,
+        "to": 1330333391
+      },
+      {
+        "way": 118258933,
+        "version": 5,
+        "from": 1330333391,
+        "to": 1330333544
+      },
+      {
+        "way": 118258937,
+        "version": 4,
+        "from": 1330333544,
+        "to": 5028946481
+      },
+      {
+        "way": 118258952,
+        "version": 4,
+        "from": 5028946481,
+        "to": 5028946458
+      },
+      {
+        "way": 514836011,
+        "version": 2,
+        "from": 5028946458,
+        "to": 5028946477
+      },
+      {
+        "way": 118256423,
+        "version": 5,
+        "from": 5028946477,
+        "to": 1330333449
+      },
+      {
+        "way": 118258957,
+        "version": 4,
+        "from": 1330333449,
+        "to": 1330333401
+      },
+      {
+        "way": 118258959,
+        "version": 4,
+        "from": 1330333401,
+        "to": 1330333594
+      }
+    ],
+    "snapshot_sha256": "58f627f3ced9208bc6773a9df51ca451646aba9515f4a12a7410496f5bc02a4c"
+  },
+  "imagery": {
+    "detail": {
+      "name": "USGS NAIP orthoimagery (Texas 2022, 0.6 m)",
+      "resolution_m": 0.5,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "USGS, USDA, The National Map: Orthoimagery (NAIP)",
+      "acquisition": "NAIP tile m_3009751_se_14_060_20220608 (acquired 2022-06-08), from the ImageServer catalog query",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer",
+        "format": "jpg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "USGS NAIP orthoimagery (Texas 2022, 0.6 m)",
+      "resolution_m": 1.0,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "USGS, USDA, The National Map: Orthoimagery (NAIP)",
+      "acquisition": "NAIP tile m_3009751_se_14_060_20220608 (acquired 2022-06-08), from the ImageServer catalog query",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer",
+        "format": "jpg"
+      }
+    },
+    "horizon": {
+      "name": "USGS NAIP orthoimagery (Texas 2022, 0.6 m)",
+      "resolution_m": 8.0,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "USGS, USDA, The National Map: Orthoimagery (NAIP)",
+      "acquisition": "NAIP tile m_3009751_se_14_060_20220608 (acquired 2022-06-08), from the ImageServer catalog query",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer",
+        "format": "jpg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "USGS 3DEP elevation (resampled to 1 m)",
+      "resolution_m": 1.0,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey, 3D Elevation Program",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+        "resolution_m": 1.0,
+        "max_pixels": 2000
+      }
+    },
+    "horizon": {
+      "name": "USGS 3DEP elevation (resampled to 30 m)",
+      "resolution_m": 30.0,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey, 3D Elevation Program",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+        "resolution_m": 30.0,
+        "max_pixels": 2000
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "58f627f3ced9208bc6773a9df51ca451646aba9515f4a12a7410496f5bc02a4c",
+    "imagery_detail": "baf31ab3e9da453358c55640549ff082e4c75e104258f7eb701a3af18268e6ea",
+    "dem": "4f0f7904708e1a4929a51f839b7b0ea6d4eb8db290bc422f5f17b6b36dc4c0b9",
+    "dem_horizon": "9178933cae32cb6faba3e80fddd13a2cc207fdc3efce6b8d32b5b15dd2f0e5c4",
+    "imagery_overview": "3728b72e4be37151f38995bb5e6ca74a2ef94e269893c5b1cb048602f40b27fc",
+    "imagery_horizon": "08f1730ecc4d7abd1ed577703948017a1af8e43bcff324c711372dc77a927592"
+  }
+}

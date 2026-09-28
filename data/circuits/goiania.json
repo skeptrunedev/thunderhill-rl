@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "goiania",
+  "version": 1,
+  "name": "Autódromo Internacional de Goiânia – Ayrton Senna",
+  "country": "Brazil",
+  "center_lonlat": [
+    -49.1922,
+    -16.7181
+  ],
+  "crs": "EPSG:32722",
+  "layout": "Mixed Grand Prix circuit (3.835 km), clockwise, as renovated and resurfaced for MotoGP 2026; not the 2.590 km external or 1.910 km short circuits",
+  "direction": "clockwise",
+  "official_length_m": 3835,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/brasil/11588b5a-f76c-4c8e-ae06-acba82ff1303",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (track width 12 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      -49.1920529,
+      -16.7203372
+    ],
+    "source": "Approximate: middle of the main straight in front of the pit building, located in the Sentinel-2 L2A scene S2A_22KFG_20260920 (10 m); no OSM start/finish tag exists and 10 m imagery cannot show the grid"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 288004307,
+        "version": 8,
+        "from": 2915575893,
+        "to": 2915575850
+      },
+      {
+        "way": 288004307,
+        "version": 8,
+        "from": 2915575850,
+        "to": 2915575294
+      },
+      {
+        "way": 288004311,
+        "version": 7,
+        "from": 2915575294,
+        "to": 2915575854
+      },
+      {
+        "way": 288004311,
+        "version": 7,
+        "from": 2915575854,
+        "to": 2915575855
+      },
+      {
+        "way": 288004311,
+        "version": 7,
+        "from": 2915575855,
+        "to": 2915575893
+      }
+    ],
+    "snapshot_sha256": "4d73cba7b000391cd5f5fd160854e71e216c80860b52633d4af97eb362a7b6fc"
+  },
+  "imagery": {
+    "detail": null,
+    "overview": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2A_22KFG_20260920_0_L2A (2026-09-20)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/22/K/FG/2026/9/S2A_22KFG_20260920_0_L2A/TCI.tif"
+        ]
+      }
+    },
+    "horizon": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2A_22KFG_20260920_0_L2A (2026-09-20)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/22/K/FG/2026/9/S2A_22KFG_20260920_0_L2A/TCI.tif"
+        ]
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S17_00_W050_00_DEM/Copernicus_DSM_COG_10_S17_00_W050_00_DEM.tif"
+        ]
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S17_00_W050_00_DEM/Copernicus_DSM_COG_10_S17_00_W050_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "4d73cba7b000391cd5f5fd160854e71e216c80860b52633d4af97eb362a7b6fc",
+    "dem": "7b7ff50716beb06672858107a9da2830272447da66860e00034266785574edd8",
+    "dem_horizon": "783bb92dc6821e270aa9e9cd4acad27a8416251ab8903b3a802b3a89bc6818b5",
+    "imagery_overview": "7846e3595d2b1c15f219932762d53f9301495103bcc3f21ac6c3b12121b965d9",
+    "imagery_horizon": "b1d3106076e4700d33e6033b860d2b68239affcdb1186ceea2e0eef9215b0a57"
+  },
+  "layout_source": "https://en.wikipedia.org/wiki/Aut%C3%B3dromo_Internacional_Ayrton_Senna_(Goi%C3%A2nia)",
+  "motogp_round": 2
+}

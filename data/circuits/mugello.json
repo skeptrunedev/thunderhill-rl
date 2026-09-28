@@ -1,0 +1,376 @@
+{
+  "schema_version": 1,
+  "id": "mugello",
+  "version": 1,
+  "name": "Autodromo Internazionale del Mugello",
+  "country": "Italy",
+  "motogp_round": 7,
+  "center_lonlat": [
+    11.3719,
+    43.9975
+  ],
+  "crs": "EPSG:25832",
+  "layout": "Grand Prix circuit, 15 turns (9 right, 6 left), 1,141 m main straight",
+  "layout_source": "https://www.motogp.com/en/calendar/2026/event/italy/bf2104f9-f5cc-4a99-a993-cb5d01bccd24",
+  "direction": "clockwise",
+  "official_length_m": 5245,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/italy/bf2104f9-f5cc-4a99-a993-cb5d01bccd24",
+  "width_m": {
+    "published": 14,
+    "source": "motogp.com 2026 event page (track width 14 m)"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 881284147,
+        "version": 4,
+        "from": 8196525392,
+        "to": 5795827922
+      },
+      {
+        "way": 612265004,
+        "version": 4,
+        "from": 5795827922,
+        "to": 5795827867
+      },
+      {
+        "way": 612265001,
+        "version": 3,
+        "from": 5795827867,
+        "to": 5795827872
+      },
+      {
+        "way": 612265013,
+        "version": 5,
+        "from": 5795827872,
+        "to": 270555165
+      },
+      {
+        "way": 612265012,
+        "version": 11,
+        "from": 270555165,
+        "to": 8180642765
+      },
+      {
+        "way": 881284149,
+        "version": 4,
+        "from": 8180642765,
+        "to": 270555168
+      },
+      {
+        "way": 612265010,
+        "version": 4,
+        "from": 270555168,
+        "to": 5795827831
+      },
+      {
+        "way": 612265008,
+        "version": 7,
+        "from": 5795827831,
+        "to": 5795827812
+      },
+      {
+        "way": 612265009,
+        "version": 3,
+        "from": 5795827812,
+        "to": 270555215
+      },
+      {
+        "way": 612265011,
+        "version": 11,
+        "from": 270555215,
+        "to": 270555217
+      },
+      {
+        "way": 612265034,
+        "version": 6,
+        "from": 270555217,
+        "to": 270555273
+      },
+      {
+        "way": 612265032,
+        "version": 9,
+        "from": 270555273,
+        "to": 270555275
+      },
+      {
+        "way": 612265031,
+        "version": 7,
+        "from": 270555275,
+        "to": 270555287
+      },
+      {
+        "way": 881284124,
+        "version": 4,
+        "from": 270555287,
+        "to": 8196503414
+      },
+      {
+        "way": 881284125,
+        "version": 5,
+        "from": 8196503414,
+        "to": 8180642751
+      },
+      {
+        "way": 881284126,
+        "version": 4,
+        "from": 8180642751,
+        "to": 8196524584
+      },
+      {
+        "way": 881284127,
+        "version": 4,
+        "from": 8196524584,
+        "to": 270555296
+      },
+      {
+        "way": 612265029,
+        "version": 8,
+        "from": 270555296,
+        "to": 270555326
+      },
+      {
+        "way": 881284128,
+        "version": 4,
+        "from": 270555326,
+        "to": 8180642744
+      },
+      {
+        "way": 881284130,
+        "version": 4,
+        "from": 8180642744,
+        "to": 8196524756
+      },
+      {
+        "way": 1373584890,
+        "version": 2,
+        "from": 8196524756,
+        "to": 8180642741
+      },
+      {
+        "way": 881284133,
+        "version": 4,
+        "from": 8180642741,
+        "to": 8196524849
+      },
+      {
+        "way": 881284134,
+        "version": 4,
+        "from": 8196524849,
+        "to": 8180642737
+      },
+      {
+        "way": 881284135,
+        "version": 4,
+        "from": 8180642737,
+        "to": 270554882
+      },
+      {
+        "way": 881284136,
+        "version": 4,
+        "from": 270554882,
+        "to": 4332356224
+      },
+      {
+        "way": 612265027,
+        "version": 8,
+        "from": 4332356224,
+        "to": 4332356230
+      },
+      {
+        "way": 881284137,
+        "version": 4,
+        "from": 4332356230,
+        "to": 270554964
+      },
+      {
+        "way": 612265024,
+        "version": 3,
+        "from": 270554964,
+        "to": 270554974
+      },
+      {
+        "way": 881284138,
+        "version": 4,
+        "from": 270554974,
+        "to": 270554977
+      },
+      {
+        "way": 612265023,
+        "version": 7,
+        "from": 270554977,
+        "to": 270554994
+      },
+      {
+        "way": 881284139,
+        "version": 4,
+        "from": 270554994,
+        "to": 8180642723
+      },
+      {
+        "way": 881284140,
+        "version": 4,
+        "from": 8180642723,
+        "to": 270554998
+      },
+      {
+        "way": 612265020,
+        "version": 6,
+        "from": 270554998,
+        "to": 270555015
+      },
+      {
+        "way": 612265021,
+        "version": 9,
+        "from": 270555015,
+        "to": 270555017
+      },
+      {
+        "way": 612265019,
+        "version": 5,
+        "from": 270555017,
+        "to": 4756986598
+      },
+      {
+        "way": 881284142,
+        "version": 4,
+        "from": 4756986598,
+        "to": 8180642781
+      },
+      {
+        "way": 881284143,
+        "version": 4,
+        "from": 8180642781,
+        "to": 8180642778
+      },
+      {
+        "way": 881284144,
+        "version": 4,
+        "from": 8180642778,
+        "to": 270555037
+      },
+      {
+        "way": 612265017,
+        "version": 5,
+        "from": 270555037,
+        "to": 5795827982
+      },
+      {
+        "way": 881284145,
+        "version": 4,
+        "from": 5795827982,
+        "to": 5795827962
+      },
+      {
+        "way": 612265016,
+        "version": 5,
+        "from": 5795827962,
+        "to": 5795827956
+      },
+      {
+        "way": 612265016,
+        "version": 5,
+        "from": 5795827956,
+        "to": 270555098
+      },
+      {
+        "way": 881284146,
+        "version": 4,
+        "from": 270555098,
+        "to": 8196525392
+      }
+    ],
+    "snapshot_sha256": "182b3d0b4a6fe6260b5112d4e1b7919b402ace43b47f1cd02610aea9126126fe"
+  },
+  "start_finish": {
+    "lonlat": [
+      11.3714704,
+      43.9975999
+    ],
+    "source": "Start line: the full-width transverse white line at the front of the painted grid slots on the main straight, identified in the Regione Toscana 2023 orthophoto (the chequered finish line is about 33 m further on, under the bridge)"
+  },
+  "imagery": {
+    "detail": {
+      "name": "Regione Toscana Ortofoto 2023 (OFC 2023, 20 cm)",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Ortofoto 2023 - Fonte dei dati: Regione Toscana - Base Informativa Territoriale regionale, art. 55 della L.R. 65/2014",
+      "source": {
+        "kind": "wms",
+        "url": "https://www502.regione.toscana.it/ows_ofc/com.rt.wms.RTmap/wms?map=owsofc_rt",
+        "layer": "rt_ofc.5k23.32bit",
+        "format": "image/jpeg",
+        "parallel": 4,
+        "margin_px": 32
+      }
+    },
+    "overview": {
+      "name": "Regione Toscana Ortofoto 2023 (OFC 2023, 20 cm)",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Ortofoto 2023 - Fonte dei dati: Regione Toscana - Base Informativa Territoriale regionale, art. 55 della L.R. 65/2014",
+      "source": {
+        "kind": "wms",
+        "url": "https://www502.regione.toscana.it/ows_ofc/com.rt.wms.RTmap/wms?map=owsofc_rt",
+        "layer": "rt_ofc.5k23.32bit",
+        "format": "image/jpeg",
+        "margin_px": 32
+      }
+    },
+    "horizon": {
+      "name": "Regione Toscana Ortofoto 2023 (OFC 2023, 20 cm)",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Ortofoto 2023 - Fonte dei dati: Regione Toscana - Base Informativa Territoriale regionale, art. 55 della L.R. 65/2014",
+      "source": {
+        "kind": "wms",
+        "url": "https://www502.regione.toscana.it/ows_ofc/com.rt.wms.RTmap/wms?map=owsofc_rt",
+        "layer": "rt_ofc.5k23.32bit",
+        "format": "image/jpeg",
+        "margin_px": 32
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Regione Toscana DTM 10 m orografico",
+      "resolution_m": 10.0,
+      "license": "CC BY (Regione Toscana open data, dataset dem10mt)",
+      "license_url": "https://dati.toscana.it/dataset/dem10mt",
+      "attribution": "Altimetria 10 metri, DTM orografico - fonte Regione Toscana - SIPT (da CTR 1:10.000)",
+      "source": {
+        "kind": "wms_dem",
+        "url": "https://www502.regione.toscana.it/wmsraster/com.rt.wms.RTmap/wms?map=wmsmorfologia",
+        "layer": "rt_morfologia.iddtm.10m.rt",
+        "format": "image/tiff",
+        "resolution_m": 10.0
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "Regione Toscana DTM 10 m orografico",
+      "resolution_m": 10.0,
+      "license": "CC BY (Regione Toscana open data, dataset dem10mt)",
+      "license_url": "https://dati.toscana.it/dataset/dem10mt",
+      "attribution": "Altimetria 10 metri, DTM orografico - fonte Regione Toscana - SIPT (da CTR 1:10.000)",
+      "source": {
+        "kind": "wms_dem",
+        "url": "https://www502.regione.toscana.it/wmsraster/com.rt.wms.RTmap/wms?map=wmsmorfologia",
+        "layer": "rt_morfologia.iddtm.10m.rt",
+        "format": "image/tiff",
+        "resolution_m": 10.0
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "182b3d0b4a6fe6260b5112d4e1b7919b402ace43b47f1cd02610aea9126126fe",
+    "imagery_detail": "eb0b5edac73af40cbe565164f8b4c04a99989d6e1af6ec1741f4bb5e7bf9a669",
+    "dem": "072aa2e5188cad1e45920a90d169b6dbe18b8d564b56111fcdb5b49b237611f3",
+    "dem_horizon": "dd70ec44777048f863c943e4183292fd0442a9de0dfbd76a9d7ed05c5581461f",
+    "imagery_overview": "2a653f5e9b1cc8b80f03e689444bc5c54dab99b6a273e40921bf6cf3f2984ed5",
+    "imagery_horizon": "890649f06dc6f0cbe09798ad76be7f72f6e8ccd381726fdeacea74285a661f5f"
+  }
+}

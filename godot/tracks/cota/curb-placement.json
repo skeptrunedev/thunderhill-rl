@@ -1,0 +1,199 @@
+{
+ "schema_version": 1,
+ "track_sha256": "37c1efa1e01ffe3a2f8bc1163035b9104450e83300ac9527eaa25b4e651f6361",
+ "sample_count": 1834,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/cota.json",
+ "runs": [
+  {
+   "id": "K001",
+   "side": 1,
+   "segments": [
+    185,
+    186
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K002",
+   "side": 1,
+   "segments": [
+    275,
+    276,
+    277
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K003",
+   "side": 1,
+   "segments": [
+    426,
+    427
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K004",
+   "side": 1,
+   "segments": [
+    464,
+    465,
+    466,
+    467,
+    468
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K005",
+   "side": 1,
+   "segments": [
+    549,
+    550,
+    551
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K006",
+   "side": 1,
+   "segments": [
+    553,
+    554
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K007",
+   "side": 1,
+   "segments": [
+    773,
+    774
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K008",
+   "side": 1,
+   "segments": [
+    824,
+    825
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K009",
+   "side": 1,
+   "segments": [
+    1332,
+    1333,
+    1334
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K010",
+   "side": 1,
+   "segments": [
+    1663,
+    1664
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K011",
+   "side": 1,
+   "segments": [
+    1671,
+    1672
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K012",
+   "side": 1,
+   "segments": [
+    1693,
+    1694
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K013",
+   "side": -1,
+   "segments": [
+    283,
+    284,
+    285
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K014",
+   "side": -1,
+   "segments": [
+    306,
+    307
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K015",
+   "side": -1,
+   "segments": [
+    369,
+    370
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K016",
+   "side": -1,
+   "segments": [
+    477,
+    478
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K017",
+   "side": -1,
+   "segments": [
+    1063,
+    1064
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K018",
+   "side": -1,
+   "segments": [
+    1277,
+    1278
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K019",
+   "side": -1,
+   "segments": [
+    1386,
+    1387
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K020",
+   "side": -1,
+   "segments": [
+    1458,
+    1459,
+    1460
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  }
+ ]
+}

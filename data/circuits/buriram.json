@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "id": "buriram",
+  "version": 1,
+  "name": "Chang International Circuit",
+  "country": "Thailand",
+  "center_lonlat": [
+    103.085,
+    14.9628
+  ],
+  "crs": "EPSG:32648",
+  "layout": "Full Grand Prix circuit, 12 turns (7 right, 5 left), clockwise; not the 3.126 km D circuit",
+  "direction": "clockwise",
+  "official_length_m": 4554,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/thailand/364a0bd9-d3c2-4ab3-a4cd-211ff469953e",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (track width 12 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      103.0850212,
+      14.9583583
+    ],
+    "source": "Approximate: middle of the pit straight in front of the pit building (garages under the main grandstand, racingcircuits.info), located in the Sentinel-2 L2A scene S2B_48PTB_20260412 (10 m); no OSM start/finish tag exists and 10 m imagery cannot show the grid"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 400713789,
+        "version": 9,
+        "from": 6342647851,
+        "to": 6342647851
+      }
+    ],
+    "snapshot_sha256": "6c3796a2a482357b75c6c058a15c9d676e610e99d7a00e94dd969b1a0e9c9455"
+  },
+  "imagery": {
+    "detail": null,
+    "overview": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2B_48PTB_20260412_0_L2A (2026-04-12)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/48/P/TB/2026/4/S2B_48PTB_20260412_0_L2A/TCI.tif"
+        ]
+      }
+    },
+    "horizon": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2B_48PTB_20260412_0_L2A (2026-04-12)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/48/P/TB/2026/4/S2B_48PTB_20260412_0_L2A/TCI.tif"
+        ]
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N14_00_E103_00_DEM/Copernicus_DSM_COG_10_N14_00_E103_00_DEM.tif",
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N15_00_E103_00_DEM/Copernicus_DSM_COG_10_N15_00_E103_00_DEM.tif"
+        ]
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N14_00_E103_00_DEM/Copernicus_DSM_COG_10_N14_00_E103_00_DEM.tif",
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N15_00_E103_00_DEM/Copernicus_DSM_COG_10_N15_00_E103_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "6c3796a2a482357b75c6c058a15c9d676e610e99d7a00e94dd969b1a0e9c9455",
+    "dem": "bc13c66c15e72bd0ae161b660da5eaebe189b5ced599d5d86eddaa7f10f1b77a",
+    "dem_horizon": "3374f55ad832cf98290d778ae86d9534a63f420eb743e377fb8f1470ad11b462",
+    "imagery_overview": "7c4bbd848ab33da3cefcdd798f489fe2d1314186ef770b80b05f4b79f21b2e0e",
+    "imagery_horizon": "eadc2e127f63d380add4547887cee2951de65314856b843db955a9e963a94691"
+  },
+  "layout_source": "https://en.wikipedia.org/wiki/Chang_International_Circuit",
+  "motogp_round": 1
+}

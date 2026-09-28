@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "id": "balaton-park",
+  "version": 1,
+  "name": "Balaton Park Circuit",
+  "country": "Hungary",
+  "motogp_round": 8,
+  "center_lonlat": [
+    18.1989,
+    47.0081
+  ],
+  "crs": "EPSG:32634",
+  "layout": "Motorcycle Circuit (2025-present), 17 turns (7 right, 10 left): the full circuit with Turns 6-7 converted to two doglegs joined by a straight, a chicane replacing the Turn 11 dogleg, and a tighter final sector (Turns 13-15) away from the walls",
+  "layout_source": "https://en.wikipedia.org/wiki/Balaton_Park_Circuit",
+  "direction": "counterclockwise",
+  "official_length_m": 4075,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/hungria/a37708ab-914c-433f-83d4-e55d1b95ccc3",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (track width 12 m)"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 338856660,
+        "version": 7,
+        "from": 3460113816,
+        "to": 3460113805,
+        "reverse": true
+      },
+      {
+        "way": 1380605559,
+        "version": 2,
+        "from": 3460113805,
+        "to": 12782209730
+      },
+      {
+        "way": 338856660,
+        "version": 7,
+        "from": 12782209730,
+        "to": 12782209728,
+        "reverse": true
+      },
+      {
+        "way": 1380605558,
+        "version": 3,
+        "from": 12782209728,
+        "to": 3460113854
+      },
+      {
+        "way": 338856660,
+        "version": 7,
+        "from": 3460113854,
+        "to": 3460113835,
+        "reverse": true
+      },
+      {
+        "way": 1380605560,
+        "version": 2,
+        "from": 12782209759,
+        "to": 3460113816,
+        "join_coincident_node": true
+      }
+    ],
+    "snapshot_sha256": "3936c0f5adaa1a1b6dd3506f25609cccf4816c54d016f41dd75a3446fe3db52f"
+  },
+  "imagery": {
+    "detail": null,
+    "overview": {
+      "name": "Copernicus Sentinel-2 L2A true colour (S2C_33TYN_20260730_0_L2A)",
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "resolution_m": 10.0,
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/33/T/YN/2026/7/S2C_33TYN_20260730_0_L2A/TCI.tif"
+        ],
+        "resolution_m": 10.0
+      }
+    },
+    "horizon": {
+      "name": "Copernicus Sentinel-2 L2A true colour (S2C_33TYN_20260730_0_L2A)",
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "resolution_m": 10.0,
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/33/T/YN/2026/7/S2C_33TYN_20260730_0_L2A/TCI.tif"
+        ],
+        "resolution_m": 10.0
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 30.0,
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N46_00_E018_00_DEM/Copernicus_DSM_COG_10_N46_00_E018_00_DEM.tif",
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N47_00_E018_00_DEM/Copernicus_DSM_COG_10_N47_00_E018_00_DEM.tif"
+        ]
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 30.0,
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N46_00_E018_00_DEM/Copernicus_DSM_COG_10_N46_00_E018_00_DEM.tif",
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N47_00_E018_00_DEM/Copernicus_DSM_COG_10_N47_00_E018_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "start_finish": {
+    "lonlat": [
+      18.200791,
+      47.0071485
+    ],
+    "source": "Approximate: midpoint of the main straight on OSM way 338856660; OSM has no start/finish node here and 10 m Sentinel-2 imagery cannot show the painted grid"
+  },
+  "notes": [
+    "OSM way 1380605560 starts at node 12782209759, which has exactly the coordinates of ring node 3460113835 but is not connected to it; the route joins them explicitly (join_coincident_node)."
+  ],
+  "locks": {
+    "osm_snapshot": "3936c0f5adaa1a1b6dd3506f25609cccf4816c54d016f41dd75a3446fe3db52f",
+    "dem": "21fd18b939d24604831cfd0e0fc8b0b5e04ef562266a2ac40c19ee512116ec58",
+    "dem_horizon": "8e56bf21b2340b53caa706296436456417b815fc248c9f66223c26e4457a52fa",
+    "imagery_overview": "5b5dda4d46f20b44956bab3c748d2f906dfc0041e14a73f171f9858b8f1840f6",
+    "imagery_horizon": "abbdb6f7fd66dd38c372ad4072b07a67a4ebafc35e545b4d5d734221158e0438"
+  }
+}

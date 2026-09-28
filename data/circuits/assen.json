@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "id": "assen",
+  "version": 1,
+  "name": "TT Circuit Assen",
+  "country": "Netherlands",
+  "center_lonlat": [
+    6.5233,
+    52.9617
+  ],
+  "crs": "EPSG:28992",
+  "layout": "Grand Prix motorcycle course (2010 to date): OSM way 359172905 'TT Circuit' with the Ruskenhoek chicane bypassed by way 146537706, as the bike course diverts to avoid the chicane that is kept for four-wheel events",
+  "layout_source": "https://www.racingcircuits.info/europe/netherlands/tt-circuit-assen.html",
+  "direction": "clockwise",
+  "direction_source": "https://en.wikipedia.org/wiki/List_of_Grand_Prix_motorcycle_circuits",
+  "official_length_m": 4542,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/netherlands/47c25c37-d307-4d45-b1ed-b1cb5e811975 (4.54 km; 4542 m in the MotoGP timing sheets, e.g. https://resources.motogp.com/files/results/2024/NED/MotoGP/SPR/Grid.pdf)",
+  "width_m": {
+    "published": 14,
+    "source": "motogp.com 2026 event page (track width 14 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      6.5241084,
+      52.9623164
+    ],
+    "source": "Start line at the front of the painted grid (transverse white line ahead of the grid slots on the pit straight), identified in the Beeldmateriaal Nederland 2026 ortho (PDOK)"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 359172905,
+        "version": 6,
+        "from": 1598224265,
+        "to": 29838288
+      },
+      {
+        "way": 146537706,
+        "version": 5,
+        "from": 29838288,
+        "to": 1598224265
+      }
+    ],
+    "snapshot_sha256": "a32374561ffde95cdefc9502760f62c28f32211ceb6a0579ebae76493522c2e6"
+  },
+  "imagery": {
+    "detail": {
+      "name": "Beeldmateriaal Nederland luchtfoto 2026 ortho 8 cm RGB (PDOK WMS layer 2026_orthoHR)",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Beeldmateriaal Nederland / PDOK",
+      "source": {
+        "kind": "wms",
+        "url": "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0",
+        "layer": "2026_orthoHR",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "Beeldmateriaal Nederland luchtfoto 2026 ortho 8 cm RGB (PDOK WMS layer 2026_orthoHR)",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Beeldmateriaal Nederland / PDOK",
+      "source": {
+        "kind": "wms",
+        "url": "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0",
+        "layer": "2026_orthoHR",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "Beeldmateriaal Nederland luchtfoto 2026 ortho 8 cm RGB (PDOK WMS layer 2026_orthoHR)",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Beeldmateriaal Nederland / PDOK",
+      "source": {
+        "kind": "wms",
+        "url": "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0",
+        "layer": "2026_orthoHR",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "AHN DTM 0.5 m (PDOK WCS coverage dtm_05m, requested at 1 m)",
+      "resolution_m": 1.0,
+      "license": "CC0 1.0",
+      "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.nl",
+      "attribution": "AHN / PDOK",
+      "source": {
+        "kind": "wcs",
+        "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0",
+        "coverage": "dtm_05m",
+        "format": "image/tiff",
+        "resolution_m": 1.0,
+        "params": {
+          "SCALEFACTOR": "0.5"
+        }
+      }
+    },
+    "horizon": {
+      "name": "AHN DTM 0.5 m (PDOK WCS coverage dtm_05m, requested at 25 m)",
+      "resolution_m": 25.0,
+      "license": "CC0 1.0",
+      "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.nl",
+      "attribution": "AHN / PDOK",
+      "source": {
+        "kind": "wcs",
+        "url": "https://service.pdok.nl/rws/ahn/wcs/v1_0",
+        "coverage": "dtm_05m",
+        "format": "image/tiff",
+        "resolution_m": 25.0,
+        "params": {
+          "SCALEFACTOR": "0.02"
+        }
+      }
+    }
+  },
+  "motogp_round": 10,
+  "locks": {
+    "osm_snapshot": "a32374561ffde95cdefc9502760f62c28f32211ceb6a0579ebae76493522c2e6",
+    "imagery_detail": "a3ee1dc6f9dc260b3b8b25bbd834b9948e548e1f3afdf9582db4e50512b3355b",
+    "dem": "8d25cbff171b1fc815e45c7552d6ce1b5a1cec6bdb83b5b689cb5f00fb6029a0",
+    "dem_horizon": "0b5c5ffa5f220740bcf56e0dba5eae9246fb45f00073efde81ef07a82b7175d0",
+    "imagery_overview": "ae849f1eb4cb883e98088952dc6c6ac57132b79b83ac0389af637a3c489f14a8",
+    "imagery_horizon": "d8c60b1ad8ac6a83e8af8c885e841d1ad3c846a48a524503bd87181046be307a"
+  }
+}

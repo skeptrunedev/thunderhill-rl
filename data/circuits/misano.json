@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "id": "misano",
+  "version": 1,
+  "name": "Misano World Circuit Marco Simoncelli",
+  "country": "San Marino / Italy (Misano Adriatico)",
+  "motogp_round": 14,
+  "center_lonlat": [
+    12.6833,
+    43.9614
+  ],
+  "crs": "EPSG:25832",
+  "layout": "Grand Prix circuit (clockwise since 2007), 16 turns (10 right, 6 left), 530 m longest straight",
+  "layout_source": "https://en.wikipedia.org/wiki/Misano_World_Circuit_Marco_Simoncelli",
+  "direction": "clockwise",
+  "official_length_m": 4226,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/san-marino/537f71f7-25ea-4cb2-a259-70b0da576cc6",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (track width 12 m)"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 624263848,
+        "version": 6,
+        "from": 9129207547,
+        "to": 271641332
+      },
+      {
+        "way": 624263848,
+        "version": 6,
+        "from": 271641332,
+        "to": 271641330
+      },
+      {
+        "way": 1784572,
+        "version": 29,
+        "from": 271641330,
+        "to": 7594466
+      },
+      {
+        "way": 624263852,
+        "version": 7,
+        "from": 7594466,
+        "to": 945402773
+      },
+      {
+        "way": 624263860,
+        "version": 7,
+        "from": 945402773,
+        "to": 2388891197
+      },
+      {
+        "way": 624263860,
+        "version": 7,
+        "from": 2388891197,
+        "to": 7594428
+      },
+      {
+        "way": 624263859,
+        "version": 7,
+        "from": 7594428,
+        "to": 271641454
+      },
+      {
+        "way": 624263858,
+        "version": 6,
+        "from": 271641454,
+        "to": 271641453
+      },
+      {
+        "way": 624263845,
+        "version": 8,
+        "from": 271641453,
+        "to": 7594386
+      },
+      {
+        "way": 624263847,
+        "version": 6,
+        "from": 7594386,
+        "to": 7594380
+      },
+      {
+        "way": 624263844,
+        "version": 7,
+        "from": 7594380,
+        "to": 2389155919
+      },
+      {
+        "way": 624263844,
+        "version": 7,
+        "from": 2389155919,
+        "to": 271641423
+      },
+      {
+        "way": 624263857,
+        "version": 7,
+        "from": 271641423,
+        "to": 271641404
+      },
+      {
+        "way": 624263846,
+        "version": 7,
+        "from": 271641404,
+        "to": 2389155957
+      },
+      {
+        "way": 624263846,
+        "version": 7,
+        "from": 2389155957,
+        "to": 2389197970
+      },
+      {
+        "way": 624263846,
+        "version": 7,
+        "from": 2389197970,
+        "to": 7473413
+      },
+      {
+        "way": 624263856,
+        "version": 4,
+        "from": 7473413,
+        "to": 271641386
+      },
+      {
+        "way": 624263851,
+        "version": 9,
+        "from": 271641386,
+        "to": 2388879936
+      },
+      {
+        "way": 624263855,
+        "version": 9,
+        "from": 2388879936,
+        "to": 2388661665
+      },
+      {
+        "way": 624263855,
+        "version": 9,
+        "from": 2388661665,
+        "to": 2388661667
+      },
+      {
+        "way": 624263855,
+        "version": 9,
+        "from": 2388661667,
+        "to": 2388661587
+      },
+      {
+        "way": 624263855,
+        "version": 9,
+        "from": 2388661587,
+        "to": 271641351
+      },
+      {
+        "way": 624263850,
+        "version": 7,
+        "from": 271641351,
+        "to": 831486867
+      },
+      {
+        "way": 624263854,
+        "version": 8,
+        "from": 831486867,
+        "to": 831487072
+      },
+      {
+        "way": 624263849,
+        "version": 6,
+        "from": 831487072,
+        "to": 831487051
+      },
+      {
+        "way": 624263853,
+        "version": 6,
+        "from": 831487051,
+        "to": 7594555
+      },
+      {
+        "way": 624263848,
+        "version": 6,
+        "from": 7594555,
+        "to": 9129207547
+      }
+    ],
+    "snapshot_sha256": "099853fe88ebc561997f0b78216e01b3952fa0fc73c5356effbf9d4da668aaf0"
+  },
+  "start_finish": {
+    "lonlat": [
+      12.6842498,
+      43.9622656
+    ],
+    "source": "Start line at the front of the painted grid (full-width white line just ahead of the pole slot), identified in the Regione Emilia-Romagna RER 2023-24 orthophoto; about 10 m before OSM node 4503303472 (raceway=start-finish)"
+  },
+  "imagery": {
+    "detail": {
+      "name": "Regione Emilia-Romagna Ortofoto RER 2023-24 RGB (20 cm)",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_source": "https://geoportale.regione.emilia-romagna.it/catalogo/dati-cartografici/cartografia-di-base/immagini/layer-14",
+      "attribution": "Ortofoto RER 2023-24 RGB - Regione Emilia-Romagna, Archivio Cartografico (CC BY 4.0)",
+      "source": {
+        "kind": "wms",
+        "url": "https://servizigis.regione.emilia-romagna.it/wms/rer2023_24_rgb",
+        "layer": "RER2023_24_RGB",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "Regione Emilia-Romagna Ortofoto RER 2023-24 RGB (20 cm)",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_source": "https://geoportale.regione.emilia-romagna.it/catalogo/dati-cartografici/cartografia-di-base/immagini/layer-14",
+      "attribution": "Ortofoto RER 2023-24 RGB - Regione Emilia-Romagna, Archivio Cartografico (CC BY 4.0)",
+      "source": {
+        "kind": "wms",
+        "url": "https://servizigis.regione.emilia-romagna.it/wms/rer2023_24_rgb",
+        "layer": "RER2023_24_RGB",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "Regione Emilia-Romagna Ortofoto RER 2023-24 RGB (20 cm)",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_source": "https://geoportale.regione.emilia-romagna.it/catalogo/dati-cartografici/cartografia-di-base/immagini/layer-14",
+      "attribution": "Ortofoto RER 2023-24 RGB - Regione Emilia-Romagna, Archivio Cartografico (CC BY 4.0)",
+      "source": {
+        "kind": "wms",
+        "url": "https://servizigis.regione.emilia-romagna.it/wms/rer2023_24_rgb",
+        "layer": "RER2023_24_RGB",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Regione Emilia-Romagna DTM 0,5x0,5m RER 2023-24 (LiDAR)",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_source": "https://geoportale.regione.emilia-romagna.it/catalogo/dati-cartografici/altimetria/layer-60",
+      "attribution": "DTM 0,5x0,5m RER 2023-24 - Regione Emilia-Romagna, Archivio Cartografico (CC BY 4.0)",
+      "source": {
+        "kind": "wcs10",
+        "url": "https://servizigis.regione.emilia-romagna.it/wcs/dtmrer2023_24",
+        "coverage": "1",
+        "crs": "EPSG:7791",
+        "resolution_m": 1.0,
+        "max_pixels": 1000
+      }
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 30.0,
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N43_00_E012_00_DEM/Copernicus_DSM_COG_10_N43_00_E012_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "099853fe88ebc561997f0b78216e01b3952fa0fc73c5356effbf9d4da668aaf0",
+    "imagery_detail": "688326c0f0843d8d10c9af4db8f93ec805a4b2dd41ffac97e5ea30d7093b7bd7",
+    "dem": "bcb7e59c6bee340d7028fc903a5d3372fbb305ab9c32d67200f5baa3e3f9413e",
+    "dem_horizon": "c386ab5d24cb9b379cf8622917ab30d694897618e4189ee24717f7b86c374399",
+    "imagery_overview": "244ce8eb4880419b1cd15ac8d6baf9f39638a483c9589d113332a752c4381491",
+    "imagery_horizon": "67ac7889a75950f6f46f9520d18c4eabe4792cef201f2d4109676cd9eb0d9941"
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "id": "red-bull-ring",
+  "version": 1,
+  "name": "Red Bull Ring",
+  "country": "Austria",
+  "center_lonlat": [
+    14.7647,
+    47.2197
+  ],
+  "crs": "EPSG:32633",
+  "layout": "MotoGP layout (2022 to date): Grand Prix circuit with the bike-only chicane after Turn 1 (OSM way 1077423714 'Moto GP chicane'), not the MotoGP long-lap penalty loop (way 823820476)",
+  "layout_source": "https://www.openstreetmap.org/way/1077423714",
+  "direction": "clockwise",
+  "direction_source": "https://en.wikipedia.org/wiki/List_of_Grand_Prix_motorcycle_circuits",
+  "official_length_m": 4348,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/austria/1d659e29-247a-402c-ba1e-33fa14670cbe (4.35 km; 4348 m per https://www.ducati.com/ww/en/racing/motogp/calendar/redbull-ring)",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (track width 12 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      14.7651982,
+      47.2200148
+    ],
+    "source": "Start line at the front of the painted grid (transverse white line ahead of the grid slots), identified in the basemap.at orthophoto; coincides within 0.5 m with OSM node 13826152421 (name=Start Line)"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 1077423714,
+        "version": 2,
+        "from": 9878820888,
+        "to": 9878820897
+      },
+      {
+        "way": 822592404,
+        "version": 3,
+        "from": 9878820897,
+        "to": 2055868066
+      },
+      {
+        "way": 347958266,
+        "version": 9,
+        "from": 2055868066,
+        "to": 2055868013
+      },
+      {
+        "way": 822592398,
+        "version": 5,
+        "from": 2055868013,
+        "to": 981227378
+      },
+      {
+        "way": 822592399,
+        "version": 3,
+        "from": 981227378,
+        "to": 981226095
+      },
+      {
+        "way": 822592400,
+        "version": 2,
+        "from": 981226095,
+        "to": 981227514
+      },
+      {
+        "way": 822592401,
+        "version": 1,
+        "from": 981227514,
+        "to": 2055867950
+      },
+      {
+        "way": 822592402,
+        "version": 1,
+        "from": 2055867950,
+        "to": 981226448
+      },
+      {
+        "way": 822592405,
+        "version": 2,
+        "from": 981226448,
+        "to": 2055868014
+      },
+      {
+        "way": 822592406,
+        "version": 4,
+        "from": 2055868014,
+        "to": 2055868048
+      },
+      {
+        "way": 822592407,
+        "version": 2,
+        "from": 2055868048,
+        "to": 2055867972
+      },
+      {
+        "way": 822592408,
+        "version": 2,
+        "from": 2055867972,
+        "to": 981227210
+      },
+      {
+        "way": 822592409,
+        "version": 1,
+        "from": 981227210,
+        "to": 981227364
+      },
+      {
+        "way": 822592410,
+        "version": 3,
+        "from": 981227364,
+        "to": 7680684139
+      },
+      {
+        "way": 822592403,
+        "version": 1,
+        "from": 7680684139,
+        "to": 981226801
+      },
+      {
+        "way": 822592404,
+        "version": 3,
+        "from": 981226801,
+        "to": 9878820888
+      }
+    ],
+    "snapshot_sha256": "c0d22f8576272dc684b92223a40c6b712fd53f61924916856f38d694fb08e573"
+  },
+  "imagery": {
+    "detail": {
+      "name": "basemap.at Orthofoto (bmaporthofoto30cm, zoom 19)",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Datenquelle: basemap.at",
+      "source": {
+        "kind": "xyz",
+        "url": "https://maps.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg",
+        "zoom": 19,
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "basemap.at Orthofoto (bmaporthofoto30cm, zoom 17)",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Datenquelle: basemap.at",
+      "source": {
+        "kind": "xyz",
+        "url": "https://maps.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg",
+        "zoom": 17
+      }
+    },
+    "horizon": {
+      "name": "basemap.at Orthofoto (bmaporthofoto30cm, zoom 13)",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "Datenquelle: basemap.at",
+      "source": {
+        "kind": "xyz",
+        "url": "https://maps.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg",
+        "zoom": 13
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "BEV ALS DTM Hoehenraster 1 m (tile CRS3035RES50000mN2650000E4650000, Stichtag 15.09.2025)",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "© BEV",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 1.0,
+        "urls": [
+          "https://data.bev.gv.at/download/ALS/DTM/20250915/ALS_DTM_CRS3035RES50000mN2650000E4650000.tif"
+        ]
+      }
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 30.0,
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N47_00_E014_00_DEM/Copernicus_DSM_COG_10_N47_00_E014_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "motogp_round": 15,
+  "locks": {
+    "osm_snapshot": "c0d22f8576272dc684b92223a40c6b712fd53f61924916856f38d694fb08e573",
+    "imagery_detail": "d067233b4616073017765876a28a1d53e73810e7828f9e63e7253cd347d0797b",
+    "dem": "457a825c033fa8b62e5f9cf7154522a64fd579e5dce6795528c27dab29881566",
+    "dem_horizon": "caabc7e739989a37f5bd6713e2828085ac277ddc6d9cd8735a8beca14e634355",
+    "imagery_overview": "f96054186be79cc2cff4f600afd7ab2739227fd6fc23d9a64881b4302ae974c3",
+    "imagery_horizon": "9ee8bbb6597859013716c5918cbf234a3f40763304209c6b2241851944e09b57"
+  }
+}

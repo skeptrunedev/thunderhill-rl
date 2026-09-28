@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "id": "sachsenring",
+  "version": 1,
+  "name": "Sachsenring",
+  "country": "Germany",
+  "center_lonlat": [
+    12.6889,
+    50.7917
+  ],
+  "crs": "EPSG:25833",
+  "layout": "Grand Prix circuit (2003 to date), used by MotoGP: the closed OSM way 31321783 'Sachsenring' (not the pit lane 'Boxengasse', way 34402861)",
+  "layout_source": "https://en.wikipedia.org/wiki/Sachsenring",
+  "direction": "counterclockwise",
+  "direction_source": "https://en.wikipedia.org/wiki/List_of_Grand_Prix_motorcycle_circuits",
+  "official_length_m": 3671,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/germany/259be6f4-c23c-4dc2-bc42-7664842f6409 (3.67 km; 3.671 km per https://en.wikipedia.org/wiki/Sachsenring)",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (track width 12 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      12.688045,
+      50.7917689
+    ],
+    "source": "Start line at the front of the painted grid (transverse white line ahead of the last grid slots, before the start gantry), identified in the GeoSN 20 cm orthophoto"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 31321783,
+        "version": 36,
+        "from": 2383533816,
+        "to": 2383533816
+      }
+    ],
+    "snapshot_sha256": "672954a59d89b4cadba7ad692644b52c2f33aa9f818ad25cf93ce0fc4ef57eb9"
+  },
+  "imagery": {
+    "detail": {
+      "name": "GeoSN digital orthophotos 20 cm (WMS layer sn_dop_020)",
+      "resolution_m": 0.25,
+      "license": "Datenlizenz Deutschland - Namensnennung - Version 2.0 (dl-de/by-2-0)",
+      "license_url": "https://www.govdata.de/dl-de/by-2-0",
+      "attribution": "Quelle: GeoSN, dl-de/by-2-0",
+      "source": {
+        "kind": "wms",
+        "url": "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest",
+        "layer": "sn_dop_020",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "GeoSN digital orthophotos 20 cm (WMS layer sn_dop_020)",
+      "resolution_m": 1.0,
+      "license": "Datenlizenz Deutschland - Namensnennung - Version 2.0 (dl-de/by-2-0)",
+      "license_url": "https://www.govdata.de/dl-de/by-2-0",
+      "attribution": "Quelle: GeoSN, dl-de/by-2-0",
+      "source": {
+        "kind": "wms",
+        "url": "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest",
+        "layer": "sn_dop_020",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "GeoSN digital orthophotos 20 cm (WMS layer sn_dop_020)",
+      "resolution_m": 8.0,
+      "license": "Datenlizenz Deutschland - Namensnennung - Version 2.0 (dl-de/by-2-0)",
+      "license_url": "https://www.govdata.de/dl-de/by-2-0",
+      "attribution": "Quelle: GeoSN, dl-de/by-2-0",
+      "source": {
+        "kind": "wms",
+        "url": "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest",
+        "layer": "sn_dop_020",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "GeoSN DGM1 (1 m DTM, 2 km tile 33336_5628)",
+      "resolution_m": 1.0,
+      "license": "Datenlizenz Deutschland - Namensnennung - Version 2.0 (dl-de/by-2-0)",
+      "license_url": "https://www.govdata.de/dl-de/by-2-0",
+      "attribution": "Quelle: GeoSN, dl-de/by-2-0",
+      "source": {
+        "kind": "zip_geotiff",
+        "crs": "EPSG:25833",
+        "resolution_m": 1.0,
+        "urls": [
+          "https://geocloud.landesvermessung.sachsen.de/public.php/dav/files/JCcXyifaNdLDnxZ/dgm1_33336_5628_2_sn_tiff.zip"
+        ]
+      }
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 30.0,
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N50_00_E012_00_DEM/Copernicus_DSM_COG_10_N50_00_E012_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "motogp_round": 11,
+  "locks": {
+    "osm_snapshot": "672954a59d89b4cadba7ad692644b52c2f33aa9f818ad25cf93ce0fc4ef57eb9",
+    "imagery_detail": "02d0e262d7e05d37b6ef94dc58e5ee45de55322c7467237b39d460cd2f0aaffa",
+    "dem": "c805387e328017b52a356d062c686a5557e1a06866ab683592ba67d5ee8d474e",
+    "dem_horizon": "7a9ae700ce767eb873b0778e939ef59f398397d556850efaaa193dffd6765c15",
+    "imagery_overview": "7eb53513240942e01334ac116881e3601922d178fd7a2b0d692e5de2f72a5f46",
+    "imagery_horizon": "25f923641bf71fb4ac460693dab7cac6406f20f4b76c87e638fab2167ea79dd1"
+  }
+}

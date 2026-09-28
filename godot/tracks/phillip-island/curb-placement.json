@@ -1,0 +1,10 @@
+{
+ "schema_version": 1,
+ "track_sha256": "7415f7d69b624382f89ee1c6f8ca1cdd4bbe7a9052e9cf24e9fd944fd3628d03",
+ "sample_count": 1484,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/phillip-island.json",
+ "runs": []
+}

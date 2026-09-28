@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "id": "brno",
+  "version": 1,
+  "name": "Automotodrom Brno",
+  "country": "Czech Republic",
+  "center_lonlat": [
+    16.4506,
+    49.2047
+  ],
+  "crs": "EPSG:32633",
+  "layout": "Grand Prix circuit (1987 to date), used by MotoGP: OSM way 8585805 'Masarykuv okruh' plus the bridge section way 8585804",
+  "layout_source": "https://en.wikipedia.org/wiki/Brno_Circuit",
+  "direction": "clockwise",
+  "direction_source": "https://en.wikipedia.org/wiki/List_of_Grand_Prix_motorcycle_circuits",
+  "official_length_m": 5403,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/czeck-republiky/c2018c5e-fb82-4058-b359-1b7d9769e703 (5.4 km; 5.403 km per https://en.wikipedia.org/wiki/Brno_Circuit)",
+  "width_m": {
+    "published": 15,
+    "source": "motogp.com 2026 event page (track width 15 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      16.4454505,
+      49.2028522
+    ],
+    "source": "Start line at the front of the painted grid (transverse white line ahead of the faint grid slot marks on the pit straight), identified in the CUZK Ortofoto CR; the grid marks are worn and faint at this resolution"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 8585805,
+        "version": 48,
+        "from": 60945756,
+        "to": 60945758
+      },
+      {
+        "way": 8585804,
+        "version": 7,
+        "from": 60945758,
+        "to": 60945756
+      }
+    ],
+    "snapshot_sha256": "fecfcdf14dae28e1fb00ceb412abafdb4d96bbf4280e0b29a034326d457ec63b"
+  },
+  "imagery": {
+    "detail": {
+      "name": "CUZK Ortofoto CR (WMS ORTOFOTO layer 0)",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "© ČÚZK",
+      "source": {
+        "kind": "wms",
+        "url": "https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer",
+        "layer": "0",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "CUZK Ortofoto CR (WMS ORTOFOTO layer 0)",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "© ČÚZK",
+      "source": {
+        "kind": "wms",
+        "url": "https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer",
+        "layer": "0",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "CUZK Ortofoto CR (WMS ORTOFOTO layer 0)",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "© ČÚZK",
+      "source": {
+        "kind": "wms",
+        "url": "https://ags.cuzk.gov.cz/arcgis1/services/ORTOFOTO/MapServer/WMSServer",
+        "layer": "0",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "CUZK ZABAGED Vyskopis DMR 5G (2 m DTM, ImageServer dmr5g)",
+      "resolution_m": 2.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "© ČÚZK",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://ags.cuzk.gov.cz/arcgis2/rest/services/dmr5g/ImageServer",
+        "resolution_m": 2.0,
+        "max_pixels": 1500
+      }
+    },
+    "horizon": {
+      "name": "CUZK ZABAGED Vyskopis DMR 5G (ImageServer dmr5g, requested at 25 m)",
+      "resolution_m": 25.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "© ČÚZK",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://ags.cuzk.gov.cz/arcgis2/rest/services/dmr5g/ImageServer",
+        "resolution_m": 25.0,
+        "max_pixels": 1500
+      }
+    }
+  },
+  "motogp_round": 9,
+  "locks": {
+    "osm_snapshot": "fecfcdf14dae28e1fb00ceb412abafdb4d96bbf4280e0b29a034326d457ec63b",
+    "imagery_detail": "7694711a60b229d9f9a0d3c5e000fb79429dc482979b8a5aa9b1c9c54f5352af",
+    "dem": "74b0ef6f3f3dc5e78a46003ad24ab95d9db1b3a157b6ee79096fc4cfeb98db16",
+    "dem_horizon": "89bbf62097e771946370600201e4786ff1d3459d18f78403878cdde0bcf009c8",
+    "imagery_overview": "1df7e837b7ee99e2b7fde1932e4e119bd4e8c445274ac48067bb31f968a2b1fa",
+    "imagery_horizon": "c7afd0971af69cc980abc6f2f1c082a3a39ff40fcf74cf06b32dc510bb222223"
+  }
+}

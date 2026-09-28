@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "id": "silverstone",
+  "version": 1,
+  "name": "Silverstone Circuit",
+  "country": "United Kingdom",
+  "motogp_round": 12,
+  "center_lonlat": [
+    -1.016,
+    52.071
+  ],
+  "crs": "EPSG:27700",
+  "layout": "Motorcycle Grand Prix Arena circuit (Wing pits), 18 turns (10 right, 8 left): Abbey, Farm, Village, The Loop, Aintree, Wellington Straight, Brooklands, Luffield, Woodcote, Copse, Maggotts, Becketts, Chapel, Hangar Straight, Stowe, Vale, Club",
+  "layout_source": "https://www.racingcircuits.info/europe/united-kingdom/silverstone.html",
+  "direction": "clockwise",
+  "official_length_m": 5900,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/great-britain/41aa319a-8ec5-49d6-aa99-4e2059c88098",
+  "width_m": {
+    "published": 15,
+    "source": "motogp.com 2026 event page (track width 15 m)"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 55224167,
+        "version": 12,
+        "from": 17660092,
+        "to": 1810132250
+      },
+      {
+        "way": 169854842,
+        "version": 7,
+        "from": 1810132250,
+        "to": 1809612931
+      },
+      {
+        "way": 169800226,
+        "version": 9,
+        "from": 1809612931,
+        "to": 1809612923
+      },
+      {
+        "way": 169800223,
+        "version": 8,
+        "from": 1809612923,
+        "to": 2364624112
+      },
+      {
+        "way": 169800225,
+        "version": 8,
+        "from": 2364624112,
+        "to": 2364624030
+      },
+      {
+        "way": 169848882,
+        "version": 9,
+        "from": 2364624030,
+        "to": 1809612945
+      },
+      {
+        "way": 169800224,
+        "version": 10,
+        "from": 1809612945,
+        "to": 1809612946
+      },
+      {
+        "way": 169800222,
+        "version": 9,
+        "from": 1809612946,
+        "to": 17665503
+      },
+      {
+        "way": 169618242,
+        "version": 12,
+        "from": 17665503,
+        "to": 1807849029
+      },
+      {
+        "way": 169618240,
+        "version": 10,
+        "from": 1807849029,
+        "to": 1807849038
+      },
+      {
+        "way": 169618241,
+        "version": 10,
+        "from": 1807849038,
+        "to": 17660057
+      },
+      {
+        "way": 169618245,
+        "version": 11,
+        "from": 17660057,
+        "to": 2364781940
+      },
+      {
+        "way": 169609611,
+        "version": 11,
+        "from": 2364781940,
+        "to": 1808911949
+      },
+      {
+        "way": 169730588,
+        "version": 10,
+        "from": 1808911949,
+        "to": 1810071377
+      },
+      {
+        "way": 3571477,
+        "version": 16,
+        "from": 1810071377,
+        "to": 1808911995
+      },
+      {
+        "way": 169730585,
+        "version": 11,
+        "from": 1808911995,
+        "to": 17660759
+      },
+      {
+        "way": 169730587,
+        "version": 10,
+        "from": 17660759,
+        "to": 1810084412
+      },
+      {
+        "way": 169733768,
+        "version": 11,
+        "from": 1810084412,
+        "to": 17660174
+      },
+      {
+        "way": 169730586,
+        "version": 14,
+        "from": 17660174,
+        "to": 4291583941
+      },
+      {
+        "way": 430075118,
+        "version": 7,
+        "from": 4291583941,
+        "to": 17660162
+      },
+      {
+        "way": 169733766,
+        "version": 14,
+        "from": 17660162,
+        "to": 1808935963
+      },
+      {
+        "way": 169733769,
+        "version": 11,
+        "from": 1808935963,
+        "to": 1808935944
+      },
+      {
+        "way": 169733770,
+        "version": 11,
+        "from": 1808935944,
+        "to": 17660142
+      },
+      {
+        "way": 169848880,
+        "version": 9,
+        "from": 17660142,
+        "to": 1809013697
+      },
+      {
+        "way": 169848884,
+        "version": 10,
+        "from": 1809013697,
+        "to": 17672096
+      },
+      {
+        "way": 169848881,
+        "version": 8,
+        "from": 17672096,
+        "to": 17660113
+      },
+      {
+        "way": 55224168,
+        "version": 13,
+        "from": 17660113,
+        "to": 17660092
+      }
+    ],
+    "snapshot_sha256": "fc6ca2e5c0a232d77190aa42f1586695a76de3ca76002be43f6b04bb390f909c"
+  },
+  "imagery": {
+    "detail": null,
+    "overview": {
+      "name": "Copernicus Sentinel-2 L2A true colour (S2B_30UXC_20260729_0_L2A)",
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "resolution_m": 10.0,
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/30/U/XC/2026/7/S2B_30UXC_20260729_0_L2A/TCI.tif"
+        ],
+        "resolution_m": 10.0
+      }
+    },
+    "horizon": {
+      "name": "Copernicus Sentinel-2 L2A true colour (S2B_30UXC_20260729_0_L2A)",
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "resolution_m": 10.0,
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/30/U/XC/2026/7/S2B_30UXC_20260729_0_L2A/TCI.tif"
+        ],
+        "resolution_m": 10.0
+      }
+    }
+  },
+  "elevation": {
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "resolution_m": 30.0,
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_W002_00_DEM/Copernicus_DSM_COG_10_N52_00_W002_00_DEM.tif",
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_W001_00_DEM/Copernicus_DSM_COG_10_N52_00_W001_00_DEM.tif"
+        ]
+      }
+    },
+    "detail": {
+      "name": "Environment Agency LIDAR Composite DTM 1m (2022)",
+      "resolution_m": 1.0,
+      "license": "Open Government Licence v3.0",
+      "license_url": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+      "attribution": "© Environment Agency copyright and/or database right 2022. All rights reserved.",
+      "source": {
+        "kind": "wcs",
+        "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wcs",
+        "coverage": "13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m",
+        "axis_x": "E",
+        "axis_y": "N",
+        "resolution_m": 1.0
+      }
+    }
+  },
+  "start_finish": {
+    "lonlat": [
+      -1.0221521,
+      52.0693366
+    ],
+    "source": "APPROXIMATE: OSM node 13036050130 tagged raceway=start/finish on Hamilton Straight (Wing pits); the 10 m Sentinel-2 imagery cannot resolve the painted grid, and whether the MotoGP start line coincides with this node (OSM also has a separate raceway=finish node 13036050131, about 150 m earlier) is unverified"
+  },
+  "locks": {
+    "osm_snapshot": "fc6ca2e5c0a232d77190aa42f1586695a76de3ca76002be43f6b04bb390f909c",
+    "dem": "8912ad9ed1caa0100a53fbefd235d926ce658596677d2075bb65410c8adb82a0",
+    "dem_horizon": "cb69404f58454db39a3b331cb54d37327efe5a60b6cab2dfc81f912f7218d770",
+    "imagery_overview": "3c9fea4ac537d601b27b537a3069112118285426ddce2cb66d33dadf9014971a",
+    "imagery_horizon": "7860cc83054a16c077a095caf054bf4ada2ed0d87372871bf994e1ac9a87be10"
+  }
+}

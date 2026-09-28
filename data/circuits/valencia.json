@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "id": "valencia",
+  "version": 1,
+  "name": "Circuit Ricardo Tormo",
+  "country": "Spain",
+  "motogp_round": 22,
+  "center_lonlat": [
+    -0.6281,
+    39.4858
+  ],
+  "crs": "EPSG:25830",
+  "layout": "Grand Prix circuit used by MotoGP, 4.005 km, 14 turns (not the Formula E or long-lap variants)",
+  "layout_source": "https://www.motogp.com/en/calendar/2026/event/valencia/6ad2859f-51c4-459e-9714-338814e7537f",
+  "direction": "counterclockwise",
+  "direction_source": "https://www.motogp.com/en/calendar/2026/event/valencia/6ad2859f-51c4-459e-9714-338814e7537f (\"running anti-clockwise\")",
+  "official_length_m": 4005,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/valencia/6ad2859f-51c4-459e-9714-338814e7537f",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (total width 12 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      -0.6310646,
+      39.4835437
+    ],
+    "source": "Start line: transverse white line at the front of the painted grid on the pit straight, identified in the PNOA orthophoto"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 51765219,
+        "version": 15,
+        "from": 9290723351,
+        "to": 660611574
+      },
+      {
+        "way": 1007068425,
+        "version": 3,
+        "from": 660611574,
+        "to": 660611555
+      },
+      {
+        "way": 1336518434,
+        "version": 1,
+        "from": 660611555,
+        "to": 9290723351
+      }
+    ],
+    "snapshot_sha256": "694544824e90f41a281aa52ca5756a54099d91f901da99d2483f192de7e5c0a8"
+  },
+  "imagery": {
+    "detail": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "IGN MDT05 (5 m DTM)",
+      "resolution_m": 5.0,
+      "license": "CC BY 4.0",
+      "attribution": "MDT05 cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wcs",
+        "url": "https://servicios.idee.es/wcs-inspire/mdt",
+        "coverage": "Elevacion25830_5",
+        "resolution_m": 5.0
+      },
+      "bank_from_dem": false,
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "horizon": {
+      "name": "IGN MDT25 (25 m DTM)",
+      "resolution_m": 25.0,
+      "license": "CC BY 4.0",
+      "attribution": "MDT25 cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wcs",
+        "url": "https://servicios.idee.es/wcs-inspire/mdt",
+        "coverage": "Elevacion25830_25",
+        "resolution_m": 25.0
+      },
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  },
+  "locks": {
+    "osm_snapshot": "694544824e90f41a281aa52ca5756a54099d91f901da99d2483f192de7e5c0a8",
+    "imagery_detail": "78531be14bb823a07aa39fa5d0e3b838710fd28846c14807162f343383de2539",
+    "dem": "6e7780c988b16fe6af8bf15c038e0620e8c654f2481f7992a88c958355191ab7",
+    "dem_horizon": "b0788fa480f274e7e3469ec439b5103e83f7b2d21a087af8e7a6bb04fc05626e",
+    "imagery_overview": "8bc4c816510dea46216eb616b445a8ccf1a018a4584d7c29ec0bb6f6cc21b165",
+    "imagery_horizon": "cbdbb52b47755c037aed7671471c46d2a32eaa00713ca4acb089a8ac247e914f"
+  }
+}

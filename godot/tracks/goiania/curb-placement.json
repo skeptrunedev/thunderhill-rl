@@ -1,0 +1,10 @@
+{
+ "schema_version": 1,
+ "track_sha256": "7119c6f90c99646eb711c68f8c84800d53d2bf6293f03298a199696810fc8d78",
+ "sample_count": 1275,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/goiania.json",
+ "runs": []
+}

@@ -1,0 +1,10 @@
+{
+ "schema_version": 1,
+ "track_sha256": "bd21d5383669ded5cf4f8aed66f58b9c5628e415f6b32d0e041b3af4b206eabc",
+ "sample_count": 1964,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/silverstone.json",
+ "runs": []
+}

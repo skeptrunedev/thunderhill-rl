@@ -427,7 +427,7 @@ def road_profile(heights: Heights, points, left, width, dem_resolution, bank_fro
         bank_status = "DEM cross slope between the measured edges, median and Gaussian smoothed, clamped to 8 degrees"
     else:
         bank = np.zeros(len(points))
-        bank_status = (f"Zero: the {dem_resolution:g} m DEM cannot resolve cross slope" if bank_from_dem
+        bank_status = (f"Zero: the {dem_resolution:g} m DEM cannot resolve cross slope" if dem_resolution > 5.0
                        else "Zero: the DEM service rounds heights to whole metres, too coarse for cross slope")
     return smooth, bank, {"height_sigma_m": sigma_m, "bank": bank_status,
                           "max_smoothing_change_m": float(np.abs(smooth - centre).max())}
@@ -904,7 +904,9 @@ def source_row(spec: dict | None) -> str:
 def write_docs(output: Path) -> None:
     """Regenerate the per-circuit source and build tables from manifests and track.json."""
     rows, results, details = [], [], []
+    verification = record_verification()
     manifests = [json.loads(p.read_text()) for p in sorted(MANIFESTS.glob("*.json"))]
+    unbuilt = [m["id"] for m in manifests if not (TRACKS / m["id"] / "track.json").exists()]
     incomplete = [m["id"] for m in manifests if not all(m.get(k) for k in ("imagery", "elevation", "osm", "layout"))]
     manifests = [m for m in manifests if m["id"] not in incomplete]
     for m in sorted(manifests, key=lambda m: m.get("motogp_round", 99)):
@@ -922,7 +924,7 @@ def write_docs(output: Path) -> None:
                            f"{meta.get('ground_length_m', 0):.1f} | {100 * meta.get('ground_length_error', meta['length_error']):.2f}% | "
                            f"{m['direction']} | {width['range_m'][0]:.1f} to {width['range_m'][1]:.1f} | "
                            f"{100 * width['valid_fraction']:.0f}% | {meta['curb_runs']} | "
-                           f"{meta['elevation'].get('bank', '')[:40]} |")
+                           f"{meta['elevation'].get('bank', '')[:40]} | {lap_cell(verification.get(m['id']))} |")
         lines = [f"### {m['name']} (`{m['id']}`)", "",
                  f"- Layout: {m['layout']}" + (f" ([source]({m['layout_source']}))" if m.get("layout_source") else ""),
                  f"- Direction: {m['direction']}" + (
@@ -996,13 +998,17 @@ def write_docs(output: Path) -> None:
         *rows,
         "",
         *([f"Manifests still incomplete: {', '.join(incomplete)}.", ""] if incomplete else []),
+        *([f"Not built (see the notes in their provenance sections): {', '.join(unbuilt)}.", ""] if unbuilt else []),
         "## Build results",
         "",
         "Length is the game's projected centerline; ground length removes the projection scale factor",
         "and adds climb. Width is measured across the road in the detail imagery where it exists.",
         "",
-        "| Id | Official m | Game m | Ground m | Ground error | Direction | Width m | Width measured | Kerb runs | Bank |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "Scripted lap: `tools/drive_lap.py --track <id>` (privileged path follower capped at 18 m/s, a",
+        "QA driver, not a racing lap time), recorded in `data/circuit-verification.json`.",
+        "",
+        "| Id | Official m | Game m | Ground m | Ground error | Direction | Width m | Width measured | Kerb runs | Bank | Scripted lap |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         *results,
         "",
         "## Per circuit provenance",
@@ -1013,6 +1019,38 @@ def write_docs(output: Path) -> None:
     output.write_text(text)
     print(output)
     write_attribution(manifests)
+
+
+VERIFICATION = ROOT / "data/circuit-verification.json"
+
+
+def record_verification() -> dict:
+    """Merge the latest drive_lap summaries (artifacts/qa/<id>-lap) into verification.json."""
+    data = json.loads(VERIFICATION.read_text()) if VERIFICATION.exists() else {}
+    for path in sorted((ROOT / "artifacts/qa").glob("*-lap/summary.json")):
+        summary = json.loads(path.read_text())
+        circuit = summary.get("track")
+        track_path = TRACKS / str(circuit) / "track.json"
+        if not circuit or not track_path.exists():
+            continue
+        if summary.get("track_sha256", digest(track_path)) != digest(track_path):
+            continue  # a lap driven on another track.json proves nothing about this one
+        final = summary["final_observation"]
+        data[circuit] = {"track_sha256": digest(track_path), "driver": summary["driver"],
+                         "success": summary["success"], "reason": summary["reason"],
+                         "sim_time_s": round(summary["sim_time_s"], 2),
+                         "legal_distance_m": round(final["track"]["legal_distance"], 1),
+                         "max_lateral_m": round(summary["max_lateral_m"], 2),
+                         "max_target_speed_m_s": summary["max_target_speed_m_s"]}
+    VERIFICATION.write_text(json.dumps(dict(sorted(data.items())), indent=1) + "\n")
+    return data
+
+
+def lap_cell(row: dict | None) -> str:
+    if not row:
+        return "not run"
+    status = "complete, valid" if row["success"] else row["reason"]
+    return f"{status}, {row['sim_time_s']:.1f} s"
 
 
 ATTRIBUTION = ROOT / "godot/assets/ATTRIBUTION.md"

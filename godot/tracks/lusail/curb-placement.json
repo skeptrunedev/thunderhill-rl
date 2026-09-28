@@ -1,0 +1,10 @@
+{
+ "schema_version": 1,
+ "track_sha256": "30bc2ba9be9204ec916b69018e25193aec1bcbc27022c5c5cf9b14db8927b62a",
+ "sample_count": 1806,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/lusail.json",
+ "runs": []
+}

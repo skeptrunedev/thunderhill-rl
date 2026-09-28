@@ -1,0 +1,48 @@
+{
+ "schema_version": 1,
+ "track_sha256": "ed9c704a4f76b5865969f965d7a4f527fc0154a28032673ad81fbce96a902d1a",
+ "sample_count": 1334,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/valencia.json",
+ "runs": [
+  {
+   "id": "K001",
+   "side": -1,
+   "segments": [
+    637,
+    638
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K002",
+   "side": -1,
+   "segments": [
+    659,
+    660
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K003",
+   "side": -1,
+   "segments": [
+    663,
+    664
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K004",
+   "side": -1,
+   "segments": [
+    1203,
+    1204,
+    1205
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  }
+ ]
+}

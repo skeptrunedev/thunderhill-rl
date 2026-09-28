@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "id": "lusail",
+  "version": 1,
+  "name": "Lusail International Circuit",
+  "country": "Qatar",
+  "center_lonlat": [
+    51.4542,
+    25.49
+  ],
+  "crs": "EPSG:32639",
+  "layout": "Motorcycle Grand Prix circuit (5.380 km, 16 turns: 10 right, 6 left), clockwise",
+  "direction": "clockwise",
+  "official_length_m": 5380,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/qatar/3f3d3f5e-851c-42d2-887a-8ce8b41fa908",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (track width 12 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      51.4497373,
+      25.4890496
+    ],
+    "source": "OSM node 14134811030 (raceway=start-finish) on the main straight (way 1553605580); not checked against the painted grid, which 10 m Sentinel-2 imagery cannot show"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 1553605580,
+        "version": 1,
+        "from": 13197413609,
+        "to": 13197221802
+      },
+      {
+        "way": 152483595,
+        "version": 20,
+        "from": 13197221802,
+        "to": 13197413609
+      }
+    ],
+    "snapshot_sha256": "03b81560e6ff4da7f37a8c56817c2ff7146cfc7fdf8afdfec72be7af04791a02"
+  },
+  "imagery": {
+    "detail": null,
+    "overview": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2B_39RWJ_20260925_0_L2A (2026-09-25)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/39/R/WJ/2026/9/S2B_39RWJ_20260925_0_L2A/TCI.tif"
+        ]
+      }
+    },
+    "horizon": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2B_39RWJ_20260925_0_L2A (2026-09-25)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/39/R/WJ/2026/9/S2B_39RWJ_20260925_0_L2A/TCI.tif"
+        ]
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N25_00_E051_00_DEM/Copernicus_DSM_COG_10_N25_00_E051_00_DEM.tif"
+        ]
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N25_00_E051_00_DEM/Copernicus_DSM_COG_10_N25_00_E051_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "03b81560e6ff4da7f37a8c56817c2ff7146cfc7fdf8afdfec72be7af04791a02",
+    "dem": "22736ed51765ad3aebea174aa53467e0341a796ffe1886f97ae4e19fe9ccd9af",
+    "dem_horizon": "2fefead8231804669b9df23e64482fe5f3bbca7bd2b13384a96d2791b144e137",
+    "imagery_overview": "65a1ec92b975ab2bfaa373cbfdbf9da4da59e92f0a4a81724a12331dc3950e57",
+    "imagery_horizon": "4e70fc7d71f3c557195a3a77af51ef5ae47fa3bc7c6c0910b81a91f48abea20a"
+  },
+  "layout_source": "https://en.wikipedia.org/wiki/Lusail_International_Circuit",
+  "motogp_round": 20
+}

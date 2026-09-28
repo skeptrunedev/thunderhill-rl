@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "id": "aragon",
+  "version": 1,
+  "name": "MotorLand Aragón",
+  "country": "Spain",
+  "motogp_round": 13,
+  "center_lonlat": [
+    -0.2075,
+    41.0783
+  ],
+  "crs": "EPSG:25830",
+  "layout": "FIM (motorcycle) Grand Prix circuit, 5.077 km, 17 turns",
+  "layout_source": "https://en.wikipedia.org/wiki/MotorLand_Arag%C3%B3n",
+  "direction": "counterclockwise",
+  "official_length_m": 5077,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/spain/86abdbde-5e3d-45b1-a1f0-f74044a90eb3",
+  "width_m": {
+    "published": 15,
+    "source": "motogp.com 2026 event page (total width 15 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      -0.197808,
+      41.078275
+    ],
+    "source": "Start line: transverse white line at the front of the painted grid (grid slots behind it) on the pit straight, identified in the PNOA orthophoto"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 1418983515,
+        "version": 1,
+        "from": 8039699863,
+        "to": 2385784205
+      },
+      {
+        "way": 1418983515,
+        "version": 1,
+        "from": 2385784205,
+        "to": 1871759684
+      },
+      {
+        "way": 1418983516,
+        "version": 1,
+        "from": 1871759684,
+        "to": 1871759652
+      },
+      {
+        "way": 230261828,
+        "version": 7,
+        "from": 1871759652,
+        "to": 2387658941
+      },
+      {
+        "way": 1418983514,
+        "version": 1,
+        "from": 2387658941,
+        "to": 2387658883
+      },
+      {
+        "way": 1418983513,
+        "version": 1,
+        "from": 2387658883,
+        "to": 1871759790
+      },
+      {
+        "way": 1418983517,
+        "version": 1,
+        "from": 1871759790,
+        "to": 1871759678
+      },
+      {
+        "way": 1418983512,
+        "version": 1,
+        "from": 1871759678,
+        "to": 2387795850
+      },
+      {
+        "way": 1418983512,
+        "version": 1,
+        "from": 2387795850,
+        "to": 1871759733
+      },
+      {
+        "way": 1418983512,
+        "version": 1,
+        "from": 1871759733,
+        "to": 2387795710
+      },
+      {
+        "way": 1418983512,
+        "version": 1,
+        "from": 2387795710,
+        "to": 1871759674
+      },
+      {
+        "way": 1418983512,
+        "version": 1,
+        "from": 1871759674,
+        "to": 2387795852
+      },
+      {
+        "way": 1418983512,
+        "version": 1,
+        "from": 2387795852,
+        "to": 1871759854
+      },
+      {
+        "way": 1418983512,
+        "version": 1,
+        "from": 1871759854,
+        "to": 2387814012
+      },
+      {
+        "way": 1418983512,
+        "version": 1,
+        "from": 2387814012,
+        "to": 2387856990
+      },
+      {
+        "way": 871207237,
+        "version": 3,
+        "from": 2387856990,
+        "to": 2387857049
+      },
+      {
+        "way": 1418982615,
+        "version": 1,
+        "from": 2387857049,
+        "to": 1871759729
+      },
+      {
+        "way": 871207238,
+        "version": 3,
+        "from": 1871759729,
+        "to": 2387857062
+      },
+      {
+        "way": 1418982615,
+        "version": 1,
+        "from": 2387857062,
+        "to": 8039699863
+      }
+    ],
+    "snapshot_sha256": "faff77f83ed36c1c74414b817d4158683f4c821ae3afafe435408e33bcacb528"
+  },
+  "imagery": {
+    "detail": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "IGN MDT05 (5 m DTM)",
+      "resolution_m": 5.0,
+      "license": "CC BY 4.0",
+      "attribution": "MDT05 cedido por (c) Instituto Geografico Nacional de Espana",
+      "source": {
+        "kind": "wcs",
+        "url": "https://servicios.idee.es/wcs-inspire/mdt",
+        "coverage": "Elevacion25830_5",
+        "resolution_m": 5.0
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "IGN MDT25 (25 m DTM)",
+      "resolution_m": 25.0,
+      "license": "CC BY 4.0",
+      "attribution": "MDT25 cedido por (c) Instituto Geografico Nacional de Espana",
+      "source": {
+        "kind": "wcs",
+        "url": "https://servicios.idee.es/wcs-inspire/mdt",
+        "coverage": "Elevacion25830_25",
+        "resolution_m": 25.0
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "faff77f83ed36c1c74414b817d4158683f4c821ae3afafe435408e33bcacb528",
+    "imagery_detail": "23515efa7869842e0b8ecfc741277a410e16514efdb49cd8feea72ef9da31db7",
+    "dem": "aac47278860c3141bcf9a6009a4ec989381eb94b3facc19a9f607ecd888f8f27",
+    "dem_horizon": "b73b6d05764098dae237cd4fbbd52dc821d256d635c512a7d36b8653b62d55ee",
+    "imagery_overview": "db4281c414d335c3df059542732ebe879b0a133e8e85e97f53b3d9a34adbaa62",
+    "imagery_horizon": "788888e80bcc6fa43decef40ebc1dac3c3148cc047aa35a244432643e5b1dec8"
+  },
+  "direction_source": "https://motogp.tech3racing.fr/index.php/pages-gp/grand-prix-of-aragon (\"this anticlockwise circuit\")"
+}

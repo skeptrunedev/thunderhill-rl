@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "id": "mandalika",
+  "version": 1,
+  "name": "Pertamina Mandalika International Circuit",
+  "country": "Indonesia",
+  "center_lonlat": [
+    116.3058,
+    -8.8953
+  ],
+  "crs": "EPSG:32750",
+  "layout": "Grand Prix circuit (4.301 km, 17 corners: 11 right, 6 left), clockwise",
+  "direction": "clockwise",
+  "official_length_m": 4301,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/indonesia/877c27e8-70e0-4847-bacf-2290d7cc903c",
+  "width_m": {
+    "published": 15,
+    "source": "motogp.com 2026 event page (track width 15 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      116.304154,
+      -8.8955314
+    ],
+    "source": "Approximate: middle of the main straight alongside the OSM Mandalika Paddock Building (way 1041715055, the pit building), checked in the Sentinel-2 L2A scene S2A_50LMR_20260925 (10 m); no OSM start/finish tag exists and 10 m imagery cannot show the grid"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 942267289,
+        "version": 7,
+        "from": 8725543510,
+        "to": 8725543510
+      }
+    ],
+    "snapshot_sha256": "b9a60a7c1c434c733324e46a5c40fae43a0668205757eb3394ed209aef89b741"
+  },
+  "imagery": {
+    "detail": null,
+    "overview": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2A_50LMR_20260925_0_L2A (2026-09-25)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/50/L/MR/2026/9/S2A_50LMR_20260925_0_L2A/TCI.tif"
+        ]
+      }
+    },
+    "horizon": {
+      "name": "Sentinel-2 L2A true colour (TCI), scene S2A_50LMR_20260925_0_L2A (2026-09-25)",
+      "resolution_m": 10.0,
+      "license": "Copernicus Sentinel data terms (free, full and open)",
+      "license_url": "https://sentinel.esa.int/documents/247904/690755/Sentinel_Data_Legal_Notice",
+      "attribution": "Contains modified Copernicus Sentinel data 2026",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/50/L/MR/2026/9/S2A_50LMR_20260925_0_L2A/TCI.tif"
+        ]
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S09_00_E116_00_DEM/Copernicus_DSM_COG_10_S09_00_E116_00_DEM.tif"
+        ]
+      },
+      "bank_from_dem": false
+    },
+    "horizon": {
+      "name": "Copernicus DEM GLO-30",
+      "resolution_m": 30.0,
+      "license": "Copernicus DEM licence (free, including commercial use)",
+      "license_url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Copernicus DEM GLO-30 (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA",
+      "source": {
+        "kind": "cog",
+        "urls": [
+          "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S09_00_E116_00_DEM/Copernicus_DSM_COG_10_S09_00_E116_00_DEM.tif"
+        ]
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "b9a60a7c1c434c733324e46a5c40fae43a0668205757eb3394ed209aef89b741",
+    "dem": "f3e52cbc1d178aad5b19b269470e97b197d088da53dbb62eb2d6ea4ea5f92365",
+    "dem_horizon": "15bb03a8de499c1c6d6b7107ed6a839daf9f1ceca0c1389e7b776ed55597a9c3",
+    "imagery_overview": "df59d48f275e7db29e0f916e565946f6bd1c39d8507cf73734786553c95193a7",
+    "imagery_horizon": "3902872f304e400bf8630fae37d3700c6481326396a552c78bd2881405512de6"
+  },
+  "layout_source": "https://en.wikipedia.org/wiki/Mandalika_International_Street_Circuit",
+  "motogp_round": 17
+}

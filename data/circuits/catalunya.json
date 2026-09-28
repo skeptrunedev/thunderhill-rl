@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "id": "catalunya",
+  "version": 1,
+  "name": "Circuit de Barcelona-Catalunya",
+  "country": "Spain",
+  "motogp_round": 6,
+  "center_lonlat": [
+    2.2611,
+    41.57
+  ],
+  "crs": "EPSG:25831",
+  "layout": "Motorcycle Grand Prix circuit (2021-present): Grand Prix circuit without the final chicane, with the Turn 10 hairpin, 14 turns",
+  "layout_source": "https://en.wikipedia.org/wiki/Circuit_de_Barcelona-Catalunya",
+  "direction": "clockwise",
+  "direction_source": "https://www.24hseries.com/circuits/circuit-de-barcelona-catalunya (Circuit direction: Clockwise)",
+  "official_length_m": 4657,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/catalunya/200bf59d-3db2-4e17-a903-4be204fa3496",
+  "width_m": {
+    "published": 12,
+    "source": "motogp.com 2026 event page (total width 12 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      2.2612105,
+      41.5700194
+    ],
+    "source": "Start line: transverse white line at the front of the painted grid on the pit straight, identified in the PNOA orthophoto; coincides with OSM node 385973430 (raceway=start) of relation 21420925"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 831804327,
+        "version": 13,
+        "from": 1300807861,
+        "to": 1644327603
+      },
+      {
+        "way": 1560896065,
+        "version": 1,
+        "from": 1644327603,
+        "to": 9760170477
+      },
+      {
+        "way": 1560896066,
+        "version": 1,
+        "from": 9760170477,
+        "to": 7765791210
+      },
+      {
+        "way": 1560896061,
+        "version": 1,
+        "from": 7765791210,
+        "to": 385973423
+      },
+      {
+        "way": 893732520,
+        "version": 4,
+        "from": 385973423,
+        "to": 8553774009
+      },
+      {
+        "way": 831804325,
+        "version": 6,
+        "from": 8553774009,
+        "to": 7765791228
+      },
+      {
+        "way": 990483278,
+        "version": 3,
+        "from": 7765791228,
+        "to": 1300807861
+      }
+    ],
+    "snapshot_sha256": "8946d25db110e47bde854371cd13c1dd3e27f685652639fad830e24f1a0d95db"
+  },
+  "imagery": {
+    "detail": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "IGN MDT05 (5 m DTM)",
+      "resolution_m": 5.0,
+      "license": "CC BY 4.0",
+      "attribution": "MDT05 cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wcs",
+        "url": "https://servicios.idee.es/wcs-inspire/mdt",
+        "coverage": "Elevacion25830_5",
+        "resolution_m": 5.0,
+        "crs": "EPSG:25830"
+      },
+      "bank_from_dem": false,
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "horizon": {
+      "name": "IGN MDT25 (25 m DTM)",
+      "resolution_m": 25.0,
+      "license": "CC BY 4.0",
+      "attribution": "MDT25 cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
+      "source": {
+        "kind": "wcs",
+        "url": "https://servicios.idee.es/wcs-inspire/mdt",
+        "coverage": "Elevacion25830_25",
+        "resolution_m": 25.0,
+        "crs": "EPSG:25830"
+      },
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  },
+  "layout_osm_relation": "https://www.openstreetmap.org/relation/21420925",
+  "locks": {
+    "osm_snapshot": "8946d25db110e47bde854371cd13c1dd3e27f685652639fad830e24f1a0d95db",
+    "imagery_detail": "95e2c59753d24f0e944b0e5d13e5523e360c500efeae96abaa381ae9ee50328e",
+    "dem": "bce3408dcc9d3b163b555919516102453e1c1db14130579866c1cdd34bdd22b9",
+    "dem_horizon": "52fe9053f2149f10d7fc3717bfa4f3a2f2bc65e307fcb1ef34f5dff161e570a5",
+    "imagery_overview": "109a6c16f285b4d8311999175bed064653556ea28bb32978b5267941c0ec5d56",
+    "imagery_horizon": "7a66a4bbf7099c152742b7804157aae4eeb01fd78a7f0ebf64cb881ce859c84f"
+  }
+}
