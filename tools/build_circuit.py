@@ -125,13 +125,21 @@ def route_nodes(manifest: dict, elements: dict) -> tuple[list[dict], list]:
         way = elements[("way", part["way"])]
         ids = way["nodes"]
         chain = way_chain(part, ids)
-        if ordered and ordered[-1]["id"] != chain[0]:
-            raise SystemExit(f"Route break before way {part['way']}: {ordered[-1]['id']} to {chain[0]}")
         nodes = [elements[("node", n)] for n in chain]
+        if ordered and ordered[-1]["id"] != chain[0]:
+            # OSM sometimes leaves two unconnected nodes at one position where a way
+            # was drawn to meet another. The manifest must say so explicitly, and the
+            # coordinates must be exactly equal; any gap at all is a route break.
+            same_place = (ordered[-1]["lon"], ordered[-1]["lat"]) == (nodes[0]["lon"], nodes[0]["lat"])
+            if not (part.get("join_coincident_node") and same_place):
+                raise SystemExit(f"Route break before way {part['way']}: {ordered[-1]['id']} to {chain[0]}")
         ordered.extend(nodes[1:] if ordered else nodes)
         snapshot.append([part["way"], way["version"],
                          [[n["id"], n["version"], n["lon"], n["lat"]] for n in nodes]])
-    if ordered[0]["id"] != ordered[-1]["id"]:
+    closes = ordered[0]["id"] == ordered[-1]["id"] or (
+        manifest["osm"]["route"][0].get("join_coincident_node")
+        and (ordered[0]["lon"], ordered[0]["lat"]) == (ordered[-1]["lon"], ordered[-1]["lat"]))
+    if not closes:
         raise SystemExit("Route is not closed")
     return ordered[:-1], snapshot
 

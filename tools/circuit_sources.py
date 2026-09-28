@@ -222,11 +222,18 @@ def imagery_tile(spec: dict, product: Product, crs: str, bounds, pixels: int, ke
         return np.clip(np.round(np.moveaxis(out[:3], 0, -1) * spec.get("scale", 1.0)), 0, 255).astype(np.uint8)
     src_crs = spec.get("crs", crs)
     if src_crs == crs:
-        raw = product.get(key, _native_request(spec, crs, bounds, pixels, pixels), suffix=".img", expect=("image/",))
+        # "margin_px" widens the request on the left and bottom (same pixel size) and
+        # crops back to the tile: services that overlay a fixed notice in a corner of
+        # every rendered image (Regione Toscana's source line, bottom left) then place
+        # it outside the tile. The attribution is carried in the manifest instead.
+        margin = spec.get("margin_px", 0)
+        request = (bounds[0] - margin * resolution, bounds[1] - margin * resolution, bounds[2], bounds[3])
+        size = pixels + margin
+        raw = product.get(key, _native_request(spec, crs, request, size, size), suffix=".img", expect=("image/",))
         image = decode_image(raw)
-        if image.shape[:2] != (pixels, pixels):
+        if image.shape[:2] != (size, size):
             raise RuntimeError(f"{kind} returned {image.shape} for {key}")
-        return image
+        return image[:pixels, margin:]
     box = _source_box(crs, src_crs, bounds, 8 * resolution)
     native = spec.get("native_units_per_pixel")
     scale = native if native else resolution
