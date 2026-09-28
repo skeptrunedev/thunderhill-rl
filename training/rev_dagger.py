@@ -15,7 +15,11 @@ that modal_rev.py trains with):
 Every round's evaluation goes to runs/rev/dagger/rounds.jsonl, and best.json names the
 best Rev so far (most completed laps, then fastest lap).
 
-  uv run training/rev_dagger.py --godot GODOT --start rev-0.8b-v1 --rounds 8
+Rerunning the same command resumes: each stage whose output is complete is skipped and a
+half-written one is removed and redone, so a supervisor can restart it after any
+failure. No new round starts after --until.
+
+  uv run training/rev_dagger.py --godot GODOT --start rev-0.8b-v1 --rounds 20 --until 2026-09-28T07:00
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import signal
 import subprocess
 import time
@@ -69,6 +74,15 @@ class Server:
         self.stream.close()
 
 
+def done(path: Path, marker: str) -> bool:
+    """True when a stage's output is complete; a partial directory is removed for a redo."""
+    if (path / marker).exists():
+        return True
+    if path.exists():
+        shutil.rmtree(path)
+    return False
+
+
 def evaluation(ride_dir: Path) -> dict:
     rows = [json.loads(line) for line in (ride_dir / "eval/eval.jsonl").open()]
     laps = sorted(r["lap_time_s"] for r in rows if r["termination"] == "lap_completed")
@@ -100,44 +114,59 @@ def main():
     parser.add_argument("--port", type=int, default=8019)
     parser.add_argument("--out", type=Path, default=ROOT / "runs/rev/dagger")
     parser.add_argument("--teacher", type=Path, default=TEACHER)
+    parser.add_argument("--until", help="local time (YYYY-MM-DDTHH:MM) after which no new round starts")
     args = parser.parse_args()
+    deadline = time.mktime(time.strptime(args.until, "%Y-%m-%dT%H:%M")) if args.until else None
     args.out.mkdir(parents=True, exist_ok=True)
     log = args.out / "rev_dagger.log"
     betas = [float(b) for b in args.betas.split(",")]
     best_path = args.out / "best.json"
     best = json.loads(best_path.read_text()) if best_path.exists() else None
+    evaluated = {json.loads(line)["rev"] for line in (args.out / "rounds.jsonl").open()} \
+        if (args.out / "rounds.jsonl").exists() else set()
+    runs_dir = ROOT / "runs/rev"
     current, collections = args.start, []
     for k in range(args.rounds + 1):
-        checkpoint = ROOT / "runs/rev" / current / "checkpoint"
         beta = betas[min(k, len(betas) - 1)]
-        with Server(checkpoint, args.port, log):
-            ride = f"{current}-eval"
-            run(["uv", "run", "training/rev_drive.py", "--godot", args.godot, "--run-name", ride,
-                 "--rev-url", f"http://127.0.0.1:{args.port}"], log)
-            result = {"round": k, "rev": current, **evaluation(ROOT / "runs/rev" / ride),
-                      "ride": f"runs/rev/{ride}", "time": time.strftime("%Y-%m-%dT%H:%M:%S")}
-            with (args.out / "rounds.jsonl").open("a") as stream:
-                stream.write(json.dumps(result) + "\n")
-            if better(result, best):
-                best = result
-                best_path.write_text(json.dumps(best, indent=1) + "\n")
-            print(f"REV ROUND {k} {current}: {result['laps']}/4 laps {result['lap_times']} "
-                  f"progress {result['progress_m']} {result['terminations']} | best {best['rev']} "
-                  f"{best['laps']} laps {best['best_lap_s']}", flush=True)
-            if k == args.rounds:
-                break
-            collection = f"collect-r{k + 1}"
-            run(["uv", "run", "training/rev_drive.py", "--godot", args.godot, "--run-name", collection,
-                 "--rev-url", f"http://127.0.0.1:{args.port}", "--collect", args.collect_episodes,
-                 "--workers", args.workers, "--horizon", 60, "--beta", beta, "--teacher", args.teacher,
-                 "--seed", k + 1], log)
-        collections.append(ROOT / "runs/rev" / collection)
-        data = ROOT / f"runs/rev/data-r{k + 1}"
-        run(["uv", "run", "training/rev_dataset.py", "--teacher", args.teacher, "--dagger", *collections,
-             "--max-train-records", args.max_train_records, "--seed", k + 1, "--out", data], log)
+        ride, collection = f"{current}-eval", f"collect-r{k + 1}"
+        last = k == args.rounds or (deadline is not None and time.time() > deadline)
+        need_eval = current not in evaluated
+        need_collect = not last and not done(runs_dir / collection, "episodes.jsonl")
+        if need_eval or need_collect:
+            with Server(runs_dir / current / "checkpoint", args.port, log):
+                if need_eval:
+                    if not done(runs_dir / ride, "eval/eval.jsonl"):
+                        run(["uv", "run", "training/rev_drive.py", "--godot", args.godot, "--run-name", ride,
+                             "--rev-url", f"http://127.0.0.1:{args.port}"], log)
+                    result = {"round": k, "rev": current, **evaluation(runs_dir / ride),
+                              "ride": f"runs/rev/{ride}", "time": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                    with (args.out / "rounds.jsonl").open("a") as stream:
+                        stream.write(json.dumps(result) + "\n")
+                    evaluated.add(current)
+                    if better(result, best):
+                        best = result
+                        best_path.write_text(json.dumps(best, indent=1) + "\n")
+                    print(f"REV ROUND {k} {current}: {result['laps']}/4 laps {result['lap_times']} "
+                          f"progress {result['progress_m']} {result['terminations']} | best {best['rev']} "
+                          f"{best['laps']} laps {best['best_lap_s']}", flush=True)
+                if need_collect:
+                    run(["uv", "run", "training/rev_drive.py", "--godot", args.godot, "--run-name", collection,
+                         "--rev-url", f"http://127.0.0.1:{args.port}", "--collect", args.collect_episodes,
+                         "--workers", args.workers, "--horizon", 60, "--beta", beta, "--teacher", args.teacher,
+                         "--seed", k + 1], log)
+        if last:
+            print(f"REV DAGGER DONE after round {k}; best {best['rev']} {best['laps']} laps {best['best_lap_s']}",
+                  flush=True)
+            break
+        collections.append(runs_dir / collection)
+        data = runs_dir / f"data-r{k + 1}"
+        if not done(data, "summary.json"):
+            run(["uv", "run", "training/rev_dataset.py", "--teacher", args.teacher, "--dagger", *collections,
+                 "--max-train-records", args.max_train_records, "--seed", k + 1, "--out", data], log)
         name = f"{args.start.rsplit('-v', 1)[0]}-r{k + 1}"
-        run(["uvx", "--from", "modal==1.5.5", "modal", "run", "training/modal_rev.py::train", "--data", data,
-             "--name", name, "--init-from", current, "--epochs", 1, "--lr", args.lr], log)
+        if not done(runs_dir / name, "result.json"):
+            run(["uvx", "--from", "modal==1.5.5", "modal", "run", "training/modal_rev.py::train", "--data", data,
+                 "--name", name, "--init-from", current, "--epochs", 1, "--lr", args.lr], log)
         current = name
 
 

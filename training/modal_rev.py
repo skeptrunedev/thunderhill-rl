@@ -74,8 +74,11 @@ def train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_
     from kev.predictors import LocalPredictor
 
     out = Path(RUNS) / name
-    if out.exists():
-        raise FileExistsError(f"/runs/{name} exists; choose a new name")
+    if (out / "result.json").exists():
+        raise FileExistsError(f"/runs/{name} is a finished run; choose a new name")
+    if out.exists():  # an attempt that died before scoring: start it over
+        import shutil
+        shutil.rmtree(out)
     (out / "data").mkdir(parents=True)
     for part, text in data.items():
         (out / "data" / f"{part}.jsonl").write_text(text)
