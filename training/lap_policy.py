@@ -36,6 +36,15 @@ def track_json(track: str = DEFAULT_TRACK) -> Path:
     return path
 
 
+def held_out(track: str) -> bool:
+    """Held-out test tracks (track.json metadata purpose "held-out ...") exist to measure
+    generalization and must never be trained on; evaluation may still ride them."""
+    if track == DEFAULT_TRACK:
+        return False
+    metadata = json.loads(track_json(track).read_text()).get("metadata", {})
+    return str(metadata.get("purpose", "")).startswith("held-out")
+
+
 class RoadTelemetry:
     def __init__(self, track_path: Path | None = None, *, track: str = DEFAULT_TRACK):
         if track_path is not None and track != DEFAULT_TRACK:

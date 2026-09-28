@@ -529,16 +529,22 @@ def build(circuit: str, update_lock: bool) -> None:
     horizontal = np.linalg.norm(np.roll(points, -1, axis=0) - points, axis=1)
     climb = np.roll(heights, -1) - heights
     ground_length = float(np.sum(np.hypot(horizontal / scale, climb)))
-    error = abs(length - official) / official
-    ground_error = abs(ground_length - official) / official
-    report = {"circuit": circuit, "official_length_m": official, "computed_length_m": round(length, 3),
+    # A manifest may declare that the built layout is not the official one (a held-out
+    # test track built from the layout OSM holds). The 1% gate then checks the length
+    # of that declared layout, which must itself cite a published source.
+    reference = manifest.get("length_reference")
+    gate = float(reference["length_m"]) if reference else float(official)
+    error = abs(length - gate) / gate
+    ground_error = abs(ground_length - gate) / gate
+    report = {"circuit": circuit, "official_length_m": official, "gate_length_m": gate,
+              "computed_length_m": round(length, 3),
               "ground_length_m": round(ground_length, 3), "length_error": round(error, 5),
               "ground_length_error": round(ground_error, 5), "projection_scale_factor": round(float(scale.mean()), 7),
               "osm_polyline_length_m": round(source_length, 3)}
     print(json.dumps(report), flush=True)
     if max(error, ground_error) > LENGTH_TOLERANCE:
         raise SystemExit(f"Computed length {length:.1f} m (ground {ground_length:.1f} m) is more than "
-                         f"{100 * LENGTH_TOLERANCE:g}% from official {official} m")
+                         f"{100 * LENGTH_TOLERANCE:g}% from {'the declared reference' if reference else 'official'} {gate:g} m")
     assert segments.min() > 1.0 and segments.max() < 5.0
 
     samples = [{"s": round(float(station[i]), 3), "p": np.round(xyz[i], 4).tolist(),
@@ -562,6 +568,8 @@ def build(circuit: str, update_lock: bool) -> None:
         "metadata": {
             "country": manifest["country"], "layout": manifest["layout"], "direction": manifest["direction"],
             "official_length_m": official, "official_length_source": manifest["official_length_source"],
+            **({"length_reference": reference} if reference else {}),
+            **({"purpose": manifest["purpose"]} if manifest.get("purpose") else {}),
             "length_error": round(error, 5), "ground_length_m": round(ground_length, 3),
             "ground_length_error": round(ground_error, 5),
             "projection_scale_factor": round(float(scale.mean()), 7), "start_finish": manifest["start_finish"],
@@ -911,7 +919,7 @@ def write_docs(output: Path) -> None:
     manifests = [m for m in manifests if m["id"] not in incomplete]
     for m in sorted(manifests, key=lambda m: m.get("motogp_round", 99)):
         imagery = m["imagery"]
-        rows.append(f"| {m.get('motogp_round', '')} | `{m['id']}` | {m['name']}, {m['country']} | {m['layout']} | "
+        rows.append(f"| {m.get('motogp_round', 'test')} | `{m['id']}`{' (held out)' if m.get('purpose') else ''} | {m['name']}, {m['country']} | {m['layout']} | "
                     f"[{m['official_length_m']} m]({m['official_length_source']}) | "
                     f"{source_row(imagery.get('detail'))} | {source_row(imagery.get('overview'))} | "
                     f"{source_row(m['elevation']['detail'])} |")
@@ -926,7 +934,11 @@ def write_docs(output: Path) -> None:
                            f"{100 * width['valid_fraction']:.0f}% | {meta['curb_runs']} | "
                            f"{meta['elevation'].get('bank', '')[:40]} | {lap_cell(verification.get(m['id']))} |")
         lines = [f"### {m['name']} (`{m['id']}`)", "",
+                 *([f"- **Purpose: {m['purpose']}**"] if m.get("purpose") else []),
                  f"- Layout: {m['layout']}" + (f" ([source]({m['layout_source']}))" if m.get("layout_source") else ""),
+                 *([f"- Length gate: {m['length_reference']['length_m']} m, {m['length_reference']['layout']} "
+                    f"([source]({m['length_reference']['source']})), not the official length. "
+                    f"{m['length_reference']['reason']}"] if m.get("length_reference") else []),
                  f"- Direction: {m['direction']}" + (
                      (f" ([source]({m['direction_source']}))" if m["direction_source"].startswith("http")
                       else f" ({m['direction_source']})") if m.get("direction_source") else ""),
@@ -992,6 +1004,10 @@ def write_docs(output: Path) -> None:
         "## Calendar and sources",
         "",
         "Calendar: the 2026 MotoGP season as published by motogp.com (Qatar moved to 6 to 8 November).",
+        "Held-out test tracks (marked \"held out\", never used to train the general SAC policy) measure",
+        "generalization: `portimao` is built from the layout OSM holds, which matches the 4.653 km car",
+        "Grand Prix circuit rather than the verified 4.592 km MotoGP layout; `laguna-seca` is not a",
+        "MotoGP circuit.",
         "",
         "| Round | Id | Circuit | Layout | Official lap | Detail imagery | Overview imagery | Elevation |",
         "| --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -1007,7 +1023,7 @@ def write_docs(output: Path) -> None:
         "Scripted lap: `tools/drive_lap.py --track <id>` (privileged path follower capped at 18 m/s, a",
         "QA driver, not a racing lap time), recorded in `data/circuit-verification.json`.",
         "",
-        "| Id | Official m | Game m | Ground m | Ground error | Direction | Width m | Width measured | Kerb runs | Bank | Scripted lap |",
+        "| Id | Official m | Game m | Ground m | Ground error (vs length gate) | Direction | Width m | Width measured | Kerb runs | Bank | Scripted lap |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         *results,
         "",

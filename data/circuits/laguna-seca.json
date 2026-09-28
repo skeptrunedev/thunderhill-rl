@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "id": "laguna-seca",
+  "version": 1,
+  "name": "WeatherTech Raceway Laguna Seca",
+  "country": "United States",
+  "purpose": "held-out test track: never used for training the general SAC policy; built to measure generalization",
+  "center_lonlat": [
+    -121.75361,
+    36.58417
+  ],
+  "crs": "EPSG:32610",
+  "layout": "Full road course (1996 to date), 11 turns including the Corkscrew (Turns 8 and 8A)",
+  "layout_source": "https://en.wikipedia.org/wiki/WeatherTech_Raceway_Laguna_Seca",
+  "direction": "counterclockwise",
+  "direction_source": "Every OSM route way is tagged oneway=yes and the chained route runs counterclockwise. Checked against the official elevation facts (weathertechraceway.com track information: the Corkscrew drops 59 ft / 18.0 m in 450 ft / 137 m): the steepest 137 m descent along the built route in the direction of travel is 18.5 m, at the imaged Corkscrew S-bend (station 2475)",
+  "official_length_m": 3602,
+  "official_length_source": "https://weathertechraceway.com/pages/track-information (2.238 miles); https://en.wikipedia.org/wiki/WeatherTech_Raceway_Laguna_Seca (3.602 km)",
+  "width_m": {
+    "published": 12,
+    "source": "No published width verified (secondary sources quote 30 to 50 ft); 12 m is only the prior for the orthoimagery edge measurement, which sets the width"
+  },
+  "start_finish": {
+    "lonlat": [
+      -121.7566371,
+      36.5864582
+    ],
+    "source": "OSM node 8866453726 (description=Start/Finish) beside the bridge over the main straight; the 0.6 m NAIP imagery does not resolve the painted line or grid"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 10464852,
+        "version": 17,
+        "from": 7215279265,
+        "to": 89865280
+      },
+      {
+        "way": 1315957508,
+        "version": 1,
+        "from": 89865280,
+        "to": 89865318
+      },
+      {
+        "way": 1315957507,
+        "version": 1,
+        "from": 89865318,
+        "to": 7215279233
+      },
+      {
+        "way": 1315957502,
+        "version": 1,
+        "from": 7215279233,
+        "to": 7215279253
+      },
+      {
+        "way": 1315957506,
+        "version": 1,
+        "from": 7215279253,
+        "to": 7215279256
+      },
+      {
+        "way": 1315957503,
+        "version": 1,
+        "from": 7215279256,
+        "to": 89865175
+      },
+      {
+        "way": 1315957504,
+        "version": 1,
+        "from": 89865175,
+        "to": 7215279262
+      },
+      {
+        "way": 1315957505,
+        "version": 1,
+        "from": 7215279262,
+        "to": 7215279265
+      }
+    ],
+    "snapshot_sha256": "d0f000d5041013d896e3d3dc57ac2c1c24b12cdf175c0e362711f7475d7e1018"
+  },
+  "imagery": {
+    "detail": {
+      "name": "USGS NAIP orthoimagery (California)",
+      "resolution_m": 0.5,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "USGS, USDA, The National Map: Orthoimagery (NAIP)",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer",
+        "format": "jpg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "USGS NAIP orthoimagery (California)",
+      "resolution_m": 1.0,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "USGS, USDA, The National Map: Orthoimagery (NAIP)",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer",
+        "format": "jpg"
+      }
+    },
+    "horizon": {
+      "name": "USGS NAIP orthoimagery (California)",
+      "resolution_m": 8.0,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "USGS, USDA, The National Map: Orthoimagery (NAIP)",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer",
+        "format": "jpg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "USGS 3DEP elevation (resampled to 1 m)",
+      "resolution_m": 1.0,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey, 3D Elevation Program",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+        "resolution_m": 1.0,
+        "max_pixels": 2000
+      }
+    },
+    "horizon": {
+      "name": "USGS 3DEP elevation (resampled to 30 m)",
+      "resolution_m": 30.0,
+      "license": "Public domain (U.S. Government work)",
+      "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+      "attribution": "U.S. Geological Survey, 3D Elevation Program",
+      "source": {
+        "kind": "arcgis_image",
+        "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+        "resolution_m": 30.0,
+        "max_pixels": 2000
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "d0f000d5041013d896e3d3dc57ac2c1c24b12cdf175c0e362711f7475d7e1018",
+    "imagery_detail": "57911cac4aa2f4e867954f9d05beaa70ebaa19e8587c8183c521d4aafa159b60",
+    "dem": "73e990b4c561e008196aa9bc85d5d56a0526e69a25056aa6d492541b38ef53d8",
+    "dem_horizon": "5ca6ba7d82501dc6ae5086334c72f901bb10efd0f4ee80567a9dea4ce5ca4b4c",
+    "imagery_overview": "eadec13dd8425f3b45f0289c7330d455f0ba2ffb7dfd300e2f24ca6eb1b4b7e0",
+    "imagery_horizon": "7f827f13ad9397dc749a92951b803ab6af004c8b00f59aa1edf2e6ec152f6280"
+  },
+  "notes": [
+    "Held-out test track: not a MotoGP circuit, never used to train the general SAC policy."
+  ]
+}

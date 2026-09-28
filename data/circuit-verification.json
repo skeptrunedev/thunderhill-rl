@@ -89,6 +89,16 @@
   "max_lateral_m": 0.98,
   "max_target_speed_m_s": 18.0
  },
+ "laguna-seca": {
+  "track_sha256": "acb154ea6c6d473937ef640eca2441b08cb2d6b6443b64c6bb741814e3975d5d",
+  "driver": "privileged-path-qa-v1",
+  "success": true,
+  "reason": "completed",
+  "sim_time_s": 254.33,
+  "legal_distance_m": 3601.0,
+  "max_lateral_m": 1.82,
+  "max_target_speed_m_s": 18.0
+ },
  "le-mans": {
   "track_sha256": "c0a10e2a7d1d66ce4e7eec753ba4c6660798ce9547621deceade60421562c769",
   "driver": "privileged-path-qa-v1",
@@ -157,6 +167,16 @@
   "sim_time_s": 310.74,
   "legal_distance_m": 4450.9,
   "max_lateral_m": 1.3,
+  "max_target_speed_m_s": 18.0
+ },
+ "portimao": {
+  "track_sha256": "bcf81689788a3463dd2a935b04624edf36b2934a066e115352d2d1dc1236488f",
+  "driver": "privileged-path-qa-v1",
+  "success": true,
+  "reason": "completed",
+  "sim_time_s": 331.04,
+  "legal_distance_m": 4639.7,
+  "max_lateral_m": 1.55,
   "max_target_speed_m_s": 18.0
  },
  "red-bull-ring": {

@@ -1,0 +1,30 @@
+{
+ "schema_version": 1,
+ "track_sha256": "acb154ea6c6d473937ef640eca2441b08cb2d6b6443b64c6bb741814e3975d5d",
+ "sample_count": 1200,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/laguna-seca.json",
+ "runs": [
+  {
+   "id": "K001",
+   "side": 1,
+   "segments": [
+    305,
+    306
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K002",
+   "side": -1,
+   "segments": [
+    607,
+    608,
+    609
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  }
+ ]
+}

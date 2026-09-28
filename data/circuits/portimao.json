@@ -10,7 +10,7 @@
     37.2319
   ],
   "crs": "EPSG:3763",
-  "layout": "Motorcycle Grand Prix circuit, 4.592 km, 15 turns",
+  "layout": "OSM layout (the full Torre VIP loop, matching the shape of the official MotoGP map); its length (4640 m) matches the 4.653 km car Grand Prix circuit, not the 4.592 km MotoGP layout. NOT the verified MotoGP layout.",
   "layout_source": "https://www.motogp.com/en/calendar/2026/event/portugal/c7f7626b-807f-4a6f-813e-7ad2c68302a3",
   "direction": "clockwise",
   "direction_source": "https://www.24hseries.com/circuits/autodromo-internacional-do-algarve (Circuit direction: Clockwise)",
@@ -25,7 +25,7 @@
       -8.6308098,
       37.2321164
     ],
-    "source": "provisional"
+    "source": "OSM node 5006082198 (raceway=start); in the DGT Ortos2025 orthophoto it lies on a transverse white line across the pit straight with faint grid slot marks behind it"
   },
   "imagery": {
     "detail": {
@@ -309,10 +309,25 @@
         "from": 469811441,
         "to": 1699903423
       }
-    ]
+    ],
+    "snapshot_sha256": "8d66ff9ab131a5cce84dcb1b3ac57ad6bcdcd1fd2b3691d40f0605c7b636896c"
   },
-  "status": "blocked",
   "notes": [
-    "NOT BUILT. The OSM route that matches the official MotoGP map (discover rank 3, full Torre VIP loop) measures 4639.7 m against the official motorcycle lap of 4592 m (+1.04%, over the 1% gate). OSM gives about the 4653 m car layout, and its ways cite a Wikimedia schematic as source; the geometry of the motorcycle variant is not in OSM and could not be verified."
-  ]
+    "Held-out test track built from the OSM layout, not the verified MotoGP layout. The 1% length gate is applied to the 4653 m car Grand Prix length (length_reference); against MotoGP 4592 m the lap is +1.04%."
+  ],
+  "purpose": "held-out test track: never used for training the general SAC policy; built to measure generalization",
+  "length_reference": {
+    "length_m": 4653,
+    "layout": "Grand Prix Circuit (2008-present), 15 turns",
+    "source": "https://en.wikipedia.org/wiki/Algarve_International_Circuit",
+    "reason": "The OSM geometry (ways tagged with a Wikimedia schematic as source) measures within 0.3% of the car Grand Prix length; the 4.592 km motorcycle variant is not mapped in OSM and could not be verified."
+  },
+  "locks": {
+    "osm_snapshot": "8d66ff9ab131a5cce84dcb1b3ac57ad6bcdcd1fd2b3691d40f0605c7b636896c",
+    "imagery_detail": "39855886b64e3e67b9cca1d99a67baa1fc99b556ceea78e8f54ecd6987f312e2",
+    "dem": "e34e60f5c6895fcc7586157df4a67ce9ec202db64178f113dddba3e97b93421f",
+    "dem_horizon": "976225c802d0530f8c1d32291230f0ae61151b706c4f0067c118fc8fad460ba1",
+    "imagery_overview": "43a50d72de04a40ad7547b01970ac103f0e8dbed8aedaf1d1c48ce04fd5036b7",
+    "imagery_horizon": "10999970c809424ce69db1330c908e60af0c4b878cc0b9d4d3ffa0791a3037e5"
+  }
 }

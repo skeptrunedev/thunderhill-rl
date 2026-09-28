@@ -95,6 +95,7 @@ from sac_env import (  # noqa: E402
     Track,
     evaluation_starts,
 )
+from lap_policy import held_out  # noqa: E402
 
 ACTION_SIZE = 2
 TERMINATIONS = ("offroad", "collision", "fall", "stall", "horizon", "lap_completed",
@@ -910,11 +911,15 @@ def main():
     if args.tracks:
         circuits = ROOT / "godot" / "tracks"
         known = sorted(path.parent.name for path in circuits.glob("*/track.json"))
-        args.tracks = ([DEFAULT_TRACK, *known] if args.tracks == "all"
+        # "all" means every training circuit: held-out test tracks never enter training.
+        trainable = [t for t in known if not held_out(t)]
+        args.tracks = ([DEFAULT_TRACK, *trainable] if args.tracks == "all"
                        else [t.strip() for t in args.tracks.split(",") if t.strip()])
         for track in args.tracks:
             if track != DEFAULT_TRACK and track not in known:
                 parser.error(f"Unknown track {track!r}; available: {[DEFAULT_TRACK, *known]}")
+            if track in known and held_out(track):
+                parser.error(f"{track} is a held-out test track; it is never trained on")
             if track != DEFAULT_TRACK and not (circuits / track / "generated" / "imagery.json").exists():
                 parser.error(f"Circuit {track} is not built: uv run tools/build_circuit.py {track}")
     run_dir.mkdir(parents=True, exist_ok=True)
