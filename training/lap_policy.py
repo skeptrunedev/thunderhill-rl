@@ -22,9 +22,26 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+DEFAULT_TRACK = "thunderhill-east"
+
+
+def track_json(track: str = DEFAULT_TRACK) -> Path:
+    """Geometry the game loads for --track=<track> (godot/tracks/<id>, tools/build_circuit.py)."""
+    if track == DEFAULT_TRACK:
+        return ROOT / "godot/data/track.json"
+    path = ROOT / "godot/tracks" / track / "track.json"
+    if not path.exists():
+        known = sorted(p.parent.name for p in (ROOT / "godot/tracks").glob("*/track.json"))
+        raise ValueError(f"Unknown track {track!r}; available: {[DEFAULT_TRACK, *known]}")
+    return path
+
+
 class RoadTelemetry:
-    def __init__(self, track_path: Path = ROOT / "godot/data/track.json"):
-        self.path = Path(track_path)
+    def __init__(self, track_path: Path | None = None, *, track: str = DEFAULT_TRACK):
+        if track_path is not None and track != DEFAULT_TRACK:
+            raise ValueError("Pass either track_path or track, not both")
+        self.track = track
+        self.path = Path(track_path) if track_path is not None else track_json(track)
         self.geometry = json.loads(self.path.read_text())
         self.samples = self.geometry["samples"]
         self.stations = [row["s"] for row in self.samples]

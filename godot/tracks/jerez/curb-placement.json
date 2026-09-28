@@ -1,0 +1,39 @@
+{
+ "schema_version": 1,
+ "track_sha256": "833da2b29f9675ad41aa2fa7c678f236efd34265981011df51c77916168988ea",
+ "sample_count": 1476,
+ "width_m": 0.9,
+ "inner_height_m": 0.05,
+ "outer_height_m": 0.11,
+ "source_reference": "data/circuits/jerez.json",
+ "runs": [
+  {
+   "id": "K001",
+   "side": 1,
+   "segments": [
+    213,
+    214
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K002",
+   "side": -1,
+   "segments": [
+    233,
+    234,
+    235
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  },
+  {
+   "id": "K003",
+   "side": -1,
+   "segments": [
+    1153,
+    1154
+   ],
+   "status": "Detected in orthoimagery: alternating saturated and white band outside the measured edge"
+  }
+ ]
+}

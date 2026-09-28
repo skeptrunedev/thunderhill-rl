@@ -95,6 +95,9 @@ var startup_previous_usec: int
 # One selection point: --vehicle=car (default motorcycle), or a replay's manifest.
 # The car's scripts load only when selected; the motorcycle path is unchanged.
 var vehicle := "motorcycle"
+# --track=<id> selects a MotoGP circuit (godot/tracks/<id>); default Thunderhill East.
+# A replay renders the track its manifest names.
+var track_id := "thunderhill-east"
 var wheel_radius_m := 0.32
 var envelope_script: GDScript = preload("res://scripts/bike_collision_envelope.gd")
 
@@ -180,12 +183,21 @@ func _ready() -> void:
 				push_error("Vehicle must be one of %s" % str(VEHICLES))
 				get_tree().quit(2)
 				return
+		if arg.begins_with("--track="):
+			track_id = arg.trim_prefix("--track=")
 	if not replay_path.is_empty():
 		var recorded := _recorded_vehicle(replay_path)
 		if "--vehicle=" + vehicle not in OS.get_cmdline_user_args() or recorded == vehicle:
 			vehicle = recorded
 		else:
 			push_error("Replay vehicle %s differs from --vehicle=%s" % [recorded, vehicle])
+			get_tree().quit(2)
+			return
+		var recorded_track := _recorded_track(replay_path)
+		if "--track=" + track_id not in OS.get_cmdline_user_args() or recorded_track == track_id:
+			track_id = recorded_track
+		else:
+			push_error("Replay track %s differs from --track=%s" % [recorded_track, track_id])
 			get_tree().quit(2)
 			return
 	if (
@@ -251,6 +263,15 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	track = TrackScript.new()
+	var track_error: String = track.select_circuit(track_id)
+	if not track_error.is_empty():
+		push_error(track_error)
+		get_tree().quit(2)
+		return
+	if track.circuit and is_finite(preview_canopy_strength):
+		push_error("The canopy study applies only to Thunderhill East")
+		get_tree().quit(2)
+		return
 	track.startup_observer = _startup_mark
 	add_child(track)
 	if not track.initialization_error.is_empty():
@@ -270,22 +291,26 @@ func _ready() -> void:
 	add_child(horizon)
 	horizon.build(track)
 	_startup_mark("horizon_complete")
-	var landmarks = preload("res://scripts/landmarks.gd").new()
-	add_child(landmarks)
-	landmarks.build_prepared(track)
-	if not landmarks.initialization_error.is_empty():
-		push_error(landmarks.initialization_error)
-		get_tree().quit(2)
-		return
-	_startup_mark("landmarks_complete")
-	var scenery_error: String = preload("res://scripts/scenery.gd").validate_bake()
-	if not scenery_error.is_empty():
-		push_error(scenery_error)
-		get_tree().quit(2)
-		return
-	var scenery = load("res://assets/generated/scenery.scn").instantiate()
-	add_child(scenery)
-	_startup_mark("scenery_complete")
+	if track.circuit:
+		# Landmarks, scenery and the pit wall are Thunderhill East reconstructions.
+		_startup_mark("circuit_scenery_skipped")
+	else:
+		var landmarks = preload("res://scripts/landmarks.gd").new()
+		add_child(landmarks)
+		landmarks.build_prepared(track)
+		if not landmarks.initialization_error.is_empty():
+			push_error(landmarks.initialization_error)
+			get_tree().quit(2)
+			return
+		_startup_mark("landmarks_complete")
+		var scenery_error: String = preload("res://scripts/scenery.gd").validate_bake()
+		if not scenery_error.is_empty():
+			push_error(scenery_error)
+			get_tree().quit(2)
+			return
+		var scenery = load("res://assets/generated/scenery.scn").instantiate()
+		add_child(scenery)
+		_startup_mark("scenery_complete")
 	sim = SimScript.new() if vehicle == "motorcycle" else load("res://scripts/car.gd").new()
 	if vehicle == "car":
 		wheel_radius_m = sim.wheel_radius_m()
@@ -346,7 +371,7 @@ func _ready() -> void:
 	if not replay_path.is_empty():
 		replay = preload("res://scripts/replay.gd").new()
 		var replay_error: String = replay.open_recording(
-			replay_path, FileAccess.get_sha256("res://data/track.json")
+			replay_path, FileAccess.get_sha256(track.source_path("track")), track
 		)
 		if not replay_error.is_empty():
 			push_error(replay_error)
@@ -358,7 +383,7 @@ func _ready() -> void:
 	if not benchmark_path.is_empty():
 		benchmark = preload("res://scripts/control_benchmark.gd").new()
 		var error: String = benchmark.open_trace(
-			benchmark_path, sim, FileAccess.get_sha256("res://data/track.json"), DT
+			benchmark_path, sim, FileAccess.get_sha256(track.source_path("track")), DT
 		)
 		if not error.is_empty():
 			push_error(error)
@@ -404,6 +429,17 @@ static func _recorded_vehicle(path: String) -> String:
 	if first is Dictionary:
 		return str(first.get("vehicle", "motorcycle"))
 	return "motorcycle"
+
+
+## The track a recording was made on; recordings before track selection are Thunderhill.
+static func _recorded_track(path: String) -> String:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return "thunderhill-east"
+	var first: Variant = JSON.parse_string(file.get_line())
+	if first is Dictionary:
+		return str(first.get("track_id", "thunderhill-east"))
+	return "thunderhill-east"
 
 
 func _startup_mark(stage: String) -> void:
@@ -579,9 +615,11 @@ func _start_recording(station: float) -> void:
 			"episode_id": episode_id,
 			"policy_id": policy_id,
 			"policy_display": policy_display.duplicate(true),
-			"track_sha256": FileAccess.get_sha256("res://data/track.json"),
-			"terrain_sha256": FileAccess.get_sha256("res://data/terrain.json"),
-			"surface_sha256": FileAccess.get_sha256("res://data/surface.json"),
+			"track_id": track.track_id,
+			"track_version": track.track_version(),
+			"track_sha256": FileAccess.get_sha256(track.source_path("track")),
+			"terrain_sha256": FileAccess.get_sha256(track.source_path("terrain")),
+			"surface_sha256": FileAccess.get_sha256(track.source_path("surface")),
 			"vehicle": vehicle,
 			"physics_version": sim.MODEL_VERSION,
 			"physics_dt": DT,
@@ -595,7 +633,8 @@ func _start_recording(station: float) -> void:
 				"envelope": envelope_script.MODEL_VERSION,
 				"sweep": preload("res://scripts/bike_sweep.gd").MODEL_VERSION,
 				"spatial_tolerance_m": preload("res://scripts/bike_sweep.gd").SPATIAL_TOLERANCE_M,
-				"pit_wall_sha256": FileAccess.get_sha256("res://data/pit-wall.json"),
+				"pit_wall_sha256":
+				"" if track.circuit else FileAccess.get_sha256("res://data/pit-wall.json"),
 				"response": "terminal_freeze_no_impact_dynamics"
 			},
 			"snapshot": episode_snapshot.duplicate(true),
@@ -1530,8 +1569,8 @@ func _build_provenance() -> Dictionary:
 		"instrument_display_sha256": FileAccess.get_sha256("res://scripts/instrument_display.gd"),
 		"instrument_screen_sha256":
 		FileAccess.get_sha256("res://shaders/instrument_screen.gdshader"),
-		"pavement_sha256": FileAccess.get_sha256("res://data/pavement.json"),
-		"curb_placement_sha256": FileAccess.get_sha256("res://data/curb-placement.json"),
+		"pavement_sha256": FileAccess.get_sha256(track.source_path("pavement")),
+		"curb_placement_sha256": FileAccess.get_sha256(track.source_path("curb-placement")),
 		"track_script_sha256": FileAccess.get_sha256("res://scripts/track.gd"),
 		"envelope_script_sha256": FileAccess.get_sha256(envelope_script.resource_path),
 		"sweep_script_sha256": FileAccess.get_sha256("res://scripts/bike_sweep.gd")

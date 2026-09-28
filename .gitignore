@@ -11,3 +11,6 @@ godot/builds/
 godot/data/build-info.json
 .claude/
 runs/
+
+# MotoGP circuit builds (tools/build_circuit.py): meshes and imagery are regenerated
+godot/tracks/*/generated/

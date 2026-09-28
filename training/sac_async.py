@@ -77,7 +77,9 @@ import numpy as np  # noqa: E402
 from sac_env import (  # noqa: E402
     OBSERVATION_SIZE,
     ROOT,
+    RoadTelemetry,
     ThunderhillSACEnv,
+    Track,
     evaluation_starts,
 )
 
@@ -212,7 +214,7 @@ def run_actor(index, args, shared: Shared):
     env = ThunderhillSACEnv(godot=args.godot, data_dir=args.run_dir / "workers",
                             horizon_s=args.horizon, seed=args.seed * 1000 + index,
                             reward_line=args.reward_line, pedal_gain=args.pedal_gain,
-                            vehicle=args.vehicle, policy_id=args.run_name)
+                            vehicle=args.vehicle, track=args.track, policy_id=args.run_name)
     rng = np.random.default_rng([args.seed, index, int(time.time())])
     policy = NumpyPolicy(args.hidden)
     rows, meta = shared.rows[index], shared.meta[index]
@@ -258,10 +260,10 @@ def run_evaluator(args, shared: Shared, requests, results):
     Godot recordings kept for rendering."""
     parent = _child_setup(0)
     directory = args.run_dir / "eval"
-    starts = evaluation_starts(args.eval_starts)
+    starts = evaluation_starts(args.eval_starts, Track(RoadTelemetry(track=args.track)))
     envs = [ThunderhillSACEnv(godot=args.godot, data_dir=directory, horizon_s=args.eval_horizon,
                               reward_line=args.reward_line, pedal_gain=args.pedal_gain,
-                              vehicle=args.vehicle, record_godot=True,
+                              vehicle=args.vehicle, track=args.track, record_godot=True,
                               policy_id=f"{args.run_name}-eval")
             for _ in starts]
 
@@ -685,6 +687,9 @@ def main():
     parser.add_argument("--vehicle", choices=("motorcycle", "car"), default="motorcycle",
                         help="simulated vehicle: the motorcycle (motorcycle.gd) or the MX-5 Cup "
                         "car (car.gd, docs/car-reference.md)")
+    parser.add_argument("--track", default="thunderhill-east",
+                        help="circuit: thunderhill-east or a MotoGP circuit built by "
+                        "tools/build_circuit.py (godot/tracks/<id>)")
     parser.add_argument("--workers", type=int, default=48, help="actor processes (one Godot each)")
     parser.add_argument("--actor-nice", type=int, default=5,
                         help="niceness added to actors and their Godot workers, so the "

@@ -5,7 +5,7 @@ extends Node3D
 ## Actual USGS terrain surrounding the detailed driving area.
 func build(track: Node3D) -> void:
 	var data: Dictionary = JSON.parse_string(
-		FileAccess.get_file_as_string("res://data/horizon.json")
+		FileAccess.get_file_as_string(track.source_path("horizon"))
 	)
 	var detail: Dictionary = track.terrain
 	var xmin: float = detail.x0

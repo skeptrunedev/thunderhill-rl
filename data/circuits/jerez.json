@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "id": "jerez",
+  "version": 1,
+  "name": "Circuito de Jerez - Angel Nieto",
+  "country": "Spain",
+  "center_lonlat": [
+    -6.033,
+    36.709
+  ],
+  "crs": "EPSG:25830",
+  "layout": "Motorcycle Grand Prix circuit, 13 turns, through Curva Alex Criville (not the car-only Senna chicane added in 1994)",
+  "direction": "clockwise",
+  "official_length_m": 4423,
+  "official_length_source": "https://www.motogp.com/en/calendar/2026/event/espa%C3%B1a/a24be69b-8472-4aa4-9e83-d3610e0f1d98",
+  "width_m": {
+    "published": 11,
+    "source": "motogp.com 2026 event page (track width 11 m)"
+  },
+  "start_finish": {
+    "lonlat": [
+      -6.0325101,
+      36.7096783
+    ],
+    "source": "Start line at the front of the painted grid, identified in the PNOA orthophoto"
+  },
+  "osm": {
+    "route": [
+      {
+        "way": 80804175,
+        "version": 8,
+        "from": 7223045088,
+        "to": 942327949
+      },
+      {
+        "way": 773658465,
+        "version": 1,
+        "from": 942327949,
+        "to": 2058774488
+      },
+      {
+        "way": 773658466,
+        "version": 1,
+        "from": 2058774488,
+        "to": 10920081
+      },
+      {
+        "way": 773658467,
+        "version": 2,
+        "from": 10920081,
+        "to": 332679433
+      },
+      {
+        "way": 773658468,
+        "version": 2,
+        "from": 332679433,
+        "to": 2058774534
+      },
+      {
+        "way": 2497139,
+        "version": 13,
+        "from": 2058774534,
+        "to": 332679445
+      },
+      {
+        "way": 773658469,
+        "version": 2,
+        "from": 332679445,
+        "to": 10920020
+      },
+      {
+        "way": 773658470,
+        "version": 2,
+        "from": 10920020,
+        "to": 2058774498
+      },
+      {
+        "way": 773658471,
+        "version": 2,
+        "from": 2058774498,
+        "to": 10920013
+      },
+      {
+        "way": 773658472,
+        "version": 2,
+        "from": 10920013,
+        "to": 2058774476
+      },
+      {
+        "way": 773658473,
+        "version": 2,
+        "from": 2058774476,
+        "to": 2058791883
+      },
+      {
+        "way": 773658474,
+        "version": 2,
+        "from": 2058791883,
+        "to": 2058791863
+      },
+      {
+        "way": 773658475,
+        "version": 2,
+        "from": 2058791863,
+        "to": 332679421
+      },
+      {
+        "way": 773658476,
+        "version": 2,
+        "from": 332679421,
+        "to": 10920048
+      },
+      {
+        "way": 773658477,
+        "version": 1,
+        "from": 10920048,
+        "to": 10920082
+      },
+      {
+        "way": 2497152,
+        "version": 8,
+        "from": 10920082,
+        "to": 10920083
+      },
+      {
+        "way": 773658479,
+        "version": 1,
+        "from": 10920083,
+        "to": 944276631
+      },
+      {
+        "way": 773658480,
+        "version": 2,
+        "from": 944276631,
+        "to": 2058791843
+      },
+      {
+        "way": 773658481,
+        "version": 1,
+        "from": 2058791843,
+        "to": 10920034
+      },
+      {
+        "way": 773658482,
+        "version": 2,
+        "from": 10920034,
+        "to": 2058791873
+      },
+      {
+        "way": 773658483,
+        "version": 2,
+        "from": 2058791873,
+        "to": 7223044860
+      },
+      {
+        "way": 80864063,
+        "version": 4,
+        "from": 7223044860,
+        "to": 7223045088
+      }
+    ],
+    "snapshot_sha256": "48a143bfd6eddb8da5ddd46eb921444135d400c2e9139e2bf3715fefdf5489e6"
+  },
+  "imagery": {
+    "detail": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 0.25,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por (c) Instituto Geografico Nacional de Espana",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg",
+        "parallel": 4
+      }
+    },
+    "overview": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 1.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por (c) Instituto Geografico Nacional de Espana",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg"
+      }
+    },
+    "horizon": {
+      "name": "PNOA maxima actualidad orthophoto",
+      "resolution_m": 8.0,
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "PNOA cedido por (c) Instituto Geografico Nacional de Espana",
+      "source": {
+        "kind": "wms",
+        "url": "https://www.ign.es/wms-inspire/pnoa-ma",
+        "layer": "OI.OrthoimageCoverage",
+        "format": "image/jpeg"
+      }
+    }
+  },
+  "elevation": {
+    "detail": {
+      "name": "IGN MDT05 (5 m DTM)",
+      "resolution_m": 5.0,
+      "license": "CC BY 4.0",
+      "attribution": "MDT05 cedido por (c) Instituto Geografico Nacional de Espana",
+      "source": {
+        "kind": "wcs",
+        "url": "https://servicios.idee.es/wcs-inspire/mdt",
+        "coverage": "Elevacion25830_5",
+        "resolution_m": 5.0
+      }
+    },
+    "horizon": {
+      "name": "IGN MDT25 (25 m DTM)",
+      "resolution_m": 25.0,
+      "license": "CC BY 4.0",
+      "attribution": "MDT25 cedido por (c) Instituto Geografico Nacional de Espana",
+      "source": {
+        "kind": "wcs",
+        "url": "https://servicios.idee.es/wcs-inspire/mdt",
+        "coverage": "Elevacion25830_25",
+        "resolution_m": 25.0
+      }
+    }
+  },
+  "locks": {
+    "osm_snapshot": "48a143bfd6eddb8da5ddd46eb921444135d400c2e9139e2bf3715fefdf5489e6",
+    "imagery_detail": "fcb67d2439b7acee5cea6e466219bdeea055e9baa12c9310fc28706fb362ef9f",
+    "dem": "c067d515cdd4989e08e6584a998390ca1c70cb41540a41cf4666b8ea028626fb",
+    "dem_horizon": "f72014087282cf979930054f0d3c4e14288802452a1dccd98617f0db00a80b38",
+    "imagery_overview": "228b6c9be7a9f360b73b673d3b74f45c7df3e9178406660905734fa63c7b8e7d",
+    "imagery_horizon": "a230fcb35d9a55ab8d66a4c9c9b9d18282a2b6d9317bf038b09ff413ce67e22e"
+  },
+  "layout_source": "https://www.racingcircuits.info/europe/spain/jerez.html",
+  "motogp_round": 4
+}

@@ -2,7 +2,8 @@
 
 Rendering is playback of recorded states, never a second simulation. One second
 of final state is retained, including for attempts with no accepted controls.
-The game renders the vehicle the recording names (motorcycle or car).
+The game renders the vehicle and track the recording names (motorcycle or car;
+Thunderhill East or a MotoGP circuit from tools/build_circuit.py).
 The source and an existing output are never overwritten.
 """
 import argparse
@@ -77,6 +78,8 @@ def inspect_recording(source: Path, fps: int = 30) -> dict:
         'episode_id': header.get('episode_id'), 'policy_id': header.get('policy_id'),
         'policy_display': header.get('policy_display', {}),
         'vehicle': header.get('vehicle', 'motorcycle'),
+        'track_id': header.get('track_id', 'thunderhill-east'),
+        'track_version': header.get('track_version', 1),
         'physics_version': header.get('physics_version'),
         'initial_tick': initial['tick'], 'final_tick': previous['tick'],
         'initial_elapsed_seconds': initial['elapsed'],

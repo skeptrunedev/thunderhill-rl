@@ -9,7 +9,7 @@ var pending_decisions: Array[Dictionary] = []
 var model_control_start_tick := -1
 
 
-func open_recording(path: String, expected_track_hash: String) -> String:
+func open_recording(path: String, expected_track_hash: String, track: Node = null) -> String:
 	file = FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return "Cannot open replay: " + path
@@ -25,14 +25,23 @@ func open_recording(path: String, expected_track_hash: String) -> String:
 		var key: String = source + "_sha256"
 		if (
 			manifest.has(key)
-			and manifest[key] != FileAccess.get_sha256("res://data/" + source + ".json")
+			and (
+				manifest[key]
+				!= FileAccess.get_sha256(
+					track.source_path(source) if track != null else "res://data/" + source + ".json"
+				)
+			)
 		):
 			return "Replay " + source + " hash differs from loaded ground"
 	if (
 		manifest.has("obstacle_collision")
 		and (
 			manifest.obstacle_collision.get("pit_wall_sha256", "")
-			!= FileAccess.get_sha256("res://data/pit-wall.json")
+			!= (
+				""
+				if track != null and track.circuit
+				else FileAccess.get_sha256("res://data/pit-wall.json")
+			)
 		)
 	):
 		return "Replay pit wall hash differs from loaded obstacle"

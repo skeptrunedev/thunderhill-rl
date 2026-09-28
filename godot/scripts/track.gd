@@ -24,15 +24,61 @@ const SHOULDER_WIDTH: float = 6.0
 ## Shared linear albedo multiplier for dry ground and standing vegetation.
 ## Artistic palette matching, not measured Thunderhill reflectance.
 const DRY_GROUND_TINT := Vector3(0.4225, 0.364, 0.2795)
+const DEFAULT_TRACK_ID := "thunderhill-east"
+## --track selects a MotoGP circuit from res://tracks/<id>/ (tools/build_circuit.py).
+## The default Thunderhill East keeps its own res://data sources and materials.
+var track_id := DEFAULT_TRACK_ID
+var circuit := false
+var circuit_dir := ""
+var circuit_imagery: RefCounted
+
+
+## Select a built circuit before adding the node to the tree. Returns an error.
+func select_circuit(id: String) -> String:
+	if id == DEFAULT_TRACK_ID:
+		return ""
+	if not id.is_valid_filename() or id.contains(" ") or id.is_empty():
+		return "Invalid track id: " + id
+	var directory := "res://tracks/" + id + "/"
+	if not FileAccess.file_exists(directory + "track.json"):
+		return "Unknown track %s. Available: %s" % [id, ", ".join(available_tracks())]
+	if not FileAccess.file_exists(directory + "generated/imagery.json"):
+		return "Circuit %s is not built. Run: uv run tools/build_circuit.py %s" % [id, id]
+	track_id = id
+	circuit = true
+	circuit_dir = directory
+	return ""
+
+
+static func available_tracks() -> PackedStringArray:
+	var ids := PackedStringArray([DEFAULT_TRACK_ID])
+	for name in DirAccess.get_directories_at("res://tracks"):
+		if FileAccess.file_exists("res://tracks/" + name + "/track.json"):
+			ids.append(name)
+	return ids
+
+
+## Path of a named source document for the selected track.
+func source_path(source: String) -> String:
+	if not circuit:
+		return "res://data/" + source + ".json"
+	if source in ["track", "curb-placement"]:
+		return circuit_dir + source + ".json"
+	return circuit_dir + "generated/" + source + ".json"
+
+
+## Version recorded with episodes; Thunderhill's track.json predates the field.
+func track_version() -> int:
+	return int(data.get("version", 1))
 
 
 func _ready() -> void:
-	data = JSON.parse_string(FileAccess.get_file_as_string("res://data/track.json"))
+	data = JSON.parse_string(FileAccess.get_file_as_string(source_path("track")))
 	samples = data.samples
 	assert(samples.size() >= 3, "A track requires at least three samples")
 	length_m = data.length_m
 	assert(length_m > 0.0, "Track length must be positive")
-	terrain = JSON.parse_string(FileAccess.get_file_as_string("res://data/terrain.json"))
+	terrain = JSON.parse_string(FileAccess.get_file_as_string(source_path("terrain")))
 	_startup_mark("track_sources_parsed")
 	for i in samples.size():
 		var p: Array = samples[i].p
@@ -99,7 +145,7 @@ func validate_surface_sources(mesh_data: Dictionary) -> String:
 	for source in ["track", "terrain"]:
 		if (
 			metadata.get(source + "_sha256", "")
-			!= FileAccess.get_sha256("res://data/" + source + ".json")
+			!= FileAccess.get_sha256(source_path(source))
 		):
 			return "Offroad mesh " + source + " source mismatch"
 	return ""
@@ -107,7 +153,7 @@ func validate_surface_sources(mesh_data: Dictionary) -> String:
 
 func _build_terrain() -> void:
 	var mesh_data: Dictionary = JSON.parse_string(
-		FileAccess.get_file_as_string("res://data/surface.json")
+		FileAccess.get_file_as_string(source_path("surface"))
 	)
 	initialization_error = validate_surface_sources(mesh_data)
 	if not initialization_error.is_empty():
@@ -117,6 +163,17 @@ func _build_terrain() -> void:
 	_startup_mark("surface_contact_index_complete")
 	var st := offroad_surface.surface_tool()
 	_startup_mark("terrain_triangle_stream_complete")
+	if circuit:
+		circuit_imagery = preload("res://scripts/circuit_imagery.gd").new()
+		initialization_error = circuit_imagery.configure(
+			circuit_dir + "generated/", FileAccess.get_sha256(source_path("track"))
+		)
+		if not initialization_error.is_empty():
+			return
+		terrain_material = circuit_imagery.ground
+		_mesh(st, terrain_material, "MeasuredTerrain")
+		_startup_mark("terrain_render_mesh_complete")
+		return
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/terrain.gdshader")
 	var field_data: Variant = JSON.parse_string(
@@ -211,7 +268,7 @@ func edge_point(i: int, offset: float, lift: float = 0.04) -> Vector3:
 
 func _load_pavement() -> String:
 	var mesh_data: Variant = JSON.parse_string(
-		FileAccess.get_file_as_string("res://data/pavement.json")
+		FileAccess.get_file_as_string(source_path("pavement"))
 	)
 	if not mesh_data is Dictionary or mesh_data.get("schema_version") != 1:
 		return "Invalid pavement mesh schema"
@@ -221,7 +278,7 @@ func _load_pavement() -> String:
 	for source: String in ["track", "surface"]:
 		if (
 			metadata.get(source + "_sha256", "")
-			!= FileAccess.get_sha256("res://data/" + source + ".json")
+			!= FileAccess.get_sha256(source_path(source))
 		):
 			return "Pavement mesh " + source + " source mismatch"
 	for key: String in ["vertices", "uvs", "triangles"]:
@@ -294,8 +351,8 @@ func _build_road() -> void:
 		get_tree().quit(2)
 		return
 	initialization_error = curb_placement.configure(
-		JSON.parse_string(FileAccess.get_file_as_string("res://data/curb-placement.json")),
-		FileAccess.get_sha256("res://data/track.json"),
+		JSON.parse_string(FileAccess.get_file_as_string(source_path("curb-placement"))),
+		FileAccess.get_sha256(source_path("track")),
 		points.size()
 	)
 	if not initialization_error.is_empty():
@@ -331,6 +388,12 @@ func _build_road() -> void:
 					push_error(initialization_error)
 					get_tree().quit(2)
 					return
+	if circuit:
+		# Circuit pavement and kerbs show the orthoimagery; painted lines are in it.
+		_mesh(pavement_surface.surface_tool(), circuit_imagery.pavement, "RacingSurface")
+		if not curb_surface.vertices.is_empty():
+			_mesh(curb_surface.surface_tool(), circuit_imagery.pavement, "ImagedCurbs")
+		return
 	var asphalt := ShaderMaterial.new()
 	asphalt.shader = load("res://shaders/asphalt.gdshader")
 	asphalt.set_shader_parameter("lap_length_m", length_m)

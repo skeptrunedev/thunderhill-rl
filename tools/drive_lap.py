@@ -15,11 +15,14 @@ from pathlib import Path
 import shutil
 import socket
 import subprocess
+import sys
 import time
 
 from check_agent import Client
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "training"))
+from lap_policy import DEFAULT_TRACK, track_json  # noqa: E402
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -58,8 +61,8 @@ CAR_STEERING_LIMIT_RAD = 0.42
 class Driver:
     def __init__(self, max_speed: float, vehicle: str = "motorcycle", lateral_accel: float = 2.2,
                  braking: float = 1.8, max_pedal: float = 0.65, lookahead_base: float = 7.0,
-                 lookahead_time: float = 1.3):
-        geometry = json.loads((ROOT / "godot/data/track.json").read_text())
+                 lookahead_time: float = 1.3, track: str = DEFAULT_TRACK):
+        geometry = json.loads(track_json(track).read_text())
         self.samples = geometry["samples"]
         self.stations = [sample["s"] for sample in self.samples]
         self.length = geometry["length_m"]
@@ -118,6 +121,8 @@ def main() -> None:
     parser.add_argument("--max-speed", type=float, default=18.0)
     parser.add_argument("--max-actions", type=int, default=8000)
     parser.add_argument("--vehicle", choices=("motorcycle", "car"), default="motorcycle")
+    parser.add_argument("--track", default=DEFAULT_TRACK,
+                        help="thunderhill-east or a circuit built by tools/build_circuit.py")
     parser.add_argument("--lateral-accel", type=float, default=2.2,
                         help="corner speed target sqrt(a / curvature), m/s^2")
     parser.add_argument("--braking", type=float, default=1.8,
@@ -142,7 +147,8 @@ def main() -> None:
     with (output / "godot.log").open("wb") as log:
         process = subprocess.Popen([args.godot, "--headless", "--path", str(ROOT / "godot"),
                                     "--", f"--agent-port={port}",
-                                    *([f"--vehicle={args.vehicle}"] if args.vehicle != "motorcycle" else [])],
+                                    *([f"--vehicle={args.vehicle}"] if args.vehicle != "motorcycle" else []),
+                                    *([f"--track={args.track}"] if args.track != DEFAULT_TRACK else [])],
                                    stdout=log, stderr=subprocess.STDOUT, env=env)
         connection = None
         try:
@@ -161,7 +167,7 @@ def main() -> None:
             client = Client(connection)
             observation = client.request({"op": "reset", "policy_id": "privileged-path-qa-v1"})
             driver = Driver(args.max_speed, args.vehicle, args.lateral_accel, args.braking,
-                            args.max_pedal, args.lookahead_base, args.lookahead_time)
+                            args.max_pedal, args.lookahead_base, args.lookahead_time, args.track)
             max_lateral = 0.0
             actions = 0
             reason = "action_budget"
@@ -194,6 +200,7 @@ def main() -> None:
                 success = False
                 reason = "recording_verification_failed"
             summary = {"success": success, "reason": reason, "driver": "privileged-path-qa-v1",
+                       "track": args.track,
                        "not_training": True, "actions": actions, "sim_time_s": observation["sim_time"],
                        "wall_time_s": time.monotonic() - start, "max_lateral_m": max_lateral,
                        "max_target_speed_m_s": args.max_speed, "recording_audit": audit,

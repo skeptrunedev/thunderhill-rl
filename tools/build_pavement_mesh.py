@@ -36,7 +36,8 @@ def edge_key(a, b):
     return tuple(sorted((point_key(a), point_key(b))))
 
 
-def build(track_path, surface_path, output_path):
+def build(track_path, surface_path, output_path, metadata=None):
+    """metadata overrides the Thunderhill provenance strings for other circuits."""
     track = json.loads(track_path.read_text())
     surface = json.loads(surface_path.read_text())
     if surface['metadata']['track_sha256'] != digest(track_path):
@@ -190,6 +191,8 @@ def build(track_path, surface_path, output_path):
                            'attribution': 'OpenStreetMap contributors; USGS 3DEP',
                            'limitations': 'Historical provisional road geometry, not surveyed road margins.',
                            'validation': report}}
+    if metadata:
+        output['metadata'].update(metadata)
     output_path.write_text(json.dumps(output, separators=(',', ':'))+'\n')
     print(json.dumps(report, indent=2))
 

@@ -80,7 +80,7 @@ from alpagym_metrics import (  # noqa: E402
 )
 from check_parallel import worker  # noqa: E402
 from episode_config import MAX_INITIAL_SPEED_M_S, _speed_limits  # noqa: E402
-from lap_policy import RoadTelemetry  # noqa: E402
+from lap_policy import DEFAULT_TRACK, RoadTelemetry  # noqa: E402
 
 CONTROL_PERIOD_S = 0.1  # the game advances 12 physics ticks per request
 STEP_REFERENCE_M = REFERENCE_SPEED_M_S * CONTROL_PERIOD_S
@@ -212,7 +212,7 @@ class ThunderhillSACEnv(gym.Env):
 
     def __init__(self, *, godot: str, data_dir: str, horizon_s: float = 60.0,
                  reward_line: str = "progress", pedal_gain: float = 1.0,
-                 vehicle: str = "motorcycle",
+                 vehicle: str = "motorcycle", track: str = DEFAULT_TRACK,
                  record_godot: bool = False, starts: list[dict] | None = None,
                  seed: int = 0, policy_id: str = "sac"):
         self.godot, self.data_dir = godot, Path(data_dir)
@@ -227,7 +227,9 @@ class ThunderhillSACEnv(gym.Env):
             raise ValueError(f"Unknown vehicle {vehicle!r}")
         self.vehicle = vehicle
         self.fixed_starts, self.policy_id = starts, policy_id
-        self.track = Track(RoadTelemetry())
+        # The worker runs --track=<id>; Track mirrors that geometry for observations.
+        self.track_id = track
+        self.track = Track(RoadTelemetry(track=track))
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (OBSERVATION_SIZE,), np.float32)
         self.action_space = gym.spaces.Box(-1.0, 1.0, (2,), np.float32)
         self.rng = np.random.default_rng(seed)
@@ -244,6 +246,8 @@ class ThunderhillSACEnv(gym.Env):
         extra = () if self.record_godot else ("--agent-no-recording",)
         if self.vehicle != "motorcycle":
             extra += (f"--vehicle={self.vehicle}",)
+        if self.track_id != DEFAULT_TRACK:
+            extra += (f"--track={self.track_id}",)
         self._client, _ = self._stack.enter_context(
             worker(self.godot, directory, 120, extra)
         )
