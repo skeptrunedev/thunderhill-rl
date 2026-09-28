@@ -53,7 +53,9 @@ class Server:
         self.checkpoint, self.port, self.log, self.gpu_fraction = checkpoint, port, log, gpu_fraction
 
     def __enter__(self):
-        env = {**os.environ, "KEV_DTYPE": "fp32"}  # the 2080 Ti has no native bf16
+        # fp32: the 2080 Ti has no native bf16. No CUDA graphs: their buffers are allocated at
+        # load and do not fit next to the fp32 weights under a shared-GPU cap.
+        env = {**os.environ, "KEV_DTYPE": "fp32", "KEV_CUDA_GRAPHS": "0"}
         self.stream = self.log.open("a")
         # The card is shared with SAC training: cap this process's CUDA allocator, and kev.serve
         # runs eagerly whenever a CUDA graph capture does not fit.
