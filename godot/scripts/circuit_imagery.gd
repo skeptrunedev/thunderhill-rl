@@ -29,11 +29,15 @@ func configure(generated_dir: String, track_sha256: String) -> String:
 	var detail: Dictionary = manifest.detail
 	var imaged := float(detail.resolution_m) <= IMAGED_PAVEMENT_MAX_PIXEL_M
 	pavement.set_shader_parameter("imaged_pavement", imaged)
+	for material: ShaderMaterial in [ground, pavement]:
+		material.set_shader_parameter("albedo_gain", float(manifest.get("albedo_gain", 1.0)))
 	if DisplayServer.get_name() == "headless":
 		return ""
 	var images: Array[Image] = []
-	var grid: Dictionary = detail.grid
-	var index := Image.create_empty(int(grid.ncols), int(grid.nrows), false, Image.FORMAT_R8)
+	var grid: Variant = detail.grid
+	var index: Image
+	if grid is Dictionary:
+		index = Image.create_empty(int(grid.ncols), int(grid.nrows), false, Image.FORMAT_R8)
 	for layer: Dictionary in detail.layers:
 		var image := _load(generated_dir + "imagery/" + str(layer.file))
 		if image == null:
@@ -58,9 +62,9 @@ func configure(generated_dir: String, track_sha256: String) -> String:
 			material.set_shader_parameter("detail_tiles", array)
 			material.set_shader_parameter("tile_index", ImageTexture.create_from_image(index))
 			material.set_shader_parameter("has_detail", true)
-		material.set_shader_parameter("grid_origin", Vector2(grid.x0, grid.z0))
-		material.set_shader_parameter("grid_cells", Vector2(grid.ncols, grid.nrows))
-		material.set_shader_parameter("tile_m", float(grid.tile_m))
+			material.set_shader_parameter("grid_origin", Vector2(grid.x0, grid.z0))
+			material.set_shader_parameter("grid_cells", Vector2(grid.ncols, grid.nrows))
+			material.set_shader_parameter("tile_m", float(grid.tile_m))
 		material.set_shader_parameter("overview", ImageTexture.create_from_image(overview))
 		material.set_shader_parameter("overview_bounds", _bounds(manifest.overview.bounds))
 		material.set_shader_parameter("horizon_image", ImageTexture.create_from_image(horizon))

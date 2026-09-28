@@ -24,6 +24,8 @@ uniform sampler2D asphalt_normal : hint_normal, filter_linear_mipmap_anisotropic
 uniform sampler2D ground_detail : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float asphalt_tile_m = 1.5;
 uniform float ground_tile_m = 2.0;
+// Maps the photograph's exposure to albedo (imagery.json albedo_gain, set at build time).
+uniform float albedo_gain = 1.0;
 uniform float detail_strength : hint_range(0.0, 1.0) = 0.45;
 uniform float detail_fade_start_m = 12.0;
 uniform float detail_fade_end_m = 70.0;
@@ -71,7 +73,7 @@ void fragment() {
 	vec2 dy = dFdy(xz);
 	float distance_m = length(VERTEX);
 	float near = 1.0 - smoothstep(detail_fade_start_m, detail_fade_end_m, distance_m);
-	vec3 albedo = imagery(xz, dx, dy);
+	vec3 albedo = imagery(xz, dx, dy) * albedo_gain;
 	if (pavement) {
 		vec2 uv = xz / asphalt_tile_m;
 		vec3 grain = texture(asphalt_color, uv).rgb;

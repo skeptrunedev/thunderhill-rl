@@ -167,7 +167,7 @@
       "resolution_m": 0.25,
       "license": "CC BY 4.0",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
-      "attribution": "PNOA cedido por (c) Instituto Geografico Nacional de Espana",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
       "source": {
         "kind": "wms",
         "url": "https://www.ign.es/wms-inspire/pnoa-ma",
@@ -181,7 +181,7 @@
       "resolution_m": 1.0,
       "license": "CC BY 4.0",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
-      "attribution": "PNOA cedido por (c) Instituto Geografico Nacional de Espana",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
       "source": {
         "kind": "wms",
         "url": "https://www.ign.es/wms-inspire/pnoa-ma",
@@ -194,7 +194,7 @@
       "resolution_m": 8.0,
       "license": "CC BY 4.0",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
-      "attribution": "PNOA cedido por (c) Instituto Geografico Nacional de Espana",
+      "attribution": "PNOA cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
       "source": {
         "kind": "wms",
         "url": "https://www.ign.es/wms-inspire/pnoa-ma",
@@ -208,25 +208,28 @@
       "name": "IGN MDT05 (5 m DTM)",
       "resolution_m": 5.0,
       "license": "CC BY 4.0",
-      "attribution": "MDT05 cedido por (c) Instituto Geografico Nacional de Espana",
+      "attribution": "MDT05 cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
       "source": {
         "kind": "wcs",
         "url": "https://servicios.idee.es/wcs-inspire/mdt",
         "coverage": "Elevacion25830_5",
         "resolution_m": 5.0
-      }
+      },
+      "bank_from_dem": false,
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
     },
     "horizon": {
       "name": "IGN MDT25 (25 m DTM)",
       "resolution_m": 25.0,
       "license": "CC BY 4.0",
-      "attribution": "MDT25 cedido por (c) Instituto Geografico Nacional de Espana",
+      "attribution": "MDT25 cedido por © Instituto Geográfico Nacional – CC BY 4.0 scne.es",
       "source": {
         "kind": "wcs",
         "url": "https://servicios.idee.es/wcs-inspire/mdt",
         "coverage": "Elevacion25830_25",
         "resolution_m": 25.0
-      }
+      },
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
     }
   },
   "locks": {
@@ -238,5 +241,6 @@
     "imagery_horizon": "a230fcb35d9a55ab8d66a4c9c9b9d18282a2b6d9317bf038b09ff413ce67e22e"
   },
   "layout_source": "https://www.racingcircuits.info/europe/spain/jerez.html",
-  "motogp_round": 4
+  "motogp_round": 4,
+  "direction_source": "OSM oneway=yes on every route way, consistent with the painted grid orientation (start line at the north-west end of the grid) in the PNOA orthophoto"
 }

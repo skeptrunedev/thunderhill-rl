@@ -10,6 +10,7 @@
   uv run tools/build_circuit.py preview <circuit-id> --station S [--span M]
   uv run tools/build_circuit.py views <circuit-id> --godot G --stations S..   game screenshots
   uv run tools/build_circuit.py list                    circuits and build state
+  uv run tools/build_circuit.py docs                    regenerate docs/motogp-circuits.md
 
 The manifest data/circuits/<id>.json names every source: the OSM ways of the
 layout MotoGP uses, the orthoimagery and elevation services, their licences, and
@@ -58,6 +59,9 @@ DOMAIN_MARGIN_M = 260.0
 HORIZON_MARGIN_M = 4000.0
 HORIZON_SPACING = 32.0
 LENGTH_TOLERANCE = 0.01
+# Aged asphalt albedo is about 0.10 to 0.18 (new asphalt about 0.05; Lawrence Berkeley
+# National Laboratory Heat Island Group, "Cool Pavements"). Appearance calibration only.
+ASPHALT_ALBEDO = 0.12
 # Measured widths are accepted from this far below to this far above the published width.
 WIDTH_BELOW_M = 1.5
 WIDTH_ABOVE_M = 3.5
@@ -383,11 +387,11 @@ class Heights:
         return map_coordinates(self.array, [row, col], order=1, mode="nearest")
 
 
-def road_profile(heights: Heights, points, left, width, dem_resolution):
+def road_profile(heights: Heights, points, left, width, dem_resolution, bank_from_dem=True):
     centre = heights(points)
     sigma_m = max(6.0, dem_resolution)
     smooth = gaussian_filter1d(median_filter(centre, 5, mode="wrap"), sigma_m / ROAD_SPACING, mode="wrap")
-    if dem_resolution <= 5.0:
+    if dem_resolution <= 5.0 and bank_from_dem:
         half = (width / 2)[:, None]
         hl = heights(points + left * half)
         hr = heights(points - left * half)
@@ -397,7 +401,8 @@ def road_profile(heights: Heights, points, left, width, dem_resolution):
         bank_status = "DEM cross slope between the measured edges, median and Gaussian smoothed, clamped to 8 degrees"
     else:
         bank = np.zeros(len(points))
-        bank_status = f"Zero: the {dem_resolution:g} m DEM cannot resolve cross slope"
+        bank_status = (f"Zero: the {dem_resolution:g} m DEM cannot resolve cross slope" if bank_from_dem
+                       else "Zero: the DEM service rounds heights to whole metres, too coarse for cross slope")
     return smooth, bank, {"height_sigma_m": sigma_m, "bank": bank_status,
                           "max_smoothing_change_m": float(np.abs(smooth - centre).max())}
 
@@ -437,15 +442,21 @@ def build(circuit: str, update_lock: bool) -> None:
     stations = np.linspace(0, closed_length(smooth), count, endpoint=False)
     points = resample(smooth, stations)
     _, left = normals(points)
-    detail = sources.Product("imagery-detail", cache)
-    keys = TileSet.keys_for(points[::10], CORRIDOR_M)
-    tiles = acquire_tiles(manifest, detail, keys, crs)
-    new_locks["imagery_detail"] = sources.check_lock(detail, locks.get("imagery_detail"), update_lock)
     # Published MotoGP widths are nominal; real pavement narrows and widens around it.
     published_width = manifest["width_m"]["published"]
     width_range = (published_width - WIDTH_BELOW_M, published_width + WIDTH_ABOVE_M)
-    measured = measure_edges(tiles, points, left, width_range)
-    width, offset, width_meta = fit_width(measured, width_range, published_width, count)
+    tiles = None
+    if manifest["imagery"].get("detail"):
+        detail = sources.Product("imagery-detail", cache)
+        keys = TileSet.keys_for(points[::10], CORRIDOR_M)
+        tiles = acquire_tiles(manifest, detail, keys, crs)
+        new_locks["imagery_detail"] = sources.check_lock(detail, locks.get("imagery_detail"), update_lock)
+        measured = measure_edges(tiles, points, left, width_range)
+        width, offset, width_meta = fit_width(measured, width_range, published_width, count)
+    else:
+        # Satellite imagery (10 m) cannot resolve pavement edges or kerbs.
+        width, offset = np.full(count, float(published_width)), np.zeros(count)
+        width_meta = {"valid_fraction": 0.0, "status": "Published width; no open imagery fine enough to measure edges"}
     points = points + left * offset[:, None]
     # Recentre and resample once more so samples stay evenly spaced.
     length_after = closed_length(points)
@@ -454,7 +465,7 @@ def build(circuit: str, update_lock: bool) -> None:
     width = np.interp(stations2, s_old, width, period=length_after)
     points = resample(points, stations2)
     heading, left = normals(points)
-    curbs = detect_curbs(tiles, points, left, width)
+    curbs = detect_curbs(tiles, points, left, width) if tiles is not None else []
 
     # Domain, elevation and local origin.
     lo_xy, hi_xy = points.min(axis=0), points.max(axis=0)
@@ -469,7 +480,8 @@ def build(circuit: str, update_lock: bool) -> None:
     dem_product = sources.Product("dem", cache)
     dem = Heights(sources.elevation(dem_spec["source"], dem_product, crs, dem_bounds, dem_res), dem_bounds, dem_res)
     new_locks["dem"] = sources.check_lock(dem_product, locks.get("dem"), update_lock)
-    heights, banks, height_meta = road_profile(dem, points, left, width, dem_res)
+    heights, banks, height_meta = road_profile(dem, points, left, width, dem_res,
+                                               dem_spec.get("bank_from_dem", True))
     # Whole metre origin: grid bounds stay exactly representable in float32, which
     # the pavement join relies on to recognise the outer terrain boundary.
     origin = np.array([round(points[0, 0]), round(points[0, 1]), round(float(heights[0]))], dtype=float)
@@ -511,7 +523,8 @@ def build(circuit: str, update_lock: bool) -> None:
     generated = out_dir / "generated"
     generated.mkdir(parents=True, exist_ok=True)
     (generated / ".gdignore").write_text("")
-    imagery_meta = {k: v for k, v in manifest["imagery"]["detail"].items() if k != "source"}
+    primary = manifest["imagery"].get("detail") or manifest["imagery"]["overview"]
+    imagery_meta = {k: v for k, v in primary.items() if k != "source"}
     track = {
         "schema_version": 1, "id": circuit, "version": manifest["version"], "name": manifest["name"],
         "closed": True, "length_m": round(length, 3),
@@ -538,7 +551,7 @@ def build(circuit: str, update_lock: bool) -> None:
                           "dem_filled_fraction": dem.filled_fraction},
             "imagery": imagery_meta, "curb_runs": len(curbs),
             "license": "Open Database License 1.0 (ODbL) for OSM derived geometry, separate from repository MIT source code",
-            "attribution": "; ".join(["OpenStreetMap contributors", manifest["imagery"]["detail"]["attribution"],
+            "attribution": "; ".join(["OpenStreetMap contributors", primary["attribution"],
                                       dem_spec["attribution"]]),
             "limitations": manifest.get("limitations", []) + [
                 "Centerline is OSM geometry recentred on imaged pavement, not a survey",
@@ -611,18 +624,19 @@ def build(circuit: str, update_lock: bool) -> None:
     if imagery_dir.exists():
         shutil.rmtree(imagery_dir)
     imagery_dir.mkdir()
-    game_keys = TileSet.keys_for(points[::4], CORRIDOR_M - 10)
-    layers = []
-    for key in game_keys:
-        name = f"detail_{key[0]}_{key[1]}.jpg"
-        Image.fromarray(tiles.tiles[key]).save(imagery_dir / name, quality=92)
-        layers.append({"file": name, "key": list(key)})
-    cols = [k[0] for k in game_keys]
-    rows = [k[1] for k in game_keys]
-    tile_grid = {"tile_m": TILE_M, "pixels": tiles.pixels, "col0": min(cols), "row_top": max(rows),
-                 "ncols": max(cols) - min(cols) + 1, "nrows": max(rows) - min(rows) + 1,
-                 # Local x of the west edge and local z of the north edge of the grid.
-                 "x0": min(cols) * TILE_M - origin[0], "z0": origin[1] - (max(rows) + 1) * TILE_M}
+    layers, tile_grid = [], None
+    if tiles is not None:
+        game_keys = TileSet.keys_for(points[::4], CORRIDOR_M - 10)
+        for key in game_keys:
+            name = f"detail_{key[0]}_{key[1]}.jpg"
+            Image.fromarray(tiles.tiles[key]).save(imagery_dir / name, quality=92)
+            layers.append({"file": name, "key": list(key)})
+        cols = [k[0] for k in game_keys]
+        rows = [k[1] for k in game_keys]
+        tile_grid = {"tile_m": TILE_M, "pixels": tiles.pixels, "col0": min(cols), "row_top": max(rows),
+                     "ncols": max(cols) - min(cols) + 1, "nrows": max(rows) - min(rows) + 1,
+                     # Local x of the west edge and local z of the north edge of the grid.
+                     "x0": min(cols) * TILE_M - origin[0], "z0": origin[1] - (max(rows) + 1) * TILE_M}
     overview_spec = manifest["imagery"]["overview"]
     overview_product = sources.Product("imagery-overview", cache)
     overview = mosaic(overview_spec, overview_product, crs, domain, max_pixels=4096)
@@ -637,11 +651,28 @@ def build(circuit: str, update_lock: bool) -> None:
     def local_bounds(b):
         return {"x0": b[0] - origin[0], "z0": origin[1] - b[3], "x1": b[2] - origin[0], "z1": origin[1] - b[1]}
 
-    imagery = {"schema_version": 1, "track_sha256": digest(track_path), "detail": {"grid": tile_grid, "layers": layers,
-               "resolution_m": tiles.resolution},
+    # Orthophotos are exposure-adjusted radiance, not albedo. One gain for the whole
+    # image maps the imaged pavement to a typical aged asphalt albedo, keeping every
+    # colour relation in the photograph.
+    if tiles is not None:
+        pavement_rgb = tiles.sample(points)
+    else:
+        col = (points[:, 0] - domain[0]) / overview["resolution"] - 0.5
+        row = (domain[3] - points[:, 1]) / overview["resolution"] - 0.5
+        pavement_rgb = np.stack([map_coordinates(overview["image"][:, :, b].astype(float), [row, col], order=1)
+                                 for b in range(3)], axis=1) / 255.0
+    linear = np.where(pavement_rgb <= 0.04045, pavement_rgb / 12.92, ((pavement_rgb + 0.055) / 1.055) ** 2.4)
+    pavement_linear = float(np.median(linear @ np.array([0.2126, 0.7152, 0.0722])))
+    albedo_gain = ASPHALT_ALBEDO / pavement_linear
+    imagery = {"schema_version": 1, "track_sha256": digest(track_path),
+               "albedo_gain": round(albedo_gain, 4), "imaged_pavement_linear_luminance": round(pavement_linear, 4),
+               "target_asphalt_albedo": ASPHALT_ALBEDO,
+               "detail": {"grid": tile_grid, "layers": layers,
+               "resolution_m": tiles.resolution if tiles is not None else overview["resolution"]},
                "overview": {"file": "overview.jpg", "bounds": local_bounds(domain), "resolution_m": overview["resolution"]},
                "horizon": {"file": "horizon.jpg", "bounds": local_bounds(hdomain), "resolution_m": himage["resolution"]},
-               "attribution": {k: manifest["imagery"][k]["attribution"] for k in ("detail", "overview", "horizon")}}
+               "attribution": {k: manifest["imagery"][k]["attribution"] for k in ("detail", "overview", "horizon")
+                               if manifest["imagery"].get(k)}}
     (generated / "imagery.json").write_text(json.dumps(imagery, indent=1) + "\n")
 
     if update_lock or locks != {**locks, **new_locks}:
@@ -817,6 +848,134 @@ def views(circuit: str, stations: list[float], godot: str, output: Path | None, 
             print(json.dumps(result))
 
 
+def source_row(spec: dict | None) -> str:
+    if not spec:
+        return "none"
+    return f"{spec['name']}, {spec['resolution_m']:g} m, {spec['license']}"
+
+
+def write_docs(output: Path) -> None:
+    """Regenerate the per-circuit source and build tables from manifests and track.json."""
+    rows, results, details = [], [], []
+    manifests = [json.loads(p.read_text()) for p in sorted(MANIFESTS.glob("*.json"))]
+    incomplete = [m["id"] for m in manifests if not all(m.get(k) for k in ("imagery", "elevation", "osm", "layout"))]
+    manifests = [m for m in manifests if m["id"] not in incomplete]
+    for m in sorted(manifests, key=lambda m: m.get("motogp_round", 99)):
+        imagery = m["imagery"]
+        rows.append(f"| {m.get('motogp_round', '')} | `{m['id']}` | {m['name']}, {m['country']} | {m['layout']} | "
+                    f"[{m['official_length_m']} m]({m['official_length_source']}) | "
+                    f"{source_row(imagery.get('detail'))} | {source_row(imagery.get('overview'))} | "
+                    f"{source_row(m['elevation']['detail'])} |")
+        track_path = TRACKS / m["id"] / "track.json"
+        if track_path.exists():
+            meta = json.loads(track_path.read_text())["metadata"]
+            track = json.loads(track_path.read_text())
+            width = meta["width"]
+            results.append(f"| `{m['id']}` | {m['official_length_m']} | {track['length_m']:.1f} | "
+                           f"{meta.get('ground_length_m', 0):.1f} | {100 * meta.get('ground_length_error', meta['length_error']):.2f}% | "
+                           f"{m['direction']} | {width['range_m'][0]:.1f} to {width['range_m'][1]:.1f} | "
+                           f"{100 * width['valid_fraction']:.0f}% | {meta['curb_runs']} | "
+                           f"{meta['elevation'].get('bank', '')[:40]} |")
+        lines = [f"### {m['name']} (`{m['id']}`)", "",
+                 f"- Layout: {m['layout']}" + (f" ([source]({m['layout_source']}))" if m.get("layout_source") else ""),
+                 f"- Direction: {m['direction']}" + (
+                     (f" ([source]({m['direction_source']}))" if m["direction_source"].startswith("http")
+                      else f" ({m['direction_source']})") if m.get("direction_source") else ""),
+                 f"- Official lap: {m['official_length_m']} m, published width {m['width_m']['published']} m ({m['width_m']['source']})",
+                 f"- Start line: {m['start_finish']['lonlat']}, {m['start_finish']['source']}",
+                 "- OSM route (ODbL 1.0, OpenStreetMap contributors): " + ", ".join(
+                     f"[{r['way']}](https://www.openstreetmap.org/way/{r['way']}) v{r['version']}" for r in m["osm"]["route"]),
+                 f"- OSM node snapshot SHA256: `{m['osm'].get('snapshot_sha256', 'unpinned')}`"]
+        for group in ("imagery", "elevation"):
+            for level, spec in m[group].items():
+                if not spec:
+                    continue
+                src = spec["source"]
+                where = src.get("url") or ", ".join(src.get("urls", []))
+                layer = src.get("layer") or src.get("coverage") or ""
+                lines.append(f"- {group.capitalize()} {level}: {spec['name']}, {spec['resolution_m']:g} m, "
+                             f"`{src['kind']}` {where} {('layer `' + str(layer) + '`') if layer else ''}. "
+                             f"Licence: [{spec['license']}]({spec.get('license_url', '')}). Attribution: \"{spec['attribution']}\"")
+        lines.append("- Response locks: " + ", ".join(f"{k} `{v[:16]}…`" for k, v in m.get("locks", {}).items()))
+        for note in m.get("notes", []):
+            lines.append(f"- Note: {note}")
+        details.append("\n".join(lines))
+    text = "\n".join([
+        "# MotoGP circuits",
+        "",
+        "Generated by `uv run tools/build_circuit.py docs` from `data/circuits/*.json` and the built",
+        "`godot/tracks/<id>/track.json`. Do not edit by hand; edit the manifests and regenerate.",
+        "",
+        "Build a circuit with `uv run tools/build_circuit.py <id>`: it fetches the pinned OSM ways,",
+        "orthoimagery and elevation, verifies every response against the manifest's SHA256 locks, and",
+        "writes the committed `godot/tracks/<id>/track.json` plus the ignored `generated/` meshes and",
+        "imagery. Select it with `--track=<id>` in the game, `ThunderhillSACEnv(track=<id>)`,",
+        "`RoadTelemetry(track=<id>)`, `tools/drive_lap.py --track <id>` and `sac_async.py --track <id>`.",
+        "Thunderhill East (`thunderhill-east`) stays the default and keeps its own pipeline",
+        "(docs/geometry-sources.md).",
+        "",
+        "## Calendar and sources",
+        "",
+        "Calendar: the 2026 MotoGP season as published by motogp.com (Qatar moved to 6 to 8 November).",
+        "",
+        "| Round | Id | Circuit | Layout | Official lap | Detail imagery | Overview imagery | Elevation |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        *rows,
+        "",
+        *([f"Manifests still incomplete: {', '.join(incomplete)}.", ""] if incomplete else []),
+        "## Build results",
+        "",
+        "Length is the game's projected centerline; ground length removes the projection scale factor",
+        "and adds climb. Width is measured across the road in the detail imagery where it exists.",
+        "",
+        "| Id | Official m | Game m | Ground m | Ground error | Direction | Width m | Width measured | Kerb runs | Bank |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        *results,
+        "",
+        "## Per circuit provenance",
+        "",
+        "\n\n".join(details),
+        "",
+    ])
+    output.write_text(text)
+    print(output)
+    write_attribution(manifests)
+
+
+ATTRIBUTION = ROOT / "godot/assets/ATTRIBUTION.md"
+BEGIN, END = "<!-- motogp-circuits:begin (tools/build_circuit.py docs) -->", "<!-- motogp-circuits:end -->"
+
+
+def write_attribution(manifests: list[dict]) -> None:
+    """Regenerate the MotoGP circuit block of godot/assets/ATTRIBUTION.md."""
+    lines = [BEGIN, "", "## MotoGP circuits", "",
+             "`godot/tracks/<id>/track.json` and the generated meshes under `godot/tracks/<id>/generated/` are",
+             "derived geographic databases under ODbL 1.0 (OpenStreetMap contributors,",
+             "https://www.openstreetmap.org/copyright), separate from the MIT game code. The orthoimagery",
+             "tiles and elevation in `generated/` are not committed; `tools/build_circuit.py` fetches them",
+             "from the sources below, whose licences and attributions apply. Full provenance, pinned URLs",
+             "and response hashes: docs/motogp-circuits.md. The project is not affiliated with MotoGP,",
+             "Dorna or any circuit.", ""]
+    for m in sorted(manifests, key=lambda m: m.get("motogp_round", 99)):
+        credits = []
+        for group in ("imagery", "elevation"):
+            for spec in m[group].values():
+                if spec and (spec["attribution"], spec["license"]) not in [(c[0], c[1]) for c in credits]:
+                    credits.append((spec["attribution"], spec["license"], spec.get("license_url", "")))
+        lines.append(f"* `{m['id']}` ({m['name']}): OpenStreetMap contributors (ODbL 1.0); " + "; ".join(
+            f"{a} ({lic}{', ' + url if url else ''})" for a, lic, url in credits) + ".")
+    lines += ["", END]
+    text = ATTRIBUTION.read_text()
+    block = "\n".join(lines)
+    if BEGIN in text:
+        head, rest = text.split(BEGIN, 1)
+        text = head + block + rest.split(END, 1)[1]
+    else:
+        text = text.rstrip("\n") + "\n\n" + block + "\n"
+    ATTRIBUTION.write_text(text)
+    print(ATTRIBUTION)
+
+
 def list_circuits() -> None:
     for path in sorted(MANIFESTS.glob("*.json")):
         manifest = json.loads(path.read_text())
@@ -838,7 +997,9 @@ def main() -> None:
     parser.add_argument("--godot", default=shutil.which("godot") or shutil.which("godot4"))
     parser.add_argument("--workers", type=int, default=2, help="parallel Godot renders (at most 4)")
     args = parser.parse_args()
-    if args.command == "list":
+    if args.command == "docs":
+        write_docs(args.output or ROOT / "docs/motogp-circuits.md")
+    elif args.command == "list":
         list_circuits()
     elif args.command == "discover":
         discover(args.circuit)

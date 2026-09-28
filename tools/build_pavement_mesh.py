@@ -24,6 +24,21 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_BOUNDARY_OFFSET_M = 0.0001
 
 
+def boundary_tolerance(*points):
+    """Largest boundary to road offset the float32 mesh format can cause here.
+
+    float32 enters where this builder reads the terrain vertices and road segment
+    endpoints (np.float32 below), matching Godot's Vector3 storage. Each is rounded
+    to the nearest float32, at most half a unit in the last place per axis, so a
+    vertex exactly on the float64 segment can sit up to sqrt(2) ulp off the rounded
+    one. Two ulp at the largest horizontal coordinate magnitude of these points
+    bounds that. The fixed 0.1 mm floor governs within 1024 m of the local origin,
+    where the ulp is smaller; beyond it (large circuits) the ulp term takes over.
+    """
+    magnitude = max(float(np.abs(np.asarray(p)[..., [0, 2]]).max()) for p in points)
+    return max(MAX_BOUNDARY_OFFSET_M, 2.0 * float(np.spacing(np.float32(magnitude))))
+
+
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -80,18 +95,20 @@ def build(track_path, surface_path, output_path, metadata=None):
             offset = float(np.linalg.norm(point[[0, 2]] - projected[[0, 2]]))
             max_offset = max(max_offset, offset)
             max_height_offset = max(max_height_offset, abs(float(point[1] - projected[1])))
-            if offset > MAX_BOUNDARY_OFFSET_M:
+            if abs(float(point[1] - projected[1])) > boundary_tolerance(point, a, b):
+                raise ValueError(f'Terrain boundary {vertex} height differs by '
+                                 f'{abs(float(point[1] - projected[1]))}m from road segment {segment}')
+            if offset > boundary_tolerance(point, a, b):
                 raise ValueError(f'Terrain boundary {vertex} is {offset}m from road segment {segment}')
             groups[segment].append((float(t), int(vertex)))
-    if max_height_offset > MAX_BOUNDARY_OFFSET_M:
-        raise ValueError(f'Terrain boundary height differs by {max_height_offset}m from road')
     chains = []
     for segment, group in enumerate(groups):
         chain = sorted(set(group))
         if not chain:
             raise ValueError(f'Road segment {segment} has no terrain boundary')
         points = ground[[vertex for _, vertex in chain]]
-        if max(np.linalg.norm(points[0] - starts[segment]), np.linalg.norm(points[-1] - ends[segment])) > MAX_BOUNDARY_OFFSET_M:
+        if max(np.linalg.norm(points[0] - starts[segment]), np.linalg.norm(points[-1] - ends[segment])) > \
+                boundary_tolerance(points[0], points[-1], starts[segment], ends[segment]):
             raise ValueError(f'Road segment {segment} endpoints do not exactly match ground: '
                              f'{points[0] - starts[segment]}, {points[-1] - ends[segment]}')
         chains.append(chain)
