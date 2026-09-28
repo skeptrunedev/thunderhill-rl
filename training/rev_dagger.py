@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -48,14 +49,18 @@ def run(cmd, log: Path, cwd=ROOT):
 class Server:
     """kev.serve for one Rev checkpoint on the local GPU, for the duration of a with block."""
 
-    def __init__(self, checkpoint: Path, port: int, log: Path):
-        self.checkpoint, self.port, self.log = checkpoint, port, log
+    def __init__(self, checkpoint: Path, port: int, log: Path, gpu_fraction: float = 1.0):
+        self.checkpoint, self.port, self.log, self.gpu_fraction = checkpoint, port, log, gpu_fraction
 
     def __enter__(self):
         env = {**os.environ, "KEV_DTYPE": "fp32"}  # the 2080 Ti has no native bf16
         self.stream = self.log.open("a")
+        # The card is shared with SAC training: cap this process's CUDA allocator, and kev.serve
+        # runs eagerly whenever a CUDA graph capture does not fit.
+        launch = (f"import torch; torch.cuda.set_per_process_memory_fraction({self.gpu_fraction}); "
+                  "import runpy; runpy.run_module('kev.serve', run_name='__main__')")
         self.process = subprocess.Popen(
-            ["uv", "run", "--extra", "serve", "python", "-m", "kev.serve", "--run", str(self.checkpoint),
+            ["uv", "run", "--extra", "serve", "python", "-c", launch, "--run", str(self.checkpoint),
              "--port", str(self.port)], cwd=KEV, env=env, stdout=self.stream, stderr=subprocess.STDOUT,
             start_new_session=True)
         for _ in range(180):
@@ -115,6 +120,15 @@ def main():
     parser.add_argument("--out", type=Path, default=ROOT / "runs/rev/dagger")
     parser.add_argument("--teacher", type=Path, default=TEACHER)
     parser.add_argument("--until", help="local time (YYYY-MM-DDTHH:MM) after which no new round starts")
+    parser.add_argument("--round-offset", type=int, default=0,
+                        help="continue a previous block: rounds are numbered from offset + 1")
+    parser.add_argument("--prior-collections", type=Path, nargs="*", default=[],
+                        help="earlier blocks' collections, kept in the aggregated DAgger data")
+    parser.add_argument("--focus-fraction", type=float, default=0.0,
+                        help="share of collection rides that restart before the last eval's and "
+                             "collection's failures")
+    parser.add_argument("--gpu-fraction", type=float, default=1.0,
+                        help="cap on the local Rev server's share of GPU memory")
     args = parser.parse_args()
     deadline = time.mktime(time.strptime(args.until, "%Y-%m-%dT%H:%M")) if args.until else None
     args.out.mkdir(parents=True, exist_ok=True)
@@ -125,20 +139,22 @@ def main():
     evaluated = {json.loads(line)["rev"] for line in (args.out / "rounds.jsonl").open()} \
         if (args.out / "rounds.jsonl").exists() else set()
     runs_dir = ROOT / "runs/rev"
-    current, collections = args.start, []
+    current, collections = args.start, list(args.prior_collections)
+    stem = re.sub(r"-(v|r)\d+$", "", args.start)
     for k in range(args.rounds + 1):
         beta = betas[min(k, len(betas) - 1)]
-        ride, collection = f"{current}-eval", f"collect-r{k + 1}"
+        number = args.round_offset + k + 1
+        ride, collection = f"{current}-eval", f"collect-r{number}"
         last = k == args.rounds or (deadline is not None and time.time() > deadline)
         need_eval = current not in evaluated
         need_collect = not last and not done(runs_dir / collection, "episodes.jsonl")
         if need_eval or need_collect:
-            with Server(runs_dir / current / "checkpoint", args.port, log):
+            with Server(runs_dir / current / "checkpoint", args.port, log, args.gpu_fraction):
                 if need_eval:
                     if not done(runs_dir / ride, "eval/eval.jsonl"):
                         run(["uv", "run", "training/rev_drive.py", "--godot", args.godot, "--run-name", ride,
                              "--rev-url", f"http://127.0.0.1:{args.port}"], log)
-                    result = {"round": k, "rev": current, **evaluation(runs_dir / ride),
+                    result = {"round": args.round_offset + k, "rev": current, **evaluation(runs_dir / ride),
                               "ride": f"runs/rev/{ride}", "time": time.strftime("%Y-%m-%dT%H:%M:%S")}
                     with (args.out / "rounds.jsonl").open("a") as stream:
                         stream.write(json.dumps(result) + "\n")
@@ -146,7 +162,7 @@ def main():
                     if better(result, best):
                         best = result
                         best_path.write_text(json.dumps(best, indent=1) + "\n")
-                    print(f"REV ROUND {k} {current}: {result['laps']}/4 laps {result['lap_times']} "
+                    print(f"REV ROUND {args.round_offset + k} {current}: {result['laps']}/4 laps {result['lap_times']} "
                           f"progress {result['progress_m']} {result['terminations']} | best {best['rev']} "
                           f"{best['laps']} laps {best['best_lap_s']}", flush=True)
                 if need_collect and deadline is not None and time.time() > deadline:
@@ -155,17 +171,18 @@ def main():
                     run(["uv", "run", "training/rev_drive.py", "--godot", args.godot, "--run-name", collection,
                          "--rev-url", f"http://127.0.0.1:{args.port}", "--collect", args.collect_episodes,
                          "--workers", args.workers, "--horizon", 60, "--beta", beta, "--teacher", args.teacher,
-                         "--seed", k + 1], log)
+                         "--seed", number, "--focus-fraction", args.focus_fraction,
+                         "--focus-from", runs_dir / ride, *collections[-1:]], log)
         if last:
             print(f"REV DAGGER DONE after round {k}; best {best['rev']} {best['laps']} laps {best['best_lap_s']}",
                   flush=True)
             break
         collections.append(runs_dir / collection)
-        data = runs_dir / f"data-r{k + 1}"
+        data = runs_dir / f"data-r{number}"
         if not done(data, "summary.json"):
             run(["uv", "run", "training/rev_dataset.py", "--teacher", args.teacher, "--dagger", *collections,
-                 "--max-train-records", args.max_train_records, "--seed", k + 1, "--out", data], log)
-        name = f"{args.start.rsplit('-v', 1)[0]}-r{k + 1}"
+                 "--max-train-records", args.max_train_records, "--seed", number, "--out", data], log)
+        name = f"{stem}-r{number}"
         if not done(runs_dir / name, "result.json"):
             run(["uvx", "--from", "modal==1.5.5", "modal", "run", "training/modal_rev.py::train", "--data", data,
                  "--name", name, "--init-from", current, "--epochs", 1, "--lr", args.lr], log)

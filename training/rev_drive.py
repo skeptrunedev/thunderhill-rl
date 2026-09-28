@@ -40,10 +40,13 @@ collect-*.npz for rev_dataset.py --dagger.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
+import os
 import sys
+import threading
 import time
-import urllib.request
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -52,20 +55,75 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rev_dataset import PEDAL_LEVELS, QUESTIONS, STEER_LEVELS, expected_level, render_state  # noqa: E402
 from rev_dataset import OFF_TRACK_HORIZON_STEPS, OFF_TRACK_TERMINATIONS  # noqa: E402
-from sac_env import ROOT, ThunderhillSACEnv, evaluation_starts  # noqa: E402
+from sac_env import (  # noqa: E402
+    MAX_INITIAL_SPEED_M_S,
+    MIN_START_SPEED_M_S,
+    ROOT,
+    ThunderhillSACEnv,
+    Track,
+    evaluation_starts,
+)
+from lap_policy import RoadTelemetry  # noqa: E402
+
+FOCUS_LEAD_M = 150.0  # focus rides start this far before a failure, at 80% of the safe speed there
+
+
+def crash_starts(directories) -> list[dict]:
+    """Rolling starts FOCUS_LEAD_M before every offroad or fall in these rides
+    (rev_drive runs: eval/eval.jsonl or a collection's episodes.jsonl)."""
+    track = Track(RoadTelemetry())
+    starts = []
+    for directory in directories:
+        for name in ("eval/eval.jsonl", "episodes.jsonl"):
+            path = Path(directory) / name
+            if not path.exists():
+                continue
+            for line in path.open():
+                row = json.loads(line)
+                if row["termination"] not in OFF_TRACK_TERMINATIONS:
+                    continue
+                station = (row["start_station_m"] + row["legal_progress_m"] - FOCUS_LEAD_M) % track.length
+                index = int(np.searchsorted(track._s, station, side="right") - 1)
+                speed = float(np.clip(0.8 * track.speed_limits[index], MIN_START_SPEED_M_S, MAX_INITIAL_SPEED_M_S))
+                starts.append(dict(station=round(float(station), 2), speed=round(speed, 2)))
+    return starts
 
 
 class RevRider:
+    """Asks a Rev server over one kept-alive HTTP(S) connection per thread: a fresh TLS
+    handshake per control step cost more than the model (660 ms against 8 ms on Modal)."""
+
     def __init__(self, url: str, decode: str, pedal_gain: float):
-        self.url, self.decode, self.pedal_gain = url.rstrip("/") + "/v1/systemone", decode, pedal_gain
+        self.url = urllib.parse.urlsplit(url.rstrip("/") + "/v1/systemone")
+        self.decode, self.pedal_gain = decode, pedal_gain
+        key = os.environ.get("REV_API_KEY")
+        self.headers = {"content-type": "application/json", **({"authorization": f"Bearer {key}"} if key else {})}
+        self.local = threading.local()
+
+    def _connection(self, fresh=False):
+        if fresh or getattr(self.local, "connection", None) is None:
+            kind = http.client.HTTPSConnection if self.url.scheme == "https" else http.client.HTTPConnection
+            self.local.connection = kind(self.url.netloc, timeout=120)
+        return self.local.connection
 
     def ask(self, obs) -> dict:
         # kev.serve answers to its fixed alias whatever checkpoint it loaded; the weights are Rev's.
         body = json.dumps({"model": "kev-latest", "state": render_state(obs), "questions": QUESTIONS}).encode()
-        request = urllib.request.Request(self.url, body, {"content-type": "application/json"})
         began = time.perf_counter()
-        with urllib.request.urlopen(request, timeout=60) as response:
-            answer = json.load(response)
+        for attempt in range(5):
+            try:
+                connection = self._connection(fresh=attempt > 0)
+                connection.request("POST", self.url.path, body, self.headers)
+                response = connection.getresponse()
+                payload = response.read()
+                if response.status != 200:
+                    raise RuntimeError(f"Rev server returned {response.status}: {payload[:200]!r}")
+                answer = json.loads(payload)
+                break
+            except (OSError, http.client.HTTPException, RuntimeError):
+                if attempt == 4:
+                    raise
+                time.sleep(2 ** attempt)
         answer["client_ms"] = (time.perf_counter() - began) * 1000.0
         return answer
 
@@ -121,6 +179,10 @@ def main():
     parser.add_argument("--workers", type=int, default=16)
     parser.add_argument("--teacher", type=Path, help="SAC checkpoint that rides a --beta share of collect steps")
     parser.add_argument("--beta", type=float, default=0.0)
+    parser.add_argument("--focus-from", type=Path, nargs="*", default=[],
+                        help="rev_drive runs whose offroad and fall spots --collect rides revisit")
+    parser.add_argument("--focus-fraction", type=float, default=0.5,
+                        help="share of --collect episodes that start before a --focus-from failure")
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
     run_dir = args.runs_dir / args.run_name
@@ -166,6 +228,8 @@ def collect(args, run_dir: Path, rider: RevRider):
     if args.beta > 0 and teacher is None:
         raise SystemExit("--beta needs --teacher")
     decisions = (run_dir / "decisions.jsonl").open("a")
+    focus = crash_starts(args.focus_from)
+    print(f"{len(focus)} failure spots to revisit from {len(args.focus_from)} runs", flush=True)
 
     def worker(index):
         env = ThunderhillSACEnv(godot=args.godot, data_dir=run_dir / "collect", horizon_s=args.horizon,
@@ -175,7 +239,9 @@ def collect(args, run_dir: Path, rider: RevRider):
         obs, episode, off, summaries = [], [], [], []
         try:
             for k in range(args.collect):
-                summary, visited = ride(env, rider, None, lambda row: decisions.write(json.dumps(row) + "\n"),
+                start = (focus[int(rng.integers(len(focus)))]
+                         if focus and rng.random() < args.focus_fraction else None)
+                summary, visited = ride(env, rider, start, lambda row: decisions.write(json.dumps(row) + "\n"),
                                         teacher, args.beta, rng)
                 crashed = np.zeros(len(visited), dtype=bool)
                 if summary["termination"] in OFF_TRACK_TERMINATIONS:
