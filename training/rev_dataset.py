@@ -267,7 +267,7 @@ def main():
         "records": {"train": len(train), "calibration": len(calibration), "development": len(development)},
         "off_track_fraction": {name: round(float(np.mean([r[3] for r in rows])), 4) for name, rows in
                                (("train", train), ("calibration", calibration), ("development", development))},
-        "args": {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()},
+        "args": json.loads(json.dumps(vars(args), default=str)),
     }
     (args.out / "summary.json").write_text(json.dumps(summary, indent=1) + "\n")
     print(json.dumps(summary["records"]), json.dumps(summary["off_track_fraction"]))
