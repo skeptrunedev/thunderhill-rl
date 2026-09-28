@@ -88,25 +88,43 @@ def load_manifest(circuit: str) -> tuple[dict, Path]:
 
 # Route -------------------------------------------------------------------------
 
+def way_chain(part: dict, ids: list[int]) -> list[int]:
+    """Node ids of one route part, from part["from"] to part["to"] inclusive.
+
+    A closed way (a ring) is walked forward in its own node order, wrapping past
+    its closure node when needed, or backward with "reverse": true; from == to
+    takes the whole ring. An open way is walked from one index to the other; its
+    direction follows the indices, and a contradicting "reverse" flag is an error.
+    Nodes that occur more than once (other than a ring's closure) are ambiguous.
+    """
+    start, end = part["from"], part["to"]
+    closed = ids[0] == ids[-1]
+    body = ids[:-1] if closed else ids
+    for node in {start, end}:
+        if body.count(node) != 1:
+            raise SystemExit(f"Way {part['way']}: node {node} occurs {body.count(node)} times; "
+                             "the route part is ambiguous")
+    a, b = body.index(start), body.index(end)
+    reverse = bool(part.get("reverse"))
+    if closed:
+        n = len(body)
+        steps = ((b - a) % n or n) if not reverse else ((a - b) % n or n)
+        sign = -1 if reverse else 1
+        return [body[(a + sign * k) % n] for k in range(steps + 1)]
+    if a == b:
+        raise SystemExit(f"Way {part['way']} is open; from and to must differ")
+    if "reverse" in part and reverse != (a > b):
+        raise SystemExit(f"Way {part['way']}: reverse flag contradicts the from/to node order")
+    return ids[a:b + 1] if a < b else ids[b:a + 1][::-1]
+
+
 def route_nodes(manifest: dict, elements: dict) -> tuple[list[dict], list]:
     """Ordered node documents of the route, and the pinned snapshot rows."""
     ordered, snapshot = [], []
     for part in manifest["osm"]["route"]:
         way = elements[("way", part["way"])]
         ids = way["nodes"]
-        start, end = part["from"], part["to"]
-        if start == end:
-            if ids[0] != ids[-1] or start not in ids:
-                raise SystemExit(f"Way {part['way']} is not a closed ring through {start}")
-            ring = ids[:-1]
-            k = ring.index(start)
-            ring = ring[k:] + ring[:k]
-            if part.get("reverse"):
-                ring = [ring[0]] + ring[1:][::-1]
-            chain = ring + [start]
-        else:
-            a, b = ids.index(start), ids.index(end)
-            chain = ids[a:b + 1] if a < b else ids[b:a + 1][::-1]
+        chain = way_chain(part, ids)
         if ordered and ordered[-1]["id"] != chain[0]:
             raise SystemExit(f"Route break before way {part['way']}: {ordered[-1]['id']} to {chain[0]}")
         nodes = [elements[("node", n)] for n in chain]
@@ -913,6 +931,32 @@ def write_docs(output: Path) -> None:
         "`RoadTelemetry(track=<id>)`, `tools/drive_lap.py --track <id>` and `sac_async.py --track <id>`.",
         "Thunderhill East (`thunderhill-east`) stays the default and keeps its own pipeline",
         "(docs/geometry-sources.md).",
+        "",
+        "## Method",
+        "",
+        "- Layout: the OSM `highway=raceway` ways of the layout MotoGP uses, chained in race order",
+        "  (`build_circuit.py discover` proposes closed routes nearest the official length). Nodes are",
+        "  projected into the circuit's metric CRS, resampled at 0.5 m, Gaussian smoothed with a bounded",
+        "  displacement and sampled every 3 m, as `build_track.py` does for Thunderhill.",
+        "- Width and centre: where detail orthoimagery exists, each 3 m sample is measured across the",
+        "  road from pavement colour (asphalt characterised from pixels near the OSM line), accepting",
+        "  widths from 1.5 m below to 3.5 m above the published width; the line is recentred on the",
+        "  imaged pavement. Without detail imagery the published width is used on the OSM line.",
+        "- Kerbs: painted kerbs are detected as a band just outside the measured edge that alternates",
+        "  saturated colour and white. Their 3D profile reuses Thunderhill's provisional curb shape.",
+        "- Elevation: road height from the DEM along the line, median and Gaussian smoothed; bank from",
+        "  the DEM cross slope only where the DEM is 5 m or finer and not rounded to whole metres.",
+        "- Terrain: the DEM on an 8 m grid over the track bounds plus 260 m, joined to the road by the",
+        "  same road conforming mesh builders Thunderhill uses; a horizon DEM extends 4 km further.",
+        "- Imagery: 256 m detail tiles along a 60 m corridor, a domain overview and a coarse horizon",
+        "  image, all georeferenced in the circuit CRS. One exposure gain per circuit maps the imaged",
+        "  pavement to an aged asphalt albedo of 0.12, keeping the photograph's colour relations.",
+        "- Start line: identified in the imagery (front of the painted grid) where it is visible.",
+        "",
+        "Limits: no buildings, grandstands, walls, barriers or trees are modelled (they appear only as",
+        "flat imagery); run-off grip is not modelled; Sentinel-2 circuits (10 m pixels) have no",
+        "imaged pavement and use a generic CC0 asphalt texture. Imagery tiles are regenerated by the",
+        "build command and are not committed (about 10 to 30 MB per circuit).",
         "",
         "## Calendar and sources",
         "",
