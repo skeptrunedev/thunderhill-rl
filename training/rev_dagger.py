@@ -149,6 +149,8 @@ def main():
                     print(f"REV ROUND {k} {current}: {result['laps']}/4 laps {result['lap_times']} "
                           f"progress {result['progress_m']} {result['terminations']} | best {best['rev']} "
                           f"{best['laps']} laps {best['best_lap_s']}", flush=True)
+                if need_collect and deadline is not None and time.time() > deadline:
+                    need_collect, last = False, True  # the deadline passed during this round's evaluation
                 if need_collect:
                     run(["uv", "run", "training/rev_drive.py", "--godot", args.godot, "--run-name", collection,
                          "--rev-url", f"http://127.0.0.1:{args.port}", "--collect", args.collect_episodes,
