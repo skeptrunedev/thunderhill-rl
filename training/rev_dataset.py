@@ -192,14 +192,13 @@ def write(path: Path, rows, pedal_gain: float, teacher=None):
             stream.write(json.dumps(record(o, float(steer), float(pedal), off)) + "\n")
 
 
-def dagger_rows(directories):
-    """(episode, obs, None, off_track) for every step Rev rode in rev_drive --collect."""
+def dagger_rows(directory):
+    """(episode, obs, None, off_track) for every step Rev rode in one rev_drive --collect run."""
     rows = []
-    for directory in directories:
-        for path in sorted(Path(directory).glob("collect-*.npz")):
-            z = np.load(path)
-            rows += [(f"{path.stem}:{e}", o, None, bool(off))
-                     for e, o, off in zip(z["episode"], z["obs"], z["off_track"])]
+    for path in sorted(Path(directory).glob("collect-*.npz")):
+        z = np.load(path)
+        rows += [(f"{Path(directory).name}/{path.stem}:{e}", o, None, bool(off))
+                 for e, o, off in zip(z["episode"], z["obs"], z["off_track"])]
     return rows
 
 
@@ -218,6 +217,9 @@ def main():
                         help="SAC checkpoint whose deterministic action labels steer and pedal")
     parser.add_argument("--dagger", type=Path, nargs="*", default=[],
                         help="rev_drive --collect directories: Rev's own states, teacher-labelled")
+    parser.add_argument("--max-train-records", type=int, default=0,
+                        help="keep every state of the last --dagger collection and fill the rest of "
+                             "this budget with a uniform sample of the older records")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
@@ -237,9 +239,17 @@ def main():
     train = []
     for run, n in zip(args.train_runs, per_run):
         train += sample(args.runs_dir / run, n, args.positive_fraction, args.blocks, args.block_shards, rng)
-    dagger = dagger_rows(args.dagger)
+    collections = [dagger_rows(directory) for directory in args.dagger]
+    dagger = [row for rows in collections for row in rows]
     print(f"{len(dagger)} DAgger states from {len(args.dagger)} collections")
-    train += dagger
+    if args.max_train_records and len(train) + len(dagger) > args.max_train_records:
+        newest = collections[-1] if collections else []
+        older = train + [row for rows in collections[:-1] for row in rows]
+        keep = max(0, args.max_train_records - len(newest))
+        train = [older[i] for i in rng.choice(len(older), min(keep, len(older)), replace=False)] + newest
+        print(f"capped to {len(train)} records: all {len(newest)} newest DAgger states + {len(train) - len(newest)} older")
+    else:
+        train += dagger
     rng.shuffle(train)
     heldout = sample(args.runs_dir / args.heldout_run, args.heldout_records, args.positive_fraction,
                      args.blocks, args.block_shards, rng)
