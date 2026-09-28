@@ -126,6 +126,20 @@ class Track:
         )
 
 
+def evaluation_starts(count: int, track: Track | None = None) -> list[dict]:
+    """Fixed rolling starts spread evenly around the lap at 80% of the safe speed:
+    the deterministic evaluation every trainer and driver shares."""
+    track = track or Track(RoadTelemetry())
+    starts = []
+    for k in range(count):
+        station = k * track.length / count
+        index = int(np.searchsorted(track._s, station, side="right") - 1)
+        speed = float(np.clip(0.8 * track.speed_limits[index], MIN_START_SPEED_M_S,
+                              MAX_INITIAL_SPEED_M_S))
+        starts.append(dict(station=round(station, 2), speed=round(speed, 2)))
+    return starts
+
+
 VEHICLES = ("motorcycle", "car")
 
 

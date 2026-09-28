@@ -54,14 +54,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import KVWriter, Logger
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
-from sac_env import (
-    MAX_INITIAL_SPEED_M_S,
-    MIN_START_SPEED_M_S,
-    ROOT,
-    ThunderhillSACEnv,
-    Track,
-)
-from lap_policy import RoadTelemetry
+from sac_env import ROOT, ThunderhillSACEnv, evaluation_starts
 
 TERMINATIONS = ("offroad", "collision", "fall", "stall", "horizon", "lap_completed",
                 "worker_restart", "crash")
@@ -219,15 +212,7 @@ class Evaluator:
     Godot recordings kept for rendering."""
 
     def __init__(self, args, run_dir):
-        track = Track(RoadTelemetry())
-        starts = []
-        for k in range(args.eval_starts):
-            station = k * track.length / args.eval_starts
-            index = int(np.searchsorted(track._s, station, side="right") - 1)
-            speed = float(np.clip(0.8 * track.speed_limits[index], MIN_START_SPEED_M_S,
-                                  MAX_INITIAL_SPEED_M_S))
-            starts.append(dict(station=round(station, 2), speed=round(speed, 2)))
-        self.starts = starts
+        self.starts = starts = evaluation_starts(args.eval_starts)
         self.directory = run_dir / "eval"
         self.envs = [ThunderhillSACEnv(godot=args.godot, data_dir=self.directory,
                                        horizon_s=args.eval_horizon, record_godot=True,

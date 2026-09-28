@@ -75,14 +75,11 @@ from pathlib import Path  # noqa: E402
 import numpy as np  # noqa: E402
 
 from sac_env import (  # noqa: E402
-    MAX_INITIAL_SPEED_M_S,
-    MIN_START_SPEED_M_S,
     OBSERVATION_SIZE,
     ROOT,
     ThunderhillSACEnv,
-    Track,
+    evaluation_starts,
 )
-from lap_policy import RoadTelemetry  # noqa: E402
 
 ACTION_SIZE = 2
 TERMINATIONS = ("offroad", "collision", "fall", "stall", "horizon", "lap_completed",
@@ -256,18 +253,6 @@ def run_actor(index, args, shared: Shared):
 
 
 # Evaluation process ------------------------------------------------------------
-def evaluation_starts(count):
-    track = Track(RoadTelemetry())
-    starts = []
-    for k in range(count):
-        station = k * track.length / count
-        index = int(np.searchsorted(track._s, station, side="right") - 1)
-        speed = float(np.clip(0.8 * track.speed_limits[index], MIN_START_SPEED_M_S,
-                              MAX_INITIAL_SPEED_M_S))
-        starts.append(dict(station=round(station, 2), speed=round(speed, 2)))
-    return starts
-
-
 def run_evaluator(args, shared: Shared, requests, results):
     """Deterministic policy from fixed rolling starts spread around the lap, with
     Godot recordings kept for rendering."""
