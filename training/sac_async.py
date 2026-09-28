@@ -20,6 +20,7 @@ environment is sac_env.py; the GPU learner is sac_learner.py).
 
   uv run training/sac_async.py --godot GODOT --run-name sac-async --workers 48
   uv run training/sac_async.py --godot GODOT --run-name sac-async --workers 48 --resume
+  uv run training/sac_async.py --godot GODOT --run-name sac-multi --workers 28 --tracks all
 
 On the 56-core / RTX 2080 Ti box: 48 workers step ~1,900 env steps/s (CPU bound:
 each headless Godot uses ~0.9 core while stepping) and the learner sustains ~545
@@ -35,6 +36,14 @@ ahead of that ratio, so the update-to-data ratio stays controlled when the
 learner is the slower side. An evaluator process runs the deterministic policy
 from fixed starts with Godot recordings, without stopping training.
 
+--tracks (all, or a comma list) trains one policy on several circuits: the
+observation is track-relative, so the same network can drive any of them. Actor
+i starts on track i mod T and, with --track-dwell, moves on to the next track
+every that many seconds (a Godot restart of a few seconds, staggered across
+actors), so every track gets the same share of data even when T does not divide
+--workers. Rolling starts stay random along each track. The evaluator rides
+--eval-starts fixed starts on every track, --eval-workers Godots at a time.
+
 SIGINT/SIGTERM to the trainer (for a systemd unit: systemctl --user kill -s INT
 --kill-whom=main UNIT) stops the actors, then saves unflushed rollouts, a final
 checkpoint and the replay buffer; --resume continues from them.
@@ -48,6 +57,9 @@ Everything for a run lives in --runs-dir/RUN_NAME:
                                               policy_version = learner update of
                                               the acting weights, learner_update)
   rollouts/episodes.jsonl                     one row per training episode
+  tracks.json                                 with --tracks: the track list that the
+                                              shard column `track` indexes (episode
+                                              rows and eval rows name the track)
   eval/eval.jsonl + eval/worker-*/            deterministic evaluations and their
                                               Godot recordings (render_run_video.py)
 """
@@ -75,6 +87,7 @@ from pathlib import Path  # noqa: E402
 import numpy as np  # noqa: E402
 
 from sac_env import (  # noqa: E402
+    DEFAULT_TRACK,
     OBSERVATION_SIZE,
     ROOT,
     RoadTelemetry,
@@ -95,7 +108,7 @@ for _name, _width in COLUMNS.items():
     OFFSETS[_name] = slice(_offset, _offset + _width)
     _offset += _width
 ROW_WIDTH = _offset
-META = ("episode", "policy_version")
+META = ("episode", "policy_version", "track")  # track: index into args.tracks
 
 
 # Policy on the CPU ------------------------------------------------------------
@@ -211,10 +224,21 @@ def _child_setup(niceness):
 
 def run_actor(index, args, shared: Shared):
     parent = _child_setup(args.actor_nice)
-    env = ThunderhillSACEnv(godot=args.godot, data_dir=args.run_dir / "workers",
-                            horizon_s=args.horizon, seed=args.seed * 1000 + index,
-                            reward_line=args.reward_line, pedal_gain=args.pedal_gain,
-                            vehicle=args.vehicle, track=args.track, policy_id=args.run_name)
+    tracks = args.tracks or [args.track]
+    slot, rotation = index % len(tracks), 0
+
+    def make_env():
+        return ThunderhillSACEnv(godot=args.godot, data_dir=args.run_dir / "workers",
+                                 horizon_s=args.horizon,
+                                 seed=args.seed * 1000 + index + 1_000_000 * rotation,
+                                 reward_line=args.reward_line, pedal_gain=args.pedal_gain,
+                                 vehicle=args.vehicle, track=tracks[slot],
+                                 policy_id=args.run_name)
+
+    env = make_env()
+    # Actors change track at staggered times, so only a few restart at once.
+    rotate = bool(args.tracks) and args.track_dwell > 0 and len(tracks) > 1
+    switch_at = time.monotonic() + args.track_dwell * (1 + index / args.workers)
     rng = np.random.default_rng([args.seed, index, int(time.time())])
     policy = NumpyPolicy(args.hidden)
     rows, meta = shared.rows[index], shared.meta[index]
@@ -241,11 +265,19 @@ def run_actor(index, args, shared: Shared):
             row[OFFSETS["terminated"]] = terminated
             row[OFFSETS["truncated"]] = truncated
             row[OFFSETS["restart"]] = info.get("worker_restart", False)
-            meta[shared.written[index] % shared.ring] = (episode, max(policy.version, 0))
+            meta[shared.written[index] % shared.ring] = (episode, max(policy.version, 0), slot)
             shared.written[index] += 1  # publishes the slot (x86 stores are ordered)
             if terminated or truncated:
-                shared.summaries.put(dict(info["episode_summary"], env=index, episode=episode,
-                                          policy_version=max(policy.version, 0)))
+                summary = dict(info["episode_summary"], env=index, episode=episode,
+                               policy_version=max(policy.version, 0))
+                if args.tracks:
+                    summary["track"] = tracks[slot]
+                shared.summaries.put(summary)
+                if rotate and time.monotonic() >= switch_at:
+                    env.close()
+                    slot, rotation = (slot + 1) % len(tracks), rotation + 1
+                    env = make_env()
+                    switch_at += args.track_dwell
                 obs, _ = env.reset()
                 episode = shared.next_episode()
             else:
@@ -301,6 +333,61 @@ def run_evaluator(args, shared: Shared, requests, results):
             env.close()
 
 
+def run_track_evaluator(args, shared: Shared, requests, results):
+    """With --tracks: the deterministic policy from --eval-starts fixed rolling
+    starts on every track, --eval-workers Godots at a time. Each thread starts
+    one Godot per track, rides that track's starts, then closes it, so at most
+    --eval-workers Godots run however many tracks there are."""
+    parent = _child_setup(0)
+    directory = args.run_dir / "eval"
+    starts = {track: evaluation_starts(args.eval_starts, Track(RoadTelemetry(track=track)))
+              for track in args.tracks}
+
+    def ride(policy, track):
+        env = ThunderhillSACEnv(godot=args.godot, data_dir=directory,
+                                horizon_s=args.eval_horizon, reward_line=args.reward_line,
+                                pedal_gain=args.pedal_gain, vehicle=args.vehicle, track=track,
+                                record_godot=True, policy_id=f"{args.run_name}-eval")
+        rows = []
+        try:
+            for start in starts[track]:
+                obs, info = env.reset(options={"start": start})
+                # The worker directory of the Godot that rode (and recorded) it.
+                worker_dir = directory / f"worker-{env.tag}-{env._restarts - 1}"
+                while not shared.stop.is_set():
+                    obs, _, terminated, truncated, info = env.step(policy.act(obs))
+                    if terminated or truncated:
+                        break
+                else:
+                    return None
+                recordings = list(worker_dir.glob(
+                    f"**/{info['episode_summary']['episode_id']}.jsonl"))
+                rows.append(dict(info["episode_summary"], track=track, recording=(
+                    str(recordings[0].relative_to(args.run_dir)) if recordings else None)))
+        finally:
+            env.close()
+        return rows
+
+    with ThreadPoolExecutor(args.eval_workers) as pool:
+        while not shared.stop.is_set() and os.getppid() == parent:
+            try:
+                step, update, flat, checkpoint = requests.get(timeout=1.0)
+            except queue.Empty:
+                continue
+            began = time.monotonic()
+            policy = NumpyPolicy(args.hidden)
+            policy.load(flat, update)
+            per_track = list(pool.map(lambda track: ride(policy, track), args.tracks))
+            if None in per_track:
+                return
+            rows = [row for track_rows in per_track for row in track_rows]
+            with (directory / "eval.jsonl").open("a") as stream:
+                for row in rows:
+                    row.update(policy_step=step, learner_update=update, checkpoint=checkpoint)
+                    stream.write(json.dumps(row) + "\n")
+            results.put((step, update, rows, time.monotonic() - began))
+
+
 # Learner-side recording --------------------------------------------------------
 class Recorder:
     """Every transition to npz shards, every episode to JSONL, and the rollout
@@ -311,6 +398,8 @@ class Recorder:
 
     def __init__(self, args, run_dir):
         self.args = args
+        # With --tracks, a shard column `track` indexes run_dir/tracks.json.
+        self.fields = self.SHARD_FIELDS + (("track",) if args.tracks else ())
         self.directory = run_dir / "rollouts"
         self.directory.mkdir(parents=True, exist_ok=True)
         shards = sorted(self.directory.glob("shard-*.npz"))
@@ -318,7 +407,7 @@ class Recorder:
         # Episode numbers are unique within the run, continuing across resumes.
         self.first_episode = 1 + max([-1] + [int(np.load(path)["episode"].max()) for path in shards])
         self.episodes = (self.directory / "episodes.jsonl").open("a")
-        self.pending = {k: [] for k in self.SHARD_FIELDS}
+        self.pending = {k: [] for k in self.fields}
         self.pending_rows = 0
         self.writer, self.write = ThreadPoolExecutor(1), None
         self.recent = []
@@ -326,7 +415,7 @@ class Recorder:
         self.best_lap = math.inf
 
     def add_rows(self, rows):
-        for k in self.SHARD_FIELDS:
+        for k in self.fields:
             self.pending[k].append(rows[k])
         self.pending_rows += len(rows["reward"])
         if self.pending_rows >= self.args.shard_steps:
@@ -353,7 +442,7 @@ class Recorder:
                                             self.directory / f"shard-{self.shard_index:05d}.npz",
                                             **arrays)
             self.shard_index += 1
-            self.pending = {k: [] for k in self.SHARD_FIELDS}
+            self.pending = {k: [] for k in self.fields}
             self.pending_rows = 0
         self.episodes.flush()
 
@@ -375,6 +464,27 @@ class Recorder:
             for reason in TERMINATIONS:
                 values[f"termination/{reason}"] = sum(
                     row["termination"] == reason for row in recent) / len(recent)
+            if self.args.tracks:
+                values.update(self.track_values(recent))
+        return values
+
+    def track_values(self, recent):
+        """Per-track episode count, failure shares and progress: a collapse shows
+        first as one track's offroad share climbing."""
+        values = {}
+        for track in self.args.tracks:
+            rows = [row for row in recent if row["track"] == track]
+            if not rows:
+                continue
+            prefix = f"track/{track}/"
+            values[prefix + "episodes"] = len(rows)
+            values[prefix + "failed"] = sum(
+                row["termination"] in ("offroad", "collision", "fall", "stall", "crash")
+                for row in rows) / len(rows)
+            values[prefix + "offroad"] = sum(
+                row["termination"] == "offroad" for row in rows) / len(rows)
+            values[prefix + "legal_progress_mean_m"] = float(
+                np.mean([row["legal_progress_m"] for row in rows]))
         return values
 
     def close(self):
@@ -437,11 +547,20 @@ class Trainer:
         self.evaluator = None
         if args.eval_every > 0:
             self.evaluator = context.Process(
-                target=run_evaluator, name="evaluator", daemon=True,
+                target=run_track_evaluator if args.tracks else run_evaluator,
+                name="evaluator", daemon=True,
                 args=(args, self.shared, self.eval_requests, self.eval_results))
         self.pending_publish = None
         self.eval_busy = False
         self.best_eval_lap = math.inf
+        # Best evaluation lap per track so far, across resumes (--tracks).
+        self.track_best = {}
+        if args.tracks and (run_dir / "eval" / "eval.jsonl").exists():
+            with (run_dir / "eval" / "eval.jsonl").open() as stream:
+                for row in map(json.loads, stream):
+                    if row["lap_time_s"] is not None:
+                        self.track_best[row["track"]] = min(
+                            self.track_best.get(row["track"], math.inf), row["lap_time_s"])
         self.staleness = []
 
     def _allowed_env_steps(self):
@@ -474,7 +593,7 @@ class Trainer:
             "reward": column("reward")[valid, 0], "next_obs": column("next_obs")[valid],
             "terminated": column("terminated")[valid, 0]})
         versions = meta[:, 1]
-        self.recorder.add_rows({
+        record = {
             "obs": column("obs").copy(), "action": column("action").copy(),
             "reward": column("reward")[:, 0].copy(), "next_obs": column("next_obs").copy(),
             "terminated": column("terminated")[:, 0] > 0, "truncated": column("truncated")[:, 0] > 0,
@@ -482,7 +601,10 @@ class Trainer:
             "episode": meta[:, 0].copy(),
             "policy_step": self.env_steps + np.arange(n, dtype=np.int64),
             "policy_version": versions.copy(),
-            "learner_update": np.full(n, self.sac.updates, np.int64)})
+            "learner_update": np.full(n, self.sac.updates, np.int64)}
+        if self.args.tracks:
+            record["track"] = meta[:, 2].astype(np.int16)
+        self.recorder.add_rows(record)
         acted = versions > 0
         if acted.any():
             self.staleness.append(self.sac.updates - versions[acted])
@@ -546,6 +668,9 @@ class Trainer:
         except queue.Empty:
             return
         self.eval_busy = False
+        if self.args.tracks:
+            self.collect_track_eval(step, update, rows, seconds)
+            return
         laps = [r["lap_time_s"] for r in rows if r["lap_time_s"] is not None]
         values = {
             "global_step": step,
@@ -572,6 +697,45 @@ class Trainer:
         print(json.dumps({"eval": values, "episodes": [
             {k: r[k] for k in ("termination", "steps", "centered_progress_m", "lap_time_s")}
             for r in rows]}), flush=True)
+
+    def collect_track_eval(self, step, update, rows, seconds):
+        """Per-track laps, lap times and terminations; aggregates are the laps
+        completed out of all evaluation episodes and the median over tracks of
+        this evaluation's best lap relative to that track's best so far."""
+        values = {"global_step": step, "eval/learner_update": update,
+                  "eval/wall_seconds": seconds, "eval/episodes": len(rows),
+                  "eval/laps_completed": sum(r["lap_time_s"] is not None for r in rows)}
+        relative, lines = [], []
+        for track in self.args.tracks:
+            track_rows = [r for r in rows if r["track"] == track]
+            laps = [r["lap_time_s"] for r in track_rows if r["lap_time_s"] is not None]
+            prefix = f"eval_track/{track}/"
+            values[prefix + "laps"] = len(laps)
+            values[prefix + "legal_progress_mean_m"] = float(
+                np.mean([r["legal_progress_m"] for r in track_rows]))
+            if laps:
+                self.track_best[track] = min(self.track_best.get(track, math.inf), min(laps))
+                relative.append(min(laps) / self.track_best[track])
+                values[prefix + "best_lap_time_s"] = min(laps)
+            if track in self.track_best:
+                values[prefix + "best_lap_time_ever_s"] = self.track_best[track]
+            terminations = ",".join(r["termination"] for r in track_rows)
+            lines.append(f"  {track:<16} {len(laps)}/{len(track_rows)} laps  "
+                         f"{min(laps) if laps else math.nan:7.2f} s  (best "
+                         f"{self.track_best.get(track, math.nan):7.2f})  {terminations}")
+        values["eval/tracks_with_lap"] = len(relative)
+        if relative:
+            values["eval/median_relative_lap"] = float(np.median(relative))
+        for reason in TERMINATIONS:
+            values[f"eval/termination/{reason}"] = sum(
+                r["termination"] == reason for r in rows) / len(rows)
+        if self.wandb:
+            self.wandb.log(values)
+        print(f"EVAL env step {step} update {update}: {values['eval/laps_completed']}/{len(rows)} "
+              f"laps on {len(relative)}/{len(self.args.tracks)} tracks, median relative lap "
+              f"{values.get('eval/median_relative_lap', math.nan):.3f}, {seconds:.0f} s, "
+              f"elapsed {time.monotonic() - self.started:.0f} s", flush=True)
+        print("\n".join(lines), flush=True)
 
     def log(self):
         now = time.monotonic()
@@ -690,6 +854,12 @@ def main():
     parser.add_argument("--track", default="thunderhill-east",
                         help="circuit: thunderhill-east or a MotoGP circuit built by "
                         "tools/build_circuit.py (godot/tracks/<id>)")
+    parser.add_argument("--tracks",
+                        help="train on several circuits at once: 'all' (thunderhill-east and "
+                        "every circuit with a track.json) or a comma list; overrides --track")
+    parser.add_argument("--track-dwell", type=float, default=900.0,
+                        help="with --tracks: seconds an actor stays on a track before moving to "
+                        "the next one (a Godot restart); 0 keeps each actor on one track")
     parser.add_argument("--workers", type=int, default=48, help="actor processes (one Godot each)")
     parser.add_argument("--actor-nice", type=int, default=5,
                         help="niceness added to actors and their Godot workers, so the "
@@ -722,7 +892,10 @@ def main():
     parser.add_argument("--eval-every", type=int, default=500_000,
                         help="env steps between evaluations (~4 min at 1,900 steps/s; each "
                         "keeps ~165 MB of Godot recordings)")
-    parser.add_argument("--eval-starts", type=int, default=4)
+    parser.add_argument("--eval-starts", type=int, default=4,
+                        help="fixed evaluation starts (per track with --tracks)")
+    parser.add_argument("--eval-workers", type=int, default=4,
+                        help="with --tracks: Godots the evaluator runs at once")
     parser.add_argument("--eval-horizon", type=float, default=240.0)
     parser.add_argument("--wandb-project", default="thunderhill-rl")
     parser.add_argument("--wandb-entity", default="skeptrune-org")
@@ -734,7 +907,23 @@ def main():
     args.run_dir = run_dir = (args.runs_dir / args.run_name).resolve()
     if run_dir.exists() and not args.resume:
         parser.error(f"{run_dir} exists; pass --resume or choose another --run-name")
+    if args.tracks:
+        circuits = ROOT / "godot" / "tracks"
+        known = sorted(path.parent.name for path in circuits.glob("*/track.json"))
+        args.tracks = ([DEFAULT_TRACK, *known] if args.tracks == "all"
+                       else [t.strip() for t in args.tracks.split(",") if t.strip()])
+        for track in args.tracks:
+            if track != DEFAULT_TRACK and track not in known:
+                parser.error(f"Unknown track {track!r}; available: {[DEFAULT_TRACK, *known]}")
+            if track != DEFAULT_TRACK and not (circuits / track / "generated" / "imagery.json").exists():
+                parser.error(f"Circuit {track} is not built: uv run tools/build_circuit.py {track}")
     run_dir.mkdir(parents=True, exist_ok=True)
+    if args.tracks:
+        # Shards store a track index; the list it indexes must not change on --resume.
+        listing = run_dir / "tracks.json"
+        if listing.exists() and json.loads(listing.read_text()) != args.tracks:
+            parser.error(f"{listing} lists other tracks than --tracks")
+        listing.write_text(json.dumps(args.tracks, indent=1) + "\n")
 
     wandb = None
     if not args.no_wandb:
