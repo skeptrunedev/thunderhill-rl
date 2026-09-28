@@ -24,7 +24,16 @@ func label(text: String, size: int, color := Color.WHITE) -> Label:
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title = label("THUNDERHILL  /  EAST", 25, Color("eee9da"))
+	var circuit: bool = game != null and game.track != null and game.track.circuit
+	var circuit_name: String = str(game.track.data.name).to_upper() if circuit else ""
+	var circuit_country: String = (
+		str(game.track.data.metadata.country).to_upper() if circuit else ""
+	)
+	title = label(
+		circuit_name + "  /  " + circuit_country if circuit else "THUNDERHILL  /  EAST",
+		25,
+		Color("eee9da")
+	)
 	title.position = Vector2(38, 28)
 	add_child(title)
 	status = label("STREETFIGHTER V4 S   •   PRACTICE", 13, Color("c3b48d"))
@@ -74,8 +83,12 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 16)
 	panel.add_child(box)
-	box.add_child(label("THUNDERHILL", 37))
-	box.add_child(label("EAST CIRCUIT  /  CALIFORNIA", 14, Color("c3b48d")))
+	box.add_child(label(circuit_name if circuit else "THUNDERHILL", 37))
+	box.add_child(
+		label(
+			circuit_country if circuit else "EAST CIRCUIT  /  CALIFORNIA", 14, Color("c3b48d")
+		)
+	)
 	box.add_child(
 		label(
 			(
@@ -83,7 +96,7 @@ func _ready() -> void:
 				if game != null and game.vehicle == "car"
 				else "Ducati Streetfighter V4 S"
 			)
-			+ "\nOpen practice • East Circuit",
+			+ ("\nOpen practice" if circuit else "\nOpen practice • East Circuit"),
 			16,
 			Color("c7cccd")
 		)

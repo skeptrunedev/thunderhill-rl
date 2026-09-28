@@ -140,6 +140,11 @@ def build(track_path, surface_path, output_path, metadata=None):
         nonlocal split_triangles
         positions = np.asarray(positions)
         texcoords = np.asarray(texcoords)
+        # Distinct terrain vertices can round to one float32 position (a grid point
+        # and a clipped boundary point a few nanometres apart). They are one render
+        # vertex, so drop the repeat instead of emitting a zero area triangle.
+        keep = np.any(positions != np.roll(positions, 1, axis=0), axis=1)
+        positions, texcoords = positions[keep], texcoords[keep]
         if len(positions) == 3:
             faces = [(positions, texcoords)]
         else:
@@ -177,7 +182,8 @@ def build(track_path, surface_path, output_path, metadata=None):
     boundary_counts = Counter(edge_key(pv[a], pv[b]) for tri in pt
                               for a, b in zip(tri, np.roll(tri, -1)))
     actual_boundary = {edge for edge, count in boundary_counts.items() if count == 1}
-    expected_boundary = {edge_key(ground[a], ground[b]) for a, b in boundary}
+    expected_boundary = {edge_key(ground[a], ground[b]) for a, b in boundary
+                         if not np.array_equal(ground[a], ground[b])}
     if any(count > 2 for count in boundary_counts.values()) or actual_boundary != expected_boundary:
         raise ValueError(f'Pavement boundary mismatch: extra={len(actual_boundary-expected_boundary)}, '
                          f'missing={len(expected_boundary-actual_boundary)}')
