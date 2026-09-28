@@ -1,6 +1,14 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["numpy"]
+# dependencies = ["numpy", "torch==2.8.0"]
+#
+# [tool.uv.sources]
+# torch = { index = "pytorch-cpu" }
+#
+# [[tool.uv.index]]
+# name = "pytorch-cpu"
+# url = "https://download.pytorch.org/whl/cpu"
+# explicit = true
 # ///
 """SAC rollouts as labelled records for Rev, our Jev-style decision model for riding.
 
@@ -25,7 +33,14 @@ depends on steps outside the loaded rows. Training and held-out records come fro
 different runs (fit the temperature on data from outside the training distribution); the held-out run is split in half by episode into calibration and
 development.
 
+With --teacher, steer and pedal targets are that SAC checkpoint's deterministic action
+(sac_teacher.py) instead of the exploration samples SAC recorded while training, and
+--dagger adds the states Rev visited on its own rides (rev_drive.py --collect), labelled
+by the same teacher: DAgger, so Rev also learns to recover from its own mistakes.
+
   uv run training/rev_dataset.py --out runs/rev/data-v1
+  uv run training/rev_dataset.py --teacher runs/sac/sac-v7-lr1e4-1/checkpoints/step_24000071.pt \
+      --dagger runs/rev/collect-r1 --out runs/rev/data-r1
 """
 
 from __future__ import annotations
@@ -107,9 +122,8 @@ def expected_level(probabilities: dict, levels: dict) -> float:
     return float(sum(p * levels[name] for name, p in probabilities.items()))
 
 
-def record(obs, action, off_track: bool, pedal_gain: float) -> dict:
-    steer = float(np.clip(action[0], -1.0, 1.0))
-    pedal = float(np.clip(pedal_gain * action[1], -1.0, 1.0))  # sac_env.controls
+def record(obs, steer: float, pedal: float, off_track: bool) -> dict:
+    """steer and pedal as applied: pedal after sac_env.controls' gain and clip."""
     questions = {}
     for qid, value, levels in (("steer", steer, STEER_LEVELS), ("pedal", pedal, PEDAL_LEVELS)):
         target = soft_target(value, levels)
@@ -164,10 +178,29 @@ def sample(run_dir: Path, n: int, positive_fraction: float, blocks: int, block_s
     return picked
 
 
-def write(path: Path, rows, pedal_gain: float):
+def write(path: Path, rows, pedal_gain: float, teacher=None):
+    """rows are (episode, obs, recorded raw action or None, off_track); with a teacher the
+    targets are its actions, otherwise the recorded ones through sac_env.controls."""
+    obs = np.stack([row[1] for row in rows])
+    if teacher is not None:
+        controls = teacher.controls(obs)
+    else:
+        raw = np.stack([row[2] for row in rows])
+        controls = np.stack([np.clip(raw[:, 0], -1, 1), np.clip(pedal_gain * raw[:, 1], -1, 1)], axis=1)
     with path.open("w") as stream:
-        for _, obs, action, off in rows:
-            stream.write(json.dumps(record(obs, action, off, pedal_gain)) + "\n")
+        for (_, o, _, off), (steer, pedal) in zip(rows, controls):
+            stream.write(json.dumps(record(o, float(steer), float(pedal), off)) + "\n")
+
+
+def dagger_rows(directories):
+    """(episode, obs, None, off_track) for every step Rev rode in rev_drive --collect."""
+    rows = []
+    for directory in directories:
+        for path in sorted(Path(directory).glob("collect-*.npz")):
+            z = np.load(path)
+            rows += [(f"{path.stem}:{e}", o, None, bool(off))
+                     for e, o, off in zip(z["episode"], z["obs"], z["off_track"])]
+    return rows
 
 
 def main():
@@ -181,11 +214,21 @@ def main():
     parser.add_argument("--blocks", type=int, default=10)
     parser.add_argument("--block-shards", type=int, default=3)
     parser.add_argument("--pedal-gain", type=float, default=1.25)
+    parser.add_argument("--teacher", type=Path,
+                        help="SAC checkpoint whose deterministic action labels steer and pedal")
+    parser.add_argument("--dagger", type=Path, nargs="*", default=[],
+                        help="rev_drive --collect directories: Rev's own states, teacher-labelled")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     if set(args.train_runs) & {args.heldout_run}:
         parser.error("the held-out run must not be a training run")
+    if args.dagger and not args.teacher:
+        parser.error("--dagger states have no recorded action; pass --teacher to label them")
+    teacher = None
+    if args.teacher:
+        from sac_teacher import SacTeacher
+        teacher = SacTeacher(args.teacher, args.pedal_gain)
     rng = np.random.default_rng(args.seed)
     args.out.mkdir(parents=True, exist_ok=False)
 
@@ -194,6 +237,9 @@ def main():
     train = []
     for run, n in zip(args.train_runs, per_run):
         train += sample(args.runs_dir / run, n, args.positive_fraction, args.blocks, args.block_shards, rng)
+    dagger = dagger_rows(args.dagger)
+    print(f"{len(dagger)} DAgger states from {len(args.dagger)} collections")
+    train += dagger
     rng.shuffle(train)
     heldout = sample(args.runs_dir / args.heldout_run, args.heldout_records, args.positive_fraction,
                      args.blocks, args.block_shards, rng)
@@ -204,9 +250,10 @@ def main():
     development = [row for row in heldout if row[0] not in calibration_ids]
 
     for name, rows in (("train", train), ("calibration", calibration), ("development", development)):
-        write(args.out / f"{name}.jsonl", rows, args.pedal_gain)
+        write(args.out / f"{name}.jsonl", rows, args.pedal_gain, teacher)
     summary = {
         "train_runs": args.train_runs, "heldout_run": args.heldout_run,
+        "teacher": str(args.teacher) if args.teacher else None, "dagger_states": len(dagger),
         "records": {"train": len(train), "calibration": len(calibration), "development": len(development)},
         "off_track_fraction": {name: round(float(np.mean([r[3] for r in rows])), 4) for name, rows in
                                (("train", train), ("calibration", calibration), ("development", development))},
