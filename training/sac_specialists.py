@@ -209,12 +209,30 @@ def publish_entry(registry: Path, track: str, entry: dict):
         tmp.replace(registry)
 
 
+# A shaped lane may publish a lap up to this much slower than its fastest lap before
+# shaping: those laps often skipped apexes, and a line through every apex can cost
+# a few tenths.
+CEILING_TOLERANCE = 0.005
+
+
+def lap_ceiling(shaping: dict) -> float:
+    return shaping["fastest_lap_s"] * (1 + CEILING_TOLERANCE)
+
+
+def ceiling_record(shaping: dict | None) -> dict | None:
+    """The shaped-lane lap ceiling as the registry records it."""
+    if not shaping:
+        return None
+    return dict(fastest_pre_shaping_lap_s=round(shaping["fastest_lap_s"], 3),
+                tolerance=CEILING_TOLERANCE, ceiling_s=round(lap_ceiling(shaping), 3))
+
+
 def shaped_result_ok(evaluation: dict, shaping: dict | None) -> bool:
     """A lane under reward shaping may only publish an evaluation of the shaped run
-    (after shaping started) that is no slower than its fastest lap before it."""
+    (after shaping started) no slower than lap_ceiling() of its fastest lap before."""
     return shaping is None or (evaluation["steps"] > shaping["at_step"]
                                and evaluation["best_lap_s"] is not None
-                               and evaluation["best_lap_s"] <= shaping["fastest_lap_s"])
+                               and evaluation["best_lap_s"] <= lap_ceiling(shaping))
 
 
 def publish_checked(registry: Path, track: str, run_dir: Path, lane_entry: dict, starts: int,
@@ -230,6 +248,7 @@ def publish_checked(registry: Path, track: str, run_dir: Path, lane_entry: dict,
                if state_path.exists() else None)
     entry = dict(lane_entry, **summary(evaluation))
     entry.update(checkpoint=lane_entry["checkpoint"], synced_from=source,
+                 lap_ceiling=ceiling_record(shaping),
                  meets_bar=meets_bar(evaluation, starts) and shaped_result_ok(evaluation, shaping))
     if entry["meets_bar"]:
         publish_entry(registry, track, entry)
@@ -395,8 +414,8 @@ class Specialists:
             return False  # no baseline measured: never publish unchecked
         if general["best_lap_s"] is not None and best["best_lap_s"] >= general["best_lap_s"]:
             return False
-        ceiling = getattr(self, "state", {}).get("shaping_from", {}).get("fastest_lap_s")
-        return ceiling is None or best["best_lap_s"] <= ceiling
+        shaping = getattr(self, "state", {}).get("shaping_from")
+        return shaping is None or best["best_lap_s"] <= lap_ceiling(shaping)
 
     def run_trainer(self, track, learning_rate, learn, refine_from) -> str:
         """sac_async.py on one circuit until outcome() decides; after every
@@ -490,6 +509,7 @@ class Specialists:
         entry = dict(summary(best), checkpoint=str((run_dir / best["checkpoint"]).relative_to(ROOT)),
                      eval_starts=self.args.eval_starts, meets_bar=True,
                      trained_steps=self.latest_steps(run_dir),
+                     lap_ceiling=ceiling_record(shaping),
                      # The step-0 evaluation rides the --init-from weights unchanged.
                      general=general and dict(summary(general), checkpoint=str(
                          self.args.init_from.relative_to(ROOT)), evaluated_at="step_0.pt"),
