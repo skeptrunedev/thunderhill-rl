@@ -9,7 +9,8 @@ const DT: float = 1.0 / 120.0
 const VEHICLES := ["motorcycle", "car"]
 const MAX_AGENT_SNAPSHOTS := 64
 # Rolling starts up to racing straight speeds; training/episode_config.py mirrors it.
-const MAX_INITIAL_SPEED_M_S := 40.0
+# Reset validation bound; trainers choose their own start speeds within it.
+const MAX_INITIAL_SPEED_M_S := 80.0
 # Simulation bookkeeping only. Rendering interpolation and static geometry caches
 # cannot influence an agent step; the collision sweep initializes its own cache.
 const SNAPSHOT_GAME_FIELDS := [

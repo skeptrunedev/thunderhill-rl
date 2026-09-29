@@ -240,6 +240,8 @@ def run_actor(index, args, shared: Shared):
                                  apex_bonus_m=args.apex_bonus_m,
                                  throttle_bonus_m=args.throttle_bonus_m,
                                  apex_bonus_dense=args.apex_bonus_dense,
+                                 max_start_speed_m_s=args.max_start_speed,
+                                 apex_bonus_stations=args.apex_bonus_stations,
                                  vehicle=args.vehicle, track=tracks[slot],
                                  policy_id=args.run_name)
 
@@ -284,9 +286,8 @@ def run_actor(index, args, shared: Shared):
             lead = rng.uniform(min(args.focus_lead_min, reach), reach)
             focused = lead
             station = (spots[int(rng.integers(len(spots)))] - lead) % track.length
-            limit = track.speed_limits[min(int(np.searchsorted(track._s, station, side="right") - 1),
-                                           len(track.speed_limits) - 1)]
-            speed = float(np.clip(0.8 * limit, MIN_START_SPEED_M_S, MAX_INITIAL_SPEED_M_S))
+            speed = float(np.clip(0.8 * env.start_limit(station), MIN_START_SPEED_M_S,
+                                  args.max_start_speed))
             return env.reset(options={"start": dict(station=round(float(station), 2),
                                                     speed=round(speed, 2))})
         return env.reset()
@@ -967,6 +968,13 @@ def main():
                         help="opt-in shaping: metres of progress credited once per required "
                         "apex (tools/apex_report.py), scaled by the inside reach achieved "
                         "there, full at the judge's 0.75")
+    parser.add_argument("--max-start-speed", type=float, default=MAX_INITIAL_SPEED_M_S,
+                        help="training (not evaluation) starts up to this speed, within the "
+                        "braking-aware limit at their station; above 40 m/s they begin in the "
+                        "higher gears the evaluation starts never reach")
+    parser.add_argument("--apex-bonus-stations", type=lambda text: [float(x) for x in text.split(",")],
+                        help="comma list: only these required apexes pay --apex-bonus-m (a bonus "
+                        "on every corner paid mandalika for slowing down everywhere)")
     parser.add_argument("--apex-bonus-dense", action="store_true",
                         help="pay --apex-bonus-m as the inside reach grows within the apex "
                         "window rather than once on leaving it (same total)")

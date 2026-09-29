@@ -221,7 +221,9 @@ class ThunderhillSACEnv(gym.Env):
                  vehicle: str = "motorcycle", track: str = DEFAULT_TRACK,
                  record_godot: bool = False, starts: list[dict] | None = None,
                  seed: int = 0, policy_id: str = "sac", apex_bonus_m: float = 0.0,
-                 throttle_bonus_m: float = 0.0, apex_bonus_dense: bool = False):
+                 throttle_bonus_m: float = 0.0, apex_bonus_dense: bool = False,
+                 max_start_speed_m_s: float = MAX_INITIAL_SPEED_M_S,
+                 apex_bonus_stations: list[float] | None = None):
         self.godot, self.data_dir = godot, Path(data_dir)
         self.horizon_s, self.record_godot = horizon_s, record_godot
         if reward_line not in ("progress", "centered"):
@@ -236,7 +238,13 @@ class ThunderhillSACEnv(gym.Env):
         self.fixed_starts, self.policy_id = starts, policy_id
         # The worker runs --track=<id>; Track mirrors that geometry for observations.
         self.track_id = track
-        self.track = Track(RoadTelemetry(track=track))
+        road = RoadTelemetry(track=track)
+        self.track = Track(road)
+        # Training starts (not the evaluation's) may begin faster than the shared 40 m/s
+        # cap, up to the braking-aware limit computed with this higher cap.
+        self.max_start_speed = max_start_speed_m_s
+        self.start_limits = (self.track.speed_limits if max_start_speed_m_s <= MAX_INITIAL_SPEED_M_S
+                             else np.array(_speed_limits(road, max_start_speed_m_s)))
         # Opt-in shaping toward the specialists' bar (tools/apex_report.py), in metres
         # of progress: apex_bonus_m once per required apex as the bike leaves its
         # judging window, scaled by its best inside reach there (full at the 0.75
@@ -249,7 +257,10 @@ class ThunderhillSACEnv(gym.Env):
         self.apex_bonus_dense = apex_bonus_dense
         self._apexes = []
         if apex_bonus_m > 0:
-            self._apexes = [(c["apex_station_m"], c["direction"]) for c in required_corners(track)]
+            self._apexes = [(c["apex_station_m"], c["direction"]) for c in required_corners(track)
+                            # apex_bonus_stations: only these corners pay (within 5 m)
+                            if not apex_bonus_stations or any(
+                                abs(c["apex_station_m"] - s) <= 5.0 for s in apex_bonus_stations)]
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (OBSERVATION_SIZE,), np.float32)
         self.action_space = gym.spaces.Box(-1.0, 1.0, (2,), np.float32)
         self.rng = np.random.default_rng(seed)
@@ -295,10 +306,13 @@ class ThunderhillSACEnv(gym.Env):
         if self.fixed_starts:
             return self.fixed_starts[self._episodes % len(self.fixed_starts)]
         station = float(self.rng.uniform(0.0, self.track.length))
+        speed = max(MIN_START_SPEED_M_S, self.start_limit(station) * self.rng.uniform(*START_SPEED_FRACTION))
+        return dict(station=round(station, 2), speed=round(min(speed, self.max_start_speed), 2))
+
+    def start_limit(self, station: float) -> float:
+        """Braking-aware start speed limit at a station, capped at max_start_speed."""
         index = int(np.searchsorted(self.track._s, station, side="right") - 1)
-        limit = float(self.track.speed_limits[min(index, len(self.track.speed_limits) - 1)])
-        speed = max(MIN_START_SPEED_M_S, limit * self.rng.uniform(*START_SPEED_FRACTION))
-        return dict(station=round(station, 2), speed=round(min(speed, MAX_INITIAL_SPEED_M_S), 2))
+        return float(self.start_limits[min(index, len(self.start_limits) - 1)])
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
