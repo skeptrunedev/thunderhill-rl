@@ -380,7 +380,9 @@ class Specialists:
         """Faster than the general policy's step-0 evaluation (where it lapped) and,
         once shaping started, no slower than the run's best lap before it."""
         general = next((e for e in evals if e["steps"] == 0), None)
-        if general and general["best_lap_s"] is not None and best["best_lap_s"] >= general["best_lap_s"]:
+        if general is None:
+            return False  # no baseline measured: never publish unchecked
+        if general["best_lap_s"] is not None and best["best_lap_s"] >= general["best_lap_s"]:
             return False
         ceiling = getattr(self, "state", {}).get("shaping_from", {}).get("fastest_lap_s")
         return ceiling is None or best["best_lap_s"] <= ceiling
@@ -392,6 +394,17 @@ class Specialists:
         decided = self.outcome(evaluations(run_dir, args.eval_starts, track), learn, refine_from)
         if decided:
             return decided
+        if (run_dir / "checkpoints").exists() and not any(
+                e["steps"] == 0 for e in evaluations(run_dir, args.eval_starts, track)):
+            # A run whose step-0 evaluation was lost (stopped before it was saved)
+            # measures its general-policy baseline now, the same way.
+            print(f"BASELINE {track}: no step-0 evaluation; evaluating {args.init_from}", flush=True)
+            subprocess.run([
+                args.uv, "run", "--script", str(ROOT / "training/sac_async.py"), "--godot", args.godot,
+                "--runs-dir", str(args.runs_dir), "--run-name", run_dir.name, "--resume", "--eval-only",
+                "--init-from", str(args.init_from), "--track", track, "--reward-line", "progress",
+                "--pedal-gain", "1.25", "--eval-starts", str(args.eval_starts),
+                "--eval-horizon", str(args.eval_horizon), "--no-wandb"], cwd=ROOT, check=True)
         focus = run_dir / "focus.json"
         command = [
             args.uv, "run", "--script", str(ROOT / "training/sac_async.py"),

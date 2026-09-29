@@ -453,6 +453,54 @@ def run_track_evaluator(args, shared: Shared, requests, results):
             results.put((step, update, rows, time.monotonic() - began))
 
 
+def evaluate_starting_weights(args):
+    """--eval-only: the --init-from weights under the single-track evaluation, written
+    as the run's step-0 evaluation (checkpoint label checkpoints/step_0.pt), then exit.
+    For a run whose own step-0 evaluation was lost, so its general-policy baseline
+    is measured the same way as every other run's."""
+    import torch
+
+    state = torch.load(args.init_from, map_location="cpu", weights_only=False)
+    flat = torch.cat([v.reshape(-1).float() for v in state["sac"]["actor"].values()]).numpy()
+    policy = NumpyPolicy(args.hidden)
+    policy.load(flat, state["sac"]["updates"])
+    directory = args.run_dir / "eval"
+    starts = evaluation_starts(args.eval_starts, Track(RoadTelemetry(track=args.track)))
+    envs = [ThunderhillSACEnv(godot=args.godot, data_dir=directory, horizon_s=args.eval_horizon,
+                              reward_line=args.reward_line, pedal_gain=args.pedal_gain,
+                              vehicle=args.vehicle, track=args.track, record_godot=True,
+                              policy_id=f"{args.run_name}-eval")
+            for _ in starts]
+
+    def episode(env, start):
+        obs, info = env.reset(options={"start": start})
+        while True:
+            obs, _, terminated, truncated, info = env.step(policy.act(obs))
+            if terminated or truncated:
+                return info["episode_summary"]
+
+    try:
+        with ThreadPoolExecutor(len(envs)) as pool:
+            rows = list(pool.map(episode, envs, starts))
+    finally:
+        for env in envs:
+            env.close()
+    checkpoint = args.run_dir / "checkpoints" / "step_0.pt"
+    if not checkpoint.exists():
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(dict(sac=state["sac"], env_steps=0, update_offset=state["sac"]["updates"],
+                        args=vars(args)), checkpoint)
+    with (directory / "eval.jsonl").open("a") as stream:
+        for row in rows:
+            recordings = list(directory.glob(f"**/{row['episode_id']}.jsonl"))
+            row.update(policy_step=0, learner_update=state["sac"]["updates"],
+                       checkpoint=str(checkpoint.relative_to(args.run_dir)),
+                       recording=str(recordings[0].relative_to(args.run_dir)) if recordings else None)
+            stream.write(json.dumps(row) + "\n")
+    laps = sorted(r["lap_time_s"] for r in rows if r["lap_time_s"] is not None)
+    print(f"EVAL-ONLY {args.init_from}: {len(laps)}/{len(rows)} laps {laps}", flush=True)
+
+
 # Learner-side recording --------------------------------------------------------
 class Recorder:
     """Every transition to npz shards, every episode to JSONL, and the rollout
@@ -960,6 +1008,9 @@ def main():
     parser.add_argument("--runs-dir", type=Path, default=ROOT / "runs" / "sac")
     parser.add_argument("--resume", action="store_true",
                         help="continue from the run's latest checkpoint and replay buffer")
+    parser.add_argument("--eval-only", action="store_true",
+                        help="evaluate the --init-from weights as the run's step-0 evaluation "
+                        "(appended to eval/eval.jsonl) and exit")
     parser.add_argument("--resume-weights-from", type=Path,
                         help="with --resume: take the networks, optimizers and entropy "
                         "temperature from this checkpoint (e.g. the run's best) instead of "
@@ -1113,6 +1164,11 @@ def main():
         wandb.define_metric("global_step")
         wandb.define_metric("*", step_metric="global_step")
 
+    if args.eval_only:
+        if not args.init_from or args.tracks:
+            parser.error("--eval-only needs --init-from and a single --track")
+        evaluate_starting_weights(args)
+        return
     stop = []
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.append(True))
