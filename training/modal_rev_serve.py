@@ -27,6 +27,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modal_rev import HF, RUNS, hf_cache, image, runs  # noqa: E402
 
 SERVE_RUN = os.environ.get("REV_SERVE_RUN", "")
+# bf16 (default) or fp32, the exact path the trainer's scoring uses, for precision checks.
+SERVE_DTYPE = os.environ.get("REV_SERVE_DTYPE", "bf16")
 LABEL = "thunderhill-rev-serve"
 WARMUP = {"model": "kev-latest", "state": {"speed km/h": 120, "on track": True},
           "questions": {"q": {"type": "noul", "instructions": "Is the motorcycle on the track?"}}}
@@ -34,7 +36,7 @@ WARMUP = {"model": "kev-latest", "state": {"speed km/h": 120, "on track": True},
 app = modal.App("thunderhill-rev-serve")
 
 
-@app.cls(image=image.env({"REV_SERVE_RUN": SERVE_RUN}).add_local_python_source("modal_rev"), gpu="H100", cpu=4, memory=(16384, 65536),
+@app.cls(image=image.env({"REV_SERVE_RUN": SERVE_RUN, "REV_SERVE_DTYPE": SERVE_DTYPE}).add_local_python_source("modal_rev"), gpu="H100", cpu=4, memory=(16384, 65536),
          volumes={RUNS: runs, HF: hf_cache}, secrets=[modal.Secret.from_name("rev-serve-key")],
          min_containers=1, max_containers=1, scaledown_window=600, timeout=3600, startup_timeout=900)
 @modal.concurrent(max_inputs=64)
@@ -53,7 +55,9 @@ class Serve:
             raise FileNotFoundError(f"no Rev checkpoint at /runs/{run}")
         started = time.time()
         ck = Checkpoint(str(checkpoint))
-        tok, model = ck.load("cuda", LoadOptions(dtype=torch.bfloat16, cuda_graphs=True, fused=True))
+        bf16 = os.environ["REV_SERVE_DTYPE"] == "bf16"  # the fused kernels are bf16 only
+        tok, model = ck.load("cuda", LoadOptions(dtype=torch.bfloat16 if bf16 else torch.float32,
+                                                 cuda_graphs=True, fused=bf16))
         server = api.state.server = Server(ck, tok, model, "cuda")
         server.answer(SystemOneRequest.model_validate(WARMUP))
         server.wait_idle()
