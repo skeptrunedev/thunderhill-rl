@@ -313,6 +313,17 @@ class Specialists:
                 e["best_lap_s"] for e in evaluations(run_dir, args.eval_starts, track)
                 if e["laps"] == args.eval_starts and e["steps"] <= shaping["at_step"])
             state_path.write_text(json.dumps(state, indent=1) + "\n")
+        # A changed recipe restarts the stuck clock: its evaluations are a new attempt.
+        recipe = json.dumps({k: getattr(args, k) for k in (
+            "apex_bonus_m", "apex_bonus_dense", "apex_bonus_stations", "throttle_bonus_m",
+            "max_start_speed", "focus_lead", "focus_lead_min", "focus_curriculum",
+            "focus_stations")}, sort_keys=True)
+        if state.get("recipe") != recipe:
+            state.update(recipe=recipe, recipe_from=self.latest_steps(run_dir))
+            if state["phase"] == "stuck":
+                state["phase"] = "refine"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps(state, indent=1) + "\n")
         self.state = state
         if state["phase"] == "done" and self.outcome(
                 evaluations(run_dir, args.eval_starts, track), False,
@@ -358,8 +369,8 @@ class Specialists:
         if (not learn and best and self.meets_bar(best, args.eval_starts)
                 and self.fast_enough(evals, best) and self.lap_plateaued(evals, refine_from)):
             return "done"
-        since = [e for e in evals if not shaping or e["steps"] > shaping["at_step"]]
-        start = shaping["at_step"] if shaping else 0
+        start = max(shaping["at_step"] if shaping else 0, self.state.get("recipe_from", 0))
+        since = [e for e in evals if e["steps"] > start] if start else evals
         if since and since[-1]["steps"] - max(last_improvement(since, args.min_delta), start) \
                 >= args.stuck_steps:
             return "stuck"
