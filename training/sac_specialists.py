@@ -195,16 +195,28 @@ def publish_entry(registry: Path, track: str, entry: dict):
         tmp.replace(registry)
 
 
+def shaped_result_ok(evaluation: dict, shaping: dict | None) -> bool:
+    """A lane under reward shaping may only publish an evaluation of the shaped run
+    (after shaping started) that is no slower than its fastest lap before it."""
+    return shaping is None or (evaluation["steps"] > shaping["at_step"]
+                               and evaluation["best_lap_s"] is not None
+                               and evaluation["best_lap_s"] <= shaping["fastest_lap_s"])
+
+
 def publish_checked(registry: Path, track: str, run_dir: Path, lane_entry: dict, starts: int,
                     source: str) -> tuple[bool, dict]:
     """A lane's published result, measured again here at its checkpoint (the
-    recordings of that evaluation must be in run_dir) and published to the
-    registry only if it meets the bar."""
+    recordings of that evaluation must be in run_dir, with its specialist.json)
+    and published to the registry only if it meets the bar and, for a shaped
+    lane, comes from the shaped run at least as fast as before."""
     checkpoint = Path(lane_entry["checkpoint"]).relative_to(run_dir.relative_to(ROOT)).as_posix()
     evaluation, = evaluations(run_dir, starts, track, only=checkpoint)
+    state_path = run_dir / "specialist.json"
+    shaping = (json.loads(state_path.read_text()).get("shaping_from")
+               if state_path.exists() else None)
     entry = dict(lane_entry, **summary(evaluation))
-    entry.update(checkpoint=lane_entry["checkpoint"], meets_bar=meets_bar(evaluation, starts),
-                 synced_from=source)
+    entry.update(checkpoint=lane_entry["checkpoint"], synced_from=source,
+                 meets_bar=meets_bar(evaluation, starts) and shaped_result_ok(evaluation, shaping))
     if entry["meets_bar"]:
         publish_entry(registry, track, entry)
     return entry["meets_bar"], entry
@@ -332,8 +344,14 @@ class Specialists:
         best = max(evals, key=rank)
         if learn and best["laps"] == args.eval_starts:
             return "reliable"
-        if (not learn and self.meets_bar(best, args.eval_starts) and self.fast_enough(evals, best)
-                and self.lap_plateaued(evals, refine_from)):
+        shaping = getattr(self, "state", {}).get("shaping_from")
+        if shaping:
+            # Only the shaped run counts, and it needs its own refine window.
+            refine_from = max(refine_from, shaping["at_step"])
+            shaped = [e for e in evals if shaped_result_ok(e, shaping)]
+            best = max(shaped, key=rank) if shaped else None
+        if (not learn and best and self.meets_bar(best, args.eval_starts)
+                and self.fast_enough(evals, best) and self.lap_plateaued(evals, refine_from)):
             return "done"
         if evals[-1]["steps"] - last_improvement(evals, args.min_delta) >= args.stuck_steps:
             return "stuck"
@@ -419,7 +437,8 @@ class Specialists:
         """Publish the best evaluated checkpoint, then free the circuit's disk."""
         run_dir = self.run_dir(track)
         evals = evaluations(run_dir, self.args.eval_starts, track)
-        best = max(evals, key=rank)
+        shaping = getattr(self, "state", {}).get("shaping_from")
+        best = max([e for e in evals if shaped_result_ok(e, shaping)], key=rank)
         general = next((e for e in evals if e["steps"] == 0), None)
         entry = dict(summary(best), checkpoint=str((run_dir / best["checkpoint"]).relative_to(ROOT)),
                      eval_starts=self.args.eval_starts, meets_bar=True,
