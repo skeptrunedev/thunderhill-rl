@@ -183,38 +183,38 @@ def status(lanes: str = LANES):
             print(f"  latest {describe(evals[-1])}\n  best   {describe(max(evals, key=rank))}")
 
 
+def sync_track(track: str, starts: int = 6, lanes: str = LANES,
+               registry: str = "runs/sac/specialists.json") -> str:
+    """Pull one lane's published result (checkpoint, evaluation rows, best-lap
+    recordings) and publish it if it meets the bar measured here: published,
+    fails-check (with the local numbers printed) or unpublished."""
+    sys.path.insert(0, str(ROOT / "training"))
+    from sac_specialists import publish_checked
+
+    lane_entry = _read(f"{lanes}/{track}.json")
+    if lane_entry is None:
+        return "unpublished"
+    lane_entry = json.loads(lane_entry)[track]
+    run = f"{lanes}/specialist-{track}"
+    for name in ("eval/eval.jsonl", "specialist.json", "train.log"):
+        _download(f"{run}/{name}")
+    run_dir = ROOT / run
+    checkpoint = Path(lane_entry["checkpoint"]).relative_to(run).as_posix()
+    _download(lane_entry["checkpoint"])
+    for row in map(json.loads, (run_dir / "eval/eval.jsonl").open()):
+        if row["checkpoint"] == checkpoint and row.get("recording"):
+            _download(f"{run}/{row['recording']}")
+    published, entry = publish_checked(ROOT / registry, track, run_dir, lane_entry, starts, "modal")
+    if not published:
+        print(f"{track}: lane published but the local check fails: {json.dumps(entry)}")
+        return "fails-check"
+    print(f"{track}: published {entry['checkpoint']} ({entry['best_lap_s']} s, "
+          f"{entry['apexes_hit']}/{entry['apexes_total']} apexes)")
+    return "published"
+
+
 @app.local_entrypoint()
 def sync(starts: int = 6, lanes: str = LANES, registry: str = "runs/sac/specialists.json"):
     """Pull published lanes and publish those meeting the bar, measured here."""
-    sys.path.insert(0, str(ROOT / "training"))
-    from sac_specialists import evaluations, meets_bar, publish_entry, summary
-
-    registry = ROOT / registry
     for track in _lane_tracks(lanes):
-        lane_entry = _read(f"{lanes}/{track}.json")
-        if lane_entry is None:
-            continue
-        lane_entry = json.loads(lane_entry)[track]
-        run = f"{lanes}/specialist-{track}"
-        for name in ("eval/eval.jsonl", "specialist.json", "train.log"):
-            _download(f"{run}/{name}")
-        run_dir = ROOT / run
-        rows = [json.loads(line) for line in (run_dir / "eval/eval.jsonl").open()]
-        best_rows = [r for r in rows if r["checkpoint"] == Path(lane_entry["checkpoint"])
-                     .relative_to(run).as_posix()]
-        _download(lane_entry["checkpoint"])
-        for row in best_rows:
-            if row.get("recording"):
-                _download(f"{run}/{row['recording']}")
-        (run_dir / "apex.jsonl").unlink(missing_ok=True)
-        evaluation, = evaluations(run_dir, starts, track, only=best_rows[0]["checkpoint"])
-        entry = dict(lane_entry, **summary(evaluation))
-        entry.update(checkpoint=lane_entry["checkpoint"], meets_bar=meets_bar(evaluation, starts),
-                     synced_from="modal")
-        if not entry["meets_bar"]:
-            print(f"{track}: lane published but the local apex check fails: "
-                  f"{json.dumps(summary(evaluation))}")
-            continue
-        publish_entry(registry, track, entry)
-        print(f"{track}: published {entry['checkpoint']} ({entry['best_lap_s']} s, "
-              f"{entry['apexes_hit']}/{entry['apexes_total']} apexes)")
+        sync_track(track, starts, lanes, registry)

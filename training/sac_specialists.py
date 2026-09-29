@@ -195,6 +195,21 @@ def publish_entry(registry: Path, track: str, entry: dict):
         tmp.replace(registry)
 
 
+def publish_checked(registry: Path, track: str, run_dir: Path, lane_entry: dict, starts: int,
+                    source: str) -> tuple[bool, dict]:
+    """A lane's published result, measured again here at its checkpoint (the
+    recordings of that evaluation must be in run_dir) and published to the
+    registry only if it meets the bar."""
+    checkpoint = Path(lane_entry["checkpoint"]).relative_to(run_dir.relative_to(ROOT)).as_posix()
+    evaluation, = evaluations(run_dir, starts, track, only=checkpoint)
+    entry = dict(lane_entry, **summary(evaluation))
+    entry.update(checkpoint=lane_entry["checkpoint"], meets_bar=meets_bar(evaluation, starts),
+                 synced_from=source)
+    if entry["meets_bar"]:
+        publish_entry(registry, track, entry)
+    return entry["meets_bar"], entry
+
+
 def free_gb(path: Path) -> float:
     return shutil.disk_usage(path).free / 1e9
 
