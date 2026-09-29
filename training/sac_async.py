@@ -294,8 +294,19 @@ def run_actor(index, args, shared: Shared):
                                                     speed=round(speed, 2))})
         return env.reset()
 
+    def on_straight() -> bool:
+        """Upright, and no curvature above 1/250 1/m within the next 100 m (the
+        throttle judge's straights)."""
+        observation = env._observation
+        if abs(float(observation["state"]["lean"])) >= 0.2:
+            return False
+        station = float(observation["track"]["progress"]) * env.track.length
+        ahead = env.track.at(station + np.arange(0.0, 101.0, 10.0))["curvature"]
+        return float(np.max(np.abs(ahead))) < 1 / 250
+
     try:
         obs, _ = reset()
+        prior_episode = rng.random() < args.straight_throttle_prior
         episode = shared.next_episode()
         while not shared.stop.is_set() and os.getppid() == parent:
             # Hold while ahead of the learner's update-to-data ratio or the ring is full.
@@ -308,6 +319,10 @@ def run_actor(index, args, shared: Shared):
                 action = policy.act(obs, rng).astype(np.float32)
             else:
                 action = rng.uniform(-1.0, 1.0, ACTION_SIZE).astype(np.float32)
+            if prior_episode and action[1] >= 0 and on_straight():
+                # --straight-throttle-prior: this episode rides its straights flat out;
+                # the replay keeps the action taken, so the critic sees those returns.
+                action[1] = max(action[1], 1.0 / args.pedal_gain)
             next_obs, reward, terminated, truncated, info = env.step(action)
             row = rows[shared.written[index] % shared.ring]
             row[OFFSETS["obs"]] = obs
@@ -344,6 +359,7 @@ def run_actor(index, args, shared: Shared):
                     env = make_env()
                     switch_at += args.track_dwell
                 obs, _ = reset()
+                prior_episode = rng.random() < args.straight_throttle_prior
                 episode = shared.next_episode()
             else:
                 obs = next_obs
@@ -1028,6 +1044,10 @@ def main():
     parser.add_argument("--apex-bonus-stations", type=lambda text: [float(x) for x in text.split(",")],
                         help="comma list: only these required apexes pay --apex-bonus-m (a bonus "
                         "on every corner paid mandalika for slowing down everywhere)")
+    parser.add_argument("--straight-throttle-prior", type=float, default=0.0,
+                        help="share of training episodes that ride upright straights at full "
+                        "throttle (the policy's own braking and steering kept), so the critic "
+                        "sees returns the policy's part-throttle cruise never produces")
     parser.add_argument("--throttle-bonus-floor", type=float, default=0.0,
                         help="applied throttle below which --throttle-bonus-m pays nothing; the "
                         "credit rises linearly from here to full throttle")
