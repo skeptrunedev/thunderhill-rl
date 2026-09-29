@@ -283,7 +283,8 @@ class Scheduler:
             home = self.state["homes"].get(track)
             hosts = [home] if home else ["thelio", "morph", "modal"]
             host = next((h for h in hosts if self.free(h)), None)
-            if host is None and home == "morph" and not self.running("morph") and self.free("modal"):
+            if (host is None and home == "morph" and track not in self.state.get("pinned", [])
+                    and not self.running("morph") and self.free("modal")):
                 # morph idle only for lack of disk while a Modal slot is free: move the run.
                 self.migrate_to_modal(track)
                 host = "modal"
@@ -329,6 +330,9 @@ def main():
     parser.add_argument("--extra", action="append", default=[],
                         help="TRACK='ARGS': extra sac_specialists.py arguments for that circuit's "
                         "future starts (kept in the state); TRACK= clears them")
+    parser.add_argument("--pin", action="append", default=[],
+                        help="TRACK: keep it on its home host, never migrated to Modal; below the "
+                        "disk floor its lane stops cleanly and waits (kept in the state)")
     parser.add_argument("--modal-lanes", type=int, default=10)
     parser.add_argument("--modal-budget-usd", type=float, default=250.0)
     parser.add_argument("--modal-spend-before-usd", type=float, default=0.0,
@@ -355,6 +359,11 @@ def main():
             scheduler.state["homes"][track] = host
         scheduler.state["queue"] = [t for t in scheduler.state["queue"]
                                     if t not in scheduler.state["claims"]]
+        scheduler.save()
+    for track in args.pin:
+        pinned = scheduler.state.setdefault("pinned", [])
+        if track not in pinned:
+            pinned.append(track)
         scheduler.save()
     for item in args.extra:
         track, _, extra = item.partition("=")
