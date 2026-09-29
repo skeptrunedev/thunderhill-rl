@@ -109,8 +109,11 @@ def evaluations(run_dir: Path, starts: int, track: str, only: str | None = None)
               if row.get("version") == APEX_VERSION} if cache_path.exists() else {})
     result = []
     for checkpoint, rows in groups.items():
-        if len(rows) != starts or only not in (None, checkpoint):
+        # A checkpoint evaluated twice (e.g. step_0.pt by two starts of the same run)
+        # keeps its latest evaluation.
+        if not rows or len(rows) % starts or only not in (None, checkpoint):
             continue
+        rows = rows[-starts:]
         laps = [r for r in rows if r["lap_time_s"] is not None]
         evaluation = dict(checkpoint=checkpoint, steps=rows[0]["policy_step"], laps=len(laps),
                           best_lap_s=min(r["lap_time_s"] for r in laps) if laps else None,
