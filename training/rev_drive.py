@@ -105,6 +105,19 @@ class GodotSlots:
         SLOTS.mkdir(parents=True, exist_ok=True)
         self.paths = [SLOTS / f"slot-{i:02d}.lock" for i in range(count)]
 
+    def free(self) -> int:
+        """Slots no process holds right now."""
+        count = 0
+        for path in self.paths:
+            with path.open("w") as stream:
+                try:
+                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    continue
+                fcntl.flock(stream, fcntl.LOCK_UN)
+                count += 1
+        return count
+
     @contextlib.contextmanager
     def slot(self):
         while True:
