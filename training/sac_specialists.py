@@ -25,8 +25,9 @@ specialist set:
                (tools/apex_report.py)
   full gas     the median throttle while upright and off the brakes is at least
                --min-throttle
-  speed        the best lap improved by less than --plateau-fraction over the
-               last --plateau-evals evaluations
+  speed        at least --min-total-steps in all and --min-refine-steps at the
+               refine lr, and the best lap improved by less than
+               --plateau-fraction over the last --plateau-steps env steps
 
 A circuit whose best evaluation has not improved for --stuck-steps env steps is
 marked stuck, left out of the registry and reported; the next circuit starts.
@@ -236,16 +237,16 @@ class Specialists:
     def meets_bar(self, e: dict, starts: int | None = None) -> bool:
         return meets_bar(e, starts or len(e["rows"]), self.args.min_throttle)
 
-    def lap_plateaued(self, evals: list[dict]) -> bool:
-        """The best lap so far improved by less than --plateau-fraction over the
-        last --plateau-evals evaluations."""
-        best, running = math.inf, []
-        for e in evals:
-            best = min(best, e["best_lap_s"] or math.inf)
-            running.append(best)
-        k = self.args.plateau_evals
-        return (len(running) > k and math.isfinite(running[-1 - k])
-                and running[-1 - k] - running[-1] < self.args.plateau_fraction * running[-1 - k])
+    def lap_plateaued(self, evals: list[dict], refine_from: int) -> bool:
+        """Refined long enough, and the best lap so far improved by less than
+        --plateau-fraction over the last --plateau-steps env steps."""
+        args, latest = self.args, evals[-1]["steps"]
+        if latest < args.min_total_steps or latest - refine_from < args.min_refine_steps:
+            return False
+        then = min((e["best_lap_s"] or math.inf for e in evals
+                    if e["steps"] <= latest - args.plateau_steps), default=math.inf)
+        now = min(e["best_lap_s"] or math.inf for e in evals)
+        return math.isfinite(then) and then - now < args.plateau_fraction * then
 
     # One circuit ---------------------------------------------------------------
     def run_dir(self, track):
@@ -256,11 +257,17 @@ class Specialists:
         args, run_dir = self.args, self.run_dir(track)
         state_path = run_dir / "specialist.json"
         state = json.loads(state_path.read_text()) if state_path.exists() else dict(phase="learn")
+        if state["phase"] == "done" and self.outcome(
+                evaluations(run_dir, args.eval_starts, track), False,
+                state.get("learn_end_step", 0)) != "done":
+            print(f"REOPEN {track}: done under an earlier bar, refining on", flush=True)
+            state["phase"] = "refine"
         while state["phase"] in ("learn", "refine"):
             self.check_disk()
             learn = state["phase"] == "learn"
             outcome = self.run_trainer(
-                track, args.learning_rate if learn else args.refine_learning_rate, learn)
+                track, args.learning_rate if learn else args.refine_learning_rate, learn,
+                state.get("learn_end_step", 0))
             state.update({"phase": {"reliable": "refine"}.get(outcome, outcome),
                           f"{state['phase']}_end": outcome,
                           f"{state['phase']}_end_step": self.latest_steps(run_dir)})
@@ -276,7 +283,7 @@ class Specialists:
         steps = [int(p.stem.split("_")[1]) for p in (run_dir / "checkpoints").glob("step_*.pt")]
         return max(steps, default=0)
 
-    def outcome(self, evals: list[dict], learn: bool) -> str | None:
+    def outcome(self, evals: list[dict], learn: bool, refine_from: int) -> str | None:
         """reliable (learn phase: an evaluation lapped from every start), done
         (the bar is met), stuck, or None to keep training."""
         args = self.args
@@ -285,17 +292,18 @@ class Specialists:
         best = max(evals, key=rank)
         if learn and best["laps"] == args.eval_starts:
             return "reliable"
-        if not learn and self.meets_bar(best, args.eval_starts) and self.lap_plateaued(evals):
+        if (not learn and self.meets_bar(best, args.eval_starts)
+                and self.lap_plateaued(evals, refine_from)):
             return "done"
         if evals[-1]["steps"] - last_improvement(evals, args.min_delta) >= args.stuck_steps:
             return "stuck"
         return None
 
-    def run_trainer(self, track, learning_rate, learn) -> str:
+    def run_trainer(self, track, learning_rate, learn, refine_from) -> str:
         """sac_async.py on one circuit until outcome() decides; after every
         evaluation the apexes it missed go to the actors' --focus-file."""
         args, run_dir = self.args, self.run_dir(track)
-        decided = self.outcome(evaluations(run_dir, args.eval_starts, track), learn)
+        decided = self.outcome(evaluations(run_dir, args.eval_starts, track), learn, refine_from)
         if decided:
             return decided
         focus = run_dir / "focus.json"
@@ -332,9 +340,10 @@ class Specialists:
             tmp.write_text(json.dumps(dict(stations=latest["missed_apex_stations_m"] or [],
                                            checkpoint=latest["checkpoint"])) + "\n")
             tmp.replace(focus)
+            general = evals[0]["best_lap_s"] if evals[0]["steps"] == 0 else None
             print(f"EVAL {track}: {describe(latest)}; best so far "
-                  f"{describe(max(evals, key=rank))}", flush=True)
-            decided = self.outcome(evals, learn)
+                  f"{describe(max(evals, key=rank))}; general {general} s", flush=True)
+            decided = self.outcome(evals, learn, refine_from)
             if decided:
                 self.child.send_signal(signal.SIGINT)
                 break
@@ -383,9 +392,6 @@ class Specialists:
         self.publish_reused()
         stuck = []
         for track in args.tracks:
-            if track in self.registry():
-                print(f"SKIP {track}: in {args.registry.relative_to(ROOT)}", flush=True)
-                continue
             if not self.train(track):
                 stuck.append(track)
         print(f"ALL SPECIALISTS DONE; stuck: {stuck or 'none'}", flush=True)
@@ -423,9 +429,12 @@ def main():
                         help="seconds a best lap must improve by to count as progress")
     parser.add_argument("--stuck-steps", type=int, default=10_000_000,
                         help="env steps without progress after which a circuit is stuck")
-    parser.add_argument("--plateau-evals", type=int, default=3)
-    parser.add_argument("--plateau-fraction", type=float, default=0.003,
-                        help="the best lap must improve by less than this over --plateau-evals")
+    parser.add_argument("--min-total-steps", type=int, default=8_000_000)
+    parser.add_argument("--min-refine-steps", type=int, default=3_000_000,
+                        help="env steps at --refine-learning-rate before a circuit can be done")
+    parser.add_argument("--plateau-steps", type=int, default=3_000_000)
+    parser.add_argument("--plateau-fraction", type=float, default=0.002,
+                        help="the best lap must improve by less than this over --plateau-steps")
     parser.add_argument("--min-throttle", type=float, default=MIN_THROTTLE,
                         help="median throttle while upright and off the brakes")
     parser.add_argument("--eval-every", type=int, default=500_000)
