@@ -268,9 +268,10 @@ def run_actor(index, args, shared: Shared):
              else args.focus_lead)
     focus_outcomes = collections.deque(maxlen=args.focus_window)
     focused = None  # (lead) of the running episode when it is a focused one
+    focused_spot = None  # and the station it was aimed at
 
     def reset():
-        nonlocal focus_stamp, focus_stations, focused
+        nonlocal focus_stamp, focus_stations, focused, focused_spot
         focused = None
         if focus_file is not None:
             try:
@@ -287,7 +288,9 @@ def run_actor(index, args, shared: Shared):
             spots = pools[int(rng.integers(len(pools)))]
             lead = rng.uniform(min(args.focus_lead_min, reach), reach)
             focused = lead
-            station = (spots[int(rng.integers(len(spots)))] - lead) % track.length
+            spot = spots[int(rng.integers(len(spots)))]
+            focused_spot = spot
+            station = (spot - lead) % track.length
             speed = float(np.clip(0.8 * env.start_limit(station), MIN_START_SPEED_M_S,
                                   args.max_start_speed))
             return env.reset(options={"start": dict(station=round(float(station), 2),
@@ -340,7 +343,14 @@ def run_actor(index, args, shared: Shared):
                 summary = dict(info["episode_summary"], env=index, episode=episode,
                                policy_version=max(policy.version, 0))
                 if focused is not None:
+                    # Past the spot by 30 m; and, when the spot is a bonus apex, reaching
+                    # the judge's 0.75 there (the curriculum then widens on the line, not
+                    # on mere survival).
                     passed = summary["legal_progress_m"] >= focused + 30.0
+                    reached = [value for key, value in summary.get("apex_reach", {}).items()
+                               if abs(float(key) - focused_spot) <= 5.0]
+                    if reached:
+                        passed = passed and reached[0] >= 0.75
                     summary.update(focus_lead_m=round(focused, 1), focus_reach_m=round(reach, 1),
                                    focus_passed=passed)
                     if args.focus_curriculum:

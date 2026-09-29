@@ -351,6 +351,7 @@ class ThunderhillSACEnv(gym.Env):
         self._progress_window = []
         self._return, self._laps, self._lap_time = 0.0, 0, None
         self._apex_reach = [None] * len(self._apexes)  # best reach while in each window
+        self._apex_best = {}  # apex station -> best reach this episode
         self._apex_bonus = self._throttle_bonus = 0.0
         self._start = start
         self._vector = observation_vector(self.track, observation, self._previous_action,
@@ -439,6 +440,7 @@ class ThunderhillSACEnv(gym.Env):
                     reach = direction * float(road["lateral_m"]) / float(road["half_width_m"])
                     best = self._apex_reach[index]
                     self._apex_reach[index] = reach if best is None else max(best, reach)
+                    self._apex_best[apex] = max(self._apex_best.get(apex, -9.0), reach)
                     if self.apex_bonus_dense:  # paid as the best reach grows, not on exit
                         gained = self.apex_bonus_m * (
                             self._apex_credit(self._apex_reach[index])
@@ -476,4 +478,5 @@ class ThunderhillSACEnv(gym.Env):
             "lap_time_s": self._lap_time,
             "apex_bonus_m": round(self._apex_bonus, 3),
             "throttle_bonus_m": round(self._throttle_bonus, 3),
+            "apex_reach": {str(k): round(v, 3) for k, v in self._apex_best.items()},
         }}
