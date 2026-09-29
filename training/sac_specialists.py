@@ -45,8 +45,9 @@ already-trained teachers (thunderhill-east) without training them.
 
 Resumable: finished and stuck circuits are skipped and a half-done one resumes
 from its latest checkpoint and replay buffer, in its phase (runs/sac/
-specialists/specialist-TRACK/specialist.json). SIGINT/SIGTERM stops the running
-trainer cleanly. Rollout shards are skipped (episodes, evaluations and
+specialists/specialist-TRACK/specialist.json). SIGINT/SIGTERM, or a file named
+STOP in the circuit's run dir (how a Modal lane is stopped), stops the running
+trainer cleanly, saving its checkpoint and replay buffer. Rollout shards are skipped (episodes, evaluations and
 checkpoints are kept); after a circuit its replay buffer is deleted and the
 Godot recordings of every evaluation but the best are gzip-compressed. Below
 --min-free-gb free disk the trainer is stopped and this exits 0, so a
@@ -328,6 +329,10 @@ class Specialists:
         while self.child.poll() is None:
             time.sleep(15)
             if self.stop_requested:  # on_signal already stopped the trainer
+                break
+            if (run_dir / "STOP").exists():  # a clean stop asked for through the run dir
+                (run_dir / "STOP").unlink()
+                self.child.send_signal(signal.SIGINT)
                 break
             if free_gb(run_dir) < args.min_free_gb:
                 self.child.send_signal(signal.SIGINT)

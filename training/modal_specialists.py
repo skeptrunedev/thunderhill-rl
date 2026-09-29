@@ -10,7 +10,9 @@ local unit) on headless Godot actors and a small-GPU learner.
 
 The image carries Godot 4.7.2, the main checkout's godot/ project with every
 circuit's generated imagery and meshes as built here (they are not committed and
-are not rebuilt remotely), and the uv environment of sac_async.py. The volume
+are not rebuilt remotely); sac_async.py's dependencies are resolved by uv when a
+lane starts (~50 s; warming them into the image did not make uv reuse them). The
+volume
 thunderhill-specialists is mounted as the repo's runs/: upload puts the general
 warm-start checkpoint there, and each lane keeps its run in
 runs/sac/specialists-modal/specialist-TRACK with its lane registry
@@ -30,6 +32,7 @@ runs/sac/specialists.json.
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import modal
@@ -44,6 +47,9 @@ CPU, WORKERS, GPU = 16.0, 24, "T4"
 
 app = modal.App("thunderhill-specialists")
 volume = modal.Volume.from_name("thunderhill-specialists", create_if_missing=True)
+# stop::TRACK -> True asks that circuit's lane to stop cleanly (checkpoint and replay
+# buffer saved); a running container does not see files put on the volume meanwhile.
+control = modal.Dict.from_name("thunderhill-specialists-control", create_if_missing=True)
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .apt_install("build-essential", "gzip", "libfontconfig1")
@@ -55,9 +61,6 @@ image = (
     # The import cache headless workers load resources from.
     .run_commands("chmod 755 /usr/local/bin/godot",
                   f"godot --headless --path {REMOTE}/godot --editor --import")
-    # sac_async.py's script environment (torch and friends), resolved once at build.
-    .add_local_file(str(ROOT / "training/sac_async.py"), "/opt/warm/sac_async.py", copy=True)
-    .run_commands("uv sync --script /opt/warm/sac_async.py")
     .add_local_dir(str(ROOT / "training"), f"{REMOTE}/training", ignore=["__pycache__"])
     .add_local_dir(str(ROOT / "tools"), f"{REMOTE}/tools", ignore=["__pycache__"])
 )
@@ -73,8 +76,44 @@ def lane(track: str, workers: int = WORKERS, extra: list[str] | None = None):
                "--runs-dir", f"{REMOTE}/{LANES}", "--registry", f"{REMOTE}/{LANES}/{track}.json",
                "--workers", str(workers), "--min-free-gb", "0", "--no-wandb", *(extra or [])]
     print(" ".join(command), flush=True)
-    subprocess.run(command, cwd=REMOTE, check=True)
+    control.pop(f"stop::{track}", None)
+    run_dir = Path(f"{REMOTE}/{LANES}/specialist-{track}")
+    process = subprocess.Popen(command, cwd=REMOTE)
+    while process.poll() is None:
+        time.sleep(30)
+        if control.get(f"stop::{track}", False):
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "STOP").touch()  # sac_specialists stops its trainer cleanly
+            control.pop(f"stop::{track}", None)
     volume.commit()
+    if process.returncode:
+        raise subprocess.CalledProcessError(process.returncode, command)
+
+
+@app.function(image=image, cpu=2, memory=4096, timeout=900)
+def check_image():
+    """How long sac_async's script environment takes to set up (a lane resolves it
+    at start, ~50 s), and that Godot runs."""
+    started = time.monotonic()
+    help_text = subprocess.run(["uv", "run", "--script", f"{REMOTE}/training/sac_async.py", "--help"],
+                               cwd=REMOTE, capture_output=True, text=True, check=True)
+    version = subprocess.run(["godot", "--headless", "--version"], capture_output=True, text=True)
+    return dict(seconds=round(time.monotonic() - started, 1),
+                downloaded="Downloading" in help_text.stderr, godot=version.stdout.strip(),
+                focus_file="--focus-file" in help_text.stdout)
+
+
+@app.local_entrypoint()
+def check():
+    print(check_image.remote())
+
+
+@app.local_entrypoint()
+def stop(tracks: str):
+    """Ask these circuits' lanes to stop cleanly; launch resumes them."""
+    for track in (t.strip() for t in tracks.split(",") if t.strip()):
+        control[f"stop::{track}"] = True
+        print(f"{track}: stop requested")
 
 
 @app.local_entrypoint()
