@@ -69,6 +69,8 @@ class Server:
         for _ in range(180):
             try:
                 urllib.request.urlopen(f"http://127.0.0.1:{self.port}/v1/models", timeout=2)
+                self.began = time.time()
+                print(f"[{time.strftime('%H:%M:%S')}] REV SERVER UP {self.checkpoint.parent.name}", flush=True)
                 return self
             except OSError:
                 if self.process.poll() is not None:
@@ -80,6 +82,8 @@ class Server:
         os.killpg(self.process.pid, signal.SIGTERM)
         self.process.wait(timeout=60)
         self.stream.close()
+        # The local GPU is shared with SAC training: it is held only while Rev rides.
+        print(f"[{time.strftime('%H:%M:%S')}] REV SERVER DOWN after {time.time() - self.began:.0f} s", flush=True)
 
 
 def done(path: Path, marker: str) -> bool:
