@@ -897,7 +897,8 @@ class Trainer:
                     self.checkpoint()
                 if time.monotonic() - last_health_check > 1.0:
                     last_health_check = time.monotonic()
-                    dead = [p.name for p in self.actors + [self.evaluator] if p and not p.is_alive()]
+                    dead = [f"{p.name} (exit {p.exitcode})"
+                            for p in self.actors + [self.evaluator] if p and not p.is_alive()]
                     if dead:
                         failure = f"child processes exited: {dead}"
                         break

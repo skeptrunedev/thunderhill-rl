@@ -289,11 +289,13 @@ class Specialists:
         state = json.loads(state_path.read_text()) if state_path.exists() else dict(phase="learn")
         self.resume_weights = None
         if args.restart_from_best and "shaping_from" not in state:
-            # Shaping starts from the run's best evaluation so far; its lap is the
-            # ceiling a result must not be slower than.
-            best = max(evaluations(run_dir, args.eval_starts, track), key=rank)
+            # Shaping starts from the run's fastest evaluation that lapped from every
+            # start, the lap a shaped result must match; shaping adds the apexes.
+            best = min((e for e in evaluations(run_dir, args.eval_starts, track)
+                        if e["laps"] == args.eval_starts), key=lambda e: e["best_lap_s"])
             state.update(phase="refine", shaping_from=dict(
                 checkpoint=best["checkpoint"], best_lap_s=best["best_lap_s"],
+                fastest_lap_s=best["best_lap_s"],
                 apexes=f"{best['apexes_hit']}/{best['apexes_total']}",
                 missed=best["missed_apex_stations_m"], at_step=self.latest_steps(run_dir),
                 apex_bonus_m=args.apex_bonus_m, throttle_bonus_m=args.throttle_bonus_m))
@@ -302,11 +304,11 @@ class Specialists:
             print(f"SHAPING {track}: from {best['checkpoint']} ({describe(best)})", flush=True)
         shaping = state.get("shaping_from")
         if shaping and "fastest_lap_s" not in shaping:
-            # The ceiling is the run's fastest evaluated lap before shaping, whatever
-            # its apexes: the best-ranked evaluation can be slower than that.
+            # The ceiling is the run's fastest lap before shaping among evaluations
+            # lapping from every start, whatever their apexes.
             shaping["fastest_lap_s"] = min(
                 e["best_lap_s"] for e in evaluations(run_dir, args.eval_starts, track)
-                if e["best_lap_s"] is not None and e["steps"] <= shaping["at_step"])
+                if e["laps"] == args.eval_starts and e["steps"] <= shaping["at_step"])
             state_path.write_text(json.dumps(state, indent=1) + "\n")
         self.state = state
         if state["phase"] == "done" and self.outcome(
@@ -509,9 +511,9 @@ def main():
     parser.add_argument("--throttle-bonus-m", type=float, default=0.0,
                         help="opt-in reward shaping (sac_async --throttle-bonus-m)")
     parser.add_argument("--restart-from-best", action="store_true",
-                        help="once per run: resume from its best evaluated checkpoint's weights "
-                        "(replay buffer kept), and publish nothing slower than the run's "
-                        "fastest evaluated lap so far")
+                        help="once per run: resume from the weights of its fastest evaluation "
+                        "that lapped from every start (replay buffer kept), and publish "
+                        "nothing slower than that lap")
     parser.add_argument("--focus-lead-min", type=float, default=25.0,
                         help="focused starts begin 25-150 m before the spot: close starts at "
                         "low speed let the policy meet a corner it never survives the "
