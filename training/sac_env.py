@@ -223,7 +223,7 @@ class ThunderhillSACEnv(gym.Env):
                  seed: int = 0, policy_id: str = "sac", apex_bonus_m: float = 0.0,
                  throttle_bonus_m: float = 0.0, apex_bonus_dense: bool = False,
                  max_start_speed_m_s: float = MAX_INITIAL_SPEED_M_S,
-                 apex_bonus_stations: list[float] | None = None):
+                 apex_bonus_stations: list[float] | None = None, apex_bonus_floor: float = 0.0):
         self.godot, self.data_dir = godot, Path(data_dir)
         self.horizon_s, self.record_godot = horizon_s, record_godot
         if reward_line not in ("progress", "centered"):
@@ -255,6 +255,9 @@ class ThunderhillSACEnv(gym.Env):
         # the window, instead of once when it leaves it: credit at the moment.
         self.apex_bonus_m, self.throttle_bonus_m = apex_bonus_m, throttle_bonus_m
         self.apex_bonus_dense = apex_bonus_dense
+        # apex_bonus_floor: reach below which an apex earns nothing. From 0 the credit
+        # is nearly used up by 0.7 and the last 0.05 to the bar pays a few metres.
+        self.apex_bonus_floor = apex_bonus_floor
         self._apexes = []
         if apex_bonus_m > 0:
             self._apexes = [(c["apex_station_m"], c["direction"]) for c in required_corners(track)
@@ -412,6 +415,12 @@ class ThunderhillSACEnv(gym.Env):
             info.update(self._summary(reason, result["episode_id"]))
         return self._vector, float(reward), terminated, truncated, info
 
+    def _apex_credit(self, reach: float) -> float:
+        """Share of the apex bonus for an inside reach: linear from apex_bonus_floor
+        to the judge's 0.75, so the credit concentrates where the bar is."""
+        return float(np.clip((reach - self.apex_bonus_floor) / (APEX_FRACTION - self.apex_bonus_floor),
+                             0.0, 1.0))
+
     def _shaping(self, transitions) -> float:
         """This step's apex and straight-throttle bonuses, in metres, with the
         judge's measures: reach = direction * lateral_m / half_width_m within
@@ -428,15 +437,13 @@ class ThunderhillSACEnv(gym.Env):
                     self._apex_reach[index] = reach if best is None else max(best, reach)
                     if self.apex_bonus_dense:  # paid as the best reach grows, not on exit
                         gained = self.apex_bonus_m * (
-                            float(np.clip(self._apex_reach[index] / APEX_FRACTION, 0.0, 1.0))
-                            - float(np.clip((best if best is not None else 0.0) / APEX_FRACTION,
-                                            0.0, 1.0)))
+                            self._apex_credit(self._apex_reach[index])
+                            - self._apex_credit(best if best is not None else -1.0))
                         bonus += gained
                         self._apex_bonus += gained
                 elif self._apex_reach[index] is not None:
                     if offset > 0 and not self.apex_bonus_dense:  # left the window forward
-                        earned = self.apex_bonus_m * float(np.clip(
-                            self._apex_reach[index] / APEX_FRACTION, 0.0, 1.0))
+                        earned = self.apex_bonus_m * self._apex_credit(self._apex_reach[index])
                         bonus += earned
                         self._apex_bonus += earned
                     self._apex_reach[index] = None

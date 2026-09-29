@@ -242,6 +242,7 @@ def run_actor(index, args, shared: Shared):
                                  apex_bonus_dense=args.apex_bonus_dense,
                                  max_start_speed_m_s=args.max_start_speed,
                                  apex_bonus_stations=args.apex_bonus_stations,
+                                 apex_bonus_floor=args.apex_bonus_floor,
                                  vehicle=args.vehicle, track=tracks[slot],
                                  policy_id=args.run_name)
 
@@ -1026,6 +1027,9 @@ def main():
     parser.add_argument("--apex-bonus-stations", type=lambda text: [float(x) for x in text.split(",")],
                         help="comma list: only these required apexes pay --apex-bonus-m (a bonus "
                         "on every corner paid mandalika for slowing down everywhere)")
+    parser.add_argument("--apex-bonus-floor", type=float, default=0.0,
+                        help="inside reach below which the apex bonus pays nothing; the credit "
+                        "rises linearly from here to the judge's 0.75")
     parser.add_argument("--apex-bonus-dense", action="store_true",
                         help="pay --apex-bonus-m as the inside reach grows within the apex "
                         "window rather than once on leaving it (same total)")
