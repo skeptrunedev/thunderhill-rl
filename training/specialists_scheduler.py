@@ -71,6 +71,15 @@ class Scheduler:
                                 modal_spend_usd=args.modal_spend_before_usd))
         self.lane = modal.Function.from_name(lanes.app.name, "lane")
         self.last_alert = 0.0
+        self.code = self.code_stamp()
+
+    @staticmethod
+    def code_stamp() -> dict:
+        """The judging code this process imported: the local check must never run
+        an older bar than the lanes do."""
+        return {name: (ROOT / "training" / name).stat().st_mtime_ns for name in (
+            "sac_specialists.py", "modal_specialists.py", "specialists_scheduler.py")} | {
+            "apex_report.py": (ROOT / "tools/apex_report.py").stat().st_mtime_ns}
 
     def save(self):
         tmp = self.args.state.with_suffix(".tmp")
@@ -280,10 +289,17 @@ class Scheduler:
             self.save()
         self.save()
 
+    def reload_if_changed(self):
+        if self.code_stamp() != self.code:
+            log("RELOAD judging code changed on disk; exiting for systemd to restart")
+            self.save()
+            sys.exit(3)  # Restart=on-failure brings the new code up
+
     def run(self):
         log(f"claims {self.state['claims']}, queue {self.state['queue']}, "
             f"finished {self.state['finished']}, modal spend ${self.state['modal_spend_usd']:.2f}")
         while True:
+            self.reload_if_changed()
             try:
                 self.step()
             except Exception as error:  # a transient ssh or Modal error: retry next poll
