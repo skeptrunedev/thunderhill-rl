@@ -384,7 +384,7 @@ class Specialists:
             "--workers", str(args.workers), "--buffer-size", str(args.buffer_size),
             "--learning-rate", str(learning_rate), "--total-steps", str(10**12),
             "--focus-fraction", str(args.focus_fraction), "--focus-file", str(focus),
-            "--focus-lead-min", str(args.focus_lead_min),
+            "--focus-lead-min", str(args.focus_lead_min), "--focus-lead", str(args.focus_lead),
             "--eval-every", str(args.eval_every), "--eval-starts", str(args.eval_starts),
             "--eval-horizon", str(args.eval_horizon), "--no-rollout-shards",
             "--apex-bonus-m", str(args.apex_bonus_m), "--throttle-bonus-m",
@@ -514,6 +514,8 @@ def main():
                         help="once per run: resume from the weights of its fastest evaluation "
                         "that lapped from every start (replay buffer kept), and publish "
                         "nothing slower than that lap")
+    parser.add_argument("--focus-lead", type=float, default=150.0,
+                        help="farthest a focused start begins before the spot (sac_async)")
     parser.add_argument("--focus-lead-min", type=float, default=25.0,
                         help="focused starts begin 25-150 m before the spot: close starts at "
                         "low speed let the policy meet a corner it never survives the "
