@@ -70,8 +70,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from apex_report import report as apex_report  # noqa: E402
 from lap_policy import DEFAULT_TRACK, ROOT, held_out  # noqa: E402
 
-# The general policy's weakest circuits first: no laps, then unreliable laps.
-FIRST = ("balaton-park", "red-bull-ring", "goiania", "cota", "assen", "aragon", "valencia")
+# Circuits the general policy already laps reliably come first (Rev needs teachers
+# soon), then those it laps unreliably, then those it never lapped.
+LATER = ("aragon", "assen", "valencia", "cota", "goiania", "misano", "buriram")
+LAST = ("balaton-park", "red-bull-ring")
 GENERAL = ROOT / "runs/sac/sac-multitrack-1"
 APEX_FIELDS = ("apexes_hit", "apexes_total", "missed_apex_stations_m", "upright_median_throttle",
                "full_throttle_share", "corner_source", "auto_apexes_hit", "auto_apexes_total")
@@ -374,9 +376,11 @@ class Specialists:
 
 
 def training_order(listing: Path) -> list[str]:
-    """FIRST, then the general run's other circuits in its order; never a held-out one."""
+    """The general run's circuits in its order, LATER and LAST moved to the end;
+    never a held-out one."""
     tracks = json.loads(listing.read_text())
-    order = [t for t in FIRST if t in tracks] + [t for t in tracks if t not in FIRST]
+    order = ([t for t in tracks if t not in LATER + LAST] + [t for t in LATER if t in tracks]
+             + [t for t in LAST if t in tracks])
     return [t for t in order if not held_out(t)]
 
 
@@ -388,7 +392,7 @@ def main():
     parser.add_argument("--init-from", type=Path,
                         default=GENERAL / "checkpoints/step_40672729.pt")
     parser.add_argument("--tracks", help="comma list in training order; default: "
-                        f"{', '.join(FIRST)}, then the rest of {GENERAL.name}/tracks.json")
+                        f"{GENERAL.name}/tracks.json, then {', '.join(LATER + LAST)}")
     parser.add_argument("--reuse", default=f"{DEFAULT_TRACK}=runs/sac/sac-v7-lr1e4-1/checkpoints/"
                         "step_24000071.pt", help="comma list of TRACK=CHECKPOINT teachers "
                         "published as they are, not trained")
