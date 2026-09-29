@@ -355,7 +355,10 @@ class Specialists:
         if (not learn and best and self.meets_bar(best, args.eval_starts)
                 and self.fast_enough(evals, best) and self.lap_plateaued(evals, refine_from)):
             return "done"
-        if evals[-1]["steps"] - last_improvement(evals, args.min_delta) >= args.stuck_steps:
+        since = [e for e in evals if not shaping or e["steps"] > shaping["at_step"]]
+        start = shaping["at_step"] if shaping else 0
+        if since and since[-1]["steps"] - max(last_improvement(since, args.min_delta), start) \
+                >= args.stuck_steps:
             return "stuck"
         return None
 
@@ -388,7 +391,7 @@ class Specialists:
             "--eval-every", str(args.eval_every), "--eval-starts", str(args.eval_starts),
             "--eval-horizon", str(args.eval_horizon), "--no-rollout-shards",
             "--apex-bonus-m", str(args.apex_bonus_m), "--throttle-bonus-m",
-            str(args.throttle_bonus_m),
+            str(args.throttle_bonus_m), *(["--apex-bonus-dense"] if args.apex_bonus_dense else []),
             *(["--resume-weights-from", str(self.resume_weights)] if self.resume_weights else []),
             *(["--no-wandb"] if args.no_wandb else []),
         ]
@@ -510,6 +513,8 @@ def main():
                         "short of the apex bar")
     parser.add_argument("--throttle-bonus-m", type=float, default=0.0,
                         help="opt-in reward shaping (sac_async --throttle-bonus-m)")
+    parser.add_argument("--apex-bonus-dense", action="store_true",
+                        help="opt-in (sac_async --apex-bonus-dense)")
     parser.add_argument("--restart-from-best", action="store_true",
                         help="once per run: resume from the weights of its fastest evaluation "
                         "that lapped from every start (replay buffer kept), and publish "

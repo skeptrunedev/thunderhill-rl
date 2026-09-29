@@ -17,6 +17,8 @@ a circuit without a run goes to the first free host, local hosts first. Every
   - checks each claim: a Modal lane by its function call (or, for a lane it
     adopted without one, by its lane registry and how recently its train.log
     changed), a local lane by its systemd unit;
+  - holds a circuit that exits stuck, and sends it back to its home (run
+    reopened) once its --extra recipe changes;
   - on exit, brings the result here and publishes it to runs/sac/specialists.json
     if it meets the bar measured here (Modal: modal_specialists.sync_track;
     thelio: rsync, then the same check; morph: the lane publishes itself). A
@@ -183,6 +185,19 @@ class Scheduler:
             return "stuck"
         return "requeue"
 
+    def reopen(self, track: str):
+        """Put a circuit's run back in refine on its home host."""
+        home = self.state["homes"].get(track)
+        if home == "modal":
+            self.reopen_modal(track)
+        elif home == "thelio":
+            self.reopen_thelio(track)
+        elif home == "morph":
+            path = ROOT / LOCAL_RUNS / f"specialist-{track}/specialist.json"
+            state = json.loads(path.read_text())
+            state["phase"] = "refine"
+            path.write_text(json.dumps(state, indent=1) + "\n")
+
     def reopen_modal(self, track: str):
         """A lane published a result the check here rejects (e.g. judged by an
         older apex_report): drop its lane registry entry and put its run back in
@@ -193,7 +208,8 @@ class Scheduler:
         with lanes.volume.batch_upload(force=True) as batch:
             batch.put_file(io.BytesIO((json.dumps(state, indent=1) + "\n").encode()),
                            f"{run}/specialist.json")
-        lanes.volume.remove_file(f"{lanes.LANES.removeprefix('runs/')}/{track}.json")
+        if lanes._read(f"{lanes.LANES}/{track}.json") is not None:
+            lanes.volume.remove_file(f"{lanes.LANES.removeprefix('runs/')}/{track}.json")
         log(f"REOPEN {track} on modal: lane registry removed, phase refine")
 
     def reopen_thelio(self, track: str):
@@ -219,9 +235,21 @@ class Scheduler:
             log(f"EXIT {track} on {claim['host']} after {hours:.2f} h: {result}")
             if result == "requeue":
                 self.state["queue"].insert(0, track)
+            elif result == "stuck":
+                # Held, not finished: retrying the same recipe would only repeat it.
+                # A changed --extra for the circuit sends it back to its home.
+                self.state.setdefault("stuck", {})[track] = self.state.get("extra", {}).get(track, [])
+                log(f"STUCK {track}: held until its --extra recipe changes")
             else:
                 self.state["finished"][track] = result
             self.save()
+        for track, recipe in list(self.state.get("stuck", {}).items()):
+            if self.state.get("extra", {}).get(track, []) != recipe:
+                del self.state["stuck"][track]
+                self.reopen(track)
+                self.state["queue"].insert(0, track)
+                log(f"UNSTUCK {track}: new recipe {self.state['extra'].get(track)}")
+                self.save()
         for track in list(self.state["queue"]):
             home = self.state["homes"].get(track)
             hosts = [home] if home else ["thelio", "morph", "modal"]

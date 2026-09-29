@@ -239,6 +239,7 @@ def run_actor(index, args, shared: Shared):
                                  reward_line=args.reward_line, pedal_gain=args.pedal_gain,
                                  apex_bonus_m=args.apex_bonus_m,
                                  throttle_bonus_m=args.throttle_bonus_m,
+                                 apex_bonus_dense=args.apex_bonus_dense,
                                  vehicle=args.vehicle, track=tracks[slot],
                                  policy_id=args.run_name)
 
@@ -947,6 +948,9 @@ def main():
                         help="opt-in shaping: metres of progress credited once per required "
                         "apex (tools/apex_report.py), scaled by the inside reach achieved "
                         "there, full at the judge's 0.75")
+    parser.add_argument("--apex-bonus-dense", action="store_true",
+                        help="pay --apex-bonus-m as the inside reach grows within the apex "
+                        "window rather than once on leaving it (same total)")
     parser.add_argument("--throttle-bonus-m", type=float, default=0.0,
                         help="opt-in shaping: metres of progress per step at full applied "
                         "throttle while upright (|lean| < 0.2) and off the front brake")
