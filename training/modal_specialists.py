@@ -66,11 +66,16 @@ image = (
 )
 
 
+# single_use_containers: Modal otherwise hands a finished lane's warm container
+# the next input (or a retried one), and that container's volume view dates from
+# its own start, so red-bull-ring's uploaded 1.55M-step run was invisible and the
+# lane restarted from the general checkpoint, twice.
 @app.function(image=image, gpu=GPU, cpu=CPU, memory=32768, timeout=24 * 3600,
               retries=modal.Retries(max_retries=5, initial_delay=30.0),
-              volumes={f"{REMOTE}/runs": volume})
+              volumes={f"{REMOTE}/runs": volume}, single_use_containers=True)
 def lane(track: str, workers: int = WORKERS, extra: list[str] | None = None):
     """sac_specialists.py on one circuit until it meets the bar (or is stuck)."""
+    volume.reload()  # what was put on the volume since this container mounted it
     command = ["uv", "run", "--script", f"{REMOTE}/training/sac_specialists.py",
                "--godot", "/usr/local/bin/godot", "--tracks", track, "--reuse", "",
                "--runs-dir", f"{REMOTE}/{LANES}", "--registry", f"{REMOTE}/{LANES}/{track}.json",
