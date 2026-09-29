@@ -107,7 +107,7 @@ TERMINATIONS = ("offroad", "collision", "fall", "stall", "horizon", "lap_complet
 
 # One transition row in the shared rings (float32 columns, then int64 columns).
 COLUMNS = dict(obs=OBSERVATION_SIZE, action=ACTION_SIZE, reward=1, next_obs=OBSERVATION_SIZE,
-               terminated=1, truncated=1, restart=1)
+               terminated=1, truncated=1, restart=1, prior=1)
 OFFSETS, _offset = {}, 0
 for _name, _width in COLUMNS.items():
     OFFSETS[_name] = slice(_offset, _offset + _width)
@@ -319,7 +319,8 @@ def run_actor(index, args, shared: Shared):
                 action = policy.act(obs, rng).astype(np.float32)
             else:
                 action = rng.uniform(-1.0, 1.0, ACTION_SIZE).astype(np.float32)
-            if prior_episode and action[1] >= 0 and on_straight():
+            forced = prior_episode and action[1] >= 0 and on_straight()
+            if forced:
                 # --straight-throttle-prior: this episode rides its straights flat out;
                 # the replay keeps the action taken, so the critic sees those returns.
                 action[1] = max(action[1], 1.0 / args.pedal_gain)
@@ -332,6 +333,7 @@ def run_actor(index, args, shared: Shared):
             row[OFFSETS["terminated"]] = terminated
             row[OFFSETS["truncated"]] = truncated
             row[OFFSETS["restart"]] = info.get("worker_restart", False)
+            row[OFFSETS["prior"]] = forced
             meta[shared.written[index] % shared.ring] = (episode, max(policy.version, 0), slot)
             shared.written[index] += 1  # publishes the slot (x86 stores are ordered)
             if terminated or truncated:
@@ -643,7 +645,7 @@ class Trainer:
                        hidden=args.hidden, buffer_size=args.buffer_size,
                        batch_size=args.batch_size, learning_rate=args.learning_rate,
                        gamma=args.gamma, tau=args.tau, compile=not args.no_compile,
-                       cuda_graph=not args.no_cuda_graph)
+                       cuda_graph=not args.no_cuda_graph, demo_weight=args.demo_weight)
         self.env_steps = 0
         # Learner updates made before this run's env steps (--init-from); the
         # update-to-data accounting counts only this run's updates.
@@ -743,7 +745,7 @@ class Trainer:
         self.sac.buffer.add({
             "obs": column("obs")[valid], "action": column("action")[valid],
             "reward": column("reward")[valid, 0], "next_obs": column("next_obs")[valid],
-            "terminated": column("terminated")[valid, 0]})
+            "terminated": column("terminated")[valid, 0], "prior": column("prior")[valid, 0]})
         versions = meta[:, 1]
         if self.recorder.shards:
             self.record(parts, rows, meta, n)
@@ -1044,6 +1046,9 @@ def main():
     parser.add_argument("--apex-bonus-stations", type=lambda text: [float(x) for x in text.split(",")],
                         help="comma list: only these required apexes pay --apex-bonus-m (a bonus "
                         "on every corner paid mandalika for slowing down everywhere)")
+    parser.add_argument("--demo-weight", type=float, default=0.0,
+                        help="actor loss weight pulling its pedal toward the forced "
+                        "--straight-throttle-prior demonstrations in the replay")
     parser.add_argument("--straight-throttle-prior", type=float, default=0.0,
                         help="share of training episodes that ride upright straights at full "
                         "throttle (the policy's own braking and steering kept), so the critic "

@@ -95,12 +95,14 @@ class Critics(nn.Module):
 class ReplayBuffer:
     """Circular GPU buffer of (obs, action, reward, next_obs, terminated)."""
 
-    FIELDS = ("obs", "action", "reward", "next_obs", "terminated")
+    # prior: 1 where the action taken was a forced demonstration (sac_async
+    # --straight-throttle-prior), for the actor's optional demonstration loss.
+    FIELDS = ("obs", "action", "reward", "next_obs", "terminated", "prior")
 
     def __init__(self, capacity, observation_size, action_size, device):
         self.capacity, self.position, self.count = capacity, 0, 0
         shapes = dict(obs=(observation_size,), action=(action_size,), reward=(),
-                      next_obs=(observation_size,), terminated=())
+                      next_obs=(observation_size,), terminated=(), prior=())
         self.data = {k: torch.zeros((capacity, *shapes[k]), device=device) for k in self.FIELDS}
         # Read by the captured update, so it is a device tensor updated in place.
         self.size = torch.zeros((), device=device)
@@ -114,6 +116,8 @@ class ReplayBuffer:
         device = lambda array: torch.from_numpy(np.ascontiguousarray(array)).pin_memory().to(  # noqa: E731
             self.size.device, non_blocking=True)
         index = device((self.position + np.arange(n)) % self.capacity)
+        rows = dict(rows)
+        rows.setdefault("prior", np.zeros(n, np.float32))
         for k in self.FIELDS:
             self.data[k].index_copy_(0, index, device(rows[k]))
         self.position = (self.position + n) % self.capacity
@@ -135,16 +139,21 @@ class ReplayBuffer:
 
     def load(self, path: Path):
         with np.load(path) as saved:
-            rows = {k: saved[k][-self.capacity:] for k in self.FIELDS}
+            # Buffers saved before the prior column load with prior = 0.
+            rows = {k: saved[k][-self.capacity:] for k in self.FIELDS if k in saved}
         for start in range(0, len(rows["reward"]), 262_144):
             self.add({k: v[start:start + 262_144] for k, v in rows.items()})
 
 
 class SAC:
     def __init__(self, *, observation_size, action_size, hidden, buffer_size, batch_size,
-                 learning_rate, gamma, tau, device="cuda", compile=True, cuda_graph=True):
+                 learning_rate, gamma, tau, device="cuda", compile=True, cuda_graph=True,
+                 demo_weight=0.0):
         self.device, self.batch_size, self.gamma, self.tau = device, batch_size, gamma, tau
         self.learning_rate = learning_rate
+        # demo_weight: squared-error pull of the actor's pedal mean toward the pedal
+        # of forced demonstration transitions (buffer prior = 1), DDPGfD-style.
+        self.demo_weight = demo_weight
         self.actor = Actor(observation_size, action_size, hidden).to(device)
         self.critic = Critics(observation_size, action_size, hidden).to(device)
         self.critic_target = Critics(observation_size, action_size, hidden).to(device)
@@ -187,6 +196,11 @@ class SAC:
         q_pi = self.critic(obs, action_pi, detach=True).min(0).values
         return (alpha * log_prob - q_pi).mean()
 
+    def _demo_loss(self, batch):
+        pedal = torch.tanh(self.actor.mean(self.actor.trunk(batch["obs"])))[:, 1]
+        error = (pedal - batch["action"][:, 1]) ** 2
+        return (batch["prior"] * error).sum() / batch["prior"].sum().clamp(min=1.0)
+
     def _update(self):
         batch = self.buffer.sample(self.batch_size)
         action_pi, log_prob = self._sample(batch["obs"])
@@ -204,6 +218,8 @@ class SAC:
         self.critic_optimizer.step()
 
         actor_loss = self._actor(batch["obs"], action_pi, log_prob, alpha)
+        if self.demo_weight:
+            actor_loss = actor_loss + self.demo_weight * self._demo_loss(batch)
         self.actor_optimizer.zero_grad(set_to_none=False)
         actor_loss.backward()
         self.actor_optimizer.step()
