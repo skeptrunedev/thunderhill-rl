@@ -223,7 +223,8 @@ class ThunderhillSACEnv(gym.Env):
                  seed: int = 0, policy_id: str = "sac", apex_bonus_m: float = 0.0,
                  throttle_bonus_m: float = 0.0, apex_bonus_dense: bool = False,
                  max_start_speed_m_s: float = MAX_INITIAL_SPEED_M_S,
-                 apex_bonus_stations: list[float] | None = None, apex_bonus_floor: float = 0.0):
+                 apex_bonus_stations: list[float] | None = None, apex_bonus_floor: float = 0.0,
+                 throttle_bonus_floor: float = 0.0):
         self.godot, self.data_dir = godot, Path(data_dir)
         self.horizon_s, self.record_godot = horizon_s, record_godot
         if reward_line not in ("progress", "centered"):
@@ -258,6 +259,9 @@ class ThunderhillSACEnv(gym.Env):
         # apex_bonus_floor: reach below which an apex earns nothing. From 0 the credit
         # is nearly used up by 0.7 and the last 0.05 to the bar pays a few metres.
         self.apex_bonus_floor = apex_bonus_floor
+        # throttle_bonus_floor: applied throttle below which the straight bonus pays
+        # nothing, so the credit sits where the judge's 0.95 median is decided.
+        self.throttle_bonus_floor = throttle_bonus_floor
         self._apexes = []
         if apex_bonus_m > 0:
             self._apexes = [(c["apex_station_m"], c["direction"]) for c in required_corners(track)
@@ -449,7 +453,9 @@ class ThunderhillSACEnv(gym.Env):
                     self._apex_reach[index] = None
             if (self.throttle_bonus_m and abs(float(state["lean"])) < UPRIGHT_LEAN_RAD
                     and float(transition["requested_controls"]["front_brake"]) == 0.0):
-                earned = self.throttle_bonus_m * float(state["throttle_applied"]) / len(transitions)
+                earned = self.throttle_bonus_m * float(np.clip(
+                    (float(state["throttle_applied"]) - self.throttle_bonus_floor)
+                    / (1.0 - self.throttle_bonus_floor), 0.0, 1.0)) / len(transitions)
                 bonus += earned
                 self._throttle_bonus += earned
         return bonus

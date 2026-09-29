@@ -346,7 +346,7 @@ class Specialists:
         # A changed recipe restarts the stuck clock: its evaluations are a new attempt.
         recipe = json.dumps({k: getattr(args, k) for k in (
             "apex_bonus_m", "apex_bonus_dense", "apex_bonus_stations", "apex_bonus_floor",
-            "throttle_bonus_m",
+            "throttle_bonus_m", "throttle_bonus_floor",
             "max_start_speed", "focus_lead", "focus_lead_min", "focus_curriculum",
             "focus_stations")}, sort_keys=True)
         if state.get("recipe") != recipe:
@@ -450,6 +450,7 @@ class Specialists:
             "--max-start-speed", str(args.max_start_speed),
             *(["--apex-bonus-stations", args.apex_bonus_stations] if args.apex_bonus_stations else []),
             "--apex-bonus-floor", str(args.apex_bonus_floor),
+            "--throttle-bonus-floor", str(args.throttle_bonus_floor),
             "--eval-every", str(args.eval_every), "--eval-starts", str(args.eval_starts),
             "--eval-horizon", str(args.eval_horizon), "--no-rollout-shards",
             "--apex-bonus-m", str(args.apex_bonus_m), "--throttle-bonus-m",
@@ -590,6 +591,8 @@ def main():
                         help="opt-in (sac_async --focus-curriculum)")
     parser.add_argument("--apex-bonus-floor", type=float, default=0.0,
                         help="sac_async --apex-bonus-floor")
+    parser.add_argument("--throttle-bonus-floor", type=float, default=0.0,
+                        help="sac_async --throttle-bonus-floor")
     parser.add_argument("--apex-bonus-stations", default="",
                         help="comma list (sac_async --apex-bonus-stations)")
     parser.add_argument("--max-start-speed", type=float, default=40.0,
