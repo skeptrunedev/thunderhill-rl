@@ -18,7 +18,8 @@ least --min-corner-deg are required; smaller kinks are reported only.
 
 The recording is a Godot episode recording (one JSON row per transition, as the
 SAC evaluator and rev_drive keep them). Also reported: the median requested
-throttle while upright (|lean| < --upright-lean-rad), i.e. on the straights.
+throttle while upright (|lean| < --upright-lean-rad) and off the brakes, i.e. on
+the straights outside the braking zones.
 """
 
 from __future__ import annotations
@@ -108,7 +109,8 @@ def report(track: str, recording: Path, *, window_m=WINDOW_M, apex_fraction=APEX
                           apexed=reach is not None and reach >= apex_fraction))
     required = [c for c in found if c["required"]]
     upright = [float(r["requested_controls"]["throttle"]) for r in rows
-               if abs(float(r["state"]["lean"])) < upright_lean_rad]
+               if abs(float(r["state"]["lean"])) < upright_lean_rad
+               and float(r["requested_controls"]["front_brake"]) == 0.0]
     return dict(track=track, recording=str(recording), transitions=len(rows),
                 apexes_hit=sum(c["apexed"] for c in required), apexes_total=len(required),
                 missed_apex_stations_m=[c["apex_station_m"] for c in required if not c["apexed"]],
