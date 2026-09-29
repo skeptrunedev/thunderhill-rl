@@ -79,7 +79,8 @@ def lane(track: str, workers: int = WORKERS, extra: list[str] | None = None):
     command = ["uv", "run", "--script", f"{REMOTE}/training/sac_specialists.py",
                "--godot", "/usr/local/bin/godot", "--tracks", track, "--reuse", "",
                "--runs-dir", f"{REMOTE}/{LANES}", "--registry", f"{REMOTE}/{LANES}/{track}.json",
-               "--workers", str(workers), "--min-free-gb", "0", "--no-wandb", *(extra or [])]
+               "--workers", str(workers), "--min-free-gb", "0", "--keep-recordings", "--no-wandb",
+               *(extra or [])]
     print(" ".join(command), flush=True)
     control.pop(f"stop::{track}", None)
     run_dir = Path(f"{REMOTE}/{LANES}/specialist-{track}")

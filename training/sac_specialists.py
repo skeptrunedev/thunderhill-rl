@@ -519,10 +519,12 @@ class Specialists:
                      run=str(run_dir.relative_to(ROOT)),
                      finished=datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"))
         self.publish(track, entry)
-        # Recordings of the best evaluation stay renderable; the rest are kept gzipped.
+        # Recordings of the best evaluation stay renderable; the rest are kept gzipped,
+        # unless --keep-recordings (a Modal lane: gzipping ~30 GB over the volume held a
+        # GPU container for half an hour after the result was published).
         keep = {run_dir / r["recording"] for r in best["rows"] if r.get("recording")}
-        recordings = [p for p in (run_dir / "eval").glob("worker-*/data/**/runs/*/*.jsonl")
-                      if p not in keep]
+        recordings = [] if self.args.keep_recordings else [
+            p for p in (run_dir / "eval").glob("worker-*/data/**/runs/*/*.jsonl") if p not in keep]
         for start in range(0, len(recordings), 200):
             subprocess.run(["gzip", "-f", *map(str, recordings[start:start + 200])], check=True)
         (run_dir / "replay_buffer.npz").unlink(missing_ok=True)
@@ -623,6 +625,8 @@ def main():
     parser.add_argument("--min-free-gb", type=float, default=30.0,
                         help="stop below this much free disk (the final replay-buffer save "
                         "writes ~3 GB more)")
+    parser.add_argument("--keep-recordings", action="store_true",
+                        help="leave evaluation recordings uncompressed when a circuit finishes")
     parser.add_argument("--no-wandb", action="store_true")
     args = parser.parse_args()
     args.init_from = args.init_from.absolute()  # not resolve(): see runs_dir below

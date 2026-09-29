@@ -140,8 +140,13 @@ class Scheduler:
                 newest = max(e.mtime for e in lanes.volume.listdir(
                     f"{lanes.LANES.removeprefix('runs/')}/specialist-{track}"))
                 return time.time() - newest < self.args.stale_s
+            call = modal.FunctionCall.from_id(claim["handle"])
+            if lanes._read(f"{lanes.LANES}/{track}.json") is not None:
+                # The lane published: harvest now, and stop its cleanup from holding a GPU.
+                call.cancel(terminate_containers=True)
+                return False
             try:
-                modal.FunctionCall.from_id(claim["handle"]).get(timeout=0)
+                call.get(timeout=0)
                 return False
             except TimeoutError:
                 return True
