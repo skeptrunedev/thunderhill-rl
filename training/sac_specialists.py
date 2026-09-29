@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import fcntl
 import json
 import math
 import shutil
@@ -168,6 +169,28 @@ def describe(e: dict) -> str:
             f"at {e['steps']}")
 
 
+MIN_THROTTLE = 0.95
+
+
+def meets_bar(e: dict, starts: int, min_throttle: float = MIN_THROTTLE) -> bool:
+    """Every start laps, every required apex hit, full throttle when upright."""
+    return (e["laps"] == starts and bool(e["apexes_total"])
+            and e["apexes_hit"] == e["apexes_total"]
+            and (e["upright_median_throttle"] or 0.0) >= min_throttle)
+
+
+def publish_entry(registry: Path, track: str, entry: dict):
+    """Set one circuit's registry entry; the local unit and the Modal sync both
+    write the registry, so under an exclusive lock."""
+    with registry.with_suffix(".lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        current = json.loads(registry.read_text()) if registry.exists() else {}
+        current[track] = entry
+        tmp = registry.with_suffix(".tmp")
+        tmp.write_text(json.dumps(dict(sorted(current.items())), indent=1) + "\n")
+        tmp.replace(registry)
+
+
 def free_gb(path: Path) -> float:
     return shutil.disk_usage(path).free / 1e9
 
@@ -191,11 +214,7 @@ class Specialists:
         return json.loads(path.read_text()) if path.exists() else {}
 
     def publish(self, track: str, entry: dict):
-        registry = self.registry()
-        registry[track] = entry
-        tmp = self.args.registry.with_suffix(".tmp")
-        tmp.write_text(json.dumps(dict(sorted(registry.items())), indent=1) + "\n")
-        tmp.replace(self.args.registry)
+        publish_entry(self.args.registry, track, entry)
         print(f"REGISTRY {track}: {json.dumps(entry)}", flush=True)
 
     def publish_reused(self):
@@ -215,10 +234,7 @@ class Specialists:
 
     # The bar -------------------------------------------------------------------
     def meets_bar(self, e: dict, starts: int | None = None) -> bool:
-        """Every start laps, every required apex hit, full throttle when upright."""
-        return (e["laps"] == (starts or len(e["rows"])) and bool(e["apexes_total"])
-                and e["apexes_hit"] == e["apexes_total"]
-                and (e["upright_median_throttle"] or 0.0) >= self.args.min_throttle)
+        return meets_bar(e, starts or len(e["rows"]), self.args.min_throttle)
 
     def lap_plateaued(self, evals: list[dict]) -> bool:
         """The best lap so far improved by less than --plateau-fraction over the
@@ -410,7 +426,7 @@ def main():
     parser.add_argument("--plateau-evals", type=int, default=3)
     parser.add_argument("--plateau-fraction", type=float, default=0.003,
                         help="the best lap must improve by less than this over --plateau-evals")
-    parser.add_argument("--min-throttle", type=float, default=0.95,
+    parser.add_argument("--min-throttle", type=float, default=MIN_THROTTLE,
                         help="median throttle while upright and off the brakes")
     parser.add_argument("--eval-every", type=int, default=500_000)
     parser.add_argument("--eval-starts", type=int, default=6)
@@ -421,7 +437,9 @@ def main():
     parser.add_argument("--no-wandb", action="store_true")
     args = parser.parse_args()
     args.init_from = args.init_from.resolve()
-    args.runs_dir, args.registry = args.runs_dir.resolve(), args.registry.resolve()
+    # absolute(), not resolve(): on Modal runs/ is a volume symlinked out of the
+    # checkout, and registry paths are relative to the checkout.
+    args.runs_dir, args.registry = args.runs_dir.absolute(), args.registry.absolute()
     args.reuse = {track: (ROOT / path).resolve() for track, path in
                   (item.split("=", 1) for item in args.reuse.split(",") if item)}
     args.tracks = ([t.strip() for t in args.tracks.split(",") if t.strip()] if args.tracks
