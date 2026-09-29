@@ -62,6 +62,9 @@ def main():
     graphs.GRAPH_ROW = row                                # longest question-row bucket
     graphs.GRAPH_TOKENS = graphs.GRAPH_ROWS * row
 
+    from uvicorn.config import LOGGING_CONFIG
+
+    LOGGING_CONFIG["loggers"]["uvicorn.access"]["level"] = "WARNING"  # a line per control step otherwise
     sys.argv = ["kev.serve", "--run", args.run, "--port", str(args.port)]
     runpy.run_module("kev.serve", run_name="__main__")
 

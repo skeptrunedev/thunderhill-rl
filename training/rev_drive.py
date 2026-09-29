@@ -83,6 +83,7 @@ FOCUS_LEAD_M = 150.0  # focus rides start this far before a failure, at 80% of t
 HELD_OUT_TRACKS = "portimao,laguna-seca"
 RIDE_QUESTIONS = {qid: QUESTIONS[qid] for qid in ("steer", "pedal")}
 SLOTS = Path.home() / ".cache/thunderhill-rev/godot-slots"
+REQUEST_TIMEOUT_S = 15.0
 
 
 def circuits(spec: str) -> list[str]:
@@ -147,7 +148,14 @@ def crash_starts(directories, track: str) -> list[dict]:
 
 class RevRider:
     """Asks a Rev server over one kept-alive HTTP(S) connection per thread: a fresh TLS
-    handshake per control step cost more than the model (660 ms against 8 ms on Modal)."""
+    handshake per control step cost more than the model (660 ms against 8 ms on Modal).
+
+    Modal's web ingress drops about 1 request in 1,500 before it reaches the container (a
+    probe build logged the id of every request kev.serve received: the hung ones never
+    arrived, at any point of a connection's life), and the client then waits out its whole
+    timeout. Answers take at most ~2 s even beside a busy SAC learner, so a request gets
+    REQUEST_TIMEOUT_S and is then sent again on a fresh connection: a state's answer does
+    not depend on how many times it is asked."""
 
     def __init__(self, url: str, decode: str, pedal_gain: float, off_track_fraction: float, named: bool):
         self.url = urllib.parse.urlsplit(url.rstrip("/") + "/v1/systemone")
@@ -160,7 +168,7 @@ class RevRider:
     def _connection(self, fresh=False):
         if fresh or getattr(self.local, "connection", None) is None:
             kind = http.client.HTTPSConnection if self.url.scheme == "https" else http.client.HTTPConnection
-            self.local.connection = kind(self.url.netloc, timeout=120)
+            self.local.connection = kind(self.url.netloc, timeout=REQUEST_TIMEOUT_S)
         return self.local.connection
 
     def ask(self, obs, circuit: str, rng) -> dict:
@@ -182,7 +190,7 @@ class RevRider:
             except (OSError, http.client.HTTPException, RuntimeError):
                 if attempt == 4:
                     raise
-                time.sleep(2 ** attempt)
+                time.sleep(attempt)
         answer["client_ms"] = (time.perf_counter() - began) * 1000.0
         return answer
 

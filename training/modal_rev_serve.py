@@ -6,6 +6,12 @@ Modal secret rev-serve-key (KEV_API_KEY). Serving remotely keeps the local GPU f
 SAC training, and an H100 answers a DAgger collection several times faster than the
 local 2080 Ti in fp32.
 
+One container, never more: at 20 concurrent requests Modal's autoscaler started a second
+H100 (well under max_inputs), and requests routed to it waited out its cold start. One
+container answered 35 requests/s at 20 concurrent clients and 61 at 48 (rev-0.8b-r8, from
+the Thunderhill box: ~140 ms network, model batches of 14-25 ms; the rest is kev.serve's
+event loop and model thread sharing the GIL), more than 16 envs can ask for.
+
   modal secret create rev-serve-key KEV_API_KEY=$(openssl rand -hex 24)   # once
   REV_SERVE_RUN=rev-0.8b-r6 uvx --from modal==1.5.5 modal deploy training/modal_rev_serve.py
 """
@@ -30,8 +36,8 @@ app = modal.App("thunderhill-rev-serve")
 
 @app.cls(image=image.env({"REV_SERVE_RUN": SERVE_RUN}).add_local_python_source("modal_rev"), gpu="H100", cpu=4, memory=(16384, 65536),
          volumes={RUNS: runs, HF: hf_cache}, secrets=[modal.Secret.from_name("rev-serve-key")],
-         min_containers=1, scaledown_window=600, timeout=3600, startup_timeout=900)
-@modal.concurrent(max_inputs=48)
+         min_containers=1, max_containers=1, scaledown_window=600, timeout=3600, startup_timeout=900)
+@modal.concurrent(max_inputs=64)
 class Serve:
     @modal.enter()
     def load(self):
