@@ -24,7 +24,8 @@ a circuit without a run goes to the first free host, local hosts first. Every
     else (a failure, a stop, a result the check here rejects) is queued again at
     the front, for its home;
   - starts queued circuits on free hosts: morph only with --morph-min-free-gb
-    free, Modal only while the estimated spend is under --modal-budget-usd.
+    free, Modal only while the estimated spend is under --modal-budget-usd,
+    with that circuit's --extra arguments (e.g. opt-in reward shaping).
 
 Modal spend is estimated as lane wall time times --lane-usd-per-hour.
 """
@@ -88,16 +89,18 @@ class Scheduler:
 
     def start(self, track: str, host: str):
         unit = f"thunderhill-specialist-{track}"
+        extra = self.state.get("extra", {}).get(track, [])
         common = ["--tracks", track, "--reuse", "", "--no-wandb"]
         if host == "modal":
-            handle = self.lane.spawn(track).object_id
+            handle = self.lane.spawn(track, lanes.WORKERS, extra or None).object_id
         elif host == "morph":
             subprocess.run(
                 ["systemd-run", "--user", "--collect", "--unit", unit, "-p", "Restart=on-failure",
                  "-p", "RestartSec=30", "-p", "StartLimitIntervalSec=0",
                  f"--working-directory={ROOT}", f"--setenv=PATH={Path.home()}/.local/bin:/usr/bin:/bin",
                  f"--setenv=HOME={Path.home()}", str(Path.home() / ".local/bin/uv"), "run", "--script",
-                 "training/sac_specialists.py", "--godot", str(Path(GODOT).expanduser()), *common],
+                 "training/sac_specialists.py", "--godot", str(Path(GODOT).expanduser()), *common,
+                 *extra],
                 check=True)
             handle = unit
         else:
@@ -107,13 +110,13 @@ class Scheduler:
                       '--setenv=HOME="$HOME" $HOME/.local/bin/uv run --script '
                       f"training/sac_specialists.py --godot {GODOT} {' '.join(common[:2])} "
                       f"--reuse '' --no-wandb --runs-dir {THELIO_RUNS} "
-                      f"--registry {THELIO_RUNS}/{track}.json --workers 24")
+                      f"--registry {THELIO_RUNS}/{track}.json --workers 24 {' '.join(extra)}")
             subprocess.run([*THELIO, remote], check=True)
             handle = unit
         self.state["claims"][track] = dict(host=host, handle=handle, since=time.time(),
                                            accounted=time.time())
         self.state["homes"][track] = host
-        log(f"START {track} on {host} ({handle})")
+        log(f"START {track} on {host} ({handle}){' ' + ' '.join(extra) if extra else ''}")
 
     def alive(self, track: str, claim: dict) -> bool:
         if claim["host"] == "modal":
@@ -255,6 +258,9 @@ def main():
                         "by its lane registry and its run dir's newest change")
     parser.add_argument("--homes", default="", help="new state only: TRACK=HOST where a "
                         "circuit's run already lives")
+    parser.add_argument("--extra", action="append", default=[],
+                        help="TRACK='ARGS': extra sac_specialists.py arguments for that circuit's "
+                        "future starts (kept in the state); TRACK= clears them")
     parser.add_argument("--modal-lanes", type=int, default=10)
     parser.add_argument("--modal-budget-usd", type=float, default=250.0)
     parser.add_argument("--modal-spend-before-usd", type=float, default=0.0,
@@ -281,6 +287,10 @@ def main():
             scheduler.state["homes"][track] = host
         scheduler.state["queue"] = [t for t in scheduler.state["queue"]
                                     if t not in scheduler.state["claims"]]
+        scheduler.save()
+    for item in args.extra:
+        track, _, extra = item.partition("=")
+        scheduler.state.setdefault("extra", {})[track] = extra.split()
         scheduler.save()
     scheduler.run()
 

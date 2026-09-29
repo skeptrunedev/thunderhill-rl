@@ -275,6 +275,20 @@ class Specialists:
         args, run_dir = self.args, self.run_dir(track)
         state_path = run_dir / "specialist.json"
         state = json.loads(state_path.read_text()) if state_path.exists() else dict(phase="learn")
+        self.resume_weights = None
+        if args.restart_from_best and "shaping_from" not in state:
+            # Shaping starts from the run's best evaluation so far; its lap is the
+            # ceiling a result must not be slower than.
+            best = max(evaluations(run_dir, args.eval_starts, track), key=rank)
+            state.update(phase="refine", shaping_from=dict(
+                checkpoint=best["checkpoint"], best_lap_s=best["best_lap_s"],
+                apexes=f"{best['apexes_hit']}/{best['apexes_total']}",
+                missed=best["missed_apex_stations_m"], at_step=self.latest_steps(run_dir),
+                apex_bonus_m=args.apex_bonus_m, throttle_bonus_m=args.throttle_bonus_m))
+            self.resume_weights = run_dir / best["checkpoint"]
+            state_path.write_text(json.dumps(state, indent=1) + "\n")
+            print(f"SHAPING {track}: from {best['checkpoint']} ({describe(best)})", flush=True)
+        self.state = state
         if state["phase"] == "done" and self.outcome(
                 evaluations(run_dir, args.eval_starts, track), False,
                 state.get("learn_end_step", 0)) != "done":
@@ -310,12 +324,21 @@ class Specialists:
         best = max(evals, key=rank)
         if learn and best["laps"] == args.eval_starts:
             return "reliable"
-        if (not learn and self.meets_bar(best, args.eval_starts)
+        if (not learn and self.meets_bar(best, args.eval_starts) and self.fast_enough(evals, best)
                 and self.lap_plateaued(evals, refine_from)):
             return "done"
         if evals[-1]["steps"] - last_improvement(evals, args.min_delta) >= args.stuck_steps:
             return "stuck"
         return None
+
+    def fast_enough(self, evals: list[dict], best: dict) -> bool:
+        """Faster than the general policy's step-0 evaluation (where it lapped) and,
+        once shaping started, no slower than the run's best lap before it."""
+        general = next((e for e in evals if e["steps"] == 0), None)
+        if general and general["best_lap_s"] is not None and best["best_lap_s"] >= general["best_lap_s"]:
+            return False
+        ceiling = getattr(self, "state", {}).get("shaping_from", {}).get("best_lap_s")
+        return ceiling is None or best["best_lap_s"] <= ceiling
 
     def run_trainer(self, track, learning_rate, learn, refine_from) -> str:
         """sac_async.py on one circuit until outcome() decides; after every
@@ -336,8 +359,12 @@ class Specialists:
             "--focus-lead-min", str(args.focus_lead_min),
             "--eval-every", str(args.eval_every), "--eval-starts", str(args.eval_starts),
             "--eval-horizon", str(args.eval_horizon), "--no-rollout-shards",
+            "--apex-bonus-m", str(args.apex_bonus_m), "--throttle-bonus-m",
+            str(args.throttle_bonus_m),
+            *(["--resume-weights-from", str(self.resume_weights)] if self.resume_weights else []),
             *(["--no-wandb"] if args.no_wandb else []),
         ]
+        self.resume_weights = None  # once: later restarts resume the latest
         run_dir.mkdir(parents=True, exist_ok=True)
         print(f"TRAIN {track}: {'learn' if learn else 'refine'} at lr {learning_rate} from "
               f"{self.latest_steps(run_dir)} env steps (log {run_dir / 'train.log'})", flush=True)
@@ -449,6 +476,14 @@ def main():
     parser.add_argument("--workers", type=int, default=30)
     parser.add_argument("--buffer-size", type=int, default=6_000_000)
     parser.add_argument("--focus-fraction", type=float, default=0.5)
+    parser.add_argument("--apex-bonus-m", type=float, default=0.0,
+                        help="opt-in reward shaping (sac_async --apex-bonus-m) for circuits "
+                        "short of the apex bar")
+    parser.add_argument("--throttle-bonus-m", type=float, default=0.0,
+                        help="opt-in reward shaping (sac_async --throttle-bonus-m)")
+    parser.add_argument("--restart-from-best", action="store_true",
+                        help="once per run: resume from its best evaluated checkpoint's weights "
+                        "(replay buffer kept), and publish nothing slower than that lap")
     parser.add_argument("--focus-lead-min", type=float, default=25.0,
                         help="focused starts begin 25-150 m before the spot: close starts at "
                         "low speed let the policy meet a corner it never survives the "

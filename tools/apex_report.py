@@ -170,6 +170,19 @@ def judge(road: RoadTelemetry, points, corner_list, window_m, apex_fraction) -> 
     return judged
 
 
+def required_corners(track: str, window_m=WINDOW_M) -> list[dict]:
+    """The corners report() requires on a circuit (apex_station_m, direction): the
+    signed-off list where there is one, else the automatic ones. Training rewards
+    that bring the bike to these apexes use exactly this list."""
+    road = RoadTelemetry(track=track)
+    if track in SIGNED_OFF:
+        found = listed_corners(road, SIGNED_OFF[track]["corners"], SIGNED_OFF[track]["kinks"],
+                               window_m)
+    else:
+        found = corners(road)
+    return [c for c in found if c["required"]]
+
+
 def report(track: str, recording: Path, *, corner_stations=None, kink_stations=(),
            window_m=WINDOW_M, apex_fraction=APEX_FRACTION, upright_lean_rad=UPRIGHT_LEAN_RAD,
            **corner_args) -> dict:

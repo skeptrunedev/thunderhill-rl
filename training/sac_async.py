@@ -237,6 +237,8 @@ def run_actor(index, args, shared: Shared):
                                  horizon_s=args.horizon,
                                  seed=args.seed * 1000 + index + 1_000_000 * rotation,
                                  reward_line=args.reward_line, pedal_gain=args.pedal_gain,
+                                 apex_bonus_m=args.apex_bonus_m,
+                                 throttle_bonus_m=args.throttle_bonus_m,
                                  vehicle=args.vehicle, track=tracks[slot],
                                  policy_id=args.run_name)
 
@@ -568,6 +570,14 @@ class Trainer:
             self.sac.load_state_dict(state["sac"])
             self.env_steps = state["env_steps"]
             self.update_offset = state.get("update_offset", 0)
+            if args.resume_weights_from:
+                # Networks, optimizers and temperature from an earlier checkpoint of
+                # the run (its best), keeping this resume's counters and replay.
+                updates = self.sac.updates
+                self.sac.load_state_dict(torch.load(args.resume_weights_from, map_location="cuda",
+                                                    weights_only=False)["sac"])
+                self.sac.updates = updates
+                print(f"Weights from {args.resume_weights_from}", flush=True)
             if (run_dir / "replay_buffer.npz").exists():
                 self.sac.buffer.load(run_dir / "replay_buffer.npz")
             print(f"Resumed {checkpoints[-1].name}: {self.env_steps} env steps, "
@@ -923,6 +933,17 @@ def main():
     parser.add_argument("--runs-dir", type=Path, default=ROOT / "runs" / "sac")
     parser.add_argument("--resume", action="store_true",
                         help="continue from the run's latest checkpoint and replay buffer")
+    parser.add_argument("--resume-weights-from", type=Path,
+                        help="with --resume: take the networks, optimizers and entropy "
+                        "temperature from this checkpoint (e.g. the run's best) instead of "
+                        "the latest, keeping the latest's step counters and the replay buffer")
+    parser.add_argument("--apex-bonus-m", type=float, default=0.0,
+                        help="opt-in shaping: metres of progress credited once per required "
+                        "apex (tools/apex_report.py), scaled by the inside reach achieved "
+                        "there, full at the judge's 0.75")
+    parser.add_argument("--throttle-bonus-m", type=float, default=0.0,
+                        help="opt-in shaping: metres of progress per step at full applied "
+                        "throttle while upright (|lean| < 0.2) and off the front brake")
     parser.add_argument("--init-from", type=Path,
                         help="start a new run from another run's checkpoint networks, "
                         "with an empty replay buffer")

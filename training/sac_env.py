@@ -81,6 +81,12 @@ from alpagym_metrics import (  # noqa: E402
 from check_parallel import worker  # noqa: E402
 from episode_config import MAX_INITIAL_SPEED_M_S, _speed_limits  # noqa: E402
 from lap_policy import DEFAULT_TRACK, RoadTelemetry  # noqa: E402
+from apex_report import (  # noqa: E402  the specialists' judge, for the opt-in shaping
+    APEX_FRACTION,
+    UPRIGHT_LEAN_RAD,
+    WINDOW_M as APEX_WINDOW_M,
+    required_corners,
+)
 
 CONTROL_PERIOD_S = 0.1  # the game advances 12 physics ticks per request
 STEP_REFERENCE_M = REFERENCE_SPEED_M_S * CONTROL_PERIOD_S
@@ -214,7 +220,8 @@ class ThunderhillSACEnv(gym.Env):
                  reward_line: str = "progress", pedal_gain: float = 1.0,
                  vehicle: str = "motorcycle", track: str = DEFAULT_TRACK,
                  record_godot: bool = False, starts: list[dict] | None = None,
-                 seed: int = 0, policy_id: str = "sac"):
+                 seed: int = 0, policy_id: str = "sac", apex_bonus_m: float = 0.0,
+                 throttle_bonus_m: float = 0.0):
         self.godot, self.data_dir = godot, Path(data_dir)
         self.horizon_s, self.record_godot = horizon_s, record_godot
         if reward_line not in ("progress", "centered"):
@@ -230,6 +237,16 @@ class ThunderhillSACEnv(gym.Env):
         # The worker runs --track=<id>; Track mirrors that geometry for observations.
         self.track_id = track
         self.track = Track(RoadTelemetry(track=track))
+        # Opt-in shaping toward the specialists' bar (tools/apex_report.py), in metres
+        # of progress: apex_bonus_m once per required apex as the bike leaves its
+        # judging window, scaled by its best inside reach there (full at the 0.75
+        # the judge requires, nothing at or outside the centreline);
+        # throttle_bonus_m per step at full applied throttle while upright and off
+        # the front brake (the judge's straights).
+        self.apex_bonus_m, self.throttle_bonus_m = apex_bonus_m, throttle_bonus_m
+        self._apexes = []
+        if apex_bonus_m > 0:
+            self._apexes = [(c["apex_station_m"], c["direction"]) for c in required_corners(track)]
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (OBSERVATION_SIZE,), np.float32)
         self.action_space = gym.spaces.Box(-1.0, 1.0, (2,), np.float32)
         self.rng = np.random.default_rng(seed)
@@ -309,6 +326,8 @@ class ThunderhillSACEnv(gym.Env):
         )
         self._progress_window = []
         self._return, self._laps, self._lap_time = 0.0, 0, None
+        self._apex_reach = [None] * len(self._apexes)  # best reach while in each window
+        self._apex_bonus = self._throttle_bonus = 0.0
         self._start = start
         self._vector = observation_vector(self.track, observation, self._previous_action,
                                           self.vehicle)
@@ -343,6 +362,8 @@ class ThunderhillSACEnv(gym.Env):
                     self._laps += 1
                     self._lap_time = float(event["time"])
         reward = (getattr(metrics, credited) - before_credit) / STEP_REFERENCE_M
+        if self._apexes or self.throttle_bonus_m:
+            reward += self._shaping(transitions) / STEP_REFERENCE_M
         self._observation = result
         self._step_count += 1
         self._previous_action = (command["steer"], command["throttle"] - command["front_brake"])
@@ -374,6 +395,34 @@ class ThunderhillSACEnv(gym.Env):
             info.update(self._summary(reason, result["episode_id"]))
         return self._vector, float(reward), terminated, truncated, info
 
+    def _shaping(self, transitions) -> float:
+        """This step's apex and straight-throttle bonuses, in metres, with the
+        judge's measures: reach = direction * lateral_m / half_width_m within
+        APEX_WINDOW_M of the apex; upright = |lean| < 0.2 rad, front brake off."""
+        bonus, length = 0.0, self.track.length
+        for transition in transitions:
+            road, state = transition["track"], transition["state"]
+            station = float(road["progress"]) * length
+            for index, (apex, direction) in enumerate(self._apexes):
+                offset = (station - apex + length / 2) % length - length / 2
+                if abs(offset) <= APEX_WINDOW_M:
+                    reach = direction * float(road["lateral_m"]) / float(road["half_width_m"])
+                    best = self._apex_reach[index]
+                    self._apex_reach[index] = reach if best is None else max(best, reach)
+                elif self._apex_reach[index] is not None:
+                    if offset > 0:  # left the window forward: judged once
+                        earned = self.apex_bonus_m * float(np.clip(
+                            self._apex_reach[index] / APEX_FRACTION, 0.0, 1.0))
+                        bonus += earned
+                        self._apex_bonus += earned
+                    self._apex_reach[index] = None
+            if (self.throttle_bonus_m and abs(float(state["lean"])) < UPRIGHT_LEAN_RAD
+                    and float(transition["requested_controls"]["front_brake"]) == 0.0):
+                earned = self.throttle_bonus_m * float(state["throttle_applied"]) / len(transitions)
+                bonus += earned
+                self._throttle_bonus += earned
+        return bonus
+
     def _summary(self, reason, episode_id):
         metrics = self._metrics
         return {"episode_summary": {
@@ -388,4 +437,6 @@ class ThunderhillSACEnv(gym.Env):
             "start_speed_m_s": self._start["speed"],
             "laps": self._laps,
             "lap_time_s": self._lap_time,
+            "apex_bonus_m": round(self._apex_bonus, 3),
+            "throttle_bonus_m": round(self._throttle_bonus, 3),
         }}
