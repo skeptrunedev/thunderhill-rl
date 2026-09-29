@@ -103,6 +103,18 @@ def check_image():
                 focus_file="--focus-file" in help_text.stdout)
 
 
+@app.function(image=image, cpu=0.25, memory=512, timeout=120)
+def code_version() -> dict:
+    """What the deployed lanes run: apex_report's VERSION and sac_specialists'
+    sha256, to compare with this checkout before relying on a redeploy."""
+    import hashlib
+
+    return dict(apex_version=next(line for line in open(f"{REMOTE}/tools/apex_report.py")
+                                  if line.startswith("VERSION")).split("=")[1].strip(),
+                sac_specialists=hashlib.sha256(
+                    Path(f"{REMOTE}/training/sac_specialists.py").read_bytes()).hexdigest()[:12])
+
+
 @app.local_entrypoint()
 def check():
     print(check_image.remote())

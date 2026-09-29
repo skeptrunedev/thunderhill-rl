@@ -32,6 +32,7 @@ Modal spend is estimated as lane wall time times --lane-usd-per-hour.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import shutil
 import subprocess
@@ -145,6 +146,9 @@ class Scheduler:
             outcome = lanes.sync_track(track)
             phase = json.loads(lanes._read(f"{lanes.LANES}/specialist-{track}/specialist.json")
                                or b'{"phase": "learn"}')["phase"]
+            if outcome == "fails-check":
+                self.reopen_modal(track)
+                phase = "refine"
         elif host == "thelio":
             local = ROOT / THELIO_RUNS
             local.mkdir(parents=True, exist_ok=True)
@@ -160,6 +164,8 @@ class Scheduler:
                 outcome = "published" if published else "fails-check"
                 if not published:
                     log(f"CHECK {track}: fails here: {json.dumps(entry)}")
+                    self.reopen_thelio(track)
+                    lane_registry.unlink()
             phase = json.loads((local / f"specialist-{track}/specialist.json").read_text()
                                if (local / f"specialist-{track}/specialist.json").exists()
                                else '{"phase": "learn"}')["phase"]
@@ -173,6 +179,26 @@ class Scheduler:
         if phase == "stuck":
             return "stuck"
         return "requeue"
+
+    def reopen_modal(self, track: str):
+        """A lane published a result the check here rejects (e.g. judged by an
+        older apex_report): drop its lane registry entry and put its run back in
+        refine, so the relaunched lane trains on instead of republishing."""
+        run = f"{lanes.LANES.removeprefix('runs/')}/specialist-{track}"
+        state = json.loads(lanes._read(f"{lanes.LANES}/specialist-{track}/specialist.json"))
+        state.update(phase="refine", reopened=time.time())
+        with lanes.volume.batch_upload(force=True) as batch:
+            batch.put_file(io.BytesIO((json.dumps(state, indent=1) + "\n").encode()),
+                           f"{run}/specialist.json")
+        lanes.volume.remove_file(f"{lanes.LANES.removeprefix('runs/')}/{track}.json")
+        log(f"REOPEN {track} on modal: lane registry removed, phase refine")
+
+    def reopen_thelio(self, track: str):
+        run = f"{THELIO_ROOT}/{THELIO_RUNS}"
+        script = (f"import json; p='{run}/specialist-{track}/specialist.json'; "
+                  "s=json.load(open(p)); s['phase']='refine'; json.dump(s, open(p, 'w'), indent=1)")
+        subprocess.run([*THELIO, f'python3 -c "{script}" && rm -f {run}/{track}.json'], check=True)
+        log(f"REOPEN {track} on thelio: lane registry removed, phase refine")
 
     # Loop ------------------------------------------------------------------------
     def step(self):
