@@ -510,7 +510,7 @@ def main():
                         "writes ~3 GB more)")
     parser.add_argument("--no-wandb", action="store_true")
     args = parser.parse_args()
-    args.init_from = args.init_from.resolve()
+    args.init_from = args.init_from.absolute()  # not resolve(): see runs_dir below
     # absolute(), not resolve(): on Modal runs/ is a volume symlinked out of the
     # checkout, and registry paths are relative to the checkout.
     args.runs_dir, args.registry = args.runs_dir.absolute(), args.registry.absolute()
