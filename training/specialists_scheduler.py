@@ -70,6 +70,7 @@ class Scheduler:
                       else dict(claims={}, finished={}, homes={}, queue=args.queue,
                                 modal_spend_usd=args.modal_spend_before_usd))
         self.lane = modal.Function.from_name(lanes.app.name, "lane")
+        self.last_alert = 0.0
 
     def save(self):
         tmp = self.args.state.with_suffix(".tmp")
@@ -251,6 +252,12 @@ class Scheduler:
             else:
                 self.state["finished"][track] = result
             self.save()
+        idle = [h for h in ("modal", "morph", "thelio") if self.free(h)]
+        if self.state.get("stuck") and idle and time.time() - self.last_alert > 600:
+            # Held circuits beside idle capacity need a new recipe from a person.
+            self.last_alert = time.time()
+            log(f"ALERT stuck and held with idle capacity on {idle}: "
+                f"{sorted(self.state['stuck'])}; set --extra to relaunch")
         for track, recipe in list(self.state.get("stuck", {}).items()):
             if self.state.get("extra", {}).get(track, []) != recipe:
                 del self.state["stuck"][track]
