@@ -35,6 +35,8 @@ apart and learn what the 150 m of course ahead cannot show (a braking zone after
 straight); --circuit-dropout renders that share of training states without it, so Rev
 also keeps a policy that reads the course alone. Held-out test tracks (lap_policy.held_out:
 portimao, laguna-seca) never enter a dataset; any state from one is refused.
+--exclude-circuits leaves further circuits out of every part (e.g. those whose
+specialist never cleared the bar), so they stay unseen by Rev and test it too.
 
 Records come from whole episodes inside consecutive shard blocks, so a label never
 depends on steps outside the loaded rows. Training and held-out records come from
@@ -294,6 +296,8 @@ def main():
     parser.add_argument("--max-train-records", type=int, default=0,
                         help="keep every state of the last --dagger collection and fill the rest of "
                              "this budget with a sample of the older records balanced across circuits")
+    parser.add_argument("--exclude-circuits", default="",
+                        help="comma list of circuits whose states never enter the dataset")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
@@ -314,7 +318,10 @@ def main():
     for run, n in zip(args.train_runs, per_run):
         shards = run_shards(args.runs_dir / run, args.heldout_shards if run == args.heldout_run else 0, "train")
         train += sample(args.runs_dir / run, shards, n, args.positive_fraction, args.blocks, args.block_shards, rng)
-    collections = [dagger_rows(directory) for directory in args.dagger]
+    excluded = {t.strip() for t in args.exclude_circuits.split(",") if t.strip()}
+    keep = lambda rows: [row for row in rows if row[4] not in excluded]  # noqa: E731
+    train = keep(train)
+    collections = [keep(dagger_rows(directory)) for directory in args.dagger]
     dagger = [row for rows in collections for row in rows]
     print(f"{len(dagger)} DAgger states from {len(args.dagger)} collections")
     if args.max_train_records and len(train) + len(dagger) > args.max_train_records:
@@ -326,8 +333,8 @@ def main():
         train += dagger
     rng.shuffle(train)
     run_dir = args.runs_dir / args.heldout_run
-    heldout = sample(run_dir, run_shards(run_dir, args.heldout_shards, "heldout"), args.heldout_records,
-                     args.positive_fraction, args.blocks, args.block_shards, rng)
+    heldout = keep(sample(run_dir, run_shards(run_dir, args.heldout_shards, "heldout"), args.heldout_records,
+                          args.positive_fraction, args.blocks, args.block_shards, rng))
     refuse_held_out({row[4] for row in train + heldout})
     # Whole episodes to one side, so calibration and development never share a trajectory.
     episodes = sorted({eid for eid, *_ in heldout})
