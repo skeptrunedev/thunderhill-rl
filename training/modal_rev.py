@@ -62,7 +62,8 @@ def stage(message):
     print(f"[{time.strftime('%H:%M:%S')}] {message}", flush=True)
 
 
-@app.function(image=image, gpu="H100", cpu=4, memory=(32768, 131072), timeout=4 * 3600, retries=0,
+# 12 h: Rev-4B takes ~4x Rev-0.8B's hour per 60k records and epoch.
+@app.function(image=image, gpu="H100", cpu=4, memory=(32768, 131072), timeout=12 * 3600, retries=0,
               volumes={RUNS: runs, HF: hf_cache})
 def train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_from: str = "",
                  lr: float = 0.0) -> dict:
