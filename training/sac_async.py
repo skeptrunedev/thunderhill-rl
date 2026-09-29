@@ -629,7 +629,12 @@ class Trainer:
         # Env steps the learner's updates so far match at --utd, plus the lead,
         # less those of the run before a --resume (not in shared.written).
         own = self.sac.updates - self.update_offset
-        return int(args.learning_starts + own / args.utd) + args.max_lead - self.resumed_steps
+        # Never below learning_starts + max_lead of this process's own steps: a
+        # resume whose learner is at or behind the ratio, with a replay buffer
+        # smaller than a batch (deleted, or saved nearly empty), would otherwise
+        # hold every actor while the learner waits for data that never comes.
+        return max(int(args.learning_starts + own / args.utd) + args.max_lead - self.resumed_steps,
+                   args.learning_starts + args.max_lead)
 
     def ingest(self):
         """Drain every actor ring into the replay buffer and the recorder."""
