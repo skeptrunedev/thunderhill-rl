@@ -132,9 +132,9 @@ class ReplayBuffer:
         # Oldest first, so a reload is a plain append.
         order = (self.position + np.arange(self.count)) % self.capacity if self.count == self.capacity \
             else np.arange(self.count)
-        order = torch.from_numpy(order).to(self.size.device)
         tmp = path.with_suffix(".tmp.npz")
-        np.savez(tmp, **{k: v[order].cpu().numpy() for k, v in self.data.items()})
+        # Reorder on the host: a GPU gather needs a second copy of the largest field.
+        np.savez(tmp, **{k: v.cpu().numpy()[order] for k, v in self.data.items()})
         tmp.replace(path)
 
     def load(self, path: Path):
