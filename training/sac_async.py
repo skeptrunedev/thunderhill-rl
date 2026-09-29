@@ -257,9 +257,17 @@ def run_actor(index, args, shared: Shared):
     # --focus-file: stations another process wants practised too (e.g. missed apexes),
     # {"stations": [...]}, re-read whenever the file changes.
     focus_file, focus_stamp, focus_stations = args.focus_file, None, []
+    # --focus-curriculum: focused leads start within [--focus-lead-min, +25 m] and the
+    # far end grows 25 m at a time, up to --focus-lead, whenever more than half of this
+    # actor's last --focus-window focused episodes rode 30 m past their spot.
+    reach = (min(args.focus_lead_min + 25.0, args.focus_lead) if args.focus_curriculum
+             else args.focus_lead)
+    focus_outcomes = collections.deque(maxlen=args.focus_window)
+    focused = None  # (lead) of the running episode when it is a focused one
 
     def reset():
-        nonlocal focus_stamp, focus_stations
+        nonlocal focus_stamp, focus_stations, focused
+        focused = None
         if focus_file is not None:
             try:
                 stamp = focus_file.stat().st_mtime_ns
@@ -273,7 +281,8 @@ def run_actor(index, args, shared: Shared):
         if pools and args.focus_fraction > 0 and rng.random() < args.focus_fraction:
             track = env.track
             spots = pools[int(rng.integers(len(pools)))]
-            lead = rng.uniform(min(args.focus_lead_min, args.focus_lead), args.focus_lead)
+            lead = rng.uniform(min(args.focus_lead_min, reach), reach)
+            focused = lead
             station = (spots[int(rng.integers(len(spots)))] - lead) % track.length
             limit = track.speed_limits[min(int(np.searchsorted(track._s, station, side="right") - 1),
                                            len(track.speed_limits) - 1)]
@@ -310,6 +319,16 @@ def run_actor(index, args, shared: Shared):
             if terminated or truncated:
                 summary = dict(info["episode_summary"], env=index, episode=episode,
                                policy_version=max(policy.version, 0))
+                if focused is not None:
+                    passed = summary["legal_progress_m"] >= focused + 30.0
+                    summary.update(focus_lead_m=round(focused, 1), focus_reach_m=round(reach, 1),
+                                   focus_passed=passed)
+                    if args.focus_curriculum:
+                        focus_outcomes.append(passed)
+                        if (len(focus_outcomes) == focus_outcomes.maxlen
+                                and sum(focus_outcomes) > len(focus_outcomes) / 2):
+                            reach = min(reach + 25.0, args.focus_lead)
+                            focus_outcomes.clear()
                 if args.tracks:
                     summary["track"] = tracks[slot]
                 shared.summaries.put(summary)
@@ -981,6 +1000,11 @@ def main():
     parser.add_argument("--focus-file", type=Path,
                         help="JSON {\"stations\": [...]} of extra focus stations (single track), "
                         "re-read when it changes; picked as often as the failure spots")
+    parser.add_argument("--focus-curriculum", action="store_true",
+                        help="reverse curriculum: focused leads start near the spot and widen "
+                        "toward --focus-lead as each actor's pass rate from them exceeds 50%%")
+    parser.add_argument("--focus-window", type=int, default=32,
+                        help="with --focus-curriculum: focused episodes per pass-rate check")
     parser.add_argument("--focus-lead-min", type=float, default=math.inf,
                         help="draw each focused start's lead uniformly from [this, --focus-lead]; "
                         "default: always --focus-lead")
