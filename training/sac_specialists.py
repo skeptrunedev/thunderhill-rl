@@ -134,16 +134,27 @@ def evaluations(run_dir: Path, starts: int, track: str, only: str | None = None)
     return result
 
 
+def full_bar(evaluation) -> bool:
+    """Every start lapped, every required apex hit, full throttle when upright."""
+    return (bool(evaluation.get("apexes_total"))
+            and evaluation["laps"] == len(evaluation.get("rows") or [None] * 6)
+            and evaluation.get("apexes_hit") == evaluation["apexes_total"]
+            and (evaluation.get("upright_median_throttle") or 0.0) >= MIN_THROTTLE)
+
+
 def rank(evaluation):
-    """Most laps, then most apexes, then the fastest lap; between lapless
-    evaluations, the furthest mean legal progress."""
-    return (evaluation["laps"], evaluation["apexes_hit"] or 0,
+    """Evaluations meeting the whole bar first (a faster one short of it, e.g. on
+    throttle, must never shadow one that meets it); then most laps, most apexes,
+    the fastest lap; between lapless evaluations, the furthest mean progress."""
+    return (full_bar(evaluation), evaluation["laps"], evaluation["apexes_hit"] or 0,
             -(evaluation["best_lap_s"] or math.inf), evaluation["progress_m"])
 
 
 def improved(new, old, min_delta):
-    """More laps or apexes, a best lap min_delta seconds faster, or (lapless)
-    20 m more mean progress."""
+    """Reaching the whole bar, more laps or apexes, a best lap min_delta seconds
+    faster, or (lapless) 20 m more mean progress."""
+    if full_bar(new) != full_bar(old):
+        return full_bar(new)
     if (new["laps"], new["apexes_hit"] or 0) != (old["laps"], old["apexes_hit"] or 0):
         return (new["laps"], new["apexes_hit"] or 0) > (old["laps"], old["apexes_hit"] or 0)
     if new["best_lap_s"] is not None:
