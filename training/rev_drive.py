@@ -37,7 +37,11 @@ rolling starts (--horizon 60), split across the --tracks circuits in proportion 
 its failures in the --focus-from rides. The circuit's SAC teacher (--teachers registry,
 sac_teacher.Teachers) takes each step with probability --beta, and every visited
 observation is saved with its circuit and off-track outcome to collect-*.npz for
-rev_dataset.py --dagger. Held-out test tracks are never collected on.
+rev_dataset.py --dagger. Held-out test tracks are never collected on. With --beta 1 the
+teachers ride alone and no Rev server is needed: the distillation's teacher-state data.
+--action-noise perturbs their steps, but the specialists ride at the limit: per-step noise
+of 0.05 crashed 6 of 12 jerez/mugello rides and 0.1 crashed 11 of 12 (none at 0), so
+recovery states come from the DAgger rounds instead.
 
 Every process that rides takes one of REV_GODOT_SLOTS (16) machine-wide Godot slots for
 each env (lock files, released when the env closes or the process dies), so Rev's
@@ -47,6 +51,8 @@ evaluations and collections together never run more Godot workers than that.
   uv run training/rev_drive.py --godot GODOT --run-name rev-0.8b-r8-eval --tracks all
   uv run training/rev_drive.py --godot GODOT --run-name collect-m1 --collect 2 --workers 16 --tracks all \\
       --horizon 60 --beta 0.5 --teachers runs/sac/specialists.json --focus-from runs/rev/rev-0.8b-r8-eval
+  uv run training/rev_drive.py --godot GODOT --run-name teacher-s1 --collect 8 --workers 16 --tracks all \\
+      --horizon 120 --beta 1 --teachers runs/sac/specialists.json
 """
 
 from __future__ import annotations
@@ -213,32 +219,41 @@ class RevRider:
         return expected_level(probabilities, levels)
 
 
-def ride(env: ThunderhillSACEnv, rider: RevRider, start: dict | None, log, rng, teacher=None, beta=0.0):
+def ride(env: ThunderhillSACEnv, rider: RevRider | None, start: dict | None, log, rng, teacher=None, beta=0.0,
+         action_noise=0.0):
     """One episode. With a teacher, it rides the step with probability beta (Rev is still
-    asked, so its answers are logged). Returns (summary, visited observations)."""
+    asked, so its answers are logged); with no rider the teacher rides every step. Gaussian
+    action_noise (std, in action units) perturbs the teacher's steps so the visited states
+    cover the teacher's recoveries from small mistakes (DART); labels are recomputed from the
+    clean teacher when the dataset is built. Returns (summary, visited observations)."""
     obs, _ = env.reset(options={"start": start} if start else None)
     visited = []
     while True:
         visited.append(obs)
-        response = rider.ask(obs, env.track_id, rng)
-        answers = response["answers"]
-        steer = rider.level(answers["steer"]["probabilities"], STEER_LEVELS)
-        pedal = rider.level(answers["pedal"]["probabilities"], PEDAL_LEVELS)
-        by_teacher = teacher is not None and rng.random() < beta
+        answers, response = {}, {}
+        if rider is not None:
+            response = rider.ask(obs, env.track_id, rng)
+            answers = response["answers"]
+            steer = rider.level(answers["steer"]["probabilities"], STEER_LEVELS)
+            pedal = rider.level(answers["pedal"]["probabilities"], PEDAL_LEVELS)
+        by_teacher = teacher is not None and (rider is None or rng.random() < beta)
         if by_teacher:
             steer, pedal = (float(v) for v in teacher.controls(obs))
+            if action_noise > 0:
+                steer, pedal = (float(np.clip(v + rng.normal(0.0, action_noise), -1.0, 1.0)) for v in (steer, pedal))
         # sac_env.controls scales the pedal by pedal_gain; send the raw value that lands on `pedal`.
-        action = np.array([steer, pedal / rider.pedal_gain], dtype=np.float32)
+        action = np.array([steer, pedal / env.pedal_gain], dtype=np.float32)
         next_obs, _, terminated, truncated, info = env.step(action)
         # A worker restart truncates the episode with only its summary (sac_env.step).
         episode_id = info.get("episode_id") or info.get("episode_summary", {}).get("episode_id")
         log({"track": env.track_id, "episode_id": episode_id, "step": env._step_count,
              "station_m": round(float(env._observation["track"]["progress"]) * env.track.length, 1),
              "steer": round(steer, 4), "pedal": round(pedal, 4), "teacher": by_teacher,
-             "steer_probabilities": answers["steer"]["probabilities"],
-             "pedal_probabilities": answers["pedal"]["probabilities"],
+             "steer_probabilities": answers["steer"]["probabilities"] if answers else None,
+             "pedal_probabilities": answers["pedal"]["probabilities"] if answers else None,
              "off_track_soon": answers["off_track_soon"]["noul"] if "off_track_soon" in answers else None,
-             "model_ms": response.get("latency_ms"), "client_ms": round(response["client_ms"], 1)})
+             "model_ms": response.get("latency_ms"),
+             "client_ms": round(response["client_ms"], 1) if response else None})
         obs = next_obs
         if terminated or truncated:
             return info["episode_summary"], np.stack(visited)
@@ -283,7 +298,10 @@ def main():
                         help='JSON {track: weight}: each circuit\'s share of --collect episodes (default equal)')
     parser.add_argument("--teachers", type=Path, help="sac_specialists registry: the circuit's teacher rides "
                                                       "a --beta share of collect steps")
-    parser.add_argument("--beta", type=float, default=0.0)
+    parser.add_argument("--beta", type=float, default=0.0,
+                        help="1 rides the teacher on every step and never asks Rev (no server needed)")
+    parser.add_argument("--action-noise", type=float, default=0.0,
+                        help="std of Gaussian noise on the teacher's collect steps (DART)")
     parser.add_argument("--focus-from", type=Path, nargs="*", default=[],
                         help="rev_drive runs whose offroad and fall spots --collect rides revisit")
     parser.add_argument("--focus-fraction", type=float, default=0.5,
@@ -299,7 +317,10 @@ def main():
     run_dir = args.runs_dir / args.run_name
     run_dir.mkdir(parents=True, exist_ok=False)
     (run_dir / "config.json").write_text(json.dumps({k: str(v) for k, v in vars(args).items()}, indent=1) + "\n")
-    rider = RevRider(args.rev_url, args.decode, args.pedal_gain, args.off_track_fraction, not args.no_circuit)
+    if args.collect and args.beta >= 1.0:
+        rider = None  # the teacher rides every step: nothing to ask Rev
+    else:
+        rider = RevRider(args.rev_url, args.decode, args.pedal_gain, args.off_track_fraction, not args.no_circuit)
     if args.collect:
         collect(args, run_dir, rider)
         return
@@ -365,7 +386,7 @@ def allocate(total: int, weights: dict) -> dict:
     return counts
 
 
-def collect(args, run_dir: Path, rider: RevRider):
+def collect(args, run_dir: Path, rider: RevRider | None):
     from sac_teacher import Teachers
     teachers = Teachers(args.teachers, pedal_gain=args.pedal_gain) if args.teachers else None
     if args.beta > 0 and teachers is None:
@@ -401,7 +422,7 @@ def collect(args, run_dir: Path, rider: RevRider):
                 for k in range(count):
                     spots = focus[track]
                     start = spots[int(rng.integers(len(spots)))] if spots and rng.random() < args.focus_fraction else None
-                    summary, visited = ride(env, rider, start, log, rng, teacher, args.beta)
+                    summary, visited = ride(env, rider, start, log, rng, teacher, args.beta, args.action_noise)
                     crashed = np.zeros(len(visited), dtype=bool)
                     if summary["termination"] in OFF_TRACK_TERMINATIONS:
                         crashed[-OFF_TRACK_HORIZON_STEPS:] = True
