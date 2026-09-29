@@ -36,7 +36,8 @@ circuit has a baseline under the same protocol. After each circuit the registry
 (--registry, runs/sac/specialists.json) gains
 
   track -> {checkpoint, best_lap_s, mean_lap_s, laps, eval_starts, apexes_hit,
-            apexes_total, upright_median_throttle, steps, general, run}
+            apexes_total, missed_apex_stations_m, upright_median_throttle,
+            full_throttle_share, meets_bar, steps, general, run}
 
 where general is the step-0 evaluation of the starting policy. --reuse adds
 already-trained teachers (thunderhill-east) without training them.
@@ -72,7 +73,8 @@ from lap_policy import DEFAULT_TRACK, ROOT, held_out  # noqa: E402
 # The general policy's weakest circuits first: no laps, then unreliable laps.
 FIRST = ("balaton-park", "red-bull-ring", "goiania", "cota", "assen", "aragon", "valencia")
 GENERAL = ROOT / "runs/sac/sac-multitrack-1"
-APEX_FIELDS = ("apexes_hit", "apexes_total", "missed_apex_stations_m", "upright_median_throttle")
+APEX_FIELDS = ("apexes_hit", "apexes_total", "missed_apex_stations_m", "upright_median_throttle",
+               "full_throttle_share", "corner_source", "auto_apexes_hit", "auto_apexes_total")
 
 
 class Stopped(Exception):
