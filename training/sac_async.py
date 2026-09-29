@@ -250,11 +250,25 @@ def run_actor(index, args, shared: Shared):
     # --focus-fraction: this actor's recent failure stations per track; a share of its
     # episodes restart --focus-lead metres before one of them, at 80% of the safe speed.
     failures = {track: collections.deque(maxlen=64) for track in tracks}
+    # --focus-file: stations another process wants practised too (e.g. missed apexes),
+    # {"stations": [...]}, re-read whenever the file changes.
+    focus_file, focus_stamp, focus_stations = args.focus_file, None, []
 
     def reset():
-        spots = failures[tracks[slot]]
-        if spots and args.focus_fraction > 0 and rng.random() < args.focus_fraction:
+        nonlocal focus_stamp, focus_stations
+        if focus_file is not None:
+            try:
+                stamp = focus_file.stat().st_mtime_ns
+                if stamp != focus_stamp:
+                    focus_stations = [float(x) for x in json.loads(focus_file.read_text())["stations"]]
+                    focus_stamp = stamp
+            except (FileNotFoundError, ValueError, KeyError):
+                pass  # absent or mid-write: keep the last stations read
+        # Failure spots and --focus-file stations are chosen equally often.
+        pools = [pool for pool in (list(failures[tracks[slot]]), focus_stations) if pool]
+        if pools and args.focus_fraction > 0 and rng.random() < args.focus_fraction:
             track = env.track
+            spots = pools[int(rng.integers(len(pools)))]
             station = (spots[int(rng.integers(len(spots)))] - args.focus_lead) % track.length
             limit = track.speed_limits[min(int(np.searchsorted(track._s, station, side="right") - 1),
                                            len(track.speed_limits) - 1)]
@@ -931,6 +945,9 @@ def main():
     parser.add_argument("--focus-fraction", type=float, default=0.0,
                         help="share of an actor's episodes that restart before one of its recent "
                         "failures on that track (offroad, fall, collision)")
+    parser.add_argument("--focus-file", type=Path,
+                        help="JSON {\"stations\": [...]} of extra focus stations (single track), "
+                        "re-read when it changes; picked as often as the failure spots")
     parser.add_argument("--focus-lead", type=float, default=150.0,
                         help="metres before a failure station that a focused episode starts")
     parser.add_argument("--track-dwell", type=float, default=900.0,
