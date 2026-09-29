@@ -248,7 +248,8 @@ def run_actor(index, args, shared: Shared):
     policy = NumpyPolicy(args.hidden)
     rows, meta = shared.rows[index], shared.meta[index]
     # --focus-fraction: this actor's recent failure stations per track; a share of its
-    # episodes restart --focus-lead metres before one of them, at 80% of the safe speed.
+    # episodes restart --focus-lead metres before one of them (or a distance drawn
+    # uniformly from [--focus-lead-min, --focus-lead]), at 80% of the safe speed there.
     failures = {track: collections.deque(maxlen=64) for track in tracks}
     # --focus-file: stations another process wants practised too (e.g. missed apexes),
     # {"stations": [...]}, re-read whenever the file changes.
@@ -269,7 +270,8 @@ def run_actor(index, args, shared: Shared):
         if pools and args.focus_fraction > 0 and rng.random() < args.focus_fraction:
             track = env.track
             spots = pools[int(rng.integers(len(pools)))]
-            station = (spots[int(rng.integers(len(spots)))] - args.focus_lead) % track.length
+            lead = rng.uniform(min(args.focus_lead_min, args.focus_lead), args.focus_lead)
+            station = (spots[int(rng.integers(len(spots)))] - lead) % track.length
             limit = track.speed_limits[min(int(np.searchsorted(track._s, station, side="right") - 1),
                                            len(track.speed_limits) - 1)]
             speed = float(np.clip(0.8 * limit, MIN_START_SPEED_M_S, MAX_INITIAL_SPEED_M_S))
@@ -948,6 +950,9 @@ def main():
     parser.add_argument("--focus-file", type=Path,
                         help="JSON {\"stations\": [...]} of extra focus stations (single track), "
                         "re-read when it changes; picked as often as the failure spots")
+    parser.add_argument("--focus-lead-min", type=float, default=math.inf,
+                        help="draw each focused start's lead uniformly from [this, --focus-lead]; "
+                        "default: always --focus-lead")
     parser.add_argument("--focus-lead", type=float, default=150.0,
                         help="metres before a failure station that a focused episode starts")
     parser.add_argument("--track-dwell", type=float, default=900.0,

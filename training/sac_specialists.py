@@ -333,6 +333,7 @@ class Specialists:
             "--workers", str(args.workers), "--buffer-size", str(args.buffer_size),
             "--learning-rate", str(learning_rate), "--total-steps", str(10**12),
             "--focus-fraction", str(args.focus_fraction), "--focus-file", str(focus),
+            "--focus-lead-min", str(args.focus_lead_min),
             "--eval-every", str(args.eval_every), "--eval-starts", str(args.eval_starts),
             "--eval-horizon", str(args.eval_horizon), "--no-rollout-shards",
             *(["--no-wandb"] if args.no_wandb else []),
@@ -445,6 +446,10 @@ def main():
     parser.add_argument("--workers", type=int, default=30)
     parser.add_argument("--buffer-size", type=int, default=6_000_000)
     parser.add_argument("--focus-fraction", type=float, default=0.5)
+    parser.add_argument("--focus-lead-min", type=float, default=25.0,
+                        help="focused starts begin 25-150 m before the spot: close starts at "
+                        "low speed let the policy meet a corner it never survives the "
+                        "approach to (red-bull-ring turn 3)")
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--refine-learning-rate", type=float, default=3e-5)
     parser.add_argument("--min-delta", type=float, default=0.2,
