@@ -70,7 +70,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from apex_report import report as apex_report  # noqa: E402
+from apex_report import VERSION as APEX_VERSION, report as apex_report  # noqa: E402
 from lap_policy import DEFAULT_TRACK, ROOT, held_out  # noqa: E402
 
 # Circuits the general policy already laps reliably come first (Rev needs teachers
@@ -104,8 +104,9 @@ def evaluations(run_dir: Path, starts: int, track: str, only: str | None = None)
             row = json.loads(line)
             groups.setdefault(row["checkpoint"], []).append(row)
     cache_path = run_dir / "apex.jsonl"
-    cache = ({row["checkpoint"]: row for row in map(json.loads, cache_path.open())}
-             if cache_path.exists() else {})
+    # Reports from another apex_report version are redone.
+    cache = ({row["checkpoint"]: row for row in map(json.loads, cache_path.open())
+              if row.get("version") == APEX_VERSION} if cache_path.exists() else {})
     result = []
     for checkpoint, rows in groups.items():
         if len(rows) != starts or only not in (None, checkpoint):
@@ -120,7 +121,8 @@ def evaluations(run_dir: Path, starts: int, track: str, only: str | None = None)
         if best_lap and best_lap.get("recording"):
             if checkpoint not in cache:
                 full = apex_report(track, recording_path(run_dir, best_lap["recording"]))
-                cache[checkpoint] = dict({k: full[k] for k in APEX_FIELDS}, checkpoint=checkpoint)
+                cache[checkpoint] = dict({k: full[k] for k in APEX_FIELDS}, checkpoint=checkpoint,
+                                         version=APEX_VERSION)
                 if only is None:
                     with cache_path.open("a") as stream:
                         stream.write(json.dumps(cache[checkpoint]) + "\n")
