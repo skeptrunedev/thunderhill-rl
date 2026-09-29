@@ -119,9 +119,11 @@ class Scheduler:
             if claim["handle"] is None:  # adopted: no function call to ask
                 if lanes._read(f"{lanes.LANES}/{track}.json") is not None:
                     return False
-                entries = {Path(e.path).name: e for e in lanes.volume.listdir(
-                    f"{lanes.LANES.removeprefix('runs/')}/specialist-{track}")}
-                return time.time() - entries["train.log"].mtime < self.args.stale_s
+                # train.log stays open, so the volume never shows it change; the
+                # checkpoints, apex.jsonl and focus.json of every evaluation do.
+                newest = max(e.mtime for e in lanes.volume.listdir(
+                    f"{lanes.LANES.removeprefix('runs/')}/specialist-{track}"))
+                return time.time() - newest < self.args.stale_s
             try:
                 modal.FunctionCall.from_id(claim["handle"]).get(timeout=0)
                 return False
@@ -224,7 +226,7 @@ def main():
                         "buriram,balaton-park,red-bull-ring", help="initial queue (new state only)")
     parser.add_argument("--adopt", default="", help="new state only: TRACK=HOST[:HANDLE] claims "
                         "for lanes already running; a Modal lane without a handle is tracked "
-                        "by its lane registry and train.log")
+                        "by its lane registry and its run dir's newest change")
     parser.add_argument("--homes", default="", help="new state only: TRACK=HOST where a "
                         "circuit's run already lives")
     parser.add_argument("--modal-lanes", type=int, default=10)
