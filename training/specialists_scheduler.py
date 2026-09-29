@@ -185,6 +185,14 @@ class Scheduler:
             return "stuck"
         return "requeue"
 
+    def migrate_to_modal(self, track: str):
+        run = ROOT / LOCAL_RUNS / f"specialist-{track}"
+        log(f"MIGRATE {track}: morph lacks {self.args.morph_min_free_gb} GB free; "
+            f"uploading {run} to the volume")
+        lanes.upload_run(run, track)
+        self.state["homes"][track] = "modal"
+        self.save()
+
     def reopen(self, track: str):
         """Put a circuit's run back in refine on its home host."""
         home = self.state["homes"].get(track)
@@ -254,6 +262,10 @@ class Scheduler:
             home = self.state["homes"].get(track)
             hosts = [home] if home else ["thelio", "morph", "modal"]
             host = next((h for h in hosts if self.free(h)), None)
+            if host is None and home == "morph" and not self.running("morph") and self.free("modal"):
+                # morph idle only for lack of disk while a Modal slot is free: move the run.
+                self.migrate_to_modal(track)
+                host = "modal"
             if host is None:
                 continue
             self.state["queue"].remove(track)

@@ -419,7 +419,8 @@ class Specialists:
                 continue
             reported, latest = evals[-1]["checkpoint"], evals[-1]
             tmp = focus.with_suffix(".tmp")
-            tmp.write_text(json.dumps(dict(stations=latest["missed_apex_stations_m"] or [],
+            stations = sorted(set(latest["missed_apex_stations_m"] or []) | set(args.focus_stations))
+            tmp.write_text(json.dumps(dict(stations=stations,
                                            checkpoint=latest["checkpoint"])) + "\n")
             tmp.replace(focus)
             general = evals[0]["best_lap_s"] if evals[0]["steps"] == 0 else None
@@ -520,6 +521,9 @@ def main():
                         help="once per run: resume from the weights of its fastest evaluation "
                         "that lapped from every start (replay buffer kept), and publish "
                         "nothing slower than that lap")
+    parser.add_argument("--focus-stations", type=lambda text: [float(x) for x in text.split(",")],
+                        default=[], help="comma list of stations always in the focus file, "
+                        "besides the latest evaluation's missed apexes")
     parser.add_argument("--focus-curriculum", action="store_true",
                         help="opt-in (sac_async --focus-curriculum)")
     parser.add_argument("--focus-lead", type=float, default=150.0,

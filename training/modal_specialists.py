@@ -164,6 +164,17 @@ def _download(path: str):
         volume.read_file_into_fileobj(path.removeprefix("runs/"), stream)
 
 
+def upload_run(local_run: Path, track: str):
+    """A circuit's run from a local host onto the volume, to continue it as a lane
+    (replay buffer included; worker scratch and wandb left behind)."""
+    target = f"{LANES.removeprefix('runs/')}/specialist-{track}"
+    with volume.batch_upload(force=True) as batch:
+        for path in sorted(local_run.rglob("*")):
+            relative = path.relative_to(local_run)
+            if path.is_file() and relative.parts[0] not in ("workers", "wandb"):
+                batch.put_file(str(path), f"{target}/{relative.as_posix()}")
+
+
 def _lane_tracks(lanes: str) -> list[str]:
     return sorted(Path(entry.path).name.removeprefix("specialist-")
                   for entry in volume.listdir(lanes.removeprefix("runs/"))
@@ -220,7 +231,11 @@ def sync_track(track: str, starts: int = 6, lanes: str = LANES,
     _download(lane_entry["checkpoint"])
     for row in map(json.loads, (run_dir / "eval/eval.jsonl").open()):
         if row["checkpoint"] == checkpoint and row.get("recording"):
-            _download(f"{run}/{row['recording']}")
+            try:
+                _download(f"{run}/{row['recording']}")
+            except FileNotFoundError:  # gzipped (an older evaluation moved from a local run)
+                (ROOT / run / row["recording"]).unlink(missing_ok=True)
+                _download(f"{run}/{row['recording']}.gz")
     published, entry = publish_checked(ROOT / registry, track, run_dir, lane_entry, starts, "modal")
     if not published:
         print(f"{track}: lane published but the local check fails: {json.dumps(entry)}")
