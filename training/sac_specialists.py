@@ -41,7 +41,10 @@ circuit has a baseline under the same protocol. After each circuit the registry
             full_throttle_share, meets_bar, steps, general, run}
 
 where general is the step-0 evaluation of the starting policy. --reuse adds
-already-trained teachers (thunderhill-east) without training them.
+already-trained teachers (thunderhill-east) without training them. --accept
+TRACK=CHECKPOINT publishes a checkpoint the user accepted short of the bar (the best
+a circuit reached before training stopped): measured like any other, meets_bar
+stays false and the entry is marked accepted, so it teaches Rev without passing.
 
 Resumable: finished and stuck circuits are skipped and a half-done one resumes
 from its latest checkpoint and replay buffer, in its phase (runs/sac/
@@ -253,6 +256,26 @@ def publish_checked(registry: Path, track: str, run_dir: Path, lane_entry: dict,
     if entry["meets_bar"]:
         publish_entry(registry, track, entry)
     return entry["meets_bar"], entry
+
+
+def accept(registry: Path, track: str, checkpoint: Path, starts: int, init_from: Path) -> dict:
+    """Publish a checkpoint the user accepted short of the bar, from its run's own
+    evaluation of it and the run's step-0 baseline; meets_bar is measured, not set."""
+    run_dir = checkpoint.parent.parent
+    evals = evaluations(run_dir, starts, track)
+    relative = checkpoint.relative_to(run_dir).as_posix()
+    evaluation = next((e for e in evals if e["checkpoint"] == relative), None)
+    if evaluation is None:
+        raise SystemExit(f"--accept {track}: {checkpoint} has no {starts}-start evaluation in {run_dir}")
+    general = next((e for e in evals if e["steps"] == 0), None)
+    entry = dict(summary(evaluation), checkpoint=str(checkpoint.relative_to(ROOT)), eval_starts=starts,
+                 meets_bar=meets_bar(evaluation, starts), accepted=True,
+                 general=general and dict(summary(general), checkpoint=str(init_from.relative_to(ROOT)),
+                                          evaluated_at="step_0.pt"),
+                 run=str(run_dir.relative_to(ROOT)),
+                 finished=datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"))
+    publish_entry(registry, track, entry)
+    return entry
 
 
 def free_gb(path: Path) -> float:
@@ -563,7 +586,9 @@ def training_order(listing: Path) -> list[str]:
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--godot", required=True)
+    parser.add_argument("--godot")
+    parser.add_argument("--accept", default="",
+                        help="TRACK=CHECKPOINT,...: publish checkpoints accepted short of the bar, then exit")
     parser.add_argument("--uv", default=shutil.which("uv") or "uv")
     parser.add_argument("--init-from", type=Path,
                         default=GENERAL / "checkpoints/step_40672729.pt")
@@ -641,6 +666,15 @@ def main():
     args.runs_dir, args.registry = args.runs_dir.absolute(), args.registry.absolute()
     args.reuse = {track: (ROOT / path).resolve() for track, path in
                   (item.split("=", 1) for item in args.reuse.split(",") if item)}
+    if args.accept:
+        for track, path in (item.split("=", 1) for item in args.accept.split(",") if item):
+            if held_out(track):
+                parser.error(f"{track} is a held-out test track")
+            entry = accept(args.registry, track, (ROOT / path).absolute(), args.eval_starts, args.init_from)
+            print(f"ACCEPTED {track}: {json.dumps(entry)}", flush=True)
+        return
+    if not args.godot:
+        parser.error("--godot is required to train")
     args.tracks = ([t.strip() for t in args.tracks.split(",") if t.strip()] if args.tracks
                    else training_order(GENERAL / "tracks.json"))
     for track in args.tracks:
