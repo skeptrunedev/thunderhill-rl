@@ -388,7 +388,10 @@ class Specialists:
         general = next((e for e in evals if e["steps"] == 0), None)
         entry = dict(summary(best), checkpoint=str((run_dir / best["checkpoint"]).relative_to(ROOT)),
                      eval_starts=self.args.eval_starts, meets_bar=True,
-                     trained_steps=self.latest_steps(run_dir), general=summary(general),
+                     trained_steps=self.latest_steps(run_dir),
+                     # The step-0 evaluation rides the --init-from weights unchanged.
+                     general=general and dict(summary(general), checkpoint=str(
+                         self.args.init_from.relative_to(ROOT)), evaluated_at="step_0.pt"),
                      run=str(run_dir.relative_to(ROOT)),
                      finished=datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"))
         self.publish(track, entry)
