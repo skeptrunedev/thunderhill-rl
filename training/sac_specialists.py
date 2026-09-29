@@ -288,6 +288,14 @@ class Specialists:
             self.resume_weights = run_dir / best["checkpoint"]
             state_path.write_text(json.dumps(state, indent=1) + "\n")
             print(f"SHAPING {track}: from {best['checkpoint']} ({describe(best)})", flush=True)
+        shaping = state.get("shaping_from")
+        if shaping and "fastest_lap_s" not in shaping:
+            # The ceiling is the run's fastest evaluated lap before shaping, whatever
+            # its apexes: the best-ranked evaluation can be slower than that.
+            shaping["fastest_lap_s"] = min(
+                e["best_lap_s"] for e in evaluations(run_dir, args.eval_starts, track)
+                if e["best_lap_s"] is not None and e["steps"] <= shaping["at_step"])
+            state_path.write_text(json.dumps(state, indent=1) + "\n")
         self.state = state
         if state["phase"] == "done" and self.outcome(
                 evaluations(run_dir, args.eval_starts, track), False,
@@ -337,7 +345,7 @@ class Specialists:
         general = next((e for e in evals if e["steps"] == 0), None)
         if general and general["best_lap_s"] is not None and best["best_lap_s"] >= general["best_lap_s"]:
             return False
-        ceiling = getattr(self, "state", {}).get("shaping_from", {}).get("best_lap_s")
+        ceiling = getattr(self, "state", {}).get("shaping_from", {}).get("fastest_lap_s")
         return ceiling is None or best["best_lap_s"] <= ceiling
 
     def run_trainer(self, track, learning_rate, learn, refine_from) -> str:
@@ -483,7 +491,8 @@ def main():
                         help="opt-in reward shaping (sac_async --throttle-bonus-m)")
     parser.add_argument("--restart-from-best", action="store_true",
                         help="once per run: resume from its best evaluated checkpoint's weights "
-                        "(replay buffer kept), and publish nothing slower than that lap")
+                        "(replay buffer kept), and publish nothing slower than the run's "
+                        "fastest evaluated lap so far")
     parser.add_argument("--focus-lead-min", type=float, default=25.0,
                         help="focused starts begin 25-150 m before the spot: close starts at "
                         "low speed let the policy meet a corner it never survives the "
