@@ -43,6 +43,8 @@ def main():
                         help="requests one graphed pass holds; a larger batch runs as several passes")
     parser.add_argument("--dtype", choices=("fp16", "fp32"), default="fp16")
     args = parser.parse_args()
+    if args.max_batch < 1:
+        parser.error("--max-batch must be at least 1")
     # Before torch loads: a batch's shapes vary, and fixed-size segments fragment under the cap.
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     os.environ.update(KEV_DTYPE=args.dtype, KEV_CUDA_GRAPHS="1", KEV_FUSED="0", KEV_PREFIX_CACHE="0")
@@ -60,7 +62,9 @@ def main():
     graphs.BANK_WIDTH = graphs.GRAPH_STATE = 2 * MAX_STATE  # positions per state, bucketed up from MAX_STATE
     graphs.GRAPH_ROWS = questions * args.max_batch        # question rows per row pass
     graphs.GRAPH_ROW = row                                # longest question-row bucket
-    graphs.GRAPH_TOKENS = graphs.GRAPH_ROWS * row
+    # Each question row attends to its telemetry prefix too. Even the smallest
+    # batch must fit one complete row; larger batches split into buffered passes.
+    graphs.GRAPH_TOKENS = max(graphs.GRAPH_ROWS * row, graphs.pow2(MAX_STATE) + row)
 
     from uvicorn.config import LOGGING_CONFIG
 

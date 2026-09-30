@@ -57,14 +57,16 @@ def run(cmd, log: Path, cwd=ROOT):
 class Server:
     """rev_serve.py for one Rev checkpoint on the local GPU, for the duration of a with block."""
 
-    def __init__(self, checkpoint: Path, port: int, log: Path, gpu_memory_gb: float):
+    def __init__(self, checkpoint: Path, port: int, log: Path, gpu_memory_gb: float, max_batch: int = 8):
         self.checkpoint, self.port, self.log, self.gpu_memory_gb = checkpoint, port, log, gpu_memory_gb
+        self.max_batch = max_batch
 
     def __enter__(self):
         self.stream = self.log.open("a")
         self.process = subprocess.Popen(
             ["uv", "run", "--extra", "serve", "python", str(ROOT / "training/rev_serve.py"),
-             "--run", str(self.checkpoint), "--port", str(self.port), "--gpu-memory-gb", str(self.gpu_memory_gb)],
+             "--run", str(self.checkpoint), "--port", str(self.port), "--gpu-memory-gb", str(self.gpu_memory_gb),
+             "--max-batch", str(self.max_batch)],
             cwd=KEV, stdout=self.stream, stderr=subprocess.STDOUT, start_new_session=True)
         for _ in range(180):
             try:
@@ -178,7 +180,11 @@ def main():
                         help="share of collection rides that restart before the last eval's and "
                              "collection's failures on their circuit")
     parser.add_argument("--gpu-memory-gb", type=float, default=4.5, help="cap on the local Rev server")
+    parser.add_argument("--serve-max-batch", type=int, default=8,
+                        help="requests per local CUDA graph pass; reduce for larger models on the same GPU")
     args = parser.parse_args()
+    if args.serve_max_batch < 1:
+        parser.error("--serve-max-batch must be at least 1")
     deadline = time.mktime(time.strptime(args.until, "%Y-%m-%dT%H:%M")) if args.until else None
     args.out.mkdir(parents=True, exist_ok=True)
     log = args.out / "rev_dagger.log"
@@ -198,7 +204,8 @@ def main():
         need_eval = current not in evaluated
         need_collect = not last and not done(runs_dir / collection, "episodes.jsonl")
         if need_eval or need_collect:
-            with Server(runs_dir / current / "checkpoint", args.port, log, args.gpu_memory_gb):
+            with Server(runs_dir / current / "checkpoint", args.port, log, args.gpu_memory_gb,
+                        args.serve_max_batch):
                 if need_eval:
                     if not done(runs_dir / ride, "summary.json"):
                         run(["uv", "run", "training/rev_drive.py", "--godot", args.godot, "--run-name", ride,
