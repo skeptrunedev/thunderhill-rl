@@ -140,8 +140,10 @@ def upload_parent(name: str, size: str):
     stage(f"verified parent {name}: {metrics['optimizer_steps']} actual optimizer updates, {len(files)} immutable files")
 
 
-# 12 h: Rev-4B takes ~4x Rev-0.8B's hour per 60k records and epoch.
-@app.function(image=image, gpu="H100", cpu=4, memory=(32768, 131072), timeout=12 * 3600, retries=0,
+# 24 h, Modal's maximum: LoRA runs keep no resume point, so a timeout loses the whole run.
+# Rev-0.8B takes 0.037-0.064 s per record depending on the host (640k records: 7-11.5 h),
+# and Rev-4B ~4x that.
+@app.function(image=image, gpu="H100", cpu=4, memory=(32768, 131072), timeout=24 * 3600, retries=0,
               volumes={RUNS: runs, HF: hf_cache})
 def train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_from: str = "",
                  lr: float = 0.0, source_commit: str = "", preserve_action_temperature: bool = False,
