@@ -1,5 +1,7 @@
 # Experiment graphs
 
+The separate [Rev checkpoint assessment](rev-training-assessment.md) records the September 30, 2026 comparison of the 0.8B continuations and partial 4B evaluation, with simulator outcomes, actual optimizer updates, artifact identities and guidance for further training.
+
 The current launcher enables NVIDIA Cosmos RL's console and W&B loggers. Prepared configuration uses project `thunderhill-rl` and experiment name `thunderhill-alpagym`. The native trainer owns metric names, update steps and logging. The previous custom trainer's flags, token metrics and generation axis are not the contract for this stack.
 
 Use the same upstream Python environment as [training](../training/README.md) to authenticate:
