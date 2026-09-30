@@ -417,7 +417,8 @@ def collect(args, run_dir: Path, rider: RevRider | None):
         with slots.slot():
             env = ThunderhillSACEnv(godot=args.godot, data_dir=run_dir / "collect", horizon_s=args.horizon,
                                     track=track, reward_line="progress", pedal_gain=args.pedal_gain,
-                                    seed=args.seed * 1000 + index, policy_id=f"{args.run_name}-collect")
+                                    seed=args.seed * 1000 + index, record_godot=True,
+                                    policy_id=f"{args.run_name}-collect")
             try:
                 for k in range(count):
                     spots = focus[track]
