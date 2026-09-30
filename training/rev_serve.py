@@ -42,19 +42,23 @@ def main():
                         help="cap on this process's CUDA allocations (its CUDA context adds ~0.5 GB)")
     parser.add_argument("--max-batch", type=int, default=8,
                         help="requests one graphed pass holds; a larger batch runs as several passes")
-    parser.add_argument("--dtype", choices=("fp16", "fp32"), default="fp16")
+    parser.add_argument("--dtype", choices=("bf16", "fp16", "fp32"), default="fp16")
+    parser.add_argument("--fused", type=int, choices=(0, 1), default=0,
+                        help="use Kev's fused Qwen kernels when its pinned FLA package is installed")
     parser.add_argument("--temperature", type=float,
                         help="override checkpoint temperature; 1 preserves the learned soft action targets")
     args = parser.parse_args()
     if args.max_batch < 1:
         parser.error("--max-batch must be at least 1")
+    if args.fused and args.dtype != "bf16":
+        parser.error("Kev's fused Qwen kernels require --dtype bf16")
     if args.temperature is not None:
         if not math.isfinite(args.temperature) or args.temperature <= 0:
             parser.error("--temperature must be finite and positive")
         os.environ["KEV_TEMPERATURE"] = str(args.temperature)
     # Before torch loads: a batch's shapes vary, and fixed-size segments fragment under the cap.
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-    os.environ.update(KEV_DTYPE=args.dtype, KEV_CUDA_GRAPHS="1", KEV_FUSED="0", KEV_PREFIX_CACHE="0")
+    os.environ.update(KEV_DTYPE=args.dtype, KEV_CUDA_GRAPHS="1", KEV_FUSED=str(args.fused), KEV_PREFIX_CACHE="0")
 
     import torch
 
