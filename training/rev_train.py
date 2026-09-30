@@ -87,6 +87,41 @@ def train(out: Path, checkpoint: Path, command: list[str]):
     return metrics
 
 
+def action_metrics(records: list[dict], rows: list[dict], temperature: float) -> dict:
+    """Compare decoded continuous controls with the actual soft teacher targets."""
+    from rev_dataset import PEDAL_LEVELS, STEER_LEVELS
+
+    if not math.isfinite(temperature) or temperature <= 0:
+        raise ValueError("action metric temperature must be finite and positive")
+    by_id = {record["_meta"]["id"]: record for record in records}
+    if len(by_id) != len(records):
+        raise ValueError("action metrics require unique development record identities")
+    errors = {"steer": [], "pedal": []}
+    levels = {"steer": STEER_LEVELS, "pedal": PEDAL_LEVELS}
+    for row in rows:
+        question = row["question"]
+        if row["variant"] != "clean" or question not in levels:
+            continue
+        target = by_id[row["id"]]["questions"][question].get("target")
+        if target is None:
+            continue
+        points = levels[question]
+        if len(row["keys"]) != len(row["logits"]) or not row["logits"]:
+            raise ValueError("action metric option keys and logits must match")
+        logits = [float(value) / temperature for value in row["logits"]]
+        if not all(math.isfinite(value) for value in logits):
+            raise ValueError("action metrics require finite logits")
+        weights = [math.exp(value - max(logits)) for value in logits]
+        predicted = sum(weight * points[key] for key, weight in zip(row["keys"], weights)) / sum(weights)
+        mass = sum(float(value) for value in target.values())
+        if not math.isfinite(mass) or mass <= 0 or any(float(value) < 0 for value in target.values()):
+            raise ValueError("action metrics require valid soft teacher targets")
+        teacher = sum(float(value) * points[key] for key, value in target.items()) / mass
+        errors[question].append(abs(predicted - teacher))
+    return {question: {"count": len(values), "mean_absolute_error": sum(values) / len(values) if values else None}
+            for question, values in errors.items()}
+
+
 def score(out: Path, checkpoint: Path):
     import torch
     from kev.benchmark import evaluate_records
@@ -113,7 +148,9 @@ def score(out: Path, checkpoint: Path):
     clean = [row for row in rows if row["variant"] == "clean"]
     return fitted, fit, {"raw": report["clean"], "calibrated": report["calibrated_clean"],
                          "per_question": grouped_metrics(clean, "question", 1.0),
-                         "calibrated_per_question": grouped_metrics(clean, "question", fitted)}
+                         "calibrated_per_question": grouped_metrics(clean, "question", fitted),
+                         "action_error": {"raw": action_metrics(development, rows, 1.0),
+                                          "calibrated": action_metrics(development, rows, fitted)}}
 
 
 def main():
@@ -130,6 +167,7 @@ def main():
     if kev_ref != previous["kev_ref"]:
         raise ValueError(f"Kev checkout is {kev_ref}, but the parent trained with {previous['kev_ref']}")
     subprocess.run(["git", "diff", "--quiet", "HEAD", "--", "kev"], cwd=KEV, check=True)
+    source_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     source = args.data.resolve(strict=True)
     inputs = {part: source / f"{part}.jsonl" for part in PARTITIONS}
     for path in inputs.values():
@@ -164,7 +202,7 @@ def main():
     write_json(out / "run_config.json", {"args": vars(args) | {"data": str(source)}, "recipe": recipe,
                "kev_ref": kev_ref, "base": previous["base"], "base_revision": previous["base_revision"],
                "init_from": args.init_from, "parent_result_sha256": digest(parent / "result.json"),
-               "data": data, "command": command, "training_backend": "local"})
+               "data": data, "command": command, "training_backend": "local", "source_commit": source_commit})
     started = time.time()
     status = {"started_at": datetime.now(timezone.utc).isoformat(), "status": "waiting_for_gpu"}
     write_json(out / "run_status.json", status)
@@ -185,7 +223,7 @@ def main():
                       "development": development, "optimizer_steps": metrics["optimizer_steps"],
                       "training_metrics": metrics, "data_sha256": {part: info["sha256"] for part, info in data.items()},
                       "wall_seconds": round(time.time() - started), "gpu": torch.cuda.get_device_name(0),
-                      "training_backend": "local"}
+                      "training_backend": "local", "source_commit": source_commit}
             write_json(out / "result.json", result)
         status["status"] = "complete"
     except BaseException as error:
