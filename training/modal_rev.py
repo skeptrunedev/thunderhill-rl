@@ -147,10 +147,10 @@ def upload_parent(name: str, size: str):
               volumes={RUNS: runs, HF: hf_cache})
 def train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_from: str = "",
                  lr: float = 0.0, source_commit: str = "", preserve_action_temperature: bool = False,
-                 shared_prefix: int = 0) -> dict:
+                 shared_prefix: int = 0, batch: int = 0) -> dict:
     try:
         return _train_remote(name, data, size, epochs, seed, init_from, lr, source_commit,
-                             preserve_action_temperature, shared_prefix)
+                             preserve_action_temperature, shared_prefix, batch)
     finally:
         # Preserve logs and partial checkpoints even if training or scoring fails.
         try:
@@ -161,7 +161,7 @@ def train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_
 
 def _train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_from: str,
                   lr: float, source_commit: str, preserve_action_temperature: bool,
-                  shared_prefix: int) -> dict:
+                  shared_prefix: int, batch: int) -> dict:
     import torch
     from kev.benchmark import evaluate_records
     from kev.checkpoint import LoadOptions, read_meta, write_meta
@@ -181,6 +181,7 @@ def _train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init
         (out / "data" / f"{part}.jsonl").write_text(text)
     base, revision = BASES[size]
     recipe = {**RECIPES[size], **({"epochs": epochs} if epochs else {}), **({"lr": lr} if lr else {}),
+              **({"batch": batch} if batch else {}),
               "shared_prefix": shared_prefix}
     checkpoint = out / "checkpoint"
     init = None
@@ -264,6 +265,55 @@ def _train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init
     return result
 
 
+@app.function(image=image, gpu="H100", cpu=4, memory=(32768, 131072), timeout=3600, retries=0,
+              volumes={RUNS: runs, HF: hf_cache})
+def bench_remote(train: str, size: str, init_from: str, batches: list[int], records: int) -> dict:
+    """Trainer throughput per batch size, all in one container so the host is held fixed:
+    `records` records per batch size, with GPU utilization sampled once a second."""
+    import threading
+    runs.reload()
+    base, revision = BASES[size]
+    data = Path("/tmp/bench.jsonl")
+    data.write_text(train)
+    cpu = next((line.split(":", 1)[1].strip() for line in Path("/proc/cpuinfo").read_text().splitlines()
+                if line.startswith("model name")), "unknown")
+    report = {"cpu": cpu, "gpu": "", "records": records, "batches": {}}
+    for batch in batches:
+        out = Path(f"/tmp/bench-{batch}")
+        cmd = [sys.executable, "-m", "kev.train", "--data", str(data), "--base", base, "--base_revision", revision,
+               "--epochs", "1", "--lr", "5e-5", "--batch", str(batch), "--accum", "1",
+               "--checkpointing", str(RECIPES[size]["checkpointing"]), "--shared_prefix", "1",
+               "--max_steps", str(records // batch), "--dtype", "bf16", "--device", "cuda", "--out", str(out)]
+        if init_from:
+            cmd += ["--init_from", str(Path(RUNS) / run_name(init_from) / "checkpoint")]
+        utilization, done = [], threading.Event()
+
+        def sample():
+            while not done.wait(1):
+                line = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu,name", "--format=csv,noheader,nounits"],
+                                      capture_output=True, text=True).stdout.strip()
+                if line:
+                    value, report["gpu"] = line.split(", ", 1)
+                    utilization.append(int(value))
+
+        sampler = threading.Thread(target=sample)
+        sampler.start()
+        try:
+            subprocess.run([str(c) for c in cmd], cwd=KEV_ROOT, check=True, stdout=subprocess.DEVNULL)
+        finally:
+            done.set()
+            sampler.join()
+        metrics = json.loads((out / "training_metrics.json").read_text())
+        steps = sorted(metrics["step_seconds"][10:])  # the first steps include compilation and warmup
+        median = steps[len(steps) // 2]
+        busy = sorted(utilization[len(utilization) // 2:])  # the second half is past model loading
+        report["batches"][batch] = {"median_step_s": round(median, 4), "s_per_record": round(median / batch, 5),
+                                    "gpu_util_median_pct": busy[len(busy) // 2] if busy else None,
+                                    "peak_gb": round(metrics["peak_device_bytes"] / 1e9, 1)}
+        stage(f"batch {batch}: {report['batches'][batch]}")
+    return report
+
+
 @app.function(image=image, cpu=2, memory=8192, timeout=1800, volumes={RUNS: runs})
 def pull_remote(name: str) -> bytes:
     """The run directory (checkpoint, reports, logs) without the uploaded data, as a tar."""
@@ -276,15 +326,33 @@ def pull_remote(name: str) -> bytes:
 
 
 @app.local_entrypoint()
+def bench(data: str, size: str = "0.8b", init_from: str = "", batches: str = "8,16,32", records: int = 2560,
+          hosts: int = 1):
+    """Trainer seconds per record by batch size, on `hosts` separate H100 containers.
+
+      uvx --from modal==1.5.5 modal run training/modal_rev.py::bench --data runs/rev/data-s5 \\
+          --init-from rev-0.8b-s5 --hosts 2
+    """
+    if size not in BASES:
+        raise SystemExit(f"--size must be one of {sorted(BASES)}")
+    sizes = [int(b) for b in batches.split(",")]
+    lines = (Path(data) / "train.jsonl").read_text().splitlines(keepends=True)[:records]
+    calls = [bench_remote.spawn("".join(lines), size, init_from and run_name(init_from), sizes, len(lines))
+             for _ in range(hosts)]
+    for call in calls:
+        print(json.dumps(call.get(), indent=1), flush=True)
+
+
+@app.local_entrypoint()
 def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int = 0, init_from: str = "",
           lr: float = 0.0, upload_init: bool = False, preserve_action_temperature: bool = False,
-          shared_prefix: int = 0):
+          shared_prefix: int = 0, batch: int = 0):
     if size not in BASES:
         raise SystemExit(f"--size must be one of {sorted(BASES)}")
     name = run_name(name)
     if init_from:
         init_from = run_name(init_from)
-    if shared_prefix not in (0, 1) or epochs < 0 or not math.isfinite(lr) or lr < 0:
+    if shared_prefix not in (0, 1) or batch < 0 or epochs < 0 or not math.isfinite(lr) or lr < 0:
         raise SystemExit("shared-prefix must be 0 or 1; epochs and lr must be nonnegative and finite")
     if upload_init and not init_from:
         raise SystemExit("--upload-init requires --init-from")
@@ -302,7 +370,7 @@ def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int =
     if upload_init:
         upload_parent(init_from, size)
     result = train_remote.remote(name, texts, size, epochs, seed, init_from, lr, source_commit,
-                                 preserve_action_temperature, shared_prefix)
+                                 preserve_action_temperature, shared_prefix, batch)
     local.mkdir(parents=True)
     with tarfile.open(fileobj=io.BytesIO(pull_remote.remote(name)), mode="r:gz") as tar:
         tar.extractall(local, filter="data")
