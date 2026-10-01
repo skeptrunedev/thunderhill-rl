@@ -103,6 +103,16 @@ def validate_parent(parent: Path, size: str) -> tuple[dict, dict]:
     return result, metrics
 
 
+def upload_data(name: str, files: dict) -> str:
+    """Stage the data partitions on the volume under a fresh path; returns that path."""
+    upload = f"uploads/{name}-{time.time_ns()}"
+    with runs.batch_upload() as batch:
+        for part, path in files.items():
+            batch.put_file(str(path), f"{upload}/{part}.jsonl")
+    stage(f"uploaded {', '.join(files)} to the volume at {upload}")
+    return upload
+
+
 def upload_parent(name: str, size: str):
     """Upload immutable local checkpoint files; verify and reuse identical remote files."""
     parent = ROOT / "runs/rev" / run_name(name)
@@ -145,11 +155,11 @@ def upload_parent(name: str, size: str):
 # and Rev-4B ~4x that.
 @app.function(image=image, gpu="H100", cpu=4, memory=(32768, 131072), timeout=24 * 3600, retries=0,
               volumes={RUNS: runs, HF: hf_cache})
-def train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_from: str = "",
+def train_remote(name: str, upload: str, size: str, epochs: int, seed: int, init_from: str = "",
                  lr: float = 0.0, source_commit: str = "", preserve_action_temperature: bool = False,
                  shared_prefix: int = 0, batch: int = 0) -> dict:
     try:
-        return _train_remote(name, data, size, epochs, seed, init_from, lr, source_commit,
+        return _train_remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
                              preserve_action_temperature, shared_prefix, batch)
     finally:
         # Preserve logs and partial checkpoints even if training or scoring fails.
@@ -159,7 +169,7 @@ def train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_
             hf_cache.commit()
 
 
-def _train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init_from: str,
+def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, init_from: str,
                   lr: float, source_commit: str, preserve_action_temperature: bool,
                   shared_prefix: int, batch: int) -> dict:
     import torch
@@ -177,8 +187,13 @@ def _train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init
     if out.exists():
         out.rename(out.with_name(f"{name}.incomplete-{time.time_ns()}"))
     (out / "data").mkdir(parents=True)
-    for part, text in data.items():
-        (out / "data" / f"{part}.jsonl").write_text(text)
+    # The partitions arrive through the volume (upload_data), not as call arguments, so a
+    # dataset of any size fits.
+    staged = Path(RUNS) / upload
+    for part in PARTITIONS:
+        (staged / f"{part}.jsonl").rename(out / "data" / f"{part}.jsonl")
+    staged.rmdir()
+    data = {part: out / "data" / f"{part}.jsonl" for part in PARTITIONS}
     base, revision = BASES[size]
     recipe = {**RECIPES[size], **({"epochs": epochs} if epochs else {}), **({"lr": lr} if lr else {}),
               **({"batch": batch} if batch else {}),
@@ -206,7 +221,7 @@ def _train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init
     if init:
         cmd += ["--init_from", init]
     cmd = [str(c) for c in cmd]
-    data_sha256 = {part: hashlib.sha256(text.encode("utf-8")).hexdigest() for part, text in data.items()}
+    data_sha256 = {part: file_digest(path) for part, path in data.items()}
     config = {"name": name, "init_from": init_from or None, "base": base, "base_revision": revision,
               "kev_ref": KEV_REF, "recipe": recipe, "seed": seed, "source_commit": source_commit,
               "data_sha256": data_sha256, "command": cmd, "training_backend": "modal",
@@ -250,7 +265,7 @@ def _train_remote(name: str, data: dict, size: str, epochs: int, seed: int, init
     clean = [r for r in rows if r["variant"] == "clean"]
     result = {"name": name, "model": f"rev-{size}", "base": base, "base_revision": revision, "init_from": init_from or None,
               "kev_ref": KEV_REF, "recipe": recipe, "seed": seed,
-              "records": {part: sum(bool(line.strip()) for line in text.splitlines()) for part, text in data.items()},
+              "records": {part: sum(bool(line.strip()) for line in path.open()) for part, path in data.items()},
               "temperature": temperature, "calibration_temperature": fitted, "temperature_fit": fit,
               "optimizer_steps": training_metrics["optimizer_steps"], "training_metrics": training_metrics,
               "source_commit": source_commit, "data_sha256": data_sha256, "training_backend": "modal",
@@ -363,13 +378,14 @@ def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int =
         if (local / "result.json").exists():
             raise SystemExit(f"{local} is complete; choose a new name")
         local.rename(local.with_name(f"{name}.incomplete-{time.time_ns()}"))
-    texts = {part: (Path(data) / f"{part}.jsonl").read_text() for part in PARTITIONS}
-    if any(not text.strip() for text in texts.values()):
+    files = {part: Path(data) / f"{part}.jsonl" for part in PARTITIONS}
+    if any(not path.is_file() or not path.stat().st_size for path in files.values()):
         raise SystemExit("all data partitions must contain records")
     source_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     if upload_init:
         upload_parent(init_from, size)
-    result = train_remote.remote(name, texts, size, epochs, seed, init_from, lr, source_commit,
+    upload = upload_data(name, files)
+    result = train_remote.remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
                                  preserve_action_temperature, shared_prefix, batch)
     local.mkdir(parents=True)
     with tarfile.open(fileobj=io.BytesIO(pull_remote.remote(name)), mode="r:gz") as tar:
