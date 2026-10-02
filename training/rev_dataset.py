@@ -294,8 +294,11 @@ def main():
     parser.add_argument("--dagger", type=Path, nargs="*", default=[],
                         help="rev_drive --collect directories: Rev's own states, teacher-labelled")
     parser.add_argument("--max-train-records", type=int, default=0,
-                        help="keep every state of the last --dagger collection and fill the rest of "
-                             "this budget with a sample of the older records balanced across circuits")
+                        help="keep every state of the last --newest --dagger collections and fill the rest "
+                             "of this budget with a sample of the older records balanced across circuits")
+    parser.add_argument("--newest", type=int, default=1,
+                        help="how many of the last --dagger collections --max-train-records keeps whole "
+                             "(a collection split over several Modal containers is several directories)")
     parser.add_argument("--exclude-circuits", default="",
                         help="comma list of circuits whose states never enter the dataset")
     parser.add_argument("--seed", type=int, default=0)
@@ -325,8 +328,9 @@ def main():
     dagger = [row for rows in collections for row in rows]
     print(f"{len(dagger)} DAgger states from {len(args.dagger)} collections")
     if args.max_train_records and len(train) + len(dagger) > args.max_train_records:
-        newest = collections[-1] if collections else []
-        older = train + [row for rows in collections[:-1] for row in rows]
+        split = len(collections) - min(args.newest, len(collections))
+        newest = [row for rows in collections[split:] for row in rows]
+        older = train + [row for rows in collections[:split] for row in rows]
         train = balanced(older, max(0, args.max_train_records - len(newest)), rng) + newest
         print(f"capped to {len(train)} records: all {len(newest)} newest DAgger states + {len(train) - len(newest)} older")
     else:
