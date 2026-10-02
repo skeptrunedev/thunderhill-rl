@@ -1,0 +1,69 @@
+diff --git a/kev/full_ft.py b/kev/full_ft.py
+index 5784a21..914adc7 100644
+--- a/kev/full_ft.py
++++ b/kev/full_ft.py
+@@ -182,6 +182,23 @@ def shard(model):
+     for t in model.head.parameters(): dist.broadcast(t.data, 0)
+ 
+ 
++def replicate(model):
++    """Data-parallel LoRA: every rank trains the whole (small) adapter and pointer head, starting from rank 0's copy;
++    sum_gradients makes their updates identical."""
++    for t in model.trainable_parameters(): dist.broadcast(t.data, 0)
++
++
++def sum_gradients(params):
++    """Data-parallel LoRA: each rank's gradients summed over the ranks, in one flat all-reduce. Summed, not averaged:
++    the trainer divides each micro-batch's loss by the step's global record count, as for FSDP2 (shard)."""
++    grads = [p.grad for p in params if p.grad is not None]
++    flat = torch.cat([g.reshape(-1) for g in grads])
++    dist.all_reduce(flat)
++    offset = 0
++    for g in grads:
++        g.copy_(flat[offset:offset + g.numel()].view_as(g)); offset += g.numel()
++
++
+ def rank_share(items, rank, world):
+     """This rank's equal share of one epoch's shuffled items: padded (by wrapping around) to a multiple of the world size,
+     so every rank runs the same number of micro-batches and FSDP's collectives line up (as DistributedSampler does). The
+diff --git a/kev/train.py b/kev/train.py
+index f72dcc4..0db2abc 100644
+--- a/kev/train.py
++++ b/kev/train.py
+@@ -523,7 +523,7 @@ def pinned_revision(a, manifest):
+ def main():
+     a = parse_args()
+     dev = a.device or default_device()
+-    rank, world = full_ft.init_distributed(dev) if a.full_ft else (0, 1)   # torchrun: each rank's "cuda" is its own GPU
++    rank, world = full_ft.init_distributed(dev)   # torchrun: each rank's "cuda" is its own GPU (LoRA runs too: data parallel)
+     out_dir = Path(a.out)
+     if rank: sys.stdout = open(os.devnull, "w", encoding="utf-8")   # one log: rank 0's (errors still reach stderr)
+     else: out_dir.mkdir(parents=True, exist_ok=bool(a.resume))
+@@ -559,7 +559,9 @@ def main():
+         # one runs the packed mask (rows_form) unless a record is over ROW_PASS_TOKENS, whose cost it does not measure
+         raise SystemExit("kev.train: --pass_tokens_max needs a hybrid backbone (Gated DeltaNet: every pass runs as rows or a shared "
+                          f"prefix, which pass_tokens measures); {a.base} is attention-only and runs the packed mask")
+-    if world > 1: full_ft.shard(model)
++    if world > 1:
++        if a.full_ft: full_ft.shard(model)
++        else: full_ft.replicate(model)
+     print(f"device={dev} world={world} trainable params={sum(p.numel() for p in model.trainable_parameters())/1e6:.1f}M", flush=True)
+ 
+     reqs = training_requests(a, tok, manifest, holdout)
+@@ -628,6 +630,7 @@ def main():
+             run["n"] += variants; seen += round(variants); tokens_seen += sum(v.tokens for v in batch)
+             peak_mem = max(peak_mem, allocated_bytes(dev))
+             if ends_step:
++                if not a.full_ft and world > 1: full_ft.sum_gradients(model.trainable_parameters())
+                 if not a.full_ft: norm = float(torch.nn.utils.clip_grad_norm_(model.trainable_parameters(), MAX_GRAD_NORM, error_if_nonfinite=True))   # MasterAdamW clips by the global norm itself; both refuse a non-finite norm (a NaN gradient from a finite loss)
+                 started = time.time(); opt.step(); sync(dev); optimizer_seconds += time.time() - started
+                 grad_norms += [[] for _ in range(ep + 1 - len(grad_norms))]
+@@ -659,7 +662,7 @@ def main():
+ 
+     wall = time.time() - t0
+     if a.full_ft: full_ft.save_backbone(model.lm, a.out)   # every rank: FSDP2 gathers to rank 0
+-    else: model.lm.save_pretrained(a.out)
++    elif not rank: model.lm.save_pretrained(a.out)   # data-parallel LoRA: every rank holds the same adapter
+     if rank: return
+     backbone_seconds = time.time() - t0 - wall
+     shutil.rmtree(resume_dir, ignore_errors=True)   # the checkpoint supersedes it

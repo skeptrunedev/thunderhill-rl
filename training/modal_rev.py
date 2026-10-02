@@ -52,6 +52,10 @@ image = (
     .apt_install("git")
     .run_commands(f"git clone https://github.com/jaredpalmer/kev.git {KEV_ROOT} "
                   f"&& git -C {KEV_ROOT} checkout --quiet {KEV_REF}")
+    # Kev runs LoRA on one GPU only; this patch makes it data parallel under torchrun (--gpus).
+    .add_local_file(str(Path(__file__).resolve().parent / "patches/kev-lora-data-parallel.patch"),
+                    "/tmp/kev-lora-data-parallel.patch", copy=True)
+    .run_commands(f"git -C {KEV_ROOT} apply /tmp/kev-lora-data-parallel.patch")
     .uv_pip_install(f"kev[serve] @ file://{KEV_ROOT}")
     # Gated DeltaNet kernels for the Qwen3.5 hybrid bases (same pins as Kev's Modal app).
     .uv_pip_install("flash-linear-attention==0.5.2", "triton>=3.7.1")
@@ -157,10 +161,10 @@ def upload_parent(name: str, size: str):
               volumes={RUNS: runs, HF: hf_cache})
 def train_remote(name: str, upload: str, size: str, epochs: int, seed: int, init_from: str = "",
                  lr: float = 0.0, source_commit: str = "", preserve_action_temperature: bool = False,
-                 shared_prefix: int = 0, batch: int = 0) -> dict:
+                 shared_prefix: int = 0, batch: int = 0, gpus: int = 1) -> dict:
     try:
         return _train_remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
-                             preserve_action_temperature, shared_prefix, batch)
+                             preserve_action_temperature, shared_prefix, batch, gpus)
     finally:
         # Preserve logs and partial checkpoints even if training or scoring fails.
         try:
@@ -171,7 +175,7 @@ def train_remote(name: str, upload: str, size: str, epochs: int, seed: int, init
 
 def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, init_from: str,
                   lr: float, source_commit: str, preserve_action_temperature: bool,
-                  shared_prefix: int, batch: int) -> dict:
+                  shared_prefix: int, batch: int, gpus: int) -> dict:
     import torch
     from kev.benchmark import evaluate_records
     from kev.checkpoint import LoadOptions, read_meta, write_meta
@@ -213,7 +217,10 @@ def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, ini
             raise ValueError("parent head and result temperatures differ")
     if preserve_action_temperature and inherited_temperature != 1.0:
         raise ValueError("preserving action temperature requires a parent temperature of 1.0")
-    cmd = [sys.executable, "-m", "kev.train", "--data", str(out / "data/train.jsonl"),
+    # Several GPUs: one torchrun rank per GPU; --batch is per rank, so a step sees batch x gpus records.
+    launcher = ([sys.executable, "-m", "torch.distributed.run", "--standalone", "--nproc_per_node", gpus]
+                if gpus > 1 else [sys.executable])
+    cmd = [*launcher, "-m", "kev.train", "--data", str(out / "data/train.jsonl"),
            "--base", base, "--base_revision", revision, "--epochs", recipe["epochs"], "--lr", recipe["lr"],
            "--batch", recipe["batch"], "--accum", recipe["accum"], "--checkpointing", recipe["checkpointing"],
            "--shared_prefix", recipe["shared_prefix"],
@@ -223,13 +230,13 @@ def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, ini
     cmd = [str(c) for c in cmd]
     data_sha256 = {part: file_digest(path) for part, path in data.items()}
     config = {"name": name, "init_from": init_from or None, "base": base, "base_revision": revision,
-              "kev_ref": KEV_REF, "recipe": recipe, "seed": seed, "source_commit": source_commit,
+              "kev_ref": KEV_REF, "recipe": recipe, "gpus": gpus, "seed": seed, "source_commit": source_commit,
               "data_sha256": data_sha256, "command": cmd, "training_backend": "modal",
               "preserve_action_temperature": preserve_action_temperature}
     if init:
         config["parent_result_sha256"] = file_digest(parent / "result.json")
     (out / "run_config.json").write_text(json.dumps(config, indent=1) + "\n")
-    stage("training: " + " ".join(cmd[2:]))
+    stage("training: " + " ".join(cmd[cmd.index("kev.train"):]))
     started = time.time()
     with (out / "train.log").open("w") as log, subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=KEV_ROOT) as proc:
@@ -264,7 +271,7 @@ def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, ini
     write_meta(str(checkpoint), meta)
     clean = [r for r in rows if r["variant"] == "clean"]
     result = {"name": name, "model": f"rev-{size}", "base": base, "base_revision": revision, "init_from": init_from or None,
-              "kev_ref": KEV_REF, "recipe": recipe, "seed": seed,
+              "kev_ref": KEV_REF, "recipe": recipe, "gpus": gpus, "seed": seed,
               "records": {part: sum(bool(line.strip()) for line in path.open()) for part, path in data.items()},
               "temperature": temperature, "calibration_temperature": fitted, "temperature_fit": fit,
               "optimizer_steps": training_metrics["optimizer_steps"], "training_metrics": training_metrics,
@@ -361,12 +368,14 @@ def bench(data: str, size: str = "0.8b", init_from: str = "", batches: str = "8,
 @app.local_entrypoint()
 def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int = 0, init_from: str = "",
           lr: float = 0.0, upload_init: bool = False, preserve_action_temperature: bool = False,
-          shared_prefix: int = 0, batch: int = 0):
+          shared_prefix: int = 0, batch: int = 0, gpus: int = 1):
     if size not in BASES:
         raise SystemExit(f"--size must be one of {sorted(BASES)}")
     name = run_name(name)
     if init_from:
         init_from = run_name(init_from)
+    if not 1 <= gpus <= 8:
+        raise SystemExit("--gpus must be 1 through 8 (one machine)")
     if shared_prefix not in (0, 1) or batch < 0 or epochs < 0 or not math.isfinite(lr) or lr < 0:
         raise SystemExit("shared-prefix must be 0 or 1; epochs and lr must be nonnegative and finite")
     if upload_init and not init_from:
@@ -385,8 +394,10 @@ def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int =
     if upload_init:
         upload_parent(init_from, size)
     upload = upload_data(name, files)
-    result = train_remote.remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
-                                 preserve_action_temperature, shared_prefix, batch)
+    # Every rank holds the training records and encodes its own micro-batches: CPU and memory scale with the GPUs.
+    remote = train_remote.with_options(gpu=f"H100:{gpus}", cpu=4 * gpus, memory=32768 * gpus) if gpus > 1 else train_remote
+    result = remote.remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
+                           preserve_action_temperature, shared_prefix, batch, gpus)
     local.mkdir(parents=True)
     with tarfile.open(fileobj=io.BytesIO(pull_remote.remote(name)), mode="r:gz") as tar:
         tar.extractall(local, filter="data")
