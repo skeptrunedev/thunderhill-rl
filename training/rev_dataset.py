@@ -249,6 +249,25 @@ def dagger_rows(directory):
     return rows
 
 
+def replay(directory: Path, n: int, train_path: Path, teachers, rng) -> int:
+    """Append n random training lines of a previous dataset to train_path; refuses a dataset labelled by other
+    teachers (its summary's registry description must match these teachers' for its circuits)."""
+    summary = json.loads((directory / "summary.json").read_text())
+    previous = summary.get("teachers")
+    if teachers is None or previous is None or teachers.describe(sorted(previous)) != previous:
+        raise SystemExit(f"{directory} was labelled by other teachers; it cannot be replayed with these")
+    total = summary["records"]["train"]
+    if not 0 < n <= total:
+        raise SystemExit(f"--replay-records must be 1 through {total}")
+    picked = set(rng.choice(total, n, replace=False).tolist())
+    with (directory / "train.jsonl").open() as source, train_path.open("a") as out:
+        for index, line in enumerate(source):
+            if index in picked:
+                out.write(line)
+    print(f"replayed {n} of {total} training records from {directory}")
+    return n
+
+
 def balanced(rows, n: int, rng) -> list:
     """n rows with the circuits' shares as equal as their rows allow: circuits are filled
     smallest first, and one with fewer rows than an equal share of what is left gives
@@ -299,6 +318,11 @@ def main():
     parser.add_argument("--newest", type=int, default=1,
                         help="how many of the last --dagger collections --max-train-records keeps whole "
                              "(a collection split over several Modal containers is several directories)")
+    parser.add_argument("--replay", type=Path,
+                        help="a previous dataset directory: --replay-records of its train.jsonl lines join the new "
+                             "training records verbatim (already labelled by the same teachers), so a DAgger round "
+                             "labels only its own states; with --train-records 0 no SAC states are sampled")
+    parser.add_argument("--replay-records", type=int, default=0)
     parser.add_argument("--exclude-circuits", default="",
                         help="comma list of circuits whose states never enter the dataset")
     parser.add_argument("--seed", type=int, default=0)
@@ -319,6 +343,8 @@ def main():
     per_run[0] += args.train_records - sum(per_run)
     train = []
     for run, n in zip(args.train_runs, per_run):
+        if not n:
+            continue
         shards = run_shards(args.runs_dir / run, args.heldout_shards if run == args.heldout_run else 0, "train")
         train += sample(args.runs_dir / run, shards, n, args.positive_fraction, args.blocks, args.block_shards, rng)
     excluded = {t.strip() for t in args.exclude_circuits.split(",") if t.strip()}
@@ -351,12 +377,14 @@ def main():
         # Calibration and development states always name their circuit, as rides do.
         write(args.out / f"{name}.jsonl", rows, args.pedal_gain, teachers,
               args.circuit_dropout if name == "train" else 0.0, rng)
+    replayed = replay(args.replay, args.replay_records, args.out / "train.jsonl", teachers, rng) if args.replay else 0
     parts = (("train", train), ("calibration", calibration), ("development", development))
     summary = {
         "train_runs": args.train_runs, "heldout_run": args.heldout_run,
         "teachers": teachers.describe(sorted({row[4] for _, rows in parts for row in rows})) if teachers else None,
         "dagger_states": len(dagger),
-        "records": {name: len(rows) for name, rows in parts},
+        "records": {name: len(rows) + (replayed if name == "train" else 0) for name, rows in parts},
+        "replayed": {"from": str(args.replay), "records": replayed} if args.replay else None,
         "circuits": {name: circuit_counts(rows) for name, rows in parts},
         "off_track_fraction": {name: round(float(np.mean([r[3] for r in rows])), 4) for name, rows in parts},
         "args": json.loads(json.dumps(vars(args), default=str)),
