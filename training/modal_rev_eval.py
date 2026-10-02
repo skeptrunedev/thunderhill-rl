@@ -1,4 +1,5 @@
-"""Evaluate a completed Rev checkpoint in real Godot rides on one Modal L4.
+"""Evaluate a completed Rev checkpoint in real Godot rides on one Modal L4, or collect
+DAgger states from its rides (`collect`: several L4s, rev_drive --collect).
 
 Uses the training image and pinned Kev code, with the same bf16 fused serving
 path as modal_rev_serve.py. Every control decision and full Godot recording is
@@ -6,6 +7,8 @@ kept, including failed attempts. No training or checkpoint changes occur.
 
   uvx --from modal==1.5.5 modal run --detach training/modal_rev_eval.py::evaluate \
       --checkpoint rev-4b-s1 --name rev-4b-s1-eval-modal
+  uvx --from modal==1.5.5 modal run training/modal_rev_eval.py::collect \
+      --checkpoint rev-0.8b-s6 --name collect-s7 --focus-from rev-0.8b-s6-eval-a,rev-0.8b-s6-eval-b
 """
 
 import hashlib
@@ -99,7 +102,11 @@ def _card(checkpoint: Path, temperature: float, used: bool = False) -> dict:
 @app.function(image=eval_image, gpu="L4", cpu=8, memory=32768, timeout=3600,
               retries=0, single_use_containers=True, volumes={RUNS: runs, HF: hf_cache})
 def evaluate_remote(checkpoint: str, name: str, tracks: str, heldout_tracks: str,
-                    starts: int, heldout_starts: int, workers: int, source_commit: str) -> dict:
+                    starts: int, heldout_starts: int, workers: int, source_commit: str,
+                    collect: int = 0, horizon: float = 60.0, focus_from: str = "", seed: int = 0) -> dict:
+    """With collect, rides gather DAgger states (collect-*.npz) instead of evaluating:
+    collect episodes per worker from random rolling starts of `horizon` seconds, half of
+    them just before the offroads and falls in the focus_from runs (volume run names)."""
     from kev.checkpoint import read_meta
 
     runs.reload()
@@ -136,6 +143,11 @@ def evaluate_remote(checkpoint: str, name: str, tracks: str, heldout_tracks: str
                  "--run-name", name, "--runs-dir", RUNS, "--rev-url", "http://127.0.0.1:8019",
                  "--tracks", tracks, "--heldout-tracks", heldout_tracks, "--starts", str(starts),
                  "--heldout-starts", str(heldout_starts), "--workers", str(workers)]
+    if collect:
+        drive_cmd = drive_cmd[:drive_cmd.index("--heldout-tracks")] + [
+            "--workers", str(workers), "--collect", str(collect), "--horizon", str(horizon), "--seed", str(seed)]
+        if focus_from:
+            drive_cmd += ["--focus-from", *[str(Path(RUNS) / _name(run)) for run in focus_from.split(",")]]
     provenance = dict(checkpoint=checkpoint, name=name, source_commit=source_commit, kev_ref=actual_ref,
                       base=meta.base, base_revision=meta.base_revision, temperature=meta.temperature,
                       dtype="bf16", quantization=None, fused=True, cuda_graphs_required=True,
@@ -206,6 +218,13 @@ def evaluate_remote(checkpoint: str, name: str, tracks: str, heldout_tracks: str
         if driver.returncode:
             raise subprocess.CalledProcessError(driver.returncode, drive_cmd)
         _write(sidecars["server-final.json"], _card(ck, meta.temperature, used=True))
+        if collect:
+            import numpy as np
+            shards = sorted(out.glob("collect-*.npz"))
+            if not shards:
+                raise RuntimeError("collection saved no states")
+            provenance.update(status="complete", states=sum(len(np.load(p)["obs"]) for p in shards))
+            return provenance
         rows = [json.loads(line) for line in (out / "eval/eval.jsonl").open()]
         expected = len(provenance["tracks"]) * starts + len(provenance["heldout_tracks"]) * heldout_starts
         if len(rows) != expected:
@@ -279,3 +298,35 @@ def evaluate(checkpoint: str = "rev-4b-s1", name: str = "rev-4b-s1-eval-modal", 
     heldout = [entry for entry in result["summary"].values() if entry["held_out"]]
     print(f"REV EVAL {name}: {sum(e['laps'] for e in trained)}/{sum(e['rides'] for e in trained)} laps, "
           f"held out {sum(e['laps'] for e in heldout)}/{sum(e['rides'] for e in heldout)}", flush=True)
+
+
+@app.local_entrypoint()
+def collect(checkpoint: str, name: str, focus_from: str = "", tracks: str = TRACKS, containers: int = 6,
+            episodes: int = 12, workers: int = 8, horizon: float = 60.0, source_commit: str = ""):
+    """DAgger collection on `containers` L4s at once: each rides episodes x workers episodes,
+    with its own seed, into NAME-<i>; every part is pulled to runs/rev/NAME-<i> for
+    rev_dataset.py --dagger."""
+    checkpoint, name = _name(checkpoint), _name(name)
+    parts = [f"{name}-{index}" for index in range(containers)]
+    if existing := [part for part in parts if (ROOT / "runs/rev" / part).exists()]:
+        raise SystemExit(f"{existing} exist; choose a fresh name")
+    if containers < 1 or episodes < 1 or not 1 <= workers <= 8 or horizon <= 0:
+        raise SystemExit("positive containers, episodes and horizon and 1 through 8 workers are required")
+    if not source_commit:
+        source_commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
+    calls = [evaluate_remote.spawn(checkpoint, part, tracks, "", 1, 1, workers, source_commit,
+                                   episodes, horizon, focus_from, index + 1)
+             for index, part in enumerate(parts)]
+    failed = []
+    for part, call in zip(parts, calls):
+        result = call.get()
+        local = ROOT / "runs/rev" / part
+        local.mkdir(parents=True)
+        with tarfile.open(fileobj=io.BytesIO(pull_remote.remote(part)), mode="r:gz") as tar:
+            tar.extractall(local, filter="data")
+        print(f"REV COLLECT {part}: {result['status']}, {result.get('states', 0)} states, pulled to {local}",
+              flush=True)
+        if result["status"] != "complete":
+            failed.append(part)
+    if failed:
+        raise RuntimeError(f"collection parts failed (artifacts preserved): {failed}")
