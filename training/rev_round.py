@@ -85,15 +85,24 @@ def collect(args, log: Path) -> list[str]:
     if len(parts) >= args.containers:
         stage(f"collection {args.tag} exists: {len(parts)} parts")
         return parts
-    focus = ",".join(path.name for path in eval_parts(args.parent))
+    evaluated = eval_parts(args.parent, args.eval_starts) or eval_parts(args.parent)
+    focus = ",".join(path.name for path in evaluated)
     if not focus:
         raise SystemExit(f"{args.parent} has no completed evaluation to focus the collection on")
+    # Circuits the parent fails get more of the episodes: weight 1 + 3 x its failed share of starts.
+    weights = {}
+    for row in (json.loads(line) for path in evaluated for line in (path / "eval/eval.jsonl").open()):
+        if not row["held_out"]:
+            weights.setdefault(row["track"], []).append(row["laps"] == 0)
+    weights = {track: round(1 + 3 * sum(failed) / len(failed), 2) for track, failed in weights.items()}
     missing = args.containers - len(parts)
     first = 1 + max((int(p.name.rsplit("-", 1)[-1]) for p in REV.glob(f"collect-{args.tag}-*")), default=-1)
     stage(f"collecting {missing} of {args.containers} parts on L4s from {args.parent}, focus {focus}")
+    stage(f"episode weights by failure: {json.dumps({t: w for t, w in sorted(weights.items(), key=lambda x: -x[1]) if w > 1})}")
     code = run([*MODAL, "training/modal_rev_eval.py::collect", "--checkpoint", args.parent, "--name",
                 f"collect-{args.tag}", "--focus-from", focus, "--containers", str(missing),
-                "--episodes", str(args.episodes), "--workers", "8", "--first-index", str(first)], log)
+                "--episodes", str(args.episodes), "--workers", "8", "--first-index", str(first),
+                "--track-weights", json.dumps(weights)], log)
     parts = collected(args.tag)
     if code or len(parts) < args.containers:
         raise SystemExit(f"collection has {len(parts)} of {args.containers} parts; see {log}")

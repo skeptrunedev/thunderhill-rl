@@ -103,7 +103,8 @@ def _card(checkpoint: Path, temperature: float, used: bool = False) -> dict:
               retries=0, single_use_containers=True, volumes={RUNS: runs, HF: hf_cache})
 def evaluate_remote(checkpoint: str, name: str, tracks: str, heldout_tracks: str,
                     starts: int, heldout_starts: int, workers: int, source_commit: str,
-                    collect: int = 0, horizon: float = 60.0, focus_from: str = "", seed: int = 0) -> dict:
+                    collect: int = 0, horizon: float = 60.0, focus_from: str = "", seed: int = 0,
+                    track_weights: str = "") -> dict:
     """With collect, rides gather DAgger states (collect-*.npz) instead of evaluating:
     collect episodes per worker from random rolling starts of `horizon` seconds, half of
     them just before the offroads and falls in the focus_from runs (volume run names)."""
@@ -146,6 +147,8 @@ def evaluate_remote(checkpoint: str, name: str, tracks: str, heldout_tracks: str
     if collect:
         drive_cmd = drive_cmd[:drive_cmd.index("--heldout-tracks")] + [
             "--workers", str(workers), "--collect", str(collect), "--horizon", str(horizon), "--seed", str(seed)]
+        if track_weights:  # JSON {track: weight}: each circuit's share of the episodes (rev_drive)
+            drive_cmd += ["--track-weights", track_weights]
         if focus_from:
             drive_cmd += ["--focus-from", *[str(Path(RUNS) / _name(run)) for run in focus_from.split(",")]]
     provenance = dict(checkpoint=checkpoint, name=name, source_commit=source_commit, kev_ref=actual_ref,
@@ -303,7 +306,7 @@ def evaluate(checkpoint: str = "rev-4b-s1", name: str = "rev-4b-s1-eval-modal", 
 @app.local_entrypoint()
 def collect(checkpoint: str, name: str, focus_from: str = "", tracks: str = TRACKS, containers: int = 6,
             episodes: int = 12, workers: int = 8, horizon: float = 60.0, source_commit: str = "",
-            first_index: int = 0):
+            first_index: int = 0, track_weights: str = ""):
     """DAgger collection on `containers` L4s at once: each rides episodes x workers episodes,
     with its own seed, into NAME-<i> (i from first_index); every part is pulled to
     runs/rev/NAME-<i> for rev_dataset.py --dagger. Modal can preempt an L4, and the restart
@@ -327,7 +330,7 @@ def collect(checkpoint: str, name: str, focus_from: str = "", tracks: str = TRAC
         part, index = f"{name}-{next_index}", next_index
         next_index += 1
         return part, evaluate_remote.spawn(checkpoint, part, tracks, "", 1, 1, workers, source_commit,
-                                           episodes, horizon, focus_from, index + 1)
+                                           episodes, horizon, focus_from, index + 1, track_weights)
 
     pending = [(spawn(), 0) for _ in range(containers)]
     done, failed = [], []
