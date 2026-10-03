@@ -147,7 +147,7 @@ def train(args, data: Path, log: Path):
     stage(f"training {args.name} from {args.parent} on {args.gpus} H100s")
     code = run([*MODAL, "training/modal_rev.py::train", "--data", str(data), "--name", args.name, "--size", args.size,
                 "--init-from", args.parent, "--shared-prefix", "1", "--epochs", "1", "--lr", str(args.lr),
-                "--batch", str(args.batch), "--gpus", str(args.gpus), "--seed", str(args.seed),
+                "--batch", str(args.batch), "--accum", str(args.accum), "--gpus", str(args.gpus), "--seed", str(args.seed),
                 *(["--lora", str(args.lora)] if args.lora else []),
                 *(["--upload-init"] if args.upload_init else [])], log)
     if code or not (REV / args.name / "result.json").exists():
@@ -234,7 +234,8 @@ def main():
     parser.add_argument("--containers", type=int, default=10, help="collection L4s")
     parser.add_argument("--episodes", type=int, default=7, help="collection episodes per rider (8 riders per L4)")
     parser.add_argument("--gpus", type=int, default=8)
-    parser.add_argument("--batch", type=int, default=16, help="records per GPU per step")
+    parser.add_argument("--batch", type=int, default=16, help="records per GPU per micro-batch")
+    parser.add_argument("--accum", type=int, default=1, help="micro-batches per step (a step is batch x accum x gpus records)")
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--circuit-floor", type=int, default=0,
