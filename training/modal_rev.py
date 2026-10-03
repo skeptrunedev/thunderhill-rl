@@ -44,6 +44,7 @@ BASES = {  # Qwen base checkpoints, pinned to the revisions Kev's recipes use
 RECIPES = {"0.8b": dict(epochs=2, lr=1e-4, batch=8, accum=1, checkpointing=0),
            "4b": dict(epochs=2, lr=5e-5, batch=4, accum=2, checkpointing=1)}
 PARTITIONS = ("train", "calibration", "development")
+MODAL_MAX_MEMORY_MB = 344064  # Modal's per-container memory bound ("Must be between 128 and 344064 MiB")
 ROOT = Path(__file__).resolve().parents[1]
 
 app = modal.App("thunderhill-rev")
@@ -401,10 +402,13 @@ def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int =
     if upload_init:
         upload_parent(init_from, size)
     upload = upload_data(name, files)
-    # Every rank holds the training records, encodes its own micro-batches and loads the base through host
-    # memory: CPU and memory scale with the GPUs. The 4B needs twice the 0.8B's per rank (8 ranks at 32 GB
-    # each were OOM-killed while loading 1.84M records next to Qwen3.5-4B).
+    # Every rank holds all the training records, encodes its own micro-batches and keeps the base it loaded
+    # through host memory: about 22 GB per 0.8B rank and 50 GB per 4B rank at 1.84M records. Modal caps a
+    # container at MODAL_MAX_MEMORY_MB, so a 4B run uses at most 4 GPUs (raise --batch to keep the step).
     per_gpu_mb = {"0.8b": 32768, "4b": 65536}[size]
+    if gpus > 1 and per_gpu_mb * gpus > MODAL_MAX_MEMORY_MB:
+        raise SystemExit(f"{gpus} {size} ranks need {per_gpu_mb * gpus} MiB of host memory, over Modal's "
+                         f"{MODAL_MAX_MEMORY_MB} MiB per container: use at most {MODAL_MAX_MEMORY_MB // per_gpu_mb} GPUs")
     remote = (train_remote.with_options(gpu=f"H100:{gpus}", cpu=4 * gpus, memory=per_gpu_mb * gpus)
               if gpus > 1 else train_remote)
     result = remote.remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
