@@ -401,8 +401,12 @@ def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int =
     if upload_init:
         upload_parent(init_from, size)
     upload = upload_data(name, files)
-    # Every rank holds the training records and encodes its own micro-batches: CPU and memory scale with the GPUs.
-    remote = train_remote.with_options(gpu=f"H100:{gpus}", cpu=4 * gpus, memory=32768 * gpus) if gpus > 1 else train_remote
+    # Every rank holds the training records, encodes its own micro-batches and loads the base through host
+    # memory: CPU and memory scale with the GPUs. The 4B needs twice the 0.8B's per rank (8 ranks at 32 GB
+    # each were OOM-killed while loading 1.84M records next to Qwen3.5-4B).
+    per_gpu_mb = {"0.8b": 32768, "4b": 65536}[size]
+    remote = (train_remote.with_options(gpu=f"H100:{gpus}", cpu=4 * gpus, memory=per_gpu_mb * gpus)
+              if gpus > 1 else train_remote)
     result = remote.remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
                            preserve_action_temperature, shared_prefix, batch, gpus, lora, accum)
     local.mkdir(parents=True)
