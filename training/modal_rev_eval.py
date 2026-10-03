@@ -302,31 +302,58 @@ def evaluate(checkpoint: str = "rev-4b-s1", name: str = "rev-4b-s1-eval-modal", 
 
 @app.local_entrypoint()
 def collect(checkpoint: str, name: str, focus_from: str = "", tracks: str = TRACKS, containers: int = 6,
-            episodes: int = 12, workers: int = 8, horizon: float = 60.0, source_commit: str = ""):
+            episodes: int = 12, workers: int = 8, horizon: float = 60.0, source_commit: str = "",
+            first_index: int = 0):
     """DAgger collection on `containers` L4s at once: each rides episodes x workers episodes,
-    with its own seed, into NAME-<i>; every part is pulled to runs/rev/NAME-<i> for
-    rev_dataset.py --dagger."""
+    with its own seed, into NAME-<i> (i from first_index); every part is pulled to
+    runs/rev/NAME-<i> for rev_dataset.py --dagger. Modal can preempt an L4, and the restart
+    it schedules is refused (a part's directory is never reused), so a failed part is ridden
+    again under the next free index, up to twice."""
     checkpoint, name = _name(checkpoint), _name(name)
-    parts = [f"{name}-{index}" for index in range(containers)]
-    if existing := [part for part in parts if (ROOT / "runs/rev" / part).exists()]:
-        raise SystemExit(f"{existing} exist; choose a fresh name")
-    if containers < 1 or episodes < 1 or not 1 <= workers <= 8 or horizon <= 0:
-        raise SystemExit("positive containers, episodes and horizon and 1 through 8 workers are required")
+    if containers < 1 or episodes < 1 or not 1 <= workers <= 8 or horizon <= 0 or first_index < 0:
+        raise SystemExit("positive containers, episodes and horizon, 1 through 8 workers and a nonnegative "
+                         "first index are required")
     if not source_commit:
         source_commit = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip()
-    calls = [evaluate_remote.spawn(checkpoint, part, tracks, "", 1, 1, workers, source_commit,
-                                   episodes, horizon, focus_from, index + 1)
-             for index, part in enumerate(parts)]
-    failed = []
-    for part, call in zip(parts, calls):
-        result = call.get()
+    next_index = first_index
+    # A preempted part's attempt can exist on the volume without ever being pulled: skip both.
+    taken = {Path(entry.path).name for entry in runs.listdir("/")}
+
+    def spawn():
+        nonlocal next_index
+        while (f"{name}-{next_index}" in taken or (ROOT / "runs/rev" / f"{name}-{next_index}").exists()
+               or any(t.startswith(f"{name}-{next_index}.") for t in taken)):
+            next_index += 1
+        part, index = f"{name}-{next_index}", next_index
+        next_index += 1
+        return part, evaluate_remote.spawn(checkpoint, part, tracks, "", 1, 1, workers, source_commit,
+                                           episodes, horizon, focus_from, index + 1)
+
+    pending = [(spawn(), 0) for _ in range(containers)]
+    done, failed = [], []
+    while pending:
+        ((part, call), retries), pending = pending[0], pending[1:]
+        try:
+            result = call.get()
+        except Exception as error:  # preempted and its restart refused, or any other remote failure
+            result = {"status": "failed", "error": repr(error)}
         local = ROOT / "runs/rev" / part
-        local.mkdir(parents=True)
-        with tarfile.open(fileobj=io.BytesIO(pull_remote.remote(part)), mode="r:gz") as tar:
-            tar.extractall(local, filter="data")
-        print(f"REV COLLECT {part}: {result['status']}, {result.get('states', 0)} states, pulled to {local}",
-              flush=True)
-        if result["status"] != "complete":
+        try:
+            archive = pull_remote.remote(part)
+        except Exception:
+            archive = None
+        if archive:
+            local.mkdir(parents=True, exist_ok=True)
+            with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
+                tar.extractall(local, filter="data")
+        print(f"REV COLLECT {part}: {result['status']}, {result.get('states', 0)} states", flush=True)
+        if result["status"] == "complete":
+            done.append(part)
+        elif retries < 2:
+            print(f"REV COLLECT {part}: riding it again under a fresh name ({result.get('error', '')[:200]})", flush=True)
+            pending.append((spawn(), retries + 1))
+        else:
             failed.append(part)
+    print(f"REV COLLECT {name}: {len(done)} parts complete: {', '.join(done)}", flush=True)
     if failed:
-        raise RuntimeError(f"collection parts failed (artifacts preserved): {failed}")
+        raise RuntimeError(f"collection parts failed three times (artifacts preserved): {failed}")

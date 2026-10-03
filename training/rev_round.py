@@ -61,21 +61,34 @@ def eval_parts(model: str) -> list[Path]:
     return parts
 
 
+def collected(tag: str) -> list[str]:
+    """The round's completed collection parts (a preempted part is ridden again under another index)."""
+    parts = []
+    for path in sorted(REV.glob(f"collect-{tag}-*"), key=lambda p: int(p.name.rsplit("-", 1)[-1])):
+        provenance = path / "provenance.json"
+        if provenance.exists() and json.loads(provenance.read_text())["status"] == "complete":
+            parts.append(path.name)
+    return parts
+
+
 def collect(args, log: Path) -> list[str]:
-    names = [f"collect-{args.tag}-{i}" for i in range(args.containers)]
-    if all((REV / name / "provenance.json").exists() for name in names):
-        stage(f"collection {args.tag} exists")
-        return names
+    parts = collected(args.tag)
+    if len(parts) >= args.containers:
+        stage(f"collection {args.tag} exists: {len(parts)} parts")
+        return parts
     focus = ",".join(path.name for path in eval_parts(args.parent))
     if not focus:
         raise SystemExit(f"{args.parent} has no completed evaluation to focus the collection on")
-    stage(f"collecting on {args.containers} L4s from {args.parent}, focus {focus}")
+    missing = args.containers - len(parts)
+    first = 1 + max((int(p.name.rsplit("-", 1)[-1]) for p in REV.glob(f"collect-{args.tag}-*")), default=-1)
+    stage(f"collecting {missing} of {args.containers} parts on L4s from {args.parent}, focus {focus}")
     code = run([*MODAL, "training/modal_rev_eval.py::collect", "--checkpoint", args.parent, "--name",
-                f"collect-{args.tag}", "--focus-from", focus, "--containers", str(args.containers),
-                "--episodes", str(args.episodes), "--workers", "8"], log)
-    if code:
-        raise SystemExit(f"collection failed; see {log}")
-    return names
+                f"collect-{args.tag}", "--focus-from", focus, "--containers", str(missing),
+                "--episodes", str(args.episodes), "--workers", "8", "--first-index", str(first)], log)
+    parts = collected(args.tag)
+    if code or len(parts) < args.containers:
+        raise SystemExit(f"collection has {len(parts)} of {args.containers} parts; see {log}")
+    return parts
 
 
 def dataset(args, collections: list[str], log: Path) -> Path:
