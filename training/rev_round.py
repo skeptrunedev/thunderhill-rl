@@ -44,16 +44,25 @@ def run(cmd: list[str], log: Path) -> int:
         return subprocess.run(cmd, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT).returncode
 
 
-def eval_groups() -> list[tuple[str, str]]:
-    """Four parts of the standard evaluation: five training circuits and one held-out track each."""
-    tracks = TRAINING.split(",")
-    return [(",".join(tracks[i::4]), HELD_OUT[i]) for i in range(4)]
+def eval_groups(starts: int) -> list[tuple[str, str]]:
+    """The standard evaluation in parts of about 24 rides: 4 parts at 4 starts per circuit (five training
+    circuits and one held-out track each), 8 parts at 8 starts (the held-out tracks go to the first four)."""
+    tracks, parts = TRAINING.split(","), 4 if starts <= 4 else 8
+    return [(",".join(tracks[i::parts]), HELD_OUT[i] if i < len(HELD_OUT) else "") for i in range(parts)]
 
 
-def eval_parts(model: str) -> list[Path]:
-    """The completed evaluation parts of a model: this script's groups, or the older two-part split."""
-    parts = []
-    for pattern in (f"{model}-eval-g*", f"{model}-eval-[ab]", f"{model}-eval-b2"):
+def eval_prefix(model: str, starts: int) -> str:
+    """4 starts per circuit are NAME-eval-*; any other count NAME-eval<starts>-*. Evenly spaced starts
+    (sac_env.evaluation_starts) make the 4 a subset of the 8, so the two compare start for start."""
+    return f"{model}-eval" if starts == 4 else f"{model}-eval{starts}"
+
+
+def eval_parts(model: str, starts: int = 4) -> list[Path]:
+    """The completed evaluation parts of a model at this many starts: this script's groups, or (4 starts)
+    the older two-part split."""
+    parts, prefix = [], eval_prefix(model, starts)
+    patterns = (f"{prefix}-g*",) if starts != 4 else (f"{prefix}-g*", f"{prefix}-[ab]", f"{prefix}-b2")
+    for pattern in patterns:
         for path in sorted(REV.glob(pattern)):
             provenance = path / "provenance.json"
             if provenance.exists() and json.loads(provenance.read_text())["status"] == "complete":
@@ -91,18 +100,32 @@ def collect(args, log: Path) -> list[str]:
     return parts
 
 
+def all_collections() -> list[str]:
+    """Every DAgger collection so far, oldest first: the history plus each round's completed parts."""
+    rounds = sorted({path.name.rsplit("-", 1)[0] for path in REV.glob("collect-s*-*") if path.name.rsplit("-", 1)[-1].isdigit()},
+                    key=lambda prefix: int(prefix.removeprefix("collect-s")))
+    return DAGGER_HISTORY + [part for prefix in rounds for part in collected(prefix.removeprefix("collect-"))]
+
+
 def dataset(args, collections: list[str], log: Path) -> Path:
     out = REV / f"data-{args.tag}"
     if (out / "summary.json").exists():
         stage(f"{out.name} exists")
         return out
-    stage(f"labelling {len(collections)} collections and replaying {args.replay_records} records of {args.previous_data}")
-    code = run([str(Path.home() / ".local/bin/uv"), "run", "training/rev_dataset.py",
-                "--teachers", "runs/sac/specialists.json", "--train-runs", "sac-multitrack-1",
-                "--heldout-run", "sac-multitrack-1", "--heldout-shards", "12", "--train-records", "0",
-                "--circuit-dropout", "0.2", "--exclude-circuits", EXCLUDED, "--seed", str(args.seed),
-                "--replay", str(args.previous_data), "--replay-records", str(args.replay_records),
-                "--dagger", *[f"runs/rev/{name}" for name in collections], "--out", str(out)], log)
+    common = ["--teachers", "runs/sac/specialists.json", "--train-runs", "sac-multitrack-1",
+              "--heldout-run", "sac-multitrack-1", "--heldout-shards", "12", "--circuit-dropout", "0.2",
+              "--exclude-circuits", EXCLUDED, "--seed", str(args.seed)]
+    if args.circuit_floor:
+        everything = all_collections()
+        stage(f"aggregating all {len(everything)} DAgger collections, SAC states toward {args.circuit_floor} per circuit")
+        recipe = ["--train-records", str(args.sac_records), "--circuit-floor", str(args.circuit_floor),
+                  "--dagger", *[f"runs/rev/{name}" for name in everything]]
+    else:
+        stage(f"labelling {len(collections)} collections and replaying {args.replay_records} records of {args.previous_data}")
+        recipe = ["--train-records", "0", "--replay", str(args.previous_data),
+                  "--replay-records", str(args.replay_records), "--dagger", *[f"runs/rev/{name}" for name in collections]]
+    code = run([str(Path.home() / ".local/bin/uv"), "run", "training/rev_dataset.py", *common, *recipe,
+                "--out", str(out)], log)
     if code:
         raise SystemExit(f"dataset build failed; see {log}")
     return out
@@ -120,32 +143,51 @@ def train(args, data: Path, log: Path):
         raise SystemExit(f"training failed; see {log}")
 
 
-def evaluate(args, log: Path):
+def evaluate(args, log: Path, model: str | None = None):
+    model = model or args.name
+    starts = args.eval_starts
+
     def part(index: int, tracks: str, heldout: str):
         for attempt in range(3):  # Modal can preempt an L4; its restart is refused, so ride again fresh
-            name = f"{args.name}-eval-g{index}" + (f"-r{attempt}" if attempt else "")
+            name = f"{eval_prefix(model, starts)}-g{index}" + (f"-r{attempt}" if attempt else "")
             if (REV / name / "provenance.json").exists():
                 if json.loads((REV / name / "provenance.json").read_text())["status"] == "complete":
                     return name
                 continue
-            run([*MODAL, "training/modal_rev_eval.py::evaluate", "--checkpoint", args.name, "--name", name,
-                 "--tracks", tracks, "--heldout-tracks", heldout, "--starts", "4", "--heldout-starts", "4"], log)
+            run([*MODAL, "training/modal_rev_eval.py::evaluate", "--checkpoint", model, "--name", name,
+                 "--tracks", tracks, "--heldout-tracks", heldout, "--starts", str(starts),
+                 "--heldout-starts", str(starts)], log)
             provenance = REV / name / "provenance.json"
             if provenance.exists() and json.loads(provenance.read_text())["status"] == "complete":
                 return name
         raise SystemExit(f"evaluation part {index} failed three times; see {log}")
 
-    stage(f"evaluating {args.name} on 4 L4s")
-    with ThreadPoolExecutor(4) as pool:
-        names = list(pool.map(lambda group: part(*group), [(i, *g) for i, g in enumerate(eval_groups())]))
+    groups = eval_groups(starts)
+    if len(eval_parts(model, starts)) >= len(groups):
+        stage(f"{model} is evaluated at {starts} starts")
+        return
+    stage(f"evaluating {model} at {starts} starts on {len(groups)} L4s")
+    with ThreadPoolExecutor(len(groups)) as pool:
+        names = list(pool.map(lambda group: part(*group), [(i, *g) for i, g in enumerate(groups)]))
     stage(f"evaluated: {', '.join(names)}")
 
 
-def rides(model: str) -> list[dict]:
+def rides(model: str, starts: int = 4) -> list[dict]:
     rows = []
-    for path in eval_parts(model):
+    for path in eval_parts(model, starts):
         rows += [json.loads(line) for line in (path / "eval/eval.jsonl").open()]
     return rows
+
+
+def per_circuit(new: list[dict], old: list[dict]) -> dict:
+    """Laps and mean legal progress per circuit, new against parent: where a round gained and lost."""
+    table = {}
+    for track in sorted({r["track"] for r in new}):
+        a, b = [r for r in new if r["track"] == track], [r for r in old if r["track"] == track]
+        mean = lambda rows: round(sum(r["legal_progress_m"] for r in rows) / max(1, len(rows)))  # noqa: E731
+        table[track] = {"laps": f"{sum(r['laps'] > 0 for r in a)}/{len(a)}", "parent_laps": f"{sum(r['laps'] > 0 for r in b)}/{len(b)}",
+                        "mean_m": mean(a), "parent_mean_m": mean(b), "held_out": a[0]["held_out"]}
+    return table
 
 
 def compare(args):
@@ -160,12 +202,13 @@ def compare(args):
                 "offroad": sum(r["termination"] == "offroad" for r in rows)}
 
     key = lambda r: (r["track"], round(r["start_station_m"], 1), round(r["start_speed_m_s"], 2))  # noqa: E731
-    new, old = rides(args.name), rides(args.parent)
+    new, old = rides(args.name, args.eval_starts), rides(args.parent, args.eval_starts)
     before = {key(r): r for r in old}
     pairs = [(r["legal_progress_m"], before[key(r)]["legal_progress_m"]) for r in new if key(r) in before]
     report = {"model": args.name, "parent": args.parent, "new": summary(new), "parent_summary": summary(old),
               "matched_starts": len(pairs), "farther": sum(a > b for a, b in pairs),
-              "shorter": sum(a < b for a, b in pairs)}
+              "shorter": sum(a < b for a, b in pairs), "starts_per_circuit": args.eval_starts,
+              "per_circuit": per_circuit(new, old)}
     (REV / f"{args.name}.round.json").write_text(json.dumps(report, indent=1) + "\n")
     print(json.dumps(report, indent=1), flush=True)
 
@@ -182,11 +225,22 @@ def main():
     parser.add_argument("--batch", type=int, default=16, help="records per GPU per step")
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--circuit-floor", type=int, default=0,
+                        help="aggregate instead of replaying: every DAgger collection so far, each circuit topped "
+                             "up to this many records with SAC states (--sac-records sampled)")
+    parser.add_argument("--sac-records", type=int, default=1_000_000)
+    parser.add_argument("--eval-starts", type=int, default=4, help="starts per circuit; 8 also evaluates the parent")
     args = parser.parse_args()
     args.tag = args.name.rsplit("-", 1)[-1]
     log = REV / f"{args.name}.round.log"
     began = time.time()
-    collections = collect(args, log)
+    if args.eval_starts != 4:  # the parent rides the same starts, alongside the collection
+        with ThreadPoolExecutor(2) as pool:
+            parent = pool.submit(evaluate, args, log, args.parent)
+            collections = collect(args, log)
+            parent.result()
+    else:
+        collections = collect(args, log)
     data = dataset(args, collections, log)
     train(args, data, log)
     evaluate(args, log)

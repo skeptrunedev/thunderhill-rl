@@ -315,6 +315,9 @@ def main():
     parser.add_argument("--max-train-records", type=int, default=0,
                         help="keep every state of the last --newest --dagger collections and fill the rest "
                              "of this budget with a sample of the older records balanced across circuits")
+    parser.add_argument("--circuit-floor", type=int, default=0,
+                        help="keep every --dagger state and top each circuit up to this many training records "
+                             "with sampled SAC states (DAgger's aggregate: no round's states are ever dropped)")
     parser.add_argument("--newest", type=int, default=1,
                         help="how many of the last --dagger collections --max-train-records keeps whole "
                              "(a collection split over several Modal containers is several directories)")
@@ -353,7 +356,22 @@ def main():
     collections = [keep(dagger_rows(directory)) for directory in args.dagger]
     dagger = [row for rows in collections for row in rows]
     print(f"{len(dagger)} DAgger states from {len(args.dagger)} collections")
-    if args.max_train_records and len(train) + len(dagger) > args.max_train_records:
+    if args.circuit_floor:
+        if args.max_train_records:
+            parser.error("--circuit-floor and --max-train-records are alternatives")
+        have = circuit_counts(dagger)
+        sac = {}
+        for row in train:
+            sac.setdefault(row[4], []).append(row)
+        topped = []
+        for circuit, rows in sorted(sac.items()):
+            need = max(0, args.circuit_floor - have.get(circuit, 0))
+            if need > len(rows):
+                print(f"{circuit}: only {len(rows)} SAC states to top up {need}; raise --train-records")
+            topped += [rows[i] for i in rng.choice(len(rows), min(need, len(rows)), replace=False)]
+        train = topped + dagger
+        print(f"aggregate: all {len(dagger)} DAgger states + {len(topped)} SAC states toward {args.circuit_floor} per circuit")
+    elif args.max_train_records and len(train) + len(dagger) > args.max_train_records:
         split = len(collections) - min(args.newest, len(collections))
         newest = [row for rows in collections[split:] for row in rows]
         older = train + [row for rows in collections[:split] for row in rows]
