@@ -161,10 +161,10 @@ def upload_parent(name: str, size: str):
               volumes={RUNS: runs, HF: hf_cache})
 def train_remote(name: str, upload: str, size: str, epochs: int, seed: int, init_from: str = "",
                  lr: float = 0.0, source_commit: str = "", preserve_action_temperature: bool = False,
-                 shared_prefix: int = 0, batch: int = 0, gpus: int = 1) -> dict:
+                 shared_prefix: int = 0, batch: int = 0, gpus: int = 1, lora: int = 0) -> dict:
     try:
         return _train_remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
-                             preserve_action_temperature, shared_prefix, batch, gpus)
+                             preserve_action_temperature, shared_prefix, batch, gpus, lora)
     finally:
         # Preserve logs and partial checkpoints even if training or scoring fails.
         try:
@@ -175,7 +175,7 @@ def train_remote(name: str, upload: str, size: str, epochs: int, seed: int, init
 
 def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, init_from: str,
                   lr: float, source_commit: str, preserve_action_temperature: bool,
-                  shared_prefix: int, batch: int, gpus: int) -> dict:
+                  shared_prefix: int, batch: int, gpus: int, lora: int) -> dict:
     import torch
     from kev.benchmark import evaluate_records
     from kev.checkpoint import LoadOptions, read_meta, write_meta
@@ -200,7 +200,7 @@ def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, ini
     data = {part: out / "data" / f"{part}.jsonl" for part in PARTITIONS}
     base, revision = BASES[size]
     recipe = {**RECIPES[size], **({"epochs": epochs} if epochs else {}), **({"lr": lr} if lr else {}),
-              **({"batch": batch} if batch else {}),
+              **({"batch": batch} if batch else {}), **({"lora": lora} if lora else {}),
               "shared_prefix": shared_prefix}
     checkpoint = out / "checkpoint"
     init = None
@@ -225,6 +225,8 @@ def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, ini
            "--batch", recipe["batch"], "--accum", recipe["accum"], "--checkpointing", recipe["checkpointing"],
            "--shared_prefix", recipe["shared_prefix"],
            "--dtype", "bf16", "--device", "cuda", "--seed", seed, "--out", checkpoint]
+    if lora:  # LoRA rank (Kev's default 16); a parent must have this rank (rev_widen_lora.py)
+        cmd += ["--lora", lora]
     if init:
         cmd += ["--init_from", init]
     cmd = [str(c) for c in cmd]
@@ -368,7 +370,7 @@ def bench(data: str, size: str = "0.8b", init_from: str = "", batches: str = "8,
 @app.local_entrypoint()
 def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int = 0, init_from: str = "",
           lr: float = 0.0, upload_init: bool = False, preserve_action_temperature: bool = False,
-          shared_prefix: int = 0, batch: int = 0, gpus: int = 1):
+          shared_prefix: int = 0, batch: int = 0, gpus: int = 1, lora: int = 0):
     if size not in BASES:
         raise SystemExit(f"--size must be one of {sorted(BASES)}")
     name = run_name(name)
@@ -397,7 +399,7 @@ def train(data: str, name: str, size: str = "0.8b", epochs: int = 0, seed: int =
     # Every rank holds the training records and encodes its own micro-batches: CPU and memory scale with the GPUs.
     remote = train_remote.with_options(gpu=f"H100:{gpus}", cpu=4 * gpus, memory=32768 * gpus) if gpus > 1 else train_remote
     result = remote.remote(name, upload, size, epochs, seed, init_from, lr, source_commit,
-                           preserve_action_temperature, shared_prefix, batch, gpus)
+                           preserve_action_temperature, shared_prefix, batch, gpus, lora)
     local.mkdir(parents=True)
     with tarfile.open(fileobj=io.BytesIO(pull_remote.remote(name)), mode="r:gz") as tar:
         tar.extractall(local, filter="data")

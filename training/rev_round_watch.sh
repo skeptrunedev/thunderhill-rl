@@ -11,6 +11,7 @@ set -u
 stages=${1:?usage: rev_round_watch.sh ROUND_OUTPUT MODAL_LOG}
 detail=${2:?usage: rev_round_watch.sh ROUND_OUTPUT MODAL_LOG}
 stall_minutes=${STALL_MINUTES:-45}
+name=$(basename "$detail" .round.log)   # runs/rev/NAME.round.log: several rounds can run at once
 touch "$detail"
 seen_stages=$(wc -l < "$stages"); seen_detail=$(wc -l < "$detail")
 warned_stall=0
@@ -30,7 +31,7 @@ while true; do
     echo "ROUND FINISHED: $(grep 'round .* took' "$stages" | tail -n 1)"
     exit 0
   fi
-  if ! pgrep -f "training/rev_round.py" > /dev/null; then
+  if ! pgrep -f "training/rev_round.py.*--name $name( |$)" > /dev/null; then
     echo "ROUND PROCESS EXITED WITHOUT FINISHING: $(tail -n 1 "$stages" | cut -c1-160)"
     exit 1
   fi

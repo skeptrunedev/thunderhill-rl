@@ -138,7 +138,9 @@ def train(args, data: Path, log: Path):
     stage(f"training {args.name} from {args.parent} on {args.gpus} H100s")
     code = run([*MODAL, "training/modal_rev.py::train", "--data", str(data), "--name", args.name, "--size", "0.8b",
                 "--init-from", args.parent, "--shared-prefix", "1", "--epochs", "1", "--lr", str(args.lr),
-                "--batch", str(args.batch), "--gpus", str(args.gpus), "--seed", str(args.seed)], log)
+                "--batch", str(args.batch), "--gpus", str(args.gpus), "--seed", str(args.seed),
+                *(["--lora", str(args.lora)] if args.lora else []),
+                *(["--upload-init"] if args.upload_init else [])], log)
     if code or not (REV / args.name / "result.json").exists():
         raise SystemExit(f"training failed; see {log}")
 
@@ -202,10 +204,11 @@ def compare(args):
                 "offroad": sum(r["termination"] == "offroad" for r in rows)}
 
     key = lambda r: (r["track"], round(r["start_station_m"], 1), round(r["start_speed_m_s"], 2))  # noqa: E731
-    new, old = rides(args.name, args.eval_starts), rides(args.parent, args.eval_starts)
+    reference = args.compare_to or args.parent
+    new, old = rides(args.name, args.eval_starts), rides(reference, args.eval_starts)
     before = {key(r): r for r in old}
     pairs = [(r["legal_progress_m"], before[key(r)]["legal_progress_m"]) for r in new if key(r) in before]
-    report = {"model": args.name, "parent": args.parent, "new": summary(new), "parent_summary": summary(old),
+    report = {"model": args.name, "parent": args.parent, "compared_to": reference, "new": summary(new), "parent_summary": summary(old),
               "matched_starts": len(pairs), "farther": sum(a > b for a, b in pairs),
               "shorter": sum(a < b for a, b in pairs), "starts_per_circuit": args.eval_starts,
               "per_circuit": per_circuit(new, old)}
@@ -217,7 +220,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--parent", required=True, help="the Rev run to collect from and continue")
     parser.add_argument("--name", required=True, help="the new Rev run, e.g. rev-0.8b-s8")
-    parser.add_argument("--previous-data", type=Path, required=True, help="the dataset whose records are replayed")
+    parser.add_argument("--previous-data", type=Path, help="the dataset whose records are replayed")
     parser.add_argument("--replay-records", type=int, default=750_000)
     parser.add_argument("--containers", type=int, default=10, help="collection L4s")
     parser.add_argument("--episodes", type=int, default=7, help="collection episodes per rider (8 riders per L4)")
@@ -230,18 +233,27 @@ def main():
                              "up to this many records with SAC states (--sac-records sampled)")
     parser.add_argument("--sac-records", type=int, default=1_000_000)
     parser.add_argument("--eval-starts", type=int, default=4, help="starts per circuit; 8 also evaluates the parent")
+    parser.add_argument("--data", type=Path, help="train on this existing dataset: no collection and no build "
+                                                     "(an ablation on a fixed dataset)")
+    parser.add_argument("--lora", type=int, default=0, help="LoRA rank (the parent must have it: rev_widen_lora.py)")
+    parser.add_argument("--upload-init", action="store_true", help="upload a local parent to the Modal volume first")
+    parser.add_argument("--compare-to", default="", help="the evaluated model to compare with (default the parent)")
     args = parser.parse_args()
     args.tag = args.name.rsplit("-", 1)[-1]
     log = REV / f"{args.name}.round.log"
     began = time.time()
-    if args.eval_starts != 4:  # the parent rides the same starts, alongside the collection
-        with ThreadPoolExecutor(2) as pool:
-            parent = pool.submit(evaluate, args, log, args.parent)
-            collections = collect(args, log)
-            parent.result()
+    if args.data:
+        data = args.data
+        stage(f"training on the existing {data}")
     else:
-        collections = collect(args, log)
-    data = dataset(args, collections, log)
+        if args.eval_starts != 4:  # the parent rides the same starts, alongside the collection
+            with ThreadPoolExecutor(2) as pool:
+                parent = pool.submit(evaluate, args, log, args.parent)
+                collections = collect(args, log)
+                parent.result()
+        else:
+            collections = collect(args, log)
+        data = dataset(args, collections, log)
     train(args, data, log)
     evaluate(args, log)
     compare(args)
