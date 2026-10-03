@@ -291,7 +291,8 @@ def _train_remote(name: str, upload: str, size: str, epochs: int, seed: int, ini
 
 @app.function(image=image, gpu="H100", cpu=4, memory=(32768, 131072), timeout=3600, retries=0,
               volumes={RUNS: runs, HF: hf_cache})
-def bench_remote(train: str, size: str, init_from: str, batches: list[int], records: int) -> dict:
+def bench_remote(train: str, size: str, init_from: str, batches: list[int], records: int,
+                 checkpointing: int = -1) -> dict:
     """Trainer throughput per batch size, all in one container so the host is held fixed:
     `records` records per batch size, with GPU utilization sampled once a second."""
     import threading
@@ -306,7 +307,8 @@ def bench_remote(train: str, size: str, init_from: str, batches: list[int], reco
         out = Path(f"/tmp/bench-{batch}")
         cmd = [sys.executable, "-m", "kev.train", "--data", str(data), "--base", base, "--base_revision", revision,
                "--epochs", "1", "--lr", "5e-5", "--batch", str(batch), "--accum", "1",
-               "--checkpointing", str(RECIPES[size]["checkpointing"]), "--shared_prefix", "1",
+               "--checkpointing", str(RECIPES[size]["checkpointing"] if checkpointing < 0 else checkpointing),
+               "--shared_prefix", "1",
                "--max_steps", str(records // batch), "--dtype", "bf16", "--device", "cuda", "--out", str(out)]
         if init_from:
             cmd += ["--init_from", str(Path(RUNS) / run_name(init_from) / "checkpoint")]
@@ -351,7 +353,7 @@ def pull_remote(name: str) -> bytes:
 
 @app.local_entrypoint()
 def bench(data: str, size: str = "0.8b", init_from: str = "", batches: str = "8,16,32", records: int = 2560,
-          hosts: int = 1):
+          hosts: int = 1, checkpointing: int = -1):
     """Trainer seconds per record by batch size, on `hosts` separate H100 containers.
 
       uvx --from modal==1.5.5 modal run training/modal_rev.py::bench --data runs/rev/data-s5 \\
@@ -361,7 +363,7 @@ def bench(data: str, size: str = "0.8b", init_from: str = "", batches: str = "8,
         raise SystemExit(f"--size must be one of {sorted(BASES)}")
     sizes = [int(b) for b in batches.split(",")]
     lines = (Path(data) / "train.jsonl").read_text().splitlines(keepends=True)[:records]
-    calls = [bench_remote.spawn("".join(lines), size, init_from and run_name(init_from), sizes, len(lines))
+    calls = [bench_remote.spawn("".join(lines), size, init_from and run_name(init_from), sizes, len(lines), checkpointing)
              for _ in range(hosts)]
     for call in calls:
         print(json.dumps(call.get(), indent=1), flush=True)

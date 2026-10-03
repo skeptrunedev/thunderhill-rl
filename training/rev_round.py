@@ -145,7 +145,7 @@ def train(args, data: Path, log: Path):
         stage(f"{args.name} is trained")
         return
     stage(f"training {args.name} from {args.parent} on {args.gpus} H100s")
-    code = run([*MODAL, "training/modal_rev.py::train", "--data", str(data), "--name", args.name, "--size", "0.8b",
+    code = run([*MODAL, "training/modal_rev.py::train", "--data", str(data), "--name", args.name, "--size", args.size,
                 "--init-from", args.parent, "--shared-prefix", "1", "--epochs", "1", "--lr", str(args.lr),
                 "--batch", str(args.batch), "--gpus", str(args.gpus), "--seed", str(args.seed),
                 *(["--lora", str(args.lora)] if args.lora else []),
@@ -244,6 +244,7 @@ def main():
     parser.add_argument("--eval-starts", type=int, default=4, help="starts per circuit; 8 also evaluates the parent")
     parser.add_argument("--data", type=Path, help="train on this existing dataset: no collection and no build "
                                                      "(an ablation on a fixed dataset)")
+    parser.add_argument("--size", choices=("0.8b", "4b"), default="0.8b", help="Rev base size (the parent's)")
     parser.add_argument("--lora", type=int, default=0, help="LoRA rank (the parent must have it: rev_widen_lora.py)")
     parser.add_argument("--upload-init", action="store_true", help="upload a local parent to the Modal volume first")
     parser.add_argument("--compare-to", default="", help="the evaluated model to compare with (default the parent)")
